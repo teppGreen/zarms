@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CTMS v3.0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+      background: #f3f4f6;
+    }
+    
+    .sidebar {
+      width: 240px;
+      height: 100vh;
+      position: fixed;
+      left: 0;
+      top: 0;
+      background: #1f2937;
+      color: white;
+      overflow-y: auto;
+    }
+    
+    .main-content {
+      margin-left: 240px;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    
+    .nav-item {
+      padding: 12px 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    .nav-item:hover {
+      background: #374151;
+    }
+    
+    .nav-item.active {
+      background: #4f46e5;
+      border-left: 4px solid #818cf8;
+    }
+    
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary {
+      background: #4f46e5;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #4338ca;
+    }
+    
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #374151;
+    }
+    
+    .btn-secondary:hover {
+      background: #d1d5db;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .modal.active {
+      display: flex;
+    }
+    
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 800px;
+      max-height: 90vh;
+      overflow-y: auto;
+      width: 90%;
+    }
+    
+    .table-container {
+      overflow-x: auto;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    th {
+      background: #f9fafb;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 2px solid #e5e7eb;
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    th:hover {
+      background: #f3f4f6;
+    }
+    
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    tr:hover {
+      background: #f9fafb;
+    }
+    
+    .input-field {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    
+    .input-field:focus {
+      outline: none;
+      border-color: #4f46e5;
+      ring: 2px;
+      ring-color: #c7d2fe;
+    }
+    
+    .rich-editor {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      min-height: 150px;
+    }
+    
+    .editor-toolbar {
+      background: #f9fafb;
+      padding: 8px;
+      border-bottom: 1px solid #d1d5db;
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    
+    .editor-btn {
+      padding: 6px 10px;
+      border: 1px solid #d1d5db;
+      background: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    
+    .editor-btn:hover {
+      background: #f3f4f6;
+    }
+    
+    .editor-content {
+      padding: 12px;
+      min-height: 120px;
+      outline: none;
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f4f6;
+      border-top: 3px solid #4f46e5;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    
+    .avatar-stack {
+      display: flex;
+    }
+    
+    .avatar-stack .avatar {
+      margin-left: -8px;
+      border: 2px solid white;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div style="padding: 20px; border-bottom: 1px solid #374151;">
+      <h2 style="margin: 0; font-size: 20px;">CTMS v3.0</h2>
+      <p style="margin: 4px 0 0 0; font-size: 12px; color: #9ca3af;">Creative Team Management</p>
+    </div>
+    
+    <nav style="padding: 12px 0;">
+      <div class="nav-item active" onclick="switchTab('home')">
+        <span>🏠 Home</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('works')">
+        <span>📋 Works</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('projects')">
+        <span>📁 Projects</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('members')">
+        <span>👥 Members</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('knowledge')">
+        <span>💡 Knowledge</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('summary')">
+        <span>📊 Summary</span>
+      </div>
+    </nav>
+  </div>
+
+  <div class="main-content">
+    <div id="loading-indicator" style="display: none; text-align: center; padding: 40px;">
+      <div class="loading" style="margin: 0 auto;"></div>
+      <p style="margin-top: 12px; color: #6b7280;">読み込み中...</p>
+    </div>
+    
+    <div id="tab-home" class="tab-content">
+      <div class="card">
+        <h1 id="home-greeting" style="margin: 0 0 8px 0; font-size: 28px;">こんにちは！</h1>
+        <p style="margin: 0; color: #6b7280;">今日も良い一日を!</p>
+      </div>
+      
+      <h2 style="margin: 24px 0 12px 0; font-size: 20px; font-weight: 600;">担当中の制作</h2>
+      <div id="home-works-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+        </div>
+    </div>
+
+    <div id="tab-works" class="tab-content" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 600;">Works</h1>
+        <button class="btn btn-primary" onclick="openNewWorkModal()">+ New</button>
+      </div>
+      
+      <div class="card">
+        <div class="table-container">
+          <table id="works-table">
+            <thead>
+              <tr>
+                <th onclick="sortTable('works', 'project_title')">案件</th>
+                <th onclick="sortTable('works', 'work_title')">制作タイトル</th>
+                <th onclick="sortTable('works', 'work_status_key')">ステータス</th>
+                <th onclick="sortTable('works', 'due_datetime')">納期</th>
+                <th onclick="sortTable('works', 'client_name')">依頼者</th>
+                <th>担当者</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="works-table-body">
+              </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-projects" class="tab-content" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 600;">Projects</h1>
+        <button class="btn btn-primary" onclick="openNewProjectModal()">+ New</button>
+      </div>
+      
+      <div class="card">
+        <div class="table-container">
+          <table id="projects-table">
+            <thead>
+              <tr>
+                <th onclick="sortTable('projects', 'project_title')">案件名</th>
+                <th onclick="sortTable('projects', 'created_at')">作成日</th>
+                <th onclick="sortTable('projects', 'creator_name')">作成者</th>
+                <th>Works数</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="projects-table-body">
+              </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-members" class="tab-content" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 600;">Members</h1>
+        <button id="new-member-btn" class="btn btn-primary" onclick="openNewMemberModal()" style="display: none;">+ New</button>
+      </div>
+      
+      <div class="card">
+        <div class="table-container">
+          <table id="members-table">
+            <thead>
+              <tr>
+                <th>アイコン</th>
+                <th onclick="sortTable('members', 'member_name')">名前</th>
+                <th onclick="sortTable('members', 'member_email')">メール</th>
+                <th>チーム</th>
+                <th>権限</th>
+                <th>担当Works数</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="members-table-body">
+              </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-knowledge" class="tab-content" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 600;">Knowledge</h1>
+        <button class="btn btn-primary" onclick="openNewKnowledgeModal()">+ New</button>
+      </div>
+      
+      <div id="knowledge-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 16px;">
+        </div>
+    </div>
+
+    <div id="tab-summary" class="tab-content" style="display: none;">
+      <h1 style="margin: 0 0 20px 0; font-size: 28px; font-weight: 600;">Summary</h1>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+        <div class="card">
+          <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Workステータス</h3>
+          <div id="chart-work-status" style="height: 300px;"></div>
+        </div>
+        
+        <div class="card">
+          <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">担当者別Work数</h3>
+          <div id="chart-assignee" style="height: 300px;"></div>
+        </div>
+        
+        <div class="card">
+          <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Workタイプ</h3>
+          <div id="chart-work-type" style="height: 300px;"></div>
+        </div>
+        
+        <div class="card">
+          <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">月別依頼件数</h3>
+          <div id="chart-monthly" style="height: 300px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-work-detail" class="modal">
+    <div class="modal-content">
+      <h2 style="margin: 0 0 20px 0;">Work詳細</h2>
+      <div id="work-detail-content"></div>
+      <div style="margin-top: 20px; text-align: right;">
+        <button class="btn btn-secondary" onclick="closeModal('modal-work-detail')">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-new-work" class="modal">
+    <div class="modal-content">
+      <h2 style="margin: 0 0 20px 0;">新規Work作成</h2>
+      <div id="new-work-form"></div>
+    </div>
+  </div>
+
+  <div id="modal-project-detail" class="modal">
+    <div class="modal-content">
+      <h2 style="margin: 0 0 20px 0;">Project詳細</h2>
+      <div id="project-detail-content"></div>
+      <div style="margin-top: 20px; text-align: right;">
+        <button class="btn btn-secondary" onclick="closeModal('modal-project-detail')">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-new-project" class="modal">
+    <div class="modal-content">
+      <h2 style="margin: 0 0 20px 0;">新規Project作成</h2>
+      <form id="new-project-form" onsubmit="submitNewProject(event)">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 4px; font-weight: 500;">案件タイトル</label>
+          <input type="text" name="project_title" class="input-field" required>
+        </div>
+        <div style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-new-project')" style="margin-right: 8px;">キャンセル</button>
+          <button type="submit" class="btn btn-primary">作成</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // グローバル変数
+    let currentUser = null;
+    let worksData = [];
+    let projectsData = [];
+    let membersData = [];
+    let knowledgeData = [];
+    let configData = {};
+
+    // 初期化
+    window.onload = function() {
+      loadInitialData();
+    };
+
+    function loadInitialData() {
+      showLoading();
+      
+      Promise.all([
+        callGAS('getCurrentUser'),
+        callGAS('getConfig', null),
+        callGAS('getUserRole')
+      ]).then(results => {
+        // ★★★★★ デバッグログ ★★★★★
+        console.log('loadInitialData results:', results);
+        
+        currentUser = results[0];
+        configData = groupConfigByType(results[1]);
+        const userRole = results[2];
+        
+        // ADMIN権限の場合のみ+ Newボタンを表示
+        if (userRole === 'ADMIN') {
+          document.getElementById('new-member-btn').style.display = 'block';
+        }
+        
+        hideLoading();
+        switchTab('home');
+      }).catch(error => {
+        hideLoading();
+        console.error('初期化エラー:', error);
+        alert('初期化エラー: ' + error.message);
+      });
+    }
+
+    function callGAS(functionName, ...args) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          [functionName](...args);
+      });
+    }
+
+    function groupConfigByType(configs) {
+      const grouped = {};
+      if (!configs || !Array.isArray(configs)) return grouped;
+      
+      configs.forEach(config => {
+        if (!grouped[config.config_type]) {
+          grouped[config.config_type] = [];
+        }
+        grouped[config.config_type].push(config);
+      });
+      return grouped;
+    }
+
+    function showLoading() {
+      document.getElementById('loading-indicator').style.display = 'block';
+      // document.querySelectorAll('.tab-content').forEach(tab => {
+      //   tab.style.display = 'none';
+      // });
+    }
+
+    function hideLoading() {
+      document.getElementById('loading-indicator').style.display = 'none';
+    }
+
+    // ============================================
+    // ナビゲーション & タブ読み込み
+    // ============================================
+
+    function switchTab(tabName) {
+      // ナビゲーションの更新
+      document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      
+      // クリックされた要素を探して active クラスを追加
+      const navItems = document.querySelectorAll('.nav-item');
+      navItems.forEach((item, index) => {
+        const tabNames = ['home', 'works', 'projects', 'members', 'knowledge', 'summary'];
+        if (tabNames[index] === tabName) {
+          item.classList.add('active');
+        }
+      });
+
+      // タブコンテンツの切り替え
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.style.display = 'none';
+      });
+      document.getElementById('tab-' + tabName).style.display = 'block';
+
+      // データの読み込み
+      loadTabData(tabName);
+    }
+
+    function loadTabData(tabName) {
+      showLoading();
+      
+      switch(tabName) {
+        case 'home':
+          loadHomeData();
+          break;
+        case 'works':
+          loadWorksData();
+          break;
+        case 'projects':
+          loadProjectsData();
+          break;
+        case 'members':
+          loadMembersData();
+          break;
+        case 'knowledge':
+          loadKnowledgeData();
+          break;
+        case 'summary':
+          loadSummaryData();
+          break;
+      }
+    }
+
+    // ============================================
+    // データ読み込み & 描画 (Home)
+    // ============================================
+
+    function loadHomeData() {
+      callGAS('getHomeData').then(data => {
+        // ★★★★★ デバッグログ ★★★★★
+        console.log('loadHomeData data:', data);
+
+        document.getElementById('home-greeting').textContent = 
+          `${data.greeting}、${data.memberName}さん。`;
+        
+        const container = document.getElementById('home-works-container');
+        container.innerHTML = '';
+        
+        console.log(`data.works.length: ${data.works.length}`);
+        if (data.works.length === 0) {
+          console.log('drawing1');
+          container.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
+        } else {
+          console.log('drawing2');
+          data.works.forEach(work => {
+            container.innerHTML += createWorkCard(work);
+          });
+        }
+        
+        hideLoading();
+      }).catch(error => {
+        hideLoading();
+        console.error('Homeデータ読み込みエラー:', error);
+        alert('データ読み込みエラー: ' + error.message);
+      });
+    }
+
+    function createWorkCard(work) {
+      return `
+        <div class="card" style="cursor: pointer;" onclick="openWorkDetail('${work.work_id}')">
+          <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3>
+          <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p>
+          <div style="font-size: 12px; color: #6b7280;">
+            <span>納期: ${work.due_datetime}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // ============================================
+    // データ読み込み & 描画 (Works)
+    // ============================================
+
+    function loadWorksData() {
+      callGAS('getWorks').then(data => {
+        // ★★★★★ デバッグログ ★★★★★
+        console.log('loadWorksData data:', data);
+
+        worksData = data;
+        renderWorksTable();
+        hideLoading();
+      }).catch(error => {
+        hideLoading();
+        console.error('Worksデータ読み込みエラー:', error);
+        alert('データ読み込みエラー: ' + error.message);
+      });
+    }
+
+    function renderWorksTable() {
+      let tbody = document.getElementById('works-table-body');
+      tbody.innerHTML = '';
+      
+      if (!worksData || worksData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #6b7280;">データがありません</td></tr>';
+        console.log(`works - データなし`);
+        return;
+      }
+      console.log(`works - データあり`);
+      worksData.forEach(work => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+          <td>${escapeHtml(work.project_title)}</td>
+          <td>${escapeHtml(work.work_title)}</td>
+          <td><span class="badge" style="background: #dbeafe; color: #1e40af;">${getConfigLabel(work.work_status_key, 'WORK_STATUS')}</span></td>
+          <td>${work.due_datetime}</td>
+          <td>${escapeHtml(work.client_name)}</td>
+          <td>${renderAssignees(work.assignees)}</td>
+          <td><button class="btn btn-secondary" onclick="openWorkDetail('${work.work_id}')">詳細</button></td>
+        `;
+      });
+    }
+
+    // ============================================
+    // データ読み込み & 描画 (Projects)
+    // ============================================
+
+    function loadProjectsData() {
+      callGAS('getProjects').then(data => {
+        // ★★★★★ デバッグログ ★★★★★
+        console.log('loadProjectsData data:', data);
+        
+        projectsData = data;
+        renderProjectsTable();
+        hideLoading();
+      }).catch(error => {
+        hideLoading();
+        console.error('Projectsデータ読み込みエラー:', error);
+        alert('データ読み込みエラー: ' + error.message);
+      });
+    }
+
+    function renderProjectsTable() {
+      const tbody = document.getElementById('projects-table-body');
+      tbody.innerHTML = '';
+      
+      if (!projectsData || projectsData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #6b7280;">データがありません</td></tr>';
+        return;
+      }
+      
+      projectsData.forEach(project => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+          <td>${escapeHtml(project.project_title)}</td>
+          <td>${formatDate(project.created_at)}</td>
+          <td>${escapeHtml(project.creator_name)}</td>
+          <td>${project.works_count}</td>
+          <td><button class="btn btn-secondary" onclick="openProjectDetail('${project.project_id}')">詳細</button></td>
+        `;
+      });
+    }
+
+    // ============================================
+    // データ読み込み & 描画 (Members)
+    // ============================================
+
+    function loadMembersData() {
+      callGAS('getMembers').then(data => {
+        // ★★★★★ デバッグログ ★★★★★
+        console.log('loadMembersData data:', data);
+
+        membersData = data;
+        renderMembersTable();
+        hideLoading();
+      }).catch(error => {
+        hideLoading();
+        console.error('Membersデータ読み込みエラー:', error);
+        alert('データ読み込みエラー: ' + error.message);
+      });
+    }
+
+    function renderMembersTable() {
+      const tbody = document.getElementById('members-table-body');
+      tbody.innerHTML = '';
+      
+      if (!membersData || membersData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #6b7280;">データがありません</td></tr>';
+        return;
+      }
+      
+      membersData.forEach(member => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+          <td><img src="${member.member_icon || 'https://via.placeholder.com/32'}" class="avatar" alt=""></td>
+          <td>${escapeHtml(member.member_name)}</td>
+          <td>${escapeHtml(member.member_email)}</td>
+          <td>${getConfigLabel(member.member_team_key, 'TEAM')}</td>
+          <td>${getConfigLabel(member.role_key, 'ROLE')}</td>
+          <td>${member.assigned_works_count}</td>
+          <td><button class="btn btn-secondary">詳細</button></td>
+        `;
+      });
+    }
+
+    // ============================================
+    // データ読み込み & 描画 (Knowledge)
+    // ============================================
+
+    function loadKnowledgeData() {
+      callGAS('getKnowledge').then(data => {
+        // ★★★★★ デバッグログ ★★★★★
+        console.log('loadKnowledgeData data:', data);
+
+        knowledgeData = data;
+        renderKnowledge();
+        hideLoading();
+      }).catch(error => {
+        hideLoading();
+        console.error('Knowledgeデータ読み込みエラー:', error);
+        alert('データ読み込みエラー: ' + error.message);
+      });
+    }
+
+    function renderKnowledge() {
+      const container = document.getElementById('knowledge-container');
+      container.innerHTML = '';
+      
+      if (!knowledgeData || knowledgeData.length === 0) {
+        container.innerHTML = '<p style="color: #6b7280; grid-column: 1 / -1;">データがありません</p>';
+        return;
+      }
+      
+      knowledgeData.forEach(item => {
+        container.innerHTML += `
+          <div class="card">
+            <div style="margin-bottom: 8px;">
+              <span class="badge" style="background: #fef3c7; color: #92400e;">${getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE')}</span>
+            </div>
+            <div style="margin-bottom: 12px; font-size: 14px; color: #6b7280;">
+              ${escapeHtml(item.work_title)}
+            </div>
+            <div style="margin-bottom: 12px;">
+              ${escapeHtml(item.knowledge_content.substring(0, 150))}...
+            </div>
+            <div style="font-size: 12px; color: #9ca3af;">
+              ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)}
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    // ============================================
+    // データ読み込み & 描画 (Summary)
+    // ============================================
+
+    function loadSummaryData() {
+      google.charts.load('current', {'packages':['corechart']});
+      google.charts.setOnLoadCallback(() => {
+        callGAS('getSummaryData').then(data => {
+          // ★★★★★ デバッグログ ★★★★★
+          console.log('loadSummaryData data:', data);
+
+          drawWorkStatusChart(data.workStatus);
+          drawAssigneeChart(data.assignee);
+          drawWorkTypeChart(data.workType);
+          drawMonthlyChart(data.monthly);
+          hideLoading();
+        }).catch(error => {
+          hideLoading();
+          console.error('Summaryデータ読み込みエラー:', error);
+          alert('データ読み込みエラー: ' + error.message);
+        });
+      });
+    }
+
+    function drawWorkStatusChart(data) {
+      if (!data || Object.keys(data).length === 0) {
+        document.getElementById('chart-work-status').innerHTML = '<p style="text-align: center; color: #6b7280; padding: 40px;">データがありません</p>';
+        return;
+      }
+      
+      const chartData = [['Status', 'Count']];
+      Object.keys(data).forEach(key => {
+        chartData.push([getConfigLabel(key, 'WORK_STATUS'), data[key]]);
+      });
+      
+      const dataTable = google.visualization.arrayToDataTable(chartData);
+      const options = { pieHole: 0.4 };
+      const chart = new google.visualization.PieChart(document.getElementById('chart-work-status'));
+      chart.draw(dataTable, options);
+    }
+
+    function drawAssigneeChart(data) {
+      if (!data || Object.keys(data).length === 0) {
+        document.getElementById('chart-assignee').innerHTML = '<p style="text-align: center; color: #6b7280; padding: 40px;">データがありません</p>';
+        return;
+      }
+      
+      const chartData = [['Member', 'Works']];
+      Object.keys(data).forEach(key => {
+        chartData.push([key, data[key]]);
+      });
+      
+      const dataTable = google.visualization.arrayToDataTable(chartData);
+      const options = { legend: { position: 'none' } };
+      const chart = new google.visualization.ColumnChart(document.getElementById('chart-assignee'));
+      chart.draw(dataTable, options);
+    }
+
+    function drawWorkTypeChart(data) {
+      if (!data || Object.keys(data).length === 0) {
+        document.getElementById('chart-work-type').innerHTML = '<p style="text-align: center; color: #6b7280; padding: 40px;">データがありません</p>';
+        return;
+      }
+      
+      const chartData = [['Type', 'Count']];
+      Object.keys(data).forEach(key => {
+        chartData.push([key, data[key]]);
+      });
+      
+      const dataTable = google.visualization.arrayToDataTable(chartData);
+      const options = {};
+      const chart = new google.visualization.PieChart(document.getElementById('chart-work-type'));
+      chart.draw(dataTable, options);
+    }
+
+    function drawMonthlyChart(data) {
+      if (!data || Object.keys(data).length === 0) {
+        document.getElementById('chart-monthly').innerHTML = '<p style="text-align: center; color: #6b7280; padding: 40px;">データがありません</p>';
+        return;
+      }
+      
+      const chartData = [['Month', 'Works']];
+      Object.keys(data).forEach(key => {
+        chartData.push([key, data[key]]);
+      });
+      
+      const dataTable = google.visualization.arrayToDataTable(chartData);
+      const options = { curveType: 'function', legend: { position: 'none' } };
+      const chart = new google.visualization.LineChart(document.getElementById('chart-monthly'));
+      chart.draw(dataTable, options);
+    }
+
+    // ============================================
+    // モーダル & アクション関数 (スタブを含む)
+    // ============================================
+
+    function openWorkDetail(workId) {
+      // 実装予定
+      alert('Work詳細画面は実装中です');
+    }
+
+    function openProjectDetail(projectId) {
+      // 実装予定
+      alert('Project詳細画面は実装中です');
+    }
+
+    function openNewWorkModal() {
+      // 実装予定
+      alert('新規Work作成は実装中です');
+    }
+
+    function openNewProjectModal() {
+      document.getElementById('new-project-form').reset(); // フォームをリセット
+      document.getElementById('modal-new-project').classList.add('active');
+    }
+
+    function openNewMemberModal() {
+      // 実装予定
+      alert('新規Member登録は実装中です');
+    }
+
+    function openNewKnowledgeModal() {
+      // 実装予定
+      alert('新規Knowledge作成は実装中です');
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove('active');
+    }
+
+    function submitNewProject(event) {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+      const projectTitle = formData.get('project_title');
+      
+      callGAS('createProject', projectTitle).then(() => {
+        closeModal('modal-new-project');
+        alert('プロジェクトを作成しました');
+        loadProjectsData(); // Projectsタブを再読み込み
+      }).catch(error => {
+        alert('エラー: ' + error.message); // ★★★★★ 修正点 ★★★★★ ('S' を削除)
+      });
+    }
+
+    function sortTable(tableName, column) {
+      // ソート機能は実装予定
+      console.log('Sort:', tableName, column);
+    }
+
+    // ============================================
+    // ヘルパー関数
+    // ============================================
+
+    function renderAssignees(assignees) {
+      if (!assignees || assignees.length === 0) return '-';
+      
+      // アバターを重ねて表示 (avatar-stack)
+      let html = '<div class="avatar-stack">';
+      html += assignees.map(a => 
+        `<img src="${a.member_icon || 'https://via.placeholder.com/32'}" class="avatar" title="${escapeHtml(a.member_name)}" alt="">`
+      ).join('');
+      html += '</div>';
+      return html;
+    }
+
+    function getConfigLabel(key, type) {
+      if (!key || !configData[type]) return key;
+      const config = configData[type].find(c => c.config_key === key);
+      return config ? config.config_value : key;
+    }
+
+    function formatDate(dateString) {
+      if (!dateString) return '-';
+      // サーバーからISO文字列 (例: 2023-11-13T05:00:00.000Z) で来ることを想定
+      const date = new Date(dateString);
+      return date.toLocaleDateString('ja-JP');
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // モーダルの外側クリックで閉じる
+    document.querySelectorAll('.modal').forEach(modal => {
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+          modal.classList.remove('active');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
