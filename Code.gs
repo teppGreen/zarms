@@ -2,11 +2,6 @@
 // Code.gs - メインロジックとWebアプリのエントリーポイント
 // ============================================
 
-// スプレッドシートIDを設定（★★★★★ 修正点 ★★★★★）
-// データベースとして使用するスプレッドシートのIDをここに貼り付けてください
-const SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId(); 
-console.log(`SPREADSHEET_ID: ${SPREADSHEET_ID}`);
-
 // Webアプリのエントリーポイント
 function doGet(e) {
   const userEmail = Session.getActiveUser().getEmail();
@@ -37,7 +32,7 @@ function getCurrentUser() {
     throw new Error('ユーザー情報が見つかりません');
   }
   
-  return sanitizeForClient(member); // ★ 修正
+  return sanitizeForClient(member);
 }
 
 // ============================================
@@ -45,90 +40,60 @@ function getCurrentUser() {
 // ============================================
 
 function getWorks() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('works');
-  const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return [];
+  const works = getAllData(SHEET_NAMES.WORKS);
   
-  const headers = data[0];
-  const works = [];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const work = {};
-    headers.forEach((header, index) => {
-      work[header] = row[index];
-    });
-    // プロジェクトタイトルを取得
+  const enrichedWorks = works.map(work => {
     work.project_title = getProjectTitle(work.project_id);
-    
-    // 依頼者名を取得
     work.client_name = getMemberName(work.work_client_email);
-    // 担当者情報を取得
     work.assignees = getWorkAssignees(work.work_id);
-    
-    works.push(work);
-  }
-  
-  return sanitizeForClient(works); // ★ 修正
+    return work;
+  });
+
+  return sanitizeForClient(enrichedWorks);
 }
 
 function getWorkById(workId) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('works');
-  const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return null;
+  const work = getDataById(SHEET_NAMES.WORKS, workId);
+  if (!work) return null;
+
+  // 関連データを取得
+  work.project_title = getProjectTitle(work.project_id);
+  work.client_name = getMemberName(work.work_client_email);
+  work.assignees = getWorkAssignees(work.work_id);
+  work.tasks = getTasksByWorkId(work.work_id);
+  work.apps = getWorkApps(work.work_id);
   
-  const headers = data[0];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (row[headers.indexOf('work_id')] === workId) {
-      const work = {};
-      headers.forEach((header, index) => {
-        work[header] = row[index];
-      });
-      // 関連データを取得
-      work.project_title = getProjectTitle(work.project_id);
-      work.client_name = getMemberName(work.work_client_email);
-      work.assignees = getWorkAssignees(work.work_id);
-      work.tasks = getTasksByWorkId(work.work_id);
-      work.apps = getWorkApps(work.work_id);
-      
-      return sanitizeForClient(work); // ★ 修正
-    }
-  }
-  
-  return null;
+  return sanitizeForClient(work);
 }
 
 function createWork(workData) {
   const userEmail = Session.getActiveUser().getEmail();
   const workId = Utilities.getUuid();
   const now = new Date();
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('works');
-  
+
   // 新規フォルダを作成
   const folderId = createWorkFolder(workData.project_id, workData.work_title);
-  
-  // データを挿入
-  sheet.appendRow([
-    workId,
-    workData.project_id,
-    workData.work_title,
-    workData.work_status_key || 'TODO',
-    workData.work_type_key,
-    workData.priority_key || 'MEDIUM',
-    workData.due_datetime,
-    workData.work_client_email,
-    folderId,
-    workData.work_detail_content || '',
-    workData.work_detail_design || '',
-    workData.work_detail_regulation || '',
-    workData.work_detail_note || '',
-    0, // work_delivery_count
-    userEmail,
-    now
-  ]);
+
+  const newWork = {
+    work_id: workId,
+    project_id: workData.project_id,
+    work_title: workData.work_title,
+    work_status_key: workData.work_status_key || 'TODO',
+    work_type_key: workData.work_type_key,
+    priority_key: workData.priority_key || 'MEDIUM',
+    due_datetime: workData.due_datetime,
+    work_client_email: workData.work_client_email,
+    gdrive_folder_id: folderId,
+    work_detail_content: workData.work_detail_content || '',
+    work_detail_design: workData.work_detail_design || '',
+    work_detail_regulation: workData.work_detail_regulation || '',
+    work_detail_note: workData.work_detail_note || '',
+    work_delivery_count: 0,
+    created_by: userEmail,
+    created_at: now,
+  };
+
+  createData(SHEET_NAMES.WORKS, newWork);
   
   // 通知メールを送信
   sendNewWorkNotification(workId);
@@ -137,25 +102,7 @@ function createWork(workData) {
 }
 
 function updateWork(workId, workData) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('works');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('work_id')] === workId) {
-      // 更新可能なフィールドのみ更新
-      Object.keys(workData).forEach(key => {
-        const colIndex = headers.indexOf(key);
-        if (colIndex !== -1) {
-          sheet.getRange(i + 1, colIndex + 1).setValue(workData[key]);
-        }
-      });
-      return true;
-    }
-  }
-  
-  return false;
+  return updateData(SHEET_NAMES.WORKS, workId, workData);
 }
 
 // ============================================
@@ -163,56 +110,27 @@ function updateWork(workId, workData) {
 // ============================================
 
 function getProjects() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('projects');
-  const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return [];
+  const projects = getAllData(SHEET_NAMES.PROJECTS);
   
-  const headers = data[0];
-  const projects = [];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const project = {};
-    headers.forEach((header, index) => {
-      project[header] = row[index];
-    });
-    // 作成者名を取得
+  const enrichedProjects = projects.map(project => {
     project.creator_name = getMemberName(project.created_by);
-    
-    // Work数とステータスを集計
     const workStats = getProjectWorkStats(project.project_id);
     project.works_count = workStats.count;
     project.works_status = workStats.status;
-    
-    projects.push(project);
-  }
+    return project;
+  });
   
-  return sanitizeForClient(projects); // ★ 修正
+  return sanitizeForClient(enrichedProjects);
 }
 
 function getProjectById(projectId) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('projects');
-  const data = sheet.getDataRange().getValues();
+  const project = getDataById(SHEET_NAMES.PROJECTS, projectId);
+  if (!project) return null;
+
+  project.creator_name = getMemberName(project.created_by);
+  project.works = getWorksByProjectId(project.project_id);
   
-  if (data.length <= 1) return null;
-  
-  const headers = data[0];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (row[headers.indexOf('project_id')] === projectId) {
-      const project = {};
-      headers.forEach((header, index) => {
-        project[header] = row[index];
-      });
-      project.creator_name = getMemberName(project.created_by);
-      project.works = getWorksByProjectId(project.project_id);
-      
-      return sanitizeForClient(project); // ★ 修正
-    }
-  }
-  
-  return null;
+  return sanitizeForClient(project);
 }
 
 function createProject(projectTitle) {
@@ -220,43 +138,24 @@ function createProject(projectTitle) {
   const projectId = Utilities.getUuid();
   const now = new Date();
   
-  // タイトル重複チェック
   if (isProjectTitleDuplicate(projectTitle)) {
     throw new Error('このプロジェクトタイトルは既に存在します');
   }
   
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('projects');
-  
-  sheet.appendRow([
-    projectId,
-    projectTitle,
-    '', // project_detail
-    userEmail,
-    now
-  ]);
+  const newProject = {
+    project_id: projectId,
+    project_title: projectTitle,
+    project_detail: '',
+    created_by: userEmail,
+    created_at: now,
+  };
+
+  createData(SHEET_NAMES.PROJECTS, newProject);
   return projectId;
 }
 
 function updateProject(projectId, projectData) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('projects');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('project_id')] === projectId) {
-      Object.keys(projectData).forEach(key => {
-        const colIndex = headers.indexOf(key);
-        if (colIndex !== -1) {
-          sheet.getRange(i + 1, colIndex + 1).setValue(projectData[key]);
-        }
-      });
-      return true;
-    }
-  }
-  
-  return false;
+  return updateData(SHEET_NAMES.PROJECTS, projectId, projectData);
 }
 
 // ============================================
@@ -264,30 +163,17 @@ function updateProject(projectId, projectData) {
 // ============================================
 
 function getMembers() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('members');
-  const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return [];
+  const members = getAllData(SHEET_NAMES.MEMBERS);
   
-  const headers = data[0];
-  const members = [];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const member = {};
-    headers.forEach((header, index) => {
-      member[header] = row[index];
-    });
-    // 担当Works数を集計
+  const enrichedMembers = members.map(member => {
     member.assigned_works_count = countAssignedWorks(member.member_email);
-    
-    members.push(member);
-  }
+    return member;
+  });
   
-  return sanitizeForClient(members); // ★ 修正
+  return sanitizeForClient(enrichedMembers);
 }
 
 function createMember(memberData) {
-  // 権限チェック
   if (!isAdmin()) {
     throw new Error('この操作にはADMIN権限が必要です');
   }
@@ -295,47 +181,27 @@ function createMember(memberData) {
   const userEmail = Session.getActiveUser().getEmail();
   const now = new Date();
   
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('members');
-  
-  sheet.appendRow([
-    memberData.member_email,
-    memberData.slack_member_id || '',
-    memberData.member_name,
-    memberData.member_team_key,
-    memberData.role_key,
-    memberData.member_notes || '',
-    memberData.member_icon || '',
-    userEmail,
-    now
-  ]);
-  return true;
+  const newMember = {
+    member_email: memberData.member_email,
+    slack_member_id: memberData.slack_member_id || '',
+    member_name: memberData.member_name,
+    member_team_key: memberData.member_team_key,
+    role_key: memberData.role_key,
+    member_notes: memberData.member_notes || '',
+    member_icon: memberData.member_icon || '',
+    created_by: userEmail,
+    created_at: now,
+  };
+
+  return createData(SHEET_NAMES.MEMBERS, newMember);
 }
 
 function updateMember(memberEmail, memberData) {
-  // 権限チェック
   if (!isAdmin()) {
     throw new Error('この操作にはADMIN権限が必要です');
   }
   
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('members');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('member_email')] === memberEmail) {
-      Object.keys(memberData).forEach(key => {
-        const colIndex = headers.indexOf(key);
-        if (colIndex !== -1) {
-          sheet.getRange(i + 1, colIndex + 1).setValue(memberData[key]);
-        }
-      });
-      return true;
-    }
-  }
-  
-  return false;
+  return updateData(SHEET_NAMES.MEMBERS, memberEmail, memberData);
 }
 
 // ============================================
@@ -343,26 +209,14 @@ function updateMember(memberEmail, memberData) {
 // ============================================
 
 function getTasksByWorkId(workId) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('tasks');
-  const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return [];
+  const tasks = findData(SHEET_NAMES.TASKS, { work_id: workId });
   
-  const headers = data[0];
-  const tasks = [];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (row[headers.indexOf('work_id')] === workId) {
-      const task = {};
-      headers.forEach((header, index) => {
-        task[header] = row[index];
-      });
-      task.assignee_name = getMemberName(task.assign_to);
-      tasks.push(task);
-    }
-  }
-  
-  return sanitizeForClient(tasks); // ★ 修正
+  const enrichedTasks = tasks.map(task => {
+    task.assignee_name = getMemberName(task.assign_to);
+    return task;
+  });
+
+  return sanitizeForClient(enrichedTasks);
 }
 
 function createTask(taskData) {
@@ -370,46 +224,28 @@ function createTask(taskData) {
   const taskId = Utilities.getUuid();
   const now = new Date();
   
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('tasks');
-  
-  sheet.appendRow([
-    taskId,
-    taskData.work_id,
-    taskData.task_title,
-    taskData.task_detail || '',
-    taskData.status_key || 'TODO',
-    taskData.priority_key || 'MEDIUM',
-    taskData.assign_to || '',
-    taskData.planned_start_datetime || '',
-    taskData.planned_end_datetime || '',
-    '', // actual_start_datetime
-    '', // actual_end_datetime
-    userEmail,
-    now
-  ]);
+  const newTask = {
+    task_id: taskId,
+    work_id: taskData.work_id,
+    task_title: taskData.task_title,
+    task_detail: taskData.task_detail || '',
+    status_key: taskData.status_key || 'TODO',
+    priority_key: taskData.priority_key || 'MEDIUM',
+    assign_to: taskData.assign_to || '',
+    planned_start_datetime: taskData.planned_start_datetime || '',
+    planned_end_datetime: taskData.planned_end_datetime || '',
+    actual_start_datetime: '',
+    actual_end_datetime: '',
+    created_by: userEmail,
+    created_at: now,
+  };
+
+  createData(SHEET_NAMES.TASKS, newTask);
   return taskId;
 }
 
 function updateTask(taskId, taskData) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('tasks');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('task_id')] === taskId) {
-      Object.keys(taskData).forEach(key => {
-        const colIndex = headers.indexOf(key);
-        if (colIndex !== -1) {
-          sheet.getRange(i + 1, colIndex + 1).setValue(taskData[key]);
-        }
-      });
-      return true;
-    }
-  }
-  
-  return false;
+  return updateData(SHEET_NAMES.TASKS, taskId, taskData);
 }
 
 // ============================================
@@ -417,29 +253,17 @@ function updateTask(taskId, taskData) {
 // ============================================
 
 function getKnowledge() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('knowledge');
-  const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return [];
+  const knowledge = getAllData(SHEET_NAMES.KNOWLEDGE);
   
-  const headers = data[0];
-  const knowledge = [];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const item = {};
-    headers.forEach((header, index) => {
-      item[header] = row[index];
-    });
+  const enrichedKnowledge = knowledge.map(item => {
     item.creator_name = getMemberName(item.created_by);
     item.work_title = getWorkTitle(item.work_id);
-    
-    knowledge.push(item);
-  }
+    return item;
+  });
   
-  // created_atの降順でソート
-  knowledge.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  enrichedKnowledge.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   
-  return sanitizeForClient(knowledge); // ★ 修正
+  return sanitizeForClient(enrichedKnowledge);
 }
 
 function createKnowledge(knowledgeData) {
@@ -447,17 +271,16 @@ function createKnowledge(knowledgeData) {
   const knowledgeId = Utilities.getUuid();
   const now = new Date();
   
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('knowledge');
-  
-  sheet.appendRow([
-    knowledgeId,
-    knowledgeData.work_id,
-    knowledgeData.knowledge_type_key,
-    knowledgeData.knowledge_content,
-    userEmail,
-    now
-  ]);
+  const newKnowledge = {
+    knowledge_id: knowledgeId,
+    work_id: knowledgeData.work_id,
+    knowledge_type_key: knowledgeData.knowledge_type_key,
+    knowledge_content: knowledgeData.knowledge_content,
+    created_by: userEmail,
+    created_at: now,
+  };
+
+  createData(SHEET_NAMES.KNOWLEDGE, newKnowledge);
   return knowledgeId;
 }
 
@@ -466,41 +289,17 @@ function createKnowledge(knowledgeData) {
 // ============================================
 
 function getConfig(configType) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('config');
-  if (!sheet) {
-    Logger.log('configシートが見つかりません');
-    return [];
+  let configs = getAllData(SHEET_NAMES.CONFIG);
+
+  if (configType) {
+    configs = configs.filter(config => config.config_type === configType);
   }
+
+  configs = configs.filter(config => config.is_active === true || config.is_active === 'TRUE' || config.is_active === 'true');
   
-  const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return [];
-  
-  const headers = data[0];
-  const configs = [];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    
-    // configTypeが指定されている場合はフィルタリング
-    if (configType && row[headers.indexOf('config_type')] !== configType) {
-      continue;
-    }
-    
-    const config = {};
-    headers.forEach((header, index) => {
-      config[header] = row[index];
-    });
-    
-    // is_activeがtrueのもののみ追加
-    if (config.is_active === true || config.is_active === 'TRUE' || config.is_active === 'true') {
-      configs.push(config);
-    }
-  }
-  
-  // sort_orderでソート
   configs.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   
-  return sanitizeForClient(configs); // ★ 修正
+  return sanitizeForClient(configs);
 }
 
 // ============================================
@@ -520,7 +319,7 @@ function getSummaryData() {
     monthly: monthlyStats
   };
   
-  return sanitizeForClient(data); // ★ 修正
+  return sanitizeForClient(data);
 }
 
 // ============================================
@@ -532,14 +331,13 @@ function getHomeData() {
   const member = getMemberByEmail(userEmail);
   
   if (!member) {
-    return sanitizeForClient({ // ★ 修正
+    return sanitizeForClient({
       greeting: 'こんにちは',
       memberName: 'ゲスト',
       works: []
     });
   }
   
-  // ユーザーが担当していて、かつステータスがCREATEのworksを取得
   const assignedWorks = getAssignedWorksInProgress(userEmail);
   
   const hour = new Date().getHours();
@@ -547,7 +345,7 @@ function getHomeData() {
   if (hour < 11) greeting = 'おはようございます';
   else if (hour >= 18) greeting = 'こんばんは';
   
-  return sanitizeForClient({ // ★ 修正
+  return sanitizeForClient({
     greeting: greeting,
     memberName: member.member_name,
     works: assignedWorks || []
@@ -565,77 +363,32 @@ function getHomeData() {
 
 function getProjectTitle(projectId) {
   if (!projectId) return '';
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('projects');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('project_id')] === projectId) {
-      return data[i][headers.indexOf('project_title')];
-    }
-  }
-  
-  return '';
+  const project = getDataById(SHEET_NAMES.PROJECTS, projectId);
+  return project ? project.project_title : '';
 }
 
 function isProjectTitleDuplicate(projectTitle) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('projects');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const titleIndex = headers.indexOf('project_title');
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][titleIndex] === projectTitle) {
-      return true;
-    }
-  }
-  
-  return false;
+  const projects = findData(SHEET_NAMES.PROJECTS, { project_title: projectTitle });
+  return projects.length > 0;
 }
 
 function getProjectWorkStats(projectId) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('works');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  let count = 0;
+  const works = findData(SHEET_NAMES.WORKS, { project_id: projectId });
   const statusCounts = {};
   
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('project_id')] === projectId) {
-      count++;
-      const status = data[i][headers.indexOf('work_status_key')];
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-    }
-  }
+  works.forEach(work => {
+    const status = work.work_status_key;
+    statusCounts[status] = (statusCounts[status] || 0) + 1;
+  });
   
   return {
-    count: count,
+    count: works.length,
     status: statusCounts
   };
 }
 
 function getWorksByProjectId(projectId) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('works');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const works = [];
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('project_id')] === projectId) {
-      const work = {};
-      headers.forEach((header, index) => {
-        work[header] = data[i][index];
-      });
-      works.push(work);
-    }
-  }
-  
-  return works;
+  return findData(SHEET_NAMES.WORKS, { project_id: projectId });
 }
 
 // ============================================
@@ -643,22 +396,8 @@ function getWorksByProjectId(projectId) {
 // ============================================
 
 function getMemberByEmail(email) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('members');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('member_email')] === email) {
-      const member = {};
-      headers.forEach((header, index) => {
-        member[header] = data[i][index];
-      });
-      return member;
-    }
-  }
-  
-  return null;
+  if (!email) return null;
+  return getDataById(SHEET_NAMES.MEMBERS, email);
 }
 
 function getMemberName(email) {
@@ -668,19 +407,8 @@ function getMemberName(email) {
 }
 
 function countAssignedWorks(memberEmail) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('work_assignments');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  let count = 0;
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('member_email')] === memberEmail) {
-      count++;
-    }
-  }
-  
-  return count;
+  const assignments = findData(SHEET_NAMES.WORK_ASSIGNMENTS, { member_email: memberEmail });
+  return assignments.length;
 }
 
 // ============================================
@@ -689,38 +417,16 @@ function countAssignedWorks(memberEmail) {
 
 function getWorkTitle(workId) {
   if (!workId) return '';
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('works');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('work_id')] === workId) {
-      return data[i][headers.indexOf('work_title')];
-    }
-  }
-  
-  return '';
+  const work = getDataById(SHEET_NAMES.WORKS, workId);
+  return work ? work.work_title : '';
 }
 
 function getWorkAssignees(workId) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('work_assignments');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  const assignees = [];
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('work_id')] === workId) {
-      const memberEmail = data[i][headers.indexOf('member_email')];
-      const member = getMemberByEmail(memberEmail);
-      if (member) {
-        assignees.push(member);
-      }
-    }
-  }
-  
-  return assignees;
+  const assignments = findData(SHEET_NAMES.WORK_ASSIGNMENTS, { work_id: workId });
+  const assignees = assignments.map(assignment => {
+    return getMemberByEmail(assignment.member_email);
+  });
+  return assignees.filter(member => member !== null); // nullを除外
 }
 
 function addWorkAssignee(workId, memberEmail) {
@@ -728,54 +434,30 @@ function addWorkAssignee(workId, memberEmail) {
   const assignmentId = Utilities.getUuid();
   const now = new Date();
   
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('work_assignments');
-  
-  sheet.appendRow([
-    assignmentId,
-    workId,
-    memberEmail,
-    userEmail,
-    now
-  ]);
-  return true;
+  const newAssignment = {
+    assignment_id: assignmentId,
+    work_id: workId,
+    member_email: memberEmail,
+    created_by: userEmail,
+    created_at: now,
+  };
+
+  return createData(SHEET_NAMES.WORK_ASSIGNMENTS, newAssignment);
 }
 
 function removeWorkAssignee(workId, memberEmail) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('work_assignments');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  for (let i = data.length - 1; i >= 1; i--) {
-    if (data[i][headers.indexOf('work_id')] === workId && 
-        data[i][headers.indexOf('member_email')] === memberEmail) {
-      sheet.deleteRow(i + 1);
-      return true;
-    }
-  }
-  
-  return false;
+  return deleteData(SHEET_NAMES.WORK_ASSIGNMENTS, { work_id: workId, member_email: memberEmail });
 }
 
 function getWorkApps(workId) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('app_assignments');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  const apps = [];
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('work_id')] === workId) {
-      const appKey = data[i][headers.indexOf('work_apps_key')];
-      const appConfig = getConfigValue(appKey, 'APP');
-      apps.push({
-        key: appKey,
-        value: appConfig
-      });
-    }
-  }
-  
+  const assignments = findData(SHEET_NAMES.APP_ASSIGNMENTS, { work_id: workId });
+  const apps = assignments.map(assignment => {
+    const appConfig = getConfigValue(assignment.work_apps_key, 'APP');
+    return {
+      key: assignment.work_apps_key,
+      value: appConfig,
+    };
+  });
   return apps;
 }
 
@@ -784,39 +466,23 @@ function addWorkApp(workId, appKey) {
   const assignmentId = Utilities.getUuid();
   const now = new Date();
   
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('app_assignments');
-  
-  sheet.appendRow([
-    assignmentId,
-    workId,
-    appKey,
-    userEmail,
-    now
-  ]);
-  return true;
+  const newAssignment = {
+    assignment_id: assignmentId,
+    work_id: workId,
+    work_apps_key: appKey,
+    created_by: userEmail,
+    created_at: now,
+  };
+
+  return createData(SHEET_NAMES.APP_ASSIGNMENTS, newAssignment);
 }
 
 function removeWorkApp(workId, appKey) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('app_assignments');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  for (let i = data.length - 1; i >= 1; i--) {
-    if (data[i][headers.indexOf('work_id')] === workId && 
-        data[i][headers.indexOf('work_apps_key')] === appKey) {
-      sheet.deleteRow(i + 1);
-      return true;
-    }
-  }
-  
-  return false;
+  return deleteData(SHEET_NAMES.APP_ASSIGNMENTS, { work_id: workId, work_apps_key: appKey });
 }
 
 function createWorkFolder(projectId, workTitle) {
   try {
-    // 親フォルダIDをconfigから取得
     const parentFolderId = getConfigValue('WORK_FOLDER_PARENT', 'FOLDER');
     if (!parentFolderId) {
       Logger.log('親フォルダIDが設定されていません');
@@ -836,62 +502,22 @@ function createWorkFolder(projectId, workTitle) {
 }
 
 function getAssignedWorksInProgress(memberEmail) {
-  try {
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const assignSheet = ss.getSheetByName('work_assignments');
-    if (!assignSheet) {
-      Logger.log('work_assignmentsシートが見つかりません');
-      return [];
-    }
-    
-    const assignData = assignSheet.getDataRange().getValues();
-    
-    if (assignData.length <= 1) return [];
-    
-    const assignHeaders = assignData[0];
-    
-    const workIds = [];
-    for (let i = 1; i < assignData.length; i++) {
-      if (assignData[i][assignHeaders.indexOf('member_email')] === memberEmail) {
-        workIds.push(assignData[i][assignHeaders.indexOf('work_id')]);
-      }
-    }
-    
-    if (workIds.length === 0) return [];
-    
-    const workSheet = ss.getSheetByName('works');
-    
-    if (!workSheet) {
-      Logger.log('worksシートが見つかりません');
-      return [];
-    }
-    
-    const workData = workSheet.getDataRange().getValues();
-    
-    if (workData.length <= 1) return [];
-    
-    const workHeaders = workData[0];
-    
-    const works = [];
-    for (let i = 1; i < workData.length; i++) {
-      const workId = workData[i][workHeaders.indexOf('work_id')];
-      const status = workData[i][workHeaders.indexOf('work_status_key')];
-      
-      if (workIds.includes(workId) && status === 'CREATE') {
-        const work = {};
-        workHeaders.forEach((header, index) => {
-          work[header] = workData[i][index];
-        });
-        work.project_title = getProjectTitle(work.project_id);
-        works.push(work);
-      }
-    }
-    
-    return works;
-  } catch (e) {
-    Logger.log('getAssignedWorksInProgressエラー: ' + e.message);
-    return [];
-  }
+  const assignments = findData(SHEET_NAMES.WORK_ASSIGNMENTS, { member_email: memberEmail });
+  const workIds = assignments.map(a => a.work_id);
+  if (workIds.length === 0) return [];
+
+  const allWorks = getAllData(SHEET_NAMES.WORKS);
+  
+  const works = allWorks.filter(work => 
+    workIds.includes(work.work_id) && work.work_status_key === 'CREATE'
+  );
+
+  const enrichedWorks = works.map(work => {
+    work.project_title = getProjectTitle(work.project_id);
+    return work;
+  });
+
+  return enrichedWorks;
 }
 
 // ============================================
@@ -899,35 +525,13 @@ function getAssignedWorksInProgress(memberEmail) {
 // ============================================
 
 function getConfigValue(configKey, configType) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('config');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('config_key')] === configKey && 
-        data[i][headers.indexOf('config_type')] === configType) {
-      return data[i][headers.indexOf('config_value')];
-    }
-  }
-  
-  return '';
+  const configs = findData(SHEET_NAMES.CONFIG, { config_key: configKey, config_type: configType });
+  return configs.length > 0 ? configs[0].config_value : '';
 }
 
 function getConfigPresetValue(workTypeKey) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('config');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('config_key')] === workTypeKey && 
-        data[i][headers.indexOf('config_type')] === 'WORK_TYPE') {
-      return data[i][headers.indexOf('config_preset_value')] || '';
-    }
-  }
-  
-  return '';
+  const configs = findData(SHEET_NAMES.CONFIG, { config_key: workTypeKey, config_type: 'WORK_TYPE' });
+  return configs.length > 0 ? configs[0].config_preset_value || '' : '';
 }
 
 // ============================================
@@ -969,84 +573,61 @@ function sendNewWorkNotification(workId) {
 // ============================================
 
 function getWorkStatusStats() {
-  try {
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheet = ss.getSheetByName('works');
-    
-    if (!sheet) {
-      Logger.log('worksシートが見つかりません');
-      return {};
+  const works = getAllData(SHEET_NAMES.WORKS);
+  const stats = {};
+  
+  works.forEach(work => {
+    const status = work.work_status_key;
+    if (status && status !== 'DELIVERED') {
+      stats[status] = (stats[status] || 0) + 1;
     }
-    
-    const data = sheet.getDataRange().getValues();
-    
-    if (data.length <= 1) return {};
-    
-    const headers = data[0];
-    const stats = {};
-    
-    for (let i = 1; i < data.length; i++) {
-      const status = data[i][headers.indexOf('work_status_key')];
-      
-      // 納品済み(DELIVERED)を除く
-      if (status && status !== 'DELIVERED') {
-        stats[status] = (stats[status] || 0) + 1;
-      }
-    }
-    
-    return stats;
-  } catch (e) {
-    Logger.log('getWorkStatusStatsエラー: ' + e.message);
-    return {};
-  }
+  });
+  
+  return stats;
 }
 
 function getAssigneeStats() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('work_assignments');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
+  const assignments = getAllData(SHEET_NAMES.WORK_ASSIGNMENTS);
   const stats = {};
   
-  for (let i = 1; i < data.length; i++) {
-    const email = data[i][headers.indexOf('member_email')];
-    const name = getMemberName(email);
-    stats[name] = (stats[name] || 0) + 1;
-  }
+  assignments.forEach(assignment => {
+    const name = getMemberName(assignment.member_email);
+    if (name) {
+      stats[name] = (stats[name] || 0) + 1;
+    }
+  });
   
   return stats;
 }
 
 function getWorkTypeStats() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('works');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
+  const works = getAllData(SHEET_NAMES.WORKS);
   const stats = {};
   
-  for (let i = 1; i < data.length; i++) {
-    const typeKey = data[i][headers.indexOf('work_type_key')];
+  works.forEach(work => {
+    const typeKey = work.work_type_key;
     const typeValue = getConfigValue(typeKey, 'WORK_TYPE');
-    stats[typeValue || typeKey] = (stats[typeValue || typeKey] || 0) + 1;
-  }
+    const key = typeValue || typeKey;
+    if (key) {
+      stats[key] = (stats[key] || 0) + 1;
+    }
+  });
   
   return stats;
 }
 
 function getMonthlyStats() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName('works');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
+  const works = getAllData(SHEET_NAMES.WORKS);
   const stats = {};
-  for (let i = 1; i < data.length; i++) {
-    const createdAt = new Date(data[i][headers.indexOf('created_at')]);
-    const monthKey = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}`;
-    stats[monthKey] = (stats[monthKey] || 0) + 1;
-  }
+
+  works.forEach(work => {
+    if (work.created_at) {
+      const createdAt = new Date(work.created_at);
+      const monthKey = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}`;
+      stats[monthKey] = (stats[monthKey] || 0) + 1;
+    }
+  });
   
-  // 月順にソート
   const sortedStats = {};
   Object.keys(stats).sort().forEach(key => {
     sortedStats[key] = stats[key];
@@ -1089,9 +670,9 @@ function getUserRole() {
   const userEmail = Session.getActiveUser().getEmail();
   const member = getMemberByEmail(userEmail);
   
-  if (!member) return sanitizeForClient('NONE'); // ★ 修正
+  if (!member) return sanitizeForClient('NONE');
   
-  return sanitizeForClient(member.role_key); // ★ 修正
+  return sanitizeForClient(member.role_key);
 }
 
 // 権限レベルを数値で取得（比較用）
