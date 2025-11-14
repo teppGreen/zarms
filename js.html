@@ -1,0 +1,390 @@
+<script>
+    // グローバル変数
+    let currentUser = null;
+    let worksData = [];
+    let projectsData = [];
+    let membersData = [];
+    let knowledgeData = [];
+    let configData = {};
+
+    // 初期化
+    window.onload = function() {
+      loadInitialData();
+    };
+
+    function loadInitialData() {
+      showLoading();
+      
+      Promise.all([
+        callGAS('getCurrentUser'),
+        callGAS('getConfig', null),
+        callGAS('getUserRole')
+      ]).then(([user, config, role]) => {
+        currentUser = user;
+        configData = groupConfigByType(config);
+        
+        if (role === 'ADMIN') {
+          document.getElementById('new-member-btn').style.display = 'block';
+        }
+        
+        hideLoading();
+        switchTab('home');
+      }).catch(handleError);
+    }
+
+    function callGAS(functionName, ...args) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          [functionName](...args);
+      });
+    }
+
+    function groupConfigByType(configs) {
+      const grouped = {};
+      if (!configs || !Array.isArray(configs)) return grouped;
+      
+      configs.forEach(config => {
+        if (!grouped[config.config_type]) {
+          grouped[config.config_type] = [];
+        }
+        grouped[config.config_type].push(config);
+      });
+      return grouped;
+    }
+
+    function showLoading() {
+      document.getElementById('loading-indicator').style.display = 'block';
+    }
+
+    function hideLoading() {
+      document.getElementById('loading-indicator').style.display = 'none';
+    }
+    
+    function handleError(error) {
+      hideLoading();
+      console.error('GAS Error:', error);
+      alert('エラーが発生しました: ' + error.message);
+    }
+
+    // ============================================
+    // ナビゲーション & タブ読み込み
+    // ============================================
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+      document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`).classList.add('active');
+
+      document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+      document.getElementById('tab-' + tabName).style.display = 'block';
+
+      loadTabData(tabName);
+    }
+
+    function loadTabData(tabName) {
+      showLoading();
+      const dataLoaders = {
+        'home': loadHomeData,
+        'works': loadWorksData,
+        'projects': loadProjectsData,
+        'members': loadMembersData,
+        'knowledge': loadKnowledgeData,
+        'summary': loadSummaryData,
+      };
+      
+      if (dataLoaders[tabName]) {
+        dataLoaders[tabName]();
+      } else {
+        hideLoading();
+      }
+    }
+
+    // ============================================
+    // データ読み込み & 描画
+    // ============================================
+
+    function loadHomeData() {
+      callGAS('getHomeData').then(data => {
+        document.getElementById('home-greeting').textContent = `${data.greeting}、${data.memberName}さん。`;
+        
+        const container = document.getElementById('home-works-container');
+        container.innerHTML = '';
+        
+        if (!data.works || data.works.length === 0) {
+          container.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
+        } else {
+          data.works.forEach(work => {
+            container.innerHTML += `
+              <div class="card" style="cursor: pointer;" onclick="openWorkDetail('${work.work_id}')">
+                <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3>
+                <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p>
+                <div style="font-size: 12px; color: #6b7280;">
+                  <span>納期: ${formatDate(work.due_datetime)}</span>
+                </div>
+              </div>
+            `;
+          });
+        }
+        hideLoading();
+      }).catch(handleError);
+    }
+
+    function loadWorksData() {
+      callGAS('getWorks').then(data => {
+        worksData = data;
+        renderTable('works', worksData, renderWorksRow);
+        hideLoading();
+      }).catch(handleError);
+    }
+    
+    function renderWorksRow(work) {
+      return `
+        <td>${escapeHtml(work.project_title)}</td>
+        <td>${escapeHtml(work.work_title)}</td>
+        <td><span class="badge" style="background: #dbeafe; color: #1e40af;">${getConfigLabel(work.work_status_key, 'WORK_STATUS')}</span></td>
+        <td>${formatDate(work.due_datetime)}</td>
+        <td>${escapeHtml(work.client_name)}</td>
+        <td>${renderAssignees(work.assignees)}</td>
+        <td><button class="btn btn-secondary" onclick="openWorkDetail('${work.work_id}')">詳細</button></td>
+      `;
+    }
+
+    function loadProjectsData() {
+      callGAS('getProjects').then(data => {
+        projectsData = data;
+        renderTable('projects', projectsData, renderProjectsRow);
+        hideLoading();
+      }).catch(handleError);
+    }
+
+    function renderProjectsRow(project) {
+      return `
+        <td>${escapeHtml(project.project_title)}</td>
+        <td>${formatDate(project.created_at)}</td>
+        <td>${escapeHtml(project.creator_name)}</td>
+        <td>${project.works_count}</td>
+        <td><button class="btn btn-secondary" onclick="openProjectDetail('${project.project_id}')">詳細</button></td>
+      `;
+    }
+
+    function loadMembersData() {
+      callGAS('getMembers').then(data => {
+        membersData = data;
+        renderTable('members', membersData, renderMembersRow);
+        hideLoading();
+      }).catch(handleError);
+    }
+
+    function renderMembersRow(member) {
+      return `
+        <td><img src="${member.member_icon || 'https://via.placeholder.com/32'}" class="avatar" alt=""></td>
+        <td>${escapeHtml(member.member_name)}</td>
+        <td>${escapeHtml(member.member_email)}</td>
+        <td>${getConfigLabel(member.member_team_key, 'TEAM')}</td>
+        <td>${getConfigLabel(member.role_key, 'ROLE')}</td>
+        <td>${member.assigned_works_count}</td>
+        <td><button class="btn btn-secondary">詳細</button></td>
+      `;
+    }
+
+    function loadKnowledgeData() {
+      callGAS('getKnowledge').then(data => {
+        knowledgeData = data;
+        const container = document.getElementById('knowledge-container');
+        container.innerHTML = '';
+        
+        if (!knowledgeData || knowledgeData.length === 0) {
+          container.innerHTML = '<p style="color: #6b7280; grid-column: 1 / -1;">データがありません</p>';
+        } else {
+          knowledgeData.forEach(item => {
+            container.innerHTML += `
+              <div class="card">
+                <div style="margin-bottom: 8px;">
+                  <span class="badge" style="background: #fef3c7; color: #92400e;">${getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE')}</span>
+                </div>
+                <div style="margin-bottom: 12px; font-size: 14px; color: #6b7280;">
+                  ${escapeHtml(item.work_title)}
+                </div>
+                <div style="margin-bottom: 12px;">
+                  ${escapeHtml(item.knowledge_content.substring(0, 150))}...
+                </div>
+                <div style="font-size: 12px; color: #9ca3af;">
+                  ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)}
+                </div>
+              </div>
+            `;
+          });
+        }
+        hideLoading();
+      }).catch(handleError);
+    }
+
+    function loadSummaryData() {
+      google.charts.load('current', {'packages':['corechart']});
+      google.charts.setOnLoadCallback(() => {
+        callGAS('getSummaryData').then(data => {
+          drawChart('chart-work-status', 'pie', data.workStatus, 'Status', 'Count', { pieHole: 0.4 });
+          drawChart('chart-assignee', 'column', data.assignee, 'Member', 'Works', { legend: { position: 'none' } });
+          drawChart('chart-work-type', 'pie', data.workType, 'Type', 'Count');
+          drawChart('chart-monthly', 'line', data.monthly, 'Month', 'Works', { curveType: 'function', legend: { position: 'none' } });
+          hideLoading();
+        }).catch(handleError);
+      });
+    }
+    
+    function renderTable(name, data, rowRenderer) {
+      const tbody = document.getElementById(`${name}-table-body`);
+      tbody.innerHTML = '';
+      if (!data || data.length === 0) {
+        const colspan = document.getElementById(`${name}-table`).rows[0].cells.length;
+        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align: center; color: #6b7280;">データがありません</td></tr>`;
+        return;
+      }
+      data.forEach(item => {
+        const row = tbody.insertRow();
+        row.innerHTML = rowRenderer(item);
+      });
+    }
+
+    function drawChart(elementId, chartType, data, hAxis, vAxis, options = {}) {
+      const container = document.getElementById(elementId);
+      if (!data || Object.keys(data).length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 40px;">データがありません</p>';
+        return;
+      }
+      
+      const chartData = [[hAxis, vAxis]];
+      Object.keys(data).forEach(key => {
+        const label = hAxis === 'Status' ? getConfigLabel(key, 'WORK_STATUS') : key;
+        chartData.push([label, data[key]]);
+      });
+      
+      const dataTable = google.visualization.arrayToDataTable(chartData);
+      const chart = new google.visualization[chartType === 'line' ? 'LineChart' : chartType === 'column' ? 'ColumnChart' : 'PieChart'](container);
+      chart.draw(dataTable, options);
+    }
+
+    // ============================================
+    // モーダル & アクション関数
+    // ============================================
+
+    function openWorkDetail(workId) {
+      showLoading();
+      callGAS('getWorkById', workId).then(work => {
+        const content = document.getElementById('work-detail-content');
+        // Basic detail rendering
+        content.innerHTML = `
+          <h3>${escapeHtml(work.work_title)}</h3>
+          <p><strong>案件:</strong> ${escapeHtml(work.project_title)}</p>
+          <p><strong>ステータス:</strong> ${getConfigLabel(work.work_status_key, 'WORK_STATUS')}</p>
+          <p><strong>納期:</strong> ${formatDate(work.due_datetime)}</p>
+        `;
+        hideLoading();
+        openModal('modal-work-detail');
+      }).catch(handleError);
+    }
+
+    function openProjectDetail(projectId) {
+      showLoading();
+      callGAS('getProjectById', projectId).then(project => {
+        const content = document.getElementById('project-detail-content');
+        content.innerHTML = `
+          <h3>${escapeHtml(project.project_title)}</h3>
+          <p><strong>作成者:</strong> ${escapeHtml(project.creator_name)}</p>
+          <p><strong>作成日:</strong> ${formatDate(project.created_at)}</p>
+          <h4>関連Works</h4>
+          <ul>
+            ${project.works.map(w => `<li>${escapeHtml(w.work_title)}</li>`).join('')}
+          </ul>
+        `;
+        hideLoading();
+        openModal('modal-project-detail');
+      }).catch(handleError);
+    }
+
+    function openNewWorkModal() {
+      alert('新規Work作成は実装中です');
+    }
+
+    function openNewProjectModal() {
+      document.getElementById('new-project-form').reset();
+      openModal('modal-new-project');
+    }
+
+    function openNewMemberModal() {
+      alert('新規Member登録は実装中です');
+    }
+
+    function openNewKnowledgeModal() {
+      alert('新規Knowledge作成は実装中です');
+    }
+    
+    function openModal(modalId) {
+      document.getElementById(modalId).classList.add('active');
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove('active');
+    }
+
+    function submitNewProject(event) {
+      event.preventDefault();
+      const projectTitle = event.target.elements.project_title.value;
+      showLoading();
+      callGAS('createProject', projectTitle).then(() => {
+        closeModal('modal-new-project');
+        hideLoading();
+        alert('プロジェクトを作成しました');
+        loadProjectsData();
+      }).catch(handleError);
+    }
+
+    function sortTable(tableName, column) {
+      console.log('Sort:', tableName, column);
+    }
+
+    // ============================================
+    // ヘルパー関数
+    // ============================================
+
+    function renderAssignees(assignees) {
+      if (!assignees || assignees.length === 0) return '-';
+      let html = '<div class="avatar-stack">';
+      html += assignees.map(a => 
+        `<img src="${a.member_icon || 'https://via.placeholder.com/32'}" class="avatar" title="${escapeHtml(a.member_name)}" alt="${escapeHtml(a.member_name)}">`
+      ).join('');
+      html += '</div>';
+      return html;
+    }
+
+    function getConfigLabel(key, type) {
+      if (!key || !configData[type]) return key;
+      const config = configData[type].find(c => c.config_key === key);
+      return config ? config.config_value : key;
+    }
+
+    function formatDate(dateString) {
+      if (!dateString) return '-';
+      try {
+        return new Date(dateString).toLocaleDateString('ja-JP');
+      } catch (e) {
+        return dateString;
+      }
+    }
+
+    function escapeHtml(text) {
+      if (text === null || typeof text === 'undefined') return '';
+      return String(text).replace(/[&<>"']/g, match => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[match]));
+    }
+
+    document.querySelectorAll('.modal').forEach(modal => {
+      modal.addEventListener('click', e => (e.target === modal) && closeModal(modal.id));
+    });
+  </script>
