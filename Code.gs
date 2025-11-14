@@ -14,9 +14,9 @@ function doGet(e) {
     return HtmlService.createHtmlOutput(template.evaluate())
       .setTitle('CTMS - アクセス拒否');
   }
-  
+
   // メインUIを返す
-  return HtmlService.createHtmlOutputFromFile('index')
+  return HtmlService.createTemplateFromFile("index").evaluate()
     .setTitle('CTMS v3.0')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
