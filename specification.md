@@ -231,11 +231,3 @@ Creative Team Management System (CTMS) (v3)
 ### **4.3. リッチテキストエディタの操作感**
 
 * H1, H2, H3, 太字, 斜体, 打ち消し線, 下線, 色選択（黒・赤・青・緑）
-
-# **5\. 実装方法(AIへの指示)**
-
-* GASはDBとして使用するスプレッドシートにバインドされている前提で作成すること  
-* 生成するコードは、Google Apps Scriptのエディタに直接貼り付けられる形式で出力すること  
-* Google Apps Scriptに保存できるファイル形式は、.htmlと.gs  
-* CSSやJSは、.htmlにインライン形式で記述すること  
-* DBとして使用するSPREADSHEETのファイルIDは、SpreadsheetApp.getActiveSpreadsheet().getId() で取得すること
