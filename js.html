@@ -7,9 +7,47 @@
     let knowledgeData = [];
     let configData = {};
 
+    // テーブルの状態管理（ソート、フィルター）
+    let tableState = {
+      works: { sortKey: 'due_datetime', sortOrder: 'asc', filters: {} },
+      projects: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
+      members: { sortKey: 'member_name', sortOrder: 'asc', filters: {} },
+    };
+
+    // テーブルヘッダーの定義
+    const worksTableHeaders = [
+      { key: 'work_id', label: 'ID', sortable: true },
+      { key: 'project_title', label: '案件タイトル', sortable: true, filterable: true, editable: false },
+      { key: 'work_title', label: '制作タイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
+      { key: 'work_status_key', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'WORK_STATUS' },
+      { key: 'due_datetime', label: '納品期限', sortable: true, editable: true, editType: 'datetime' },
+      { key: 'client_name', label: '依頼者', sortable: true, filterable: true, editable: false },
+      { key: 'assignees', label: '担当者', sortable: false, editable: false }
+    ];
+
+    const projectsTableHeaders = [
+      { key: 'project_id', label: 'ID', sortable: true },
+      { key: 'project_title', label: '案件タイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
+      { key: 'created_at', label: '作成日', sortable: true, editable: false },
+      { key: 'creator_name', label: '作成者', sortable: true, filterable: true, editable: false },
+      { key: 'works_count', label: '関連制作物', sortable: true, editable: false }
+    ];
+
+    const membersTableHeaders = [
+      { key: 'detail', label: '', sortable: false },
+      { key: 'avatar', label: '', sortable: false },
+      { key: 'member_name', label: '名前', sortable: true, filterable: true, editable: true, editType: 'text' },
+      { key: 'member_email', label: 'メール', sortable: true, editable: false },
+      { key: 'member_team_key', label: 'チーム', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'TEAM' },
+      { key: 'role_key', label: '権限', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'ROLE' },
+      { key: 'assigned_works_count', label: '担当制作物数', sortable: true, editable: false }
+    ];
+
+
     // 初期化
     window.onload = function() {
       loadInitialData();
+      document.body.addEventListener('click', closeAllPopups);
     };
 
     function loadInitialData() {
@@ -24,7 +62,7 @@
         configData = groupConfigByType(config);
         
         if (role === 'ADMIN') {
-          document.getElementById('new-member-btn').style.display = 'block';
+          document.getElementById('new-member-dropdown-item').style.display = 'block';
         }
         
         hideLoading();
@@ -54,12 +92,33 @@
       return grouped;
     }
 
+    let loadingTimeout = null;
+
     function showLoading() {
-      document.getElementById('loading-indicator').style.display = 'block';
+      if (loadingTimeout) clearTimeout(loadingTimeout);
+      const indicator = document.getElementById('sidebar-loading-indicator');
+      if (!indicator) return;
+      const spinner = indicator.querySelector('.loading-spinner');
+      const checkmark = indicator.querySelector('.loading-checkmark');
+      indicator.style.transition = 'none';
+      indicator.style.display = 'inline-block';
+      indicator.style.opacity = '1';
+      spinner.style.display = 'inline-block';
+      checkmark.style.display = 'none';
+      indicator.style.transition = 'opacity 0.5s ease-in-out'; 
     }
 
     function hideLoading() {
-      document.getElementById('loading-indicator').style.display = 'none';
+      const indicator = document.getElementById('sidebar-loading-indicator');
+      if (!indicator) return;
+      const spinner = indicator.querySelector('.loading-spinner');
+      const checkmark = indicator.querySelector('.loading-checkmark');
+      spinner.style.display = 'none';
+      checkmark.style.display = 'inline-block';
+      if (loadingTimeout) clearTimeout(loadingTimeout);
+      loadingTimeout = setTimeout(() => {
+        indicator.style.opacity = '0';
+      }, 1500);
     }
     
     function handleError(error) {
@@ -73,31 +132,22 @@
     // ============================================
 
     function switchTab(tabName) {
+      closeWorkDetailOverlay();
       document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
       document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`).classList.add('active');
-
       document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
       document.getElementById('tab-' + tabName).style.display = 'block';
-
       loadTabData(tabName);
     }
 
     function loadTabData(tabName) {
       showLoading();
       const dataLoaders = {
-        'home': loadHomeData,
-        'works': loadWorksData,
-        'projects': loadProjectsData,
-        'members': loadMembersData,
-        'knowledge': loadKnowledgeData,
-        'summary': loadSummaryData,
+        'home': loadHomeData, 'works': loadWorksData, 'projects': loadProjectsData,
+        'members': loadMembersData, 'knowledge': loadKnowledgeData, 'summary': loadSummaryData,
       };
-      
-      if (dataLoaders[tabName]) {
-        dataLoaders[tabName]();
-      } else {
-        hideLoading();
-      }
+      if (dataLoaders[tabName]) dataLoaders[tabName]();
+      else hideLoading();
     }
 
     // ============================================
@@ -107,23 +157,13 @@
     function loadHomeData() {
       callGAS('getHomeData').then(data => {
         document.getElementById('home-greeting').textContent = `${data.greeting}、${data.memberName}さん。`;
-        
         const container = document.getElementById('home-works-container');
         container.innerHTML = '';
-        
         if (!data.works || data.works.length === 0) {
           container.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
         } else {
           data.works.forEach(work => {
-            container.innerHTML += `
-              <div class="card" style="cursor: pointer;" onclick="openWorkDetail('${work.work_id}')">
-                <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3>
-                <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p>
-                <div style="font-size: 12px; color: #6b7280;">
-                  <span>納期: ${formatDate(work.due_datetime)}</span>
-                </div>
-              </div>
-            `;
+            container.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDate(work.due_datetime)}</span> </div> </div>`;
           });
         }
         hideLoading();
@@ -131,61 +171,13 @@
     }
 
     function loadWorksData() {
-      callGAS('getWorks').then(data => {
-        worksData = data;
-        renderTable('works', worksData, renderWorksRow);
-        hideLoading();
-      }).catch(handleError);
+      callGAS('getWorks').then(data => { worksData = data; renderTable('works', applyFiltersAndSort('works', worksData), worksTableHeaders); hideLoading(); }).catch(handleError);
     }
-    
-    function renderWorksRow(work) {
-      return `
-        <td>${escapeHtml(work.project_title)}</td>
-        <td>${escapeHtml(work.work_title)}</td>
-        <td><span class="badge" style="background: #dbeafe; color: #1e40af;">${getConfigLabel(work.work_status_key, 'WORK_STATUS')}</span></td>
-        <td>${formatDate(work.due_datetime)}</td>
-        <td>${escapeHtml(work.client_name)}</td>
-        <td>${renderAssignees(work.assignees)}</td>
-        <td><button class="btn btn-secondary" onclick="openWorkDetail('${work.work_id}')">詳細</button></td>
-      `;
-    }
-
     function loadProjectsData() {
-      callGAS('getProjects').then(data => {
-        projectsData = data;
-        renderTable('projects', projectsData, renderProjectsRow);
-        hideLoading();
-      }).catch(handleError);
+      callGAS('getProjects').then(data => { projectsData = data; renderTable('projects', applyFiltersAndSort('projects', projectsData), projectsTableHeaders); hideLoading(); }).catch(handleError);
     }
-
-    function renderProjectsRow(project) {
-      return `
-        <td>${escapeHtml(project.project_title)}</td>
-        <td>${formatDate(project.created_at)}</td>
-        <td>${escapeHtml(project.creator_name)}</td>
-        <td>${project.works_count}</td>
-        <td><button class="btn btn-secondary" onclick="openProjectDetail('${project.project_id}')">詳細</button></td>
-      `;
-    }
-
     function loadMembersData() {
-      callGAS('getMembers').then(data => {
-        membersData = data;
-        renderTable('members', membersData, renderMembersRow);
-        hideLoading();
-      }).catch(handleError);
-    }
-
-    function renderMembersRow(member) {
-      return `
-        <td><img src="${member.member_icon || 'https://via.placeholder.com/32'}" class="avatar" alt=""></td>
-        <td>${escapeHtml(member.member_name)}</td>
-        <td>${escapeHtml(member.member_email)}</td>
-        <td>${getConfigLabel(member.member_team_key, 'TEAM')}</td>
-        <td>${getConfigLabel(member.role_key, 'ROLE')}</td>
-        <td>${member.assigned_works_count}</td>
-        <td><button class="btn btn-secondary">詳細</button></td>
-      `;
+      callGAS('getMembers').then(data => { membersData = data; renderTable('members', applyFiltersAndSort('members', membersData), membersTableHeaders); hideLoading(); }).catch(handleError);
     }
 
     function loadKnowledgeData() {
@@ -193,27 +185,11 @@
         knowledgeData = data;
         const container = document.getElementById('knowledge-container');
         container.innerHTML = '';
-        
         if (!knowledgeData || knowledgeData.length === 0) {
           container.innerHTML = '<p style="color: #6b7280; grid-column: 1 / -1;">データがありません</p>';
         } else {
           knowledgeData.forEach(item => {
-            container.innerHTML += `
-              <div class="card">
-                <div style="margin-bottom: 8px;">
-                  <span class="badge" style="background: #fef3c7; color: #92400e;">${getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE')}</span>
-                </div>
-                <div style="margin-bottom: 12px; font-size: 14px; color: #6b7280;">
-                  ${escapeHtml(item.work_title)}
-                </div>
-                <div style="margin-bottom: 12px;">
-                  ${escapeHtml(item.knowledge_content.substring(0, 150))}...
-                </div>
-                <div style="font-size: 12px; color: #9ca3af;">
-                  ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)}
-                </div>
-              </div>
-            `;
+            container.innerHTML += `<div class="card"> <div style="margin-bottom: 8px;"> <span class="badge" style="background: #fef3c7; color: #92400e;">${getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE')}</span> </div> <div style="margin-bottom: 12px; font-size: 14px; color: #6b7280;"> ${escapeHtml(item.work_title)} </div> <div style="margin-bottom: 12px;"> ${escapeHtml(item.knowledge_content.substring(0, 150))}... </div> <div style="font-size: 12px; color: #9ca3af;"> ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)} </div> </div>`;
           });
         }
         hideLoading();
@@ -233,17 +209,95 @@
       });
     }
     
-    function renderTable(name, data, rowRenderer) {
-      const tbody = document.getElementById(`${name}-table-body`);
+    function renderTable(name, data, headers) {
+      const table = document.getElementById(`${name}-table`);
+      const thead = table.querySelector('thead');
+      const tbody = table.querySelector('tbody');
+      const state = tableState[name];
+
+      // ヘッダーの生成
+      thead.innerHTML = '';
+      const headerRow = thead.insertRow();
+      headers.forEach(header => {
+        const th = document.createElement('th');
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'header-content';
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = header.label;
+        contentDiv.appendChild(labelSpan);
+        if (header.sortable || header.filterable) {
+          const iconsDiv = document.createElement('div');
+          iconsDiv.className = 'header-icons';
+          if (header.sortable) {
+            const sortIcon = document.createElement('span');
+            sortIcon.className = 'sort-icon';
+            sortIcon.textContent = state.sortKey === header.key ? (state.sortOrder === 'asc' ? '↑' : '↓') : '↕';
+            th.addEventListener('click', () => sortTable(name, header.key));
+            iconsDiv.appendChild(sortIcon);
+          }
+          if (header.filterable) {
+            const filterIcon = document.createElement('span');
+            filterIcon.className = 'filter-icon';
+            filterIcon.textContent = '▼';
+            filterIcon.addEventListener('click', (e) => showFilterMenu(e, name, header.key));
+            iconsDiv.appendChild(filterIcon);
+          }
+          contentDiv.appendChild(iconsDiv);
+        }
+        th.appendChild(contentDiv);
+        headerRow.appendChild(th);
+      });
+
+      // ボディの生成
       tbody.innerHTML = '';
       if (!data || data.length === 0) {
-        const colspan = document.getElementById(`${name}-table`).rows[0].cells.length;
-        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align: center; color: #6b7280;">データがありません</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align: center; color: #6b7280;">データがありません</td></tr>`;
         return;
       }
+
+      const idKey = name === 'members' ? 'member_email' : (name === 'works' ? 'work_id' : 'project_id');
+
       data.forEach(item => {
         const row = tbody.insertRow();
-        row.innerHTML = rowRenderer(item);
+        row.dataset.id = item[idKey];
+        headers.forEach(header => {
+          const cell = row.insertCell();
+          cell.dataset.field = header.key;
+          const currentValue = item[header.key];
+          let content = '';
+
+          if (header.editable) {
+            switch(header.editType) {
+              case 'select':
+                cell.innerHTML = `<div class="editable-container" onclick="showSelectEditor(event, '${name}', '${item[idKey]}', '${header.key}')"> <span class="editable-text">${getConfigLabel(currentValue, header.configType)}</span> <button class="editable-toggle-btn">✏️</button> </div>`;
+                break;
+              case 'datetime':
+                cell.innerHTML = `<div class="editable-container datetime-editable">
+                  <span class="editable-text" onclick="switchToDateTimeEditMode(event, '${name}', '${item[idKey]}', '${header.key}')">${formatDateTimeForDisplay(currentValue)}</span>
+                  <button class="editable-toggle-btn" type="button" onclick="openDateTimePicker(event, '${name}', '${item[idKey]}', '${header.key}')">✏️</button>
+                </div>`;
+                break;
+              default: // text
+                cell.textContent = currentValue;
+                cell.classList.add('editable');
+                cell.addEventListener('click', (e) => {
+                  if (cell.classList.contains('editing')) return;
+                  switchToEditMode(cell, header, name);
+                });
+                break;
+            }
+          } else {
+            switch(header.key) {
+              case 'work_id': content = `<button class="btn-link" onclick="openWorkDetailOverlay('${item.work_id}')">${item.work_id}</button>`; break;
+              case 'project_id': content = `<button class="btn-link" onclick="openProjectDetail('${item.project_id}')">${item.project_id}</button>`; break;
+              case 'detail': content = `<button class="btn-link" onclick="openMemberDetail('${item.member_email}')">詳細</button>`; break;
+              case 'assignees': content = renderAssignees(item.assignees); break;
+              case 'avatar': content = `<img src="${item.member_icon || 'https://via.placeholder.com/32'}" class="avatar" alt="">`; break;
+              default: content = escapeHtml(currentValue); break;
+            }
+            cell.innerHTML = content;
+          }
+        });
       });
     }
 
@@ -253,138 +307,922 @@
         container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 40px;">データがありません</p>';
         return;
       }
-      
       const chartData = [[hAxis, vAxis]];
       Object.keys(data).forEach(key => {
         const label = hAxis === 'Status' ? getConfigLabel(key, 'WORK_STATUS') : key;
         chartData.push([label, data[key]]);
       });
-      
       const dataTable = google.visualization.arrayToDataTable(chartData);
       const chart = new google.visualization[chartType === 'line' ? 'LineChart' : chartType === 'column' ? 'ColumnChart' : 'PieChart'](container);
       chart.draw(dataTable, options);
     }
 
-    // ============================================
-    // モーダル & アクション関数
-    // ============================================
-
-    function openWorkDetail(workId) {
+    function openWorkDetailOverlay(workId) {
       showLoading();
-      callGAS('getWorkById', workId).then(work => {
-        const content = document.getElementById('work-detail-content');
-        // Basic detail rendering
-        content.innerHTML = `
-          <h3>${escapeHtml(work.work_title)}</h3>
-          <p><strong>案件:</strong> ${escapeHtml(work.project_title)}</p>
-          <p><strong>ステータス:</strong> ${getConfigLabel(work.work_status_key, 'WORK_STATUS')}</p>
-          <p><strong>納期:</strong> ${formatDate(work.due_datetime)}</p>
-        `;
+      const promises = [ callGAS('getWorkById', workId) ];
+      if (!membersData || membersData.length === 0) {
+        promises.push(callGAS('getMembers'));
+      } else {
+        promises.push(Promise.resolve(membersData));
+      }
+      Promise.all(promises).then(([work, members]) => {
+        if (!membersData || membersData.length === 0) {
+          membersData = members;
+        }
+        document.getElementById('work-detail-title').textContent = work.work_title;
+        document.getElementById('work-detail-content-editor').innerHTML = work.work_detail_content || '';
+        document.getElementById('work-detail-design-editor').innerHTML = work.work_detail_design || '';
+        document.getElementById('work-detail-regulation-editor').innerHTML = work.work_detail_regulation || '';
+        document.getElementById('work-detail-note-editor').innerHTML = work.work_detail_note || '';
+        renderWorkTasks(work.tasks);
+        renderWorkAssignees(work.assignees);
+        renderWorkApps(work.apps);
+        document.getElementById('new-task-button').onclick = () => openNewTaskModal(work.work_id);
+        document.getElementById('work-detail-overlay').classList.add('show');
         hideLoading();
-        openModal('modal-work-detail');
       }).catch(handleError);
+    }
+
+    function closeWorkDetailOverlay() {
+      document.getElementById('work-detail-overlay').classList.remove('show');
+    }
+
+    function renderWorkTasks(tasks) {
+      const container = document.getElementById('work-tasks-container');
+      container.innerHTML = '';
+      if (!tasks || tasks.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500">タスクはありません。</p>';
+        return;
+      }
+      const table = document.createElement('table');
+      table.className = 'table-fixed w-full text-sm';
+      table.innerHTML = `<thead><tr class="border-b"><th class="w-2/5 text-left py-2">タスク名</th><th class="w-1/5 text-left py-2">ステータス</th><th class="w-1/5 text-left py-2">担当者</th><th class="w-1/5 text-left py-2">終了予定</th><th class="w-1/12"></th></tr></thead><tbody></tbody>`;
+      const tbody = table.querySelector('tbody');
+      tasks.forEach(task => {
+        const row = tbody.insertRow();
+        row.className = 'border-b';
+        row.innerHTML = `<td class="py-2">${escapeHtml(task.task_title)}</td><td class="py-2">${getConfigLabel(task.status_key, 'TASK_STATUS')}</td><td class="py-2">${escapeHtml(getMemberNameById(task.assign_to))}</td><td class="py-2">${formatDate(task.planned_end_datetime)}</td><td class="py-2 text-right"><button class="btn btn-sm btn-secondary">編集</button></td>`;
+      });
+      container.appendChild(table);
+    }
+
+    function getMemberNameById(email) {
+      if (!email || !membersData) return '';
+      const member = membersData.find(m => m.member_email === email);
+      return member ? member.member_name : email;
+    }
+
+    function renderWorkAssignees(assignees) {
+      const container = document.getElementById('work-assignees-container');
+      container.innerHTML = '';
+      if (!assignees || assignees.length === 0) {
+        container.innerHTML = '<p>担当者はいません。</p>';
+        return;
+      }
+      container.innerHTML = assignees.map(a => `<p>${a.member_name}</p>`).join('');
+    }
+
+    function renderWorkApps(apps) {
+      const container = document.getElementById('work-apps-container');
+      container.innerHTML = '';
+      if (!apps || apps.length === 0) {
+        container.innerHTML = '<p>使用アプリはありません。</p>';
+        return;
+      }
+      container.innerHTML = apps.map(app => `<p>${app.value}</p>`).join('');
+    }
+
+    function openMemberDetail(memberEmail) {
+      alert('メンバー詳細画面は未実装です: ' + memberEmail);
     }
 
     function openProjectDetail(projectId) {
       showLoading();
       callGAS('getProjectById', projectId).then(project => {
         const content = document.getElementById('project-detail-content');
-        content.innerHTML = `
-          <h3>${escapeHtml(project.project_title)}</h3>
-          <p><strong>作成者:</strong> ${escapeHtml(project.creator_name)}</p>
-          <p><strong>作成日:</strong> ${formatDate(project.created_at)}</p>
-          <h4>関連Works</h4>
-          <ul>
-            ${project.works.map(w => `<li>${escapeHtml(w.work_title)}</li>`).join('')}
-          </ul>
-        `;
+        content.innerHTML = `<h3>${escapeHtml(project.project_title)}</h3><p><strong>作成者:</strong> ${escapeHtml(project.creator_name)}</p><p><strong>作成日:</strong> ${formatDate(project.created_at)}</p><h4>関連Works</h4><ul>${project.works.map(w => `<li>${escapeHtml(w.work_title)}</li>`).join('')}</ul>`;
         hideLoading();
         openModal('modal-project-detail');
       }).catch(handleError);
     }
 
     function openNewWorkModal() {
-      alert('新規Work作成は実装中です');
+      if (!projectsData || projectsData.length === 0) {
+        showLoading();
+        callGAS('getProjects').then(data => {
+          projectsData = data;
+          hideLoading();
+          buildNewWorkForm();
+          openModal('modal-new-work');
+        }).catch(handleError);
+      } else {
+        buildNewWorkForm();
+        openModal('modal-new-work');
+      }
+    }
+
+    function buildNewWorkForm() {
+      const formContainer = document.getElementById('new-work-form');
+      const workTypes = configData['WORK_TYPE'] || [];
+      const workTypeOptions = workTypes.map(wt => `<option value="${wt.config_key}">${wt.config_value}</option>`).join('');
+      formContainer.innerHTML = `<form id="new-work-form-element" onsubmit="submitNewWork(event)"> <div class="form-group"> <label class="form-label">案件タイトル</label> <div id="project-combobox" class="combobox-container"> <input type="text" name="project_title" class="input-field" required placeholder="既存の案件タイトルで検索、または新規作成" oninput="searchProjects(this.value)" autocomplete="off"> <input type="hidden" name="project_id"> <div id="project-suggestions" class="combobox-suggestions"></div> </div> </div> <div class="form-group"> <label class="form-label">制作タイトル</label> <input type="text" name="work_title" class="input-field" required> </div> <div class="form-group"> <label class="form-label">制作種別</label> <select name="work_type_key" class="input-field" onchange="updateRegulationPreset(this.value)"> <option value="">選択してください</option> ${workTypeOptions} </select> </div> <div class="form-group"> <label class="form-label">納品期限</label> <input type="datetime-local" name="due_datetime" class="input-field"> </div> <div class="form-group"> <label class="form-label">制作物の概要</label> <textarea name="work_detail_content" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">デザイン要項</label> <textarea name="work_detail_design" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">入稿規定</label> <textarea name="work_detail_regulation" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">依頼者からの備考</label> <textarea name="work_detail_note" class="input-field" rows="4"></textarea> </div> <div class="modal-footer"> <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-work')">キャンセル</button> <button type="submit" class="btn btn-primary">作成</button> </div> </form>`;
+    }
+
+    function updateRegulationPreset(workTypeKey) {
+      if (!workTypeKey) return;
+      const workType = (configData['WORK_TYPE'] || []).find(wt => wt.config_key === workTypeKey);
+      if (workType && workType.config_preset_value) {
+        document.querySelector('textarea[name="work_detail_regulation"]').value = workType.config_preset_value;
+      }
+    }
+
+    function searchProjects(query) {
+      const suggestionsContainer = document.getElementById('project-suggestions');
+      const projectIdInput = document.querySelector('#new-work-form-element input[name="project_id"]');
+      if (!query) {
+        suggestionsContainer.style.display = 'none';
+        return;
+      }
+      const lowerCaseQuery = query.toLowerCase();
+      const filteredProjects = projectsData.filter(p => p.project_title.toLowerCase().includes(lowerCaseQuery));
+      suggestionsContainer.innerHTML = '';
+      filteredProjects.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'combobox-item';
+        item.textContent = p.project_title;
+        item.onclick = () => {
+          document.querySelector('#new-work-form-element input[name="project_title"]').value = p.project_title;
+          projectIdInput.value = p.project_id;
+          suggestionsContainer.style.display = 'none';
+        };
+        suggestionsContainer.appendChild(item);
+      });
+      const newItem = document.createElement('div');
+      newItem.className = 'combobox-item';
+      newItem.innerHTML = `+ 新規作成: <strong>${escapeHtml(query)}</strong>`;
+      newItem.onclick = () => {
+        document.querySelector('#new-work-form-element input[name="project_title"]').value = query;
+        projectIdInput.value = '';
+        suggestionsContainer.style.display = 'none';
+      };
+      suggestionsContainer.appendChild(newItem);
+      suggestionsContainer.style.display = 'block';
+    }
+
+    document.addEventListener('click', function(event) {
+      const container = document.getElementById('project-combobox');
+      if (container && !container.contains(event.target)) {
+        const suggestions = document.getElementById('project-suggestions');
+        if (suggestions) {
+          suggestions.style.display = 'none';
+        }
+      }
+    });
+
+    function submitNewWork(event) {
+      event.preventDefault();
+      const form = event.target;
+      const formData = new FormData(form);
+      const workData = Object.fromEntries(formData.entries());
+      showModalLoading('modal-new-work', `新規制作物を作成しています`);
+      callGAS('createWork', workData)
+        .then(workId => {
+          showModalSuccess('modal-new-work', '新規制作物を作成しました', () => {
+            if (document.getElementById('tab-works').style.display === 'block') {
+              loadWorksData();
+            }
+          });
+        })
+        .catch(error => {
+          handleError(error);
+          resetModalState('modal-new-work');
+        });
     }
 
     function openNewProjectModal() {
       document.getElementById('new-project-form').reset();
       openModal('modal-new-project');
     }
-
-    function openNewMemberModal() {
-      alert('新規Member登録は実装中です');
+    function openNewMemberModal() { alert('新規Member登録は実装中です'); }
+    function openNewKnowledgeModal() { alert('新規Knowledge作成は実装中です'); }
+    function openModal(modalId) { document.getElementById(modalId).classList.add('active'); }
+    function showModalLoading(modalId, message) {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      modal.querySelector('.modal-form-content').style.display = 'none';
+      const resultContent = modal.querySelector('.modal-result-content');
+      resultContent.style.display = 'flex';
+      resultContent.innerHTML = `<div class="modal-spinner"></div><p class="modal-result-message">${message}</p>`;
     }
-
-    function openNewKnowledgeModal() {
-      alert('新規Knowledge作成は実装中です');
+    function showModalSuccess(modalId, message, callback) {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      const resultContent = modal.querySelector('.modal-result-content');
+      resultContent.innerHTML = `<div class="modal-checkmark">✓</div><p class="modal-result-message">${message}</p>`;
+      setTimeout(() => {
+        closeModal(modalId);
+        if (callback) callback();
+      }, 1500);
     }
-    
-    function openModal(modalId) {
-      document.getElementById(modalId).classList.add('active');
+    function resetModalState(modalId) {
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+        const formContent = modal.querySelector('.modal-form-content');
+        if(formContent) formContent.style.display = 'block';
+        const resultContent = modal.querySelector('.modal-result-content');
+        if(resultContent) {
+            resultContent.style.display = 'none';
+            resultContent.innerHTML = '';
+        }
     }
-
     function closeModal(modalId) {
       document.getElementById(modalId).classList.remove('active');
+      setTimeout(() => resetModalState(modalId), 300);
     }
 
     function submitNewProject(event) {
       event.preventDefault();
       const projectTitle = event.target.elements.project_title.value;
-      showLoading();
+      showModalLoading('modal-new-project');
       callGAS('createProject', projectTitle).then(() => {
-        closeModal('modal-new-project');
-        hideLoading();
-        alert('プロジェクトを作成しました');
-        loadProjectsData();
-      }).catch(handleError);
+        showModalSuccess('modal-new-project', 'プロジェクトを作成しました', () => {
+          loadProjectsData();
+        });
+      }).catch(error => {
+        handleError(error);
+        resetModalState('modal-new-project');
+      });
     }
 
-    function sortTable(tableName, column) {
-      console.log('Sort:', tableName, column);
+    function sortTable(tableName, columnKey) {
+      const state = tableState[tableName];
+      if (state.sortKey === columnKey) {
+        state.sortOrder = state.sortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.sortKey = columnKey;
+        state.sortOrder = 'asc';
+      }
+      const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'members': loadMembersData };
+      if (dataLoaders[tableName]) {
+        showLoading();
+        dataLoaders[tableName]();
+      }
+    }
+
+    function showFilterMenu(event, tableName, columnKey) {
+      event.stopPropagation();
+      closeFilterMenu();
+      const state = tableState[tableName];
+      const data = tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : membersData;
+      const uniqueValues = [...new Set(data.map(item => item[columnKey]))].filter(v => v);
+      const popup = document.createElement('div');
+      popup.id = 'filter-popup';
+      popup.className = 'filter-popup';
+      const content = document.createElement('div');
+      content.className = 'filter-popup-content';
+      uniqueValues.forEach(value => {
+        const label = document.createElement('label');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = value;
+        const currentFilters = state.filters[columnKey] || [];
+        if (currentFilters.includes(value)) checkbox.checked = true;
+        let labelText = value;
+        if (columnKey.endsWith('_key')) {
+          const type = columnKey.replace('_key', '').toUpperCase();
+          labelText = getConfigLabel(value, type) || value;
+        }
+        label.appendChild(checkbox);
+        label.append(` ${labelText}`);
+        content.appendChild(label);
+      });
+      popup.appendChild(content);
+      const buttons = document.createElement('div');
+      buttons.className = 'filter-popup-buttons';
+      const applyBtn = document.createElement('button');
+      applyBtn.textContent = '適用';
+      applyBtn.className = 'btn btn-primary';
+      applyBtn.onclick = () => {
+        const selectedValues = Array.from(content.querySelectorAll('input:checked')).map(cb => cb.value);
+        if (selectedValues.length > 0) {
+          state.filters[columnKey] = selectedValues;
+        } else {
+          delete state.filters[columnKey];
+        }
+        closeFilterMenu();
+        const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'members': loadMembersData };
+        if (dataLoaders[tableName]) {
+          showLoading();
+          dataLoaders[tableName]();
+        }
+      };
+      const clearBtn = document.createElement('button');
+      clearBtn.textContent = 'クリア';
+      clearBtn.className = 'btn btn-secondary';
+      clearBtn.onclick = () => {
+        delete state.filters[columnKey];
+        closeFilterMenu();
+        const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'members': loadMembersData };
+        if (dataLoaders[tableName]) {
+          showLoading();
+          dataLoaders[tableName]();
+        }
+      };
+      buttons.appendChild(clearBtn);
+      buttons.appendChild(applyBtn);
+      popup.appendChild(buttons);
+      document.body.appendChild(popup);
+      const rect = event.target.getBoundingClientRect();
+      popup.style.left = `${rect.left}px`;
+      popup.style.top = `${rect.bottom + window.scrollY}px`;
+      popup.style.display = 'block';
+      popup.addEventListener('click', (e) => { e.stopPropagation(); });
+      setTimeout(() => { document.addEventListener('click', closeFilterMenu); }, 0);
+    }
+
+    function closeFilterMenu() {
+      const popup = document.getElementById('filter-popup');
+      if (popup) {
+        popup.remove();
+        document.removeEventListener('click', closeFilterMenu);
+      }
+    }
+
+    function applyFiltersAndSort(tableName, data) {
+      const state = tableState[tableName];
+      let processedData = [...data];
+      const filterKeys = Object.keys(state.filters);
+      if (filterKeys.length > 0) {
+        processedData = processedData.filter(item => {
+          return filterKeys.every(key => {
+            if (!state.filters[key] || state.filters[key].length === 0) return true;
+            return state.filters[key].includes(item[key]);
+          });
+        });
+      }
+      if (state.sortKey) {
+        processedData.sort((a, b) => {
+          let valA = a[state.sortKey];
+          let valB = b[state.sortKey];
+          if (state.sortKey.includes('datetime') || state.sortKey.includes('_at')) {
+            valA = valA ? new Date(valA).getTime() : 0;
+            valB = valB ? new Date(valB).getTime() : 0;
+          }
+          if (valA < valB) return state.sortOrder === 'asc' ? -1 : 1;
+          if (valA > valB) return state.sortOrder === 'asc' ? 1 : -1;
+          return 0;
+        });
+      }
+      return processedData;
     }
 
     // ============================================
     // ヘルパー関数
     // ============================================
-
+    function getHeaderDef(tableName, field) {
+      const headers = tableName === 'works' ? worksTableHeaders : tableName === 'projects' ? projectsTableHeaders : membersTableHeaders;
+      return headers.find(h => h.key === field);
+    }
     function renderAssignees(assignees) {
       if (!assignees || assignees.length === 0) return '-';
-      let html = '<div class="avatar-stack">';
-      html += assignees.map(a => 
-        `<img src="${a.member_icon || 'https://via.placeholder.com/32'}" class="avatar" title="${escapeHtml(a.member_name)}" alt="${escapeHtml(a.member_name)}">`
-      ).join('');
-      html += '</div>';
-      return html;
+      return `<div class="avatar-stack">${assignees.map(a => `<img src="${a.member_icon || 'https://via.placeholder.com/32'}" class="avatar" title="${escapeHtml(a.member_name)}" alt="${escapeHtml(a.member_name)}">`).join('')}</div>`;
     }
-
     function getConfigLabel(key, type) {
       if (!key || !configData[type]) return key;
       const config = configData[type].find(c => c.config_key === key);
       return config ? config.config_value : key;
     }
-
     function formatDate(dateString) {
       if (!dateString) return '-';
       try {
-        return new Date(dateString).toLocaleDateString('ja-JP');
+        const dt = new Date(dateString);
+        const offset = dt.getTimezoneOffset() * 60000;
+        const localDate = new Date(dt.getTime() - offset);
+        return localDate.toISOString().slice(0,10);
+      } catch (e) { return dateString; }
+    }
+    function formatDateTimeForDisplay(dateString) {
+      if (!dateString) return 'yyyy/mm/dd hh:mm';
+      try {
+        const dt = new Date(dateString);
+        const year = dt.getFullYear();
+        const month = ('0' + (dt.getMonth() + 1)).slice(-2);
+        const day = ('0' + dt.getDate()).slice(-2);
+        const hours = ('0' + dt.getHours()).slice(-2);
+        const minutes = ('0' + dt.getMinutes()).slice(-2);
+        return `${year}/${month}/${day} ${hours}:${minutes}`;
       } catch (e) {
-        return dateString;
+        return 'yyyy/mm/dd hh:mm';
       }
     }
-
+    function formatDateTimeForInput(dateString) {
+      if (!dateString) return '';
+      try {
+        const dt = new Date(dateString);
+        const offset = dt.getTimezoneOffset() * 60000;
+        const localDate = new Date(dt.getTime() - offset);
+        return localDate.toISOString().slice(0, 16);
+      } catch (e) { return ''; }
+    }
     function escapeHtml(text) {
       if (text === null || typeof text === 'undefined') return '';
-      return String(text).replace(/[&<>"']/g, match => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-      }[match]));
+      return String(text).replace(/[&<>"']/g, match => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[match]);
     }
 
-    document.querySelectorAll('.modal').forEach(modal => {
-      modal.addEventListener('click', e => (e.target === modal) && closeModal(modal.id));
-    });
+    // ============================================
+    // インライン編集 & ポップアップ
+    // ============================================
+
+    function closeAllPopups() {
+      const popups = document.querySelectorAll('.popup-editor');
+      popups.forEach(p => p.remove());
+    }
+
+    function createPopup(referenceElement, editorElement) {
+      closeAllPopups();
+      const popup = document.createElement('div');
+      popup.className = 'popup-editor';
+      popup.appendChild(editorElement);
+      document.body.appendChild(popup);
+
+      const rect = referenceElement.getBoundingClientRect();
+      popup.style.left = `${rect.left}px`;
+      popup.style.top = `${rect.bottom}px`;
+      popup.style.width = `${rect.width}px`;
+
+      popup.addEventListener('click', e => e.stopPropagation());
+      return popup;
+    }
+
+    function saveChange(tableName, id, field, newValue, oldValue) {
+      if (String(newValue) === String(oldValue)) return;
+
+      showLoading();
+      
+      // まずデータ配列を更新する
+      const data = tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : membersData;
+      const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : 'project_id');
+      const item = data.find(d => String(d[idKey]) === String(id));
+      if (item) {
+        item[field] = newValue;
+      }
+
+      // 次に表示を更新する
+      const table = document.getElementById(`${tableName}-table`);
+      const row = table.querySelector(`tr[data-id="${id}"]`);
+      if (row) {
+        const cell = row.querySelector(`td[data-field="${field}"]`);
+        if (cell) {
+          const header = getHeaderDef(tableName, field);
+          let displayValue = newValue;
+          if (header && header.configType) {
+            displayValue = getConfigLabel(newValue, header.configType);
+          } else if (header && header.editType === 'datetime') {
+            displayValue = formatDateTimeForDisplay(newValue);
+          }
+          // editable-container の中の span.editable-text を更新する
+          const editableTextSpan = cell.querySelector('.editable-text');
+          if (editableTextSpan) {
+            editableTextSpan.textContent = displayValue;
+          } else {
+            // editable-container がない場合（テキストフィールドなど）
+            cell.textContent = displayValue;
+          }
+        }
+      }
+
+      // 最後にサーバーに保存する
+      callGAS('updateSingleField', tableName, id, field, newValue)
+        .then(success => {
+          hideLoading();
+          if (!success) {
+            handleError({ message: '更新に失敗しました。' });
+            // 失敗時はデータを再読み込み
+            const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'members': loadMembersData };
+            if (dataLoaders[tableName]) dataLoaders[tableName]();
+          }
+        })
+        .catch(err => {
+          handleError(err);
+          // エラー時はデータを再読み込み
+          const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'members': loadMembersData };
+          if (dataLoaders[tableName]) dataLoaders[tableName]();
+        });
+    }
+
+    // ---- テキスト編集 ----
+    function switchToEditMode(cell, header, tableName) {
+      cell.classList.add('editing');
+      const originalValue = cell.textContent;
+      cell.innerHTML = '';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = originalValue;
+      input.className = 'inline-edit-input';
+      cell.appendChild(input);
+      input.focus();
+
+      const onSave = () => {
+        cell.innerHTML = escapeHtml(input.value);
+        cell.classList.remove('editing');
+        saveChange(tableName, cell.parentElement.dataset.id, header.key, input.value, originalValue);
+      };
+      input.addEventListener('blur', onSave);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') input.blur();
+        if (e.key === 'Escape') {
+          cell.innerHTML = escapeHtml(originalValue);
+          cell.classList.remove('editing');
+        }
+      });
+    }
+
+    // ---- セレクト（ドロップダウン）編集 ----
+    function showSelectEditor(event, tableName, id, field) {
+      event.stopPropagation();
+      const container = event.currentTarget;
+      const header = getHeaderDef(tableName, field);
+      const data = (tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : membersData);
+      const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : 'project_id');
+      const item = data.find(d => d[idKey] === id);
+      const currentValue = item ? item[field] : '';
+      
+      const optionsContainer = document.createElement('div');
+
+      const options = configData[header.configType] || [];
+      if (options.length === 0) return;
+
+      options.forEach(opt => {
+        const optionDiv = document.createElement('div');
+        optionDiv.className = 'popup-editor-option';
+        optionDiv.textContent = opt.config_value;
+        optionDiv.dataset.value = opt.config_key;
+        if (opt.config_key === currentValue) {
+          optionDiv.classList.add('selected');
+        }
+        optionDiv.addEventListener('click', () => {
+          saveChange(tableName, id, field, opt.config_key, currentValue);
+          closeAllPopups();
+        });
+        optionsContainer.appendChild(optionDiv);
+      });
+      
+      createPopup(container, optionsContainer);
+    }
+
+
+
+    // ---- 日付編集モードに切り替え ----
+    function switchToDateTimeEditMode(event, tableName, id, field) {
+      event.stopPropagation();
+      const container = event.currentTarget;
+      const cell = container.parentElement;
+      
+      if (cell.classList.contains('editing-datetime')) return;
+      
+      const data = (tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : membersData);
+      const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : 'project_id');
+      const item = data.find(d => String(d[idKey]) === String(id));
+      const originalValue = item ? item[field] : '';
+      
+      // 現在の日時を取得してパース
+      let dateObj;
+      if (originalValue) {
+        dateObj = new Date(originalValue);
+      } else {
+        dateObj = new Date();
+      }
+      
+      const year = dateObj.getFullYear().toString().padStart(4, '0');
+      const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+      const day = dateObj.getDate().toString().padStart(2, '0');
+      const hour = dateObj.getHours().toString().padStart(2, '0');
+      const minute = dateObj.getMinutes().toString().padStart(2, '0');
+      
+      // 編集用のHTML構造を作成（プレーンテキストとして表示し、各文字にフォーカスできるように）
+      cell.classList.add('editing-datetime');
+      cell.innerHTML = `
+        <div class="datetime-editor-container">
+          <span class="datetime-text" contenteditable="true" data-segment="year" data-maxlength="4" spellcheck="false">${year}</span>
+          <span class="datetime-separator">/</span>
+          <span class="datetime-text" contenteditable="true" data-segment="month" data-maxlength="2" spellcheck="false">${month}</span>
+          <span class="datetime-separator">/</span>
+          <span class="datetime-text" contenteditable="true" data-segment="day" data-maxlength="2" spellcheck="false">${day}</span>
+          <span class="datetime-separator"> </span>
+          <span class="datetime-text" contenteditable="true" data-segment="hour" data-maxlength="2" spellcheck="false">${hour}</span>
+          <span class="datetime-separator">:</span>
+          <span class="datetime-text" contenteditable="true" data-segment="minute" data-maxlength="2" spellcheck="false">${minute}</span>
+        </div>
+      `;
+      
+      const editableSpans = cell.querySelectorAll('.datetime-text');
+      
+      // 各spanにイベントリスナーを設定
+      editableSpans.forEach((span, index) => {
+        // 数字のみ入力可能にする
+        span.addEventListener('input', (e) => {
+          let text = e.target.textContent.replace(/[^0-9]/g, '').replace(/\s/g, '');
+          const maxLength = parseInt(e.target.dataset.maxlength);
+          
+          // 最大桁数を超えた場合は切り詰める
+          if (text.length > maxLength) {
+            text = text.substring(0, maxLength);
+          }
+          
+          e.target.textContent = text;
+          
+          // カーソルを末尾に移動
+          const range = document.createRange();
+          const sel = window.getSelection();
+          if (e.target.childNodes.length > 0) {
+            range.setStart(e.target.childNodes[0], text.length);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+          
+          // 最大桁数に達したら次のフィールドに移動
+          if (text.length >= maxLength && index < editableSpans.length - 1) {
+            editableSpans[index + 1].focus();
+            selectAllText(editableSpans[index + 1]);
+          }
+        });
+        
+        // ペースト時の処理
+        span.addEventListener('paste', (e) => {
+          e.preventDefault();
+          const text = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '');
+          const maxLength = parseInt(e.target.dataset.maxlength);
+          const trimmedText = text.substring(0, maxLength);
+          
+          document.execCommand('insertText', false, trimmedText);
+        });
+        
+        // 改行などを防止
+        span.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            return false;
+          }
+        });
+        
+        // キーボード操作
+        span.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            saveDateTimeEdit(cell, tableName, id, field, originalValue);
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelDateTimeEdit(cell, originalValue);
+          } else if (e.key === 'Tab') {
+            e.preventDefault();
+            if (e.shiftKey) {
+              // Shift+Tab: 前のフィールドへ
+              if (index > 0) {
+                editableSpans[index - 1].focus();
+                selectAllText(editableSpans[index - 1]);
+              }
+            } else {
+              // Tab: 次のフィールドへ
+              if (index < editableSpans.length - 1) {
+                editableSpans[index + 1].focus();
+                selectAllText(editableSpans[index + 1]);
+              } else {
+                // 最後のフィールドの場合は保存
+                saveDateTimeEdit(cell, tableName, id, field, originalValue);
+              }
+            }
+          } else if (e.key === 'ArrowRight') {
+            const sel = window.getSelection();
+            const cursorPos = sel.focusOffset;
+            const textLength = span.textContent.length;
+            
+            if (cursorPos >= textLength && index < editableSpans.length - 1) {
+              e.preventDefault();
+              editableSpans[index + 1].focus();
+              const range = document.createRange();
+              range.setStart(editableSpans[index + 1].childNodes[0] || editableSpans[index + 1], 0);
+              range.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+          } else if (e.key === 'ArrowLeft') {
+            const sel = window.getSelection();
+            const cursorPos = sel.focusOffset;
+            
+            if (cursorPos === 0 && index > 0) {
+              e.preventDefault();
+              editableSpans[index - 1].focus();
+              const range = document.createRange();
+              const textLength = editableSpans[index - 1].textContent.length;
+              range.setStart(editableSpans[index - 1].childNodes[0] || editableSpans[index - 1], textLength);
+              range.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+          } else if (e.key === 'Backspace') {
+            const sel = window.getSelection();
+            const cursorPos = sel.focusOffset;
+            
+            if (cursorPos === 0 && span.textContent === '' && index > 0) {
+              e.preventDefault();
+              editableSpans[index - 1].focus();
+              const range = document.createRange();
+              const textLength = editableSpans[index - 1].textContent.length;
+              range.setStart(editableSpans[index - 1].childNodes[0] || editableSpans[index - 1], textLength);
+              range.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+          } else if (!/^[0-9]$/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && !e.ctrlKey && !e.metaKey) {
+            // 数字以外の入力を防ぐ
+            e.preventDefault();
+          }
+        });
+        
+        // フォーカスアウト時に保存
+        span.addEventListener('blur', (e) => {
+          // 次のフォーカスがdatetime-text内かチェック
+          setTimeout(() => {
+            const focusedElement = document.activeElement;
+            if (!focusedElement || !focusedElement.classList.contains('datetime-text') || focusedElement.closest('td') !== cell) {
+              saveDateTimeEdit(cell, tableName, id, field, originalValue);
+            }
+          }, 0);
+        });
+      });
+      
+      // ヘルパー関数: テキスト全選択
+      function selectAllText(element) {
+        const range = document.createRange();
+        const sel = window.getSelection();
+        if (element.childNodes.length > 0) {
+          range.selectNodeContents(element);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+      
+      // 最初のフィールドにフォーカス
+      editableSpans[0].focus();
+      selectAllText(editableSpans[0]);
+    }
+    
+    function saveDateTimeEdit(cell, tableName, id, field, originalValue) {
+      if (!cell.classList.contains('editing-datetime')) return;
+      
+      const editableSpans = cell.querySelectorAll('.datetime-text');
+      const year = editableSpans[0].textContent.padStart(4, '0');
+      const month = editableSpans[1].textContent.padStart(2, '0');
+      const day = editableSpans[2].textContent.padStart(2, '0');
+      const hour = editableSpans[3].textContent.padStart(2, '0');
+      const minute = editableSpans[4].textContent.padStart(2, '0');
+      
+      // バリデーション
+      const yearNum = parseInt(year);
+      const monthNum = parseInt(month);
+      const dayNum = parseInt(day);
+      const hourNum = parseInt(hour);
+      const minuteNum = parseInt(minute);
+      
+      if (yearNum < 1900 || yearNum > 2100 || monthNum < 1 || monthNum > 12 || 
+          dayNum < 1 || dayNum > 31 || hourNum < 0 || hourNum > 23 || minuteNum < 0 || minuteNum > 59) {
+        alert('無効な日時です');
+        cancelDateTimeEdit(cell, originalValue);
+        return;
+      }
+      
+      // ISO形式の日時文字列を作成
+      const newDateStr = `${year}-${month}-${day}T${hour}:${minute}:00`;
+      const newDate = new Date(newDateStr);
+      
+      if (isNaN(newDate.getTime())) {
+        alert('無効な日時です');
+        cancelDateTimeEdit(cell, originalValue);
+        return;
+      }
+      
+      const newValueAsISO = newDate.toISOString();
+      
+      // 元の表示に戻す
+      cell.classList.remove('editing-datetime');
+      cell.innerHTML = `<div class="editable-container datetime-editable">
+        <span class="editable-text" onclick="switchToDateTimeEditMode(event, '${tableName}', '${id}', '${field}')">${formatDateTimeForDisplay(newValueAsISO)}</span>
+        <button class="editable-toggle-btn" type="button" onclick="openDateTimePicker(event, '${tableName}', '${id}', '${field}')">✏️</button>
+      </div>`;
+      
+      // データを保存
+      saveChange(tableName, id, field, newValueAsISO, originalValue);
+    }
+    
+    function cancelDateTimeEdit(cell, originalValue) {
+      if (!cell.classList.contains('editing-datetime')) return;
+      
+      const tableName = cell.closest('table').id.replace('-table', '');
+      const row = cell.closest('tr');
+      const id = row.dataset.id;
+      const field = cell.dataset.field;
+      
+      cell.classList.remove('editing-datetime');
+      cell.innerHTML = `<div class="editable-container datetime-editable">
+        <span class="editable-text" onclick="switchToDateTimeEditMode(event, '${tableName}', '${id}', '${field}')">${formatDateTimeForDisplay(originalValue)}</span>
+        <button class="editable-toggle-btn" type="button" onclick="openDateTimePicker(event, '${tableName}', '${id}', '${field}')">✏️</button>
+      </div>`;
+    }
+    
+    // ---- 日付ピッカーを開く ----
+    function openDateTimePicker(event, tableName, id, field) {
+      console.log('openDateTimePicker called', { tableName, id, field });
+      event.stopPropagation();
+      event.preventDefault();
+      
+      const data = (tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : membersData);
+      const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : 'project_id');
+      const item = data.find(d => String(d[idKey]) === String(id));
+      const originalValue = item ? item[field] : '';
+      
+      console.log('Original value:', originalValue);
+      
+      // セルを取得
+      const table = document.getElementById(`${tableName}-table`);
+      const row = table.querySelector(`tr[data-id="${id}"]`);
+      if (!row) return;
+      
+      const cell = row.querySelector(`td[data-field="${field}"]`);
+      if (!cell) return;
+      
+      // 編集中の状態にする
+      cell.classList.add('editing-datetime-picker');
+      
+      // input要素を作成してセル内に配置
+      const input = document.createElement('input');
+      input.type = 'datetime-local';
+      input.className = 'datetime-picker-input';
+      input.value = formatDateTimeForInput(originalValue);
+      
+      // 既存のコンテンツを非表示にしてinputを追加
+      const container = cell.querySelector('.editable-container');
+      if (container) {
+        container.style.display = 'none';
+      }
+      cell.appendChild(input);
+      
+      console.log('Input appended to cell, value:', input.value);
+      
+      // 値変更時のハンドラー
+      const handleChange = () => {
+        const newValue = input.value;
+        console.log('Value changed to:', newValue);
+        if (newValue) {
+          const newDate = new Date(newValue);
+          const newValueAsISO = newDate.toISOString();
+          
+          // 表示を更新
+          if (container) {
+            container.style.display = 'flex';
+            const displaySpan = container.querySelector('.editable-text');
+            if (displaySpan) {
+              displaySpan.textContent = formatDateTimeForDisplay(newValueAsISO);
+            }
+          }
+          
+          // inputを削除
+          cell.removeChild(input);
+          cell.classList.remove('editing-datetime-picker');
+          
+          // データを保存
+          saveChange(tableName, id, field, newValueAsISO, originalValue);
+        }
+      };
+      
+      // クリーンアップ関数
+      const cleanup = () => {
+        console.log('Cleanup called');
+        input.removeEventListener('change', handleChange);
+        input.removeEventListener('blur', handleBlur);
+        if (input.parentNode) {
+          cell.removeChild(input);
+        }
+        if (container) {
+          container.style.display = 'flex';
+        }
+        cell.classList.remove('editing-datetime-picker');
+      };
+      
+      // blur時のハンドラー
+      const handleBlur = () => {
+        setTimeout(cleanup, 100);
+      };
+      
+      input.addEventListener('change', handleChange);
+      input.addEventListener('blur', handleBlur);
+      
+      // フォーカスを当ててピッカーを開く
+      setTimeout(() => {
+        console.log('Attempting to focus and open picker...');
+        input.focus();
+        input.click();
+        console.log('Input focused and clicked');
+      }, 0);
+    }
   </script>

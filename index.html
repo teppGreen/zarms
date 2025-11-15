@@ -4,167 +4,173 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CTMS v3.0</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
   <script src="https://www.gstatic.com/charts/loader.js"></script>
   <?!= HtmlService.createHtmlOutputFromFile('css').getContent(); ?>
 </head>
 <body>
   <div class="sidebar">
-    <div style="padding: 20px; border-bottom: 1px solid #374151;">
-      <h2 style="margin: 0; font-size: 20px;">CTMS v3.0</h2>
-      <p style="margin: 4px 0 0 0; font-size: 12px; color: #9ca3af;">Creative Team Management</p>
+    <div class="sidebar-header">
+      <h2 class="sidebar-title">CTMS v3.0 
+        <span id="sidebar-loading-indicator" style="display: inline-block; vertical-align: middle; margin-left: 8px;">
+          <span class="loading-spinner" style="display: none;"></span>
+          <span class="loading-checkmark" style="display: none;"></span>
+        </span>
+      </h2>
+      <p class="sidebar-subtitle"></p>
+      
+      <div class="new-button-container">
+        <div id="new-button" class="new-button">
+          <span id="new-button-main">+ 新規作成</span>
+          <span id="new-button-dropdown-trigger">▼</span>
+        </div>
+        <div id="new-button-dropdown" class="new-button-dropdown">
+          <a onclick="openNewWorkModal(); closeNewButtonDropdown();">制作物</a>
+          <a onclick="openNewProjectModal(); closeNewButtonDropdown();">案件</a>
+          <a id="new-member-dropdown-item" style="display: none;" onclick="openNewMemberModal(); closeNewButtonDropdown();">メンバー</a>
+          <a onclick="openNewKnowledgeModal(); closeNewButtonDropdown();">ナレッジ</a>
+        </div>
+      </div>
     </div>
     
-    <nav style="padding: 12px 0;">
-      <div class="nav-item active" onclick="switchTab('home')">
-        <span>🏠 Home</span>
+    <nav class="sidebar-nav">
+      <div id="home-nav" class="nav-item active" onclick="switchTab('home')">
+        <span>🏠</span>
+        <span>ホーム</span>
       </div>
-      <div class="nav-item" onclick="switchTab('works')">
-        <span>📋 Works</span>
+      <div id="works-nav" class="nav-item" onclick="switchTab('works')">
+        <span>📋</span>
+        <span>制作物</span>
       </div>
-      <div class="nav-item" onclick="switchTab('projects')">
-        <span>📁 Projects</span>
+      <div id="projects-nav" class="nav-item" onclick="switchTab('projects')">
+        <span>📁</span>
+        <span>案件</span>
       </div>
-      <div class="nav-item" onclick="switchTab('members')">
-        <span>👥 Members</span>
+      <div id="members-nav" class="nav-item" onclick="switchTab('members')">
+        <span>👥</span>
+        <span>メンバー</span>
       </div>
-      <div class="nav-item" onclick="switchTab('knowledge')">
-        <span>💡 Knowledge</span>
+      <div id="knowledge-nav" class="nav-item" onclick="switchTab('knowledge')">
+        <span>💡</span>
+        <span>ナレッジ</span>
       </div>
-      <div class="nav-item" onclick="switchTab('summary')">
-        <span>📊 Summary</span>
+      <div id="summary-nav" class="nav-item" onclick="switchTab('summary')">
+        <span>📊</span>
+        <span>統計</span>
       </div>
     </nav>
   </div>
 
   <div class="main-content">
-    <div id="loading-indicator" style="display: none; text-align: center; padding: 40px;">
-      <div class="loading" style="margin: 0 auto;"></div>
-      <p style="margin-top: 12px; color: #6b7280;">読み込み中...</p>
-    </div>
     
     <div id="tab-home" class="tab-content">
       <div class="card">
-        <h1 id="home-greeting" style="margin: 0 0 8px 0; font-size: 28px;">こんにちは！</h1>
-        <p style="margin: 0; color: #6b7280;">今日も良い一日を!</p>
+        <h1 id="home-greeting" class="main-title">こんにちは</h1>
+        <p class="main-subtitle">今日も良い一日を！</p>
       </div>
       
-      <h2 style="margin: 24px 0 12px 0; font-size: 20px; font-weight: 600;">担当中の制作</h2>
-      <div id="home-works-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
-        </div>
+      <h2 class="section-title">あなたが担当者の制作物</h2>
+      <div id="home-works-container" class="grid-container">
+      </div>
     </div>
 
     <div id="tab-works" class="tab-content" style="display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h1 style="margin: 0; font-size: 28px; font-weight: 600;">Works</h1>
-        <button class="btn btn-primary" onclick="openNewWorkModal()">+ New</button>
-      </div>
       
       <div class="card">
         <div class="table-container">
-          <table id="works-table">
+          <table id="works-table" class="table-full">
             <thead>
               <tr>
-                <th onclick="sortTable('works', 'project_title')">案件</th>
-                <th onclick="sortTable('works', 'work_title')">制作タイトル</th>
-                <th onclick="sortTable('works', 'work_status_key')">ステータス</th>
-                <th onclick="sortTable('works', 'due_datetime')">納期</th>
-                <th onclick="sortTable('works', 'client_name')">依頼者</th>
+                <th>案件タイトル</th>
+                <th>制作タイトル</th>
+                <th>ステータス</th>
+                <th>納品期限</th>
+                <th>依頼者</th>
                 <th>担当者</th>
-                <th>操作</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="works-table-body">
-              </tbody>
+            </tbody>
           </table>
         </div>
       </div>
     </div>
 
     <div id="tab-projects" class="tab-content" style="display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h1 style="margin: 0; font-size: 28px; font-weight: 600;">Projects</h1>
-        <button class="btn btn-primary" onclick="openNewProjectModal()">+ New</button>
-      </div>
       
       <div class="card">
         <div class="table-container">
-          <table id="projects-table">
+          <table id="projects-table" class="table-full">
             <thead>
               <tr>
-                <th onclick="sortTable('projects', 'project_title')">案件名</th>
-                <th onclick="sortTable('projects', 'created_at')">作成日</th>
-                <th onclick="sortTable('projects', 'creator_name')">作成者</th>
-                <th>Works数</th>
-                <th>操作</th>
+                <th>案件タイトル</th>
+                <th>作成日</th>
+                <th>作成者</th>
+                <th>関連制作物</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="projects-table-body">
-              </tbody>
+            </tbody>
           </table>
         </div>
       </div>
     </div>
 
     <div id="tab-members" class="tab-content" style="display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h1 style="margin: 0; font-size: 28px; font-weight: 600;">Members</h1>
-        <button id="new-member-btn" class="btn btn-primary" onclick="openNewMemberModal()" style="display: none;">+ New</button>
-      </div>
       
       <div class="card">
         <div class="table-container">
-          <table id="members-table">
+          <table id="members-table" class="table-full">
             <thead>
               <tr>
-                <th>アイコン</th>
-                <th onclick="sortTable('members', 'member_name')">名前</th>
-                <th onclick="sortTable('members', 'member_email')">メール</th>
+                <th></th>
+                <th>名前</th>
+                <th>メール</th>
                 <th>チーム</th>
                 <th>権限</th>
-                <th>担当Works数</th>
-                <th>操作</th>
+                <th>担当制作物数</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="members-table-body">
-              </tbody>
+            </tbody>
           </table>
         </div>
       </div>
     </div>
 
     <div id="tab-knowledge" class="tab-content" style="display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h1 style="margin: 0; font-size: 28px; font-weight: 600;">Knowledge</h1>
-        <button class="btn btn-primary" onclick="openNewKnowledgeModal()">+ New</button>
-      </div>
       
-      <div id="knowledge-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 16px;">
-        </div>
+      <div id="knowledge-container" class="grid-container">
+      </div>
     </div>
 
     <div id="tab-summary" class="tab-content" style="display: none;">
-      <h1 style="margin: 0 0 20px 0; font-size: 28px; font-weight: 600;">Summary</h1>
       
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+      <div class="grid-container summary-grid">
         <div class="card">
-          <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Workステータス</h3>
-          <div id="chart-work-status" style="height: 300px;"></div>
+          <h3 class="card-title">ステータス</h3>
+          <div id="chart-work-status" class="chart-container"></div>
         </div>
         
         <div class="card">
-          <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">担当者別Work数</h3>
-          <div id="chart-assignee" style="height: 300px;"></div>
+          <h3 class="card-title">担当者</h3>
+          <div id="chart-assignee" class="chart-container"></div>
         </div>
         
         <div class="card">
-          <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Workタイプ</h3>
-          <div id="chart-work-type" style="height: 300px;"></div>
+          <h3 class="card-title">タイプ</h3>
+          <div id="chart-work-type" class="chart-container"></div>
         </div>
         
         <div class="card">
-          <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">月別依頼件数</h3>
-          <div id="chart-monthly" style="height: 300px;"></div>
+          <h3 class="card-title">月別依頼件数</h3>
+          <div id="chart-monthly" class="chart-container"></div>
         </div>
       </div>
     </div>
@@ -172,9 +178,9 @@
 
   <div id="modal-work-detail" class="modal">
     <div class="modal-content">
-      <h2 style="margin: 0 0 20px 0;">Work詳細</h2>
+      <h2 class="modal-title">制作物詳細</h2>
       <div id="work-detail-content"></div>
-      <div style="margin-top: 20px; text-align: right;">
+      <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-work-detail')">閉じる</button>
       </div>
     </div>
@@ -182,16 +188,20 @@
 
   <div id="modal-new-work" class="modal">
     <div class="modal-content">
-      <h2 style="margin: 0 0 20px 0;">新規Work作成</h2>
-      <div id="new-work-form"></div>
+      <div class="modal-form-content">
+        <h2 class="modal-title">新規制作物作成</h2>
+        <div id="new-work-form"></div>
+      </div>
+      <div class="modal-result-content" style="display: none;">
+      </div>
     </div>
   </div>
 
   <div id="modal-project-detail" class="modal">
     <div class="modal-content">
-      <h2 style="margin: 0 0 20px 0;">Project詳細</h2>
+      <h2 class="modal-title">案件詳細</h2>
       <div id="project-detail-content"></div>
-      <div style="margin-top: 20px; text-align: right;">
+      <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-project-detail')">閉じる</button>
       </div>
     </div>
@@ -199,17 +209,108 @@
 
   <div id="modal-new-project" class="modal">
     <div class="modal-content">
-      <h2 style="margin: 0 0 20px 0;">新規Project作成</h2>
-      <form id="new-project-form" onsubmit="submitNewProject(event)">
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 4px; font-weight: 500;">案件タイトル</label>
-          <input type="text" name="project_title" class="input-field" required>
+      <div class="modal-form-content">
+        <h2 class="modal-title">新規案件作成</h2>
+        <form id="new-project-form" onsubmit="submitNewProject(event)">
+          <div class="form-group">
+            <label class="form-label">案件タイトル</label>
+            <input type="text" name="project_title" class="input-field" required>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-project')">キャンセル</button>
+            <button type="submit" class="btn btn-primary">作成</button>
+          </div>
+        </form>
+      </div>
+      <div class="modal-result-content" style="display: none;">
+      </div>
+    </div>
+  </div>
+
+  <div id="work-detail-overlay" class="overlay">
+    <div class="overlay-content">
+      <div class="overlay-header">
+        <h2 id="work-detail-title"></h2>
+        <button class="close-btn" onclick="closeWorkDetailOverlay()">&times;</button>
+      </div>
+      <div class="overlay-body">
+        <div class="overlay-main">
+          <!-- work_detail_... のリッチテキスト群 -->
+          <div class="detail-section">
+            <h3>制作物の概要</h3>
+            <div id="work-detail-content-editor" class="rich-text-editor"></div>
+          </div>
+          <div class="detail-section">
+            <h3>デザイン要項</h3>
+            <div id="work-detail-design-editor" class="rich-text-editor"></div>
+          </div>
+          <div class="detail-section">
+            <h3>入稿規定</h3>
+            <div id="work-detail-regulation-editor" class="rich-text-editor"></div>
+          </div>
+          <div class="detail-section">
+            <h3>依頼者からの備考</h3>
+            <div id="work-detail-note-editor" class="rich-text-editor"></div>
+          </div>
         </div>
-        <div style="text-align: right; margin-top: 20px;">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-new-project')" style="margin-right: 8px;">キャンセル</button>
-          <button type="submit" class="btn btn-primary">作成</button>
+        <div class="overlay-side">
+          <!-- タスク管理 -->
+          <div class="detail-section">
+            <h3>タスク</h3>
+            <div id="work-tasks-container"></div>
+            <button id="new-task-button" class="btn btn-sm">+ New Task</button>
+          </div>
+          <!-- 担当者管理 -->
+          <div class="detail-section">
+            <h3>担当者</h3>
+            <div id="work-assignees-container"></div>
+            <button class="btn btn-sm">+ Add Assignee</button>
+          </div>
+          <!-- 使用アプリ管理 -->
+          <div class="detail-section">
+            <h3>使用アプリ</h3>
+            <div id="work-apps-container"></div>
+            <button class="btn btn-sm">+ Add App</button>
+          </div>
         </div>
-      </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-new-task" class="modal">
+    <div class="modal-content">
+      <div class="modal-form-content">
+        <h2 class="modal-title">新規タスク作成</h2>
+        <form id="new-task-form" onsubmit="submitNewTask(event)">
+          <input type="hidden" name="work_id">
+          <div class="form-group">
+            <label class="form-label">タスク名</label>
+            <input type="text" name="task_title" class="input-field" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">担当者</label>
+            <select name="assign_to" class="input-field"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">ステータス</label>
+            <select name="status_key" class="input-field"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">優先度</label>
+            <select name="priority_key" class="input-field"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">終了予定日</label>
+            <input type="datetime-local" name="planned_end_datetime" class="input-field">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-task')">キャンセル</button>
+            <button type="submit" class="btn btn-primary">作成</button>
+          </div>
+        </form>
+      </div>
+      <div class="modal-result-content" style="display: none;">
+      </div>
     </div>
   </div>
 
