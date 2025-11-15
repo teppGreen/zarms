@@ -163,7 +163,7 @@
           container.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
         } else {
           data.works.forEach(work => {
-            container.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDate(work.due_datetime)}</span> </div> </div>`;
+            container.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
           });
         }
         hideLoading();
@@ -269,12 +269,12 @@
           if (header.editable) {
             switch(header.editType) {
               case 'select':
-                cell.innerHTML = `<div class="editable-container" onclick="showSelectEditor(event, '${name}', '${item[idKey]}', '${header.key}')"> <span class="editable-text">${getConfigLabel(currentValue, header.configType)}</span> <button class="editable-toggle-btn">✏️</button> </div>`;
+                cell.innerHTML = `<div class="editable-container" onclick="showSelectEditor(event, '${name}', '${item[idKey]}', '${header.key}')"> <span class="editable-text">${getConfigLabel(currentValue, header.configType)}</span> <span class="editable-toggle-btn">✎</span> </div>`;
                 break;
               case 'datetime':
-                cell.innerHTML = `<div class="editable-container datetime-editable">
-                  <span class="editable-text" onclick="switchToDateTimeEditMode(event, '${name}', '${item[idKey]}', '${header.key}')">${formatDateTimeForDisplay(currentValue)}</span>
-                  <button class="editable-toggle-btn" type="button" onclick="openDateTimePicker(event, '${name}', '${item[idKey]}', '${header.key}')">✏️</button>
+                cell.innerHTML = `<div class="editable-container datetime-editable" onclick="openDateTimePicker(event, '${name}', '${item[idKey]}', '${header.key}')">
+                  <span class="editable-text">${formatDateTimeForDisplay(currentValue)}</span>
+                  <span class="editable-toggle-btn">✎</span>
                 </div>`;
                 break;
               default: // text
@@ -293,7 +293,15 @@
               case 'detail': content = `<button class="btn-link" onclick="openMemberDetail('${item.member_email}')">詳細</button>`; break;
               case 'assignees': content = renderAssignees(item.assignees); break;
               case 'avatar': content = `<img src="${item.member_icon || 'https://via.placeholder.com/32'}" class="avatar" alt="">`; break;
-              default: content = escapeHtml(currentValue); break;
+              case 'due_datetime': content = formatDateTimeForDisplay(currentValue, true); break;
+              case 'created_at': content = formatDate(currentValue); break;
+              default: 
+                if (typeof currentValue === 'string' && currentValue.length > 10) {
+                  content = escapeHtml(currentValue.substring(0, 10)) + '...';
+                } else {
+                  content = escapeHtml(currentValue);
+                }
+                break;
             }
             cell.innerHTML = content;
           }
@@ -361,7 +369,7 @@
       tasks.forEach(task => {
         const row = tbody.insertRow();
         row.className = 'border-b';
-        row.innerHTML = `<td class="py-2">${escapeHtml(task.task_title)}</td><td class="py-2">${getConfigLabel(task.status_key, 'TASK_STATUS')}</td><td class="py-2">${escapeHtml(getMemberNameById(task.assign_to))}</td><td class="py-2">${formatDate(task.planned_end_datetime)}</td><td class="py-2 text-right"><button class="btn btn-sm btn-secondary">編集</button></td>`;
+        row.innerHTML = `<td class="py-2">${escapeHtml(task.task_title)}</td><td class="py-2">${getConfigLabel(task.status_key, 'TASK_STATUS')}</td><td class="py-2">${escapeHtml(getMemberNameById(task.assign_to))}</td><td class="py-2">${formatDateTimeForDisplay(task.planned_end_datetime)}</td><td class="py-2 text-right"><button class="btn btn-sm btn-secondary">編集</button></td>`;
       });
       container.appendChild(table);
     }
@@ -701,8 +709,8 @@
         return localDate.toISOString().slice(0,10);
       } catch (e) { return dateString; }
     }
-    function formatDateTimeForDisplay(dateString) {
-      if (!dateString) return 'yyyy/mm/dd hh:mm';
+    function formatDateTimeForDisplay(dateString, includeSeconds = false) {
+      if (!dateString) return includeSeconds ? 'yyyy/mm/dd hh:mm:ss' : 'yyyy/mm/dd hh:mm';
       try {
         const dt = new Date(dateString);
         const year = dt.getFullYear();
@@ -710,9 +718,13 @@
         const day = ('0' + dt.getDate()).slice(-2);
         const hours = ('0' + dt.getHours()).slice(-2);
         const minutes = ('0' + dt.getMinutes()).slice(-2);
+        const seconds = ('0' + dt.getSeconds()).slice(-2);
+        if (includeSeconds) {
+          return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+        }
         return `${year}/${month}/${day} ${hours}:${minutes}`;
       } catch (e) {
-        return 'yyyy/mm/dd hh:mm';
+        return includeSeconds ? 'yyyy/mm/dd hh:mm:ss' : 'yyyy/mm/dd hh:mm';
       }
     }
     function formatDateTimeForInput(dateString) {
@@ -872,267 +884,10 @@
 
 
 
-    // ---- 日付編集モードに切り替え ----
-    function switchToDateTimeEditMode(event, tableName, id, field) {
-      event.stopPropagation();
-      const container = event.currentTarget;
-      const cell = container.parentElement;
-      
-      if (cell.classList.contains('editing-datetime')) return;
-      
-      const data = (tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : membersData);
-      const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : 'project_id');
-      const item = data.find(d => String(d[idKey]) === String(id));
-      const originalValue = item ? item[field] : '';
-      
-      // 現在の日時を取得してパース
-      let dateObj;
-      if (originalValue) {
-        dateObj = new Date(originalValue);
-      } else {
-        dateObj = new Date();
-      }
-      
-      const year = dateObj.getFullYear().toString().padStart(4, '0');
-      const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-      const day = dateObj.getDate().toString().padStart(2, '0');
-      const hour = dateObj.getHours().toString().padStart(2, '0');
-      const minute = dateObj.getMinutes().toString().padStart(2, '0');
-      
-      // 編集用のHTML構造を作成（プレーンテキストとして表示し、各文字にフォーカスできるように）
-      cell.classList.add('editing-datetime');
-      cell.innerHTML = `
-        <div class="datetime-editor-container">
-          <span class="datetime-text" contenteditable="true" data-segment="year" data-maxlength="4" spellcheck="false">${year}</span>
-          <span class="datetime-separator">/</span>
-          <span class="datetime-text" contenteditable="true" data-segment="month" data-maxlength="2" spellcheck="false">${month}</span>
-          <span class="datetime-separator">/</span>
-          <span class="datetime-text" contenteditable="true" data-segment="day" data-maxlength="2" spellcheck="false">${day}</span>
-          <span class="datetime-separator"> </span>
-          <span class="datetime-text" contenteditable="true" data-segment="hour" data-maxlength="2" spellcheck="false">${hour}</span>
-          <span class="datetime-separator">:</span>
-          <span class="datetime-text" contenteditable="true" data-segment="minute" data-maxlength="2" spellcheck="false">${minute}</span>
-        </div>
-      `;
-      
-      const editableSpans = cell.querySelectorAll('.datetime-text');
-      
-      // 各spanにイベントリスナーを設定
-      editableSpans.forEach((span, index) => {
-        // 数字のみ入力可能にする
-        span.addEventListener('input', (e) => {
-          let text = e.target.textContent.replace(/[^0-9]/g, '').replace(/\s/g, '');
-          const maxLength = parseInt(e.target.dataset.maxlength);
-          
-          // 最大桁数を超えた場合は切り詰める
-          if (text.length > maxLength) {
-            text = text.substring(0, maxLength);
-          }
-          
-          e.target.textContent = text;
-          
-          // カーソルを末尾に移動
-          const range = document.createRange();
-          const sel = window.getSelection();
-          if (e.target.childNodes.length > 0) {
-            range.setStart(e.target.childNodes[0], text.length);
-            range.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(range);
-          }
-          
-          // 最大桁数に達したら次のフィールドに移動
-          if (text.length >= maxLength && index < editableSpans.length - 1) {
-            editableSpans[index + 1].focus();
-            selectAllText(editableSpans[index + 1]);
-          }
-        });
-        
-        // ペースト時の処理
-        span.addEventListener('paste', (e) => {
-          e.preventDefault();
-          const text = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '');
-          const maxLength = parseInt(e.target.dataset.maxlength);
-          const trimmedText = text.substring(0, maxLength);
-          
-          document.execCommand('insertText', false, trimmedText);
-        });
-        
-        // 改行などを防止
-        span.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            return false;
-          }
-        });
-        
-        // キーボード操作
-        span.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            saveDateTimeEdit(cell, tableName, id, field, originalValue);
-          } else if (e.key === 'Escape') {
-            e.preventDefault();
-            cancelDateTimeEdit(cell, originalValue);
-          } else if (e.key === 'Tab') {
-            e.preventDefault();
-            if (e.shiftKey) {
-              // Shift+Tab: 前のフィールドへ
-              if (index > 0) {
-                editableSpans[index - 1].focus();
-                selectAllText(editableSpans[index - 1]);
-              }
-            } else {
-              // Tab: 次のフィールドへ
-              if (index < editableSpans.length - 1) {
-                editableSpans[index + 1].focus();
-                selectAllText(editableSpans[index + 1]);
-              } else {
-                // 最後のフィールドの場合は保存
-                saveDateTimeEdit(cell, tableName, id, field, originalValue);
-              }
-            }
-          } else if (e.key === 'ArrowRight') {
-            const sel = window.getSelection();
-            const cursorPos = sel.focusOffset;
-            const textLength = span.textContent.length;
-            
-            if (cursorPos >= textLength && index < editableSpans.length - 1) {
-              e.preventDefault();
-              editableSpans[index + 1].focus();
-              const range = document.createRange();
-              range.setStart(editableSpans[index + 1].childNodes[0] || editableSpans[index + 1], 0);
-              range.collapse(true);
-              sel.removeAllRanges();
-              sel.addRange(range);
-            }
-          } else if (e.key === 'ArrowLeft') {
-            const sel = window.getSelection();
-            const cursorPos = sel.focusOffset;
-            
-            if (cursorPos === 0 && index > 0) {
-              e.preventDefault();
-              editableSpans[index - 1].focus();
-              const range = document.createRange();
-              const textLength = editableSpans[index - 1].textContent.length;
-              range.setStart(editableSpans[index - 1].childNodes[0] || editableSpans[index - 1], textLength);
-              range.collapse(true);
-              sel.removeAllRanges();
-              sel.addRange(range);
-            }
-          } else if (e.key === 'Backspace') {
-            const sel = window.getSelection();
-            const cursorPos = sel.focusOffset;
-            
-            if (cursorPos === 0 && span.textContent === '' && index > 0) {
-              e.preventDefault();
-              editableSpans[index - 1].focus();
-              const range = document.createRange();
-              const textLength = editableSpans[index - 1].textContent.length;
-              range.setStart(editableSpans[index - 1].childNodes[0] || editableSpans[index - 1], textLength);
-              range.collapse(true);
-              sel.removeAllRanges();
-              sel.addRange(range);
-            }
-          } else if (!/^[0-9]$/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && !e.ctrlKey && !e.metaKey) {
-            // 数字以外の入力を防ぐ
-            e.preventDefault();
-          }
-        });
-        
-        // フォーカスアウト時に保存
-        span.addEventListener('blur', (e) => {
-          // 次のフォーカスがdatetime-text内かチェック
-          setTimeout(() => {
-            const focusedElement = document.activeElement;
-            if (!focusedElement || !focusedElement.classList.contains('datetime-text') || focusedElement.closest('td') !== cell) {
-              saveDateTimeEdit(cell, tableName, id, field, originalValue);
-            }
-          }, 0);
-        });
-      });
-      
-      // ヘルパー関数: テキスト全選択
-      function selectAllText(element) {
-        const range = document.createRange();
-        const sel = window.getSelection();
-        if (element.childNodes.length > 0) {
-          range.selectNodeContents(element);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-      }
-      
-      // 最初のフィールドにフォーカス
-      editableSpans[0].focus();
-      selectAllText(editableSpans[0]);
-    }
-    
-    function saveDateTimeEdit(cell, tableName, id, field, originalValue) {
-      if (!cell.classList.contains('editing-datetime')) return;
-      
-      const editableSpans = cell.querySelectorAll('.datetime-text');
-      const year = editableSpans[0].textContent.padStart(4, '0');
-      const month = editableSpans[1].textContent.padStart(2, '0');
-      const day = editableSpans[2].textContent.padStart(2, '0');
-      const hour = editableSpans[3].textContent.padStart(2, '0');
-      const minute = editableSpans[4].textContent.padStart(2, '0');
-      
-      // バリデーション
-      const yearNum = parseInt(year);
-      const monthNum = parseInt(month);
-      const dayNum = parseInt(day);
-      const hourNum = parseInt(hour);
-      const minuteNum = parseInt(minute);
-      
-      if (yearNum < 1900 || yearNum > 2100 || monthNum < 1 || monthNum > 12 || 
-          dayNum < 1 || dayNum > 31 || hourNum < 0 || hourNum > 23 || minuteNum < 0 || minuteNum > 59) {
-        alert('無効な日時です');
-        cancelDateTimeEdit(cell, originalValue);
-        return;
-      }
-      
-      // ISO形式の日時文字列を作成
-      const newDateStr = `${year}-${month}-${day}T${hour}:${minute}:00`;
-      const newDate = new Date(newDateStr);
-      
-      if (isNaN(newDate.getTime())) {
-        alert('無効な日時です');
-        cancelDateTimeEdit(cell, originalValue);
-        return;
-      }
-      
-      const newValueAsISO = newDate.toISOString();
-      
-      // 元の表示に戻す
-      cell.classList.remove('editing-datetime');
-      cell.innerHTML = `<div class="editable-container datetime-editable">
-        <span class="editable-text" onclick="switchToDateTimeEditMode(event, '${tableName}', '${id}', '${field}')">${formatDateTimeForDisplay(newValueAsISO)}</span>
-        <button class="editable-toggle-btn" type="button" onclick="openDateTimePicker(event, '${tableName}', '${id}', '${field}')">✏️</button>
-      </div>`;
-      
-      // データを保存
-      saveChange(tableName, id, field, newValueAsISO, originalValue);
-    }
-    
-    function cancelDateTimeEdit(cell, originalValue) {
-      if (!cell.classList.contains('editing-datetime')) return;
-      
-      const tableName = cell.closest('table').id.replace('-table', '');
-      const row = cell.closest('tr');
-      const id = row.dataset.id;
-      const field = cell.dataset.field;
-      
-      cell.classList.remove('editing-datetime');
-      cell.innerHTML = `<div class="editable-container datetime-editable">
-        <span class="editable-text" onclick="switchToDateTimeEditMode(event, '${tableName}', '${id}', '${field}')">${formatDateTimeForDisplay(originalValue)}</span>
-        <button class="editable-toggle-btn" type="button" onclick="openDateTimePicker(event, '${tableName}', '${id}', '${field}')">✏️</button>
-      </div>`;
-    }
+
     
     // ---- 日付ピッカーを開く ----
     function openDateTimePicker(event, tableName, id, field) {
-      console.log('openDateTimePicker called', { tableName, id, field });
       event.stopPropagation();
       event.preventDefault();
       
@@ -1140,8 +895,6 @@
       const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : 'project_id');
       const item = data.find(d => String(d[idKey]) === String(id));
       const originalValue = item ? item[field] : '';
-      
-      console.log('Original value:', originalValue);
       
       // セルを取得
       const table = document.getElementById(`${tableName}-table`);
@@ -1151,78 +904,197 @@
       const cell = row.querySelector(`td[data-field="${field}"]`);
       if (!cell) return;
       
+      // 既に編集中なら何もしない
+      if (cell.classList.contains('editing-datetime-picker')) return;
+      
       // 編集中の状態にする
       cell.classList.add('editing-datetime-picker');
       
-      // input要素を作成してセル内に配置
-      const input = document.createElement('input');
-      input.type = 'datetime-local';
-      input.className = 'datetime-picker-input';
-      input.value = formatDateTimeForInput(originalValue);
+      // 現在の日時を取得してパース
+      let dateObj;
+      if (originalValue) {
+        dateObj = new Date(originalValue);
+      } else {
+        dateObj = new Date();
+      }
       
-      // 既存のコンテンツを非表示にしてinputを追加
+      const yyyy = dateObj.getFullYear().toString().padStart(4, '0');
+      const mm = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+      const dd = dateObj.getDate().toString().padStart(2, '0');
+      const hh = dateObj.getHours().toString().padStart(2, '0');
+      const min = dateObj.getMinutes().toString().padStart(2, '0');
+      const ss = dateObj.getSeconds().toString().padStart(2, '0');
+      
+      // 既存のコンテンツを非表示
       const container = cell.querySelector('.editable-container');
       if (container) {
         container.style.display = 'none';
       }
-      cell.appendChild(input);
       
-      console.log('Input appended to cell, value:', input.value);
+      // カスタム日時入力フィールドを作成
+      const editorDiv = document.createElement('div');
+      editorDiv.className = 'datetime-custom-editor';
+      editorDiv.innerHTML = `
+        <input type="text" class="datetime-segment" data-segment="yyyy" maxlength="4" value="${yyyy}" placeholder="yyyy" />
+        <span class="datetime-separator">/</span>
+        <input type="text" class="datetime-segment" data-segment="mm" maxlength="2" value="${mm}" placeholder="mm" />
+        <span class="datetime-separator">/</span>
+        <input type="text" class="datetime-segment" data-segment="dd" maxlength="2" value="${dd}" placeholder="dd" />
+        <span class="datetime-separator"> </span>
+        <input type="text" class="datetime-segment" data-segment="hh" maxlength="2" value="${hh}" placeholder="hh" />
+        <span class="datetime-separator">:</span>
+        <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="${min}" placeholder="mm" />
+      `;
       
-      // 値変更時のハンドラー
-      const handleChange = () => {
-        const newValue = input.value;
-        console.log('Value changed to:', newValue);
-        if (newValue) {
-          const newDate = new Date(newValue);
-          const newValueAsISO = newDate.toISOString();
+      cell.appendChild(editorDiv);
+      
+      const inputs = editorDiv.querySelectorAll('.datetime-segment');
+      
+      // 各inputにイベントリスナーを設定
+      inputs.forEach((input, index) => {
+        // 数字のみ入力可能
+        input.addEventListener('input', (e) => {
+          let value = e.target.value.replace(/[^0-9]/g, '');
+          const maxLength = parseInt(e.target.getAttribute('maxlength'));
           
-          // 表示を更新
-          if (container) {
-            container.style.display = 'flex';
-            const displaySpan = container.querySelector('.editable-text');
-            if (displaySpan) {
-              displaySpan.textContent = formatDateTimeForDisplay(newValueAsISO);
-            }
+          if (value.length > maxLength) {
+            value = value.substring(0, maxLength);
           }
           
-          // inputを削除
-          cell.removeChild(input);
-          cell.classList.remove('editing-datetime-picker');
+          e.target.value = value;
           
-          // データを保存
-          saveChange(tableName, id, field, newValueAsISO, originalValue);
-        }
-      };
+          // 最大桁数に達したら次のフィールドへ
+          if (value.length >= maxLength && index < inputs.length - 1) {
+            inputs[index + 1].focus();
+            inputs[index + 1].select();
+          }
+        });
+        
+        // キーボード操作
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            saveDateTimePicker(cell, tableName, id, field, originalValue, inputs);
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelDateTimePicker(cell, container);
+          } else if (e.key === 'Tab') {
+            // Tabキーは自然な動作を許可
+            if (!e.shiftKey && index === inputs.length - 1) {
+              // 最後のフィールドでTabを押したら保存
+              e.preventDefault();
+              saveDateTimePicker(cell, tableName, id, field, originalValue, inputs);
+            }
+          } else if (e.key === 'ArrowRight' && e.target.selectionStart === e.target.value.length) {
+            // カーソルが末尾にある場合は次のフィールドへ
+            if (index < inputs.length - 1) {
+              e.preventDefault();
+              inputs[index + 1].focus();
+              inputs[index + 1].setSelectionRange(0, 0);
+            }
+          } else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) {
+            // カーソルが先頭にある場合は前のフィールドへ
+            if (index > 0) {
+              e.preventDefault();
+              const prevInput = inputs[index - 1];
+              prevInput.focus();
+              prevInput.setSelectionRange(prevInput.value.length, prevInput.value.length);
+            }
+          }
+        });
+        
+        // フォーカスアウト時の処理
+        input.addEventListener('blur', (e) => {
+          setTimeout(() => {
+            // 次のフォーカスがdatetime-segment内かチェック
+            const focusedElement = document.activeElement;
+            if (!focusedElement || !focusedElement.classList.contains('datetime-segment') || focusedElement.closest('td') !== cell) {
+              saveDateTimePicker(cell, tableName, id, field, originalValue, inputs);
+            }
+          }, 100);
+        });
+      });
       
-      // クリーンアップ関数
-      const cleanup = () => {
-        console.log('Cleanup called');
-        input.removeEventListener('change', handleChange);
-        input.removeEventListener('blur', handleBlur);
-        if (input.parentNode) {
-          cell.removeChild(input);
-        }
-        if (container) {
-          container.style.display = 'flex';
-        }
-        cell.classList.remove('editing-datetime-picker');
-      };
-      
-      // blur時のハンドラー
-      const handleBlur = () => {
-        setTimeout(cleanup, 100);
-      };
-      
-      input.addEventListener('change', handleChange);
-      input.addEventListener('blur', handleBlur);
-      
-      // フォーカスを当ててピッカーを開く
+      // 最初のフィールドにフォーカス
       setTimeout(() => {
-        console.log('Attempting to focus and open picker...');
-        input.focus();
-        input.click();
-        console.log('Input focused and clicked');
-      }, 0);
+        inputs[0].focus();
+        inputs[0].select();
+      }, 50);
+    }
+    
+    function saveDateTimePicker(cell, tableName, id, field, originalValue, inputs) {
+      const values = Array.from(inputs).map(input => input.value);
+      const [yyyy, mm, dd, hh, min] = values;
+      
+      // バリデーション
+      const yearNum = parseInt(yyyy);
+      const monthNum = parseInt(mm);
+      const dayNum = parseInt(dd);
+      const hourNum = parseInt(hh);
+      const minuteNum = parseInt(min);
+      
+      if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100 ||
+          isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
+          isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
+          isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
+          isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
+        alert('無効な日時です');
+        cancelDateTimePicker(cell, cell.querySelector('.editable-container'));
+        return;
+      }
+      
+      // ISO形式の日時文字列を作成（秒は00固定）
+      const paddedYyyy = yyyy.padStart(4, '0');
+      const paddedMm = mm.padStart(2, '0');
+      const paddedDd = dd.padStart(2, '0');
+      const paddedHh = hh.padStart(2, '0');
+      const paddedMin = min.padStart(2, '0');
+      
+      const newDateStr = `${paddedYyyy}-${paddedMm}-${paddedDd}T${paddedHh}:${paddedMin}:00`;
+      const newDate = new Date(newDateStr);
+      
+      if (isNaN(newDate.getTime())) {
+        alert('無効な日時です');
+        cancelDateTimePicker(cell, cell.querySelector('.editable-container'));
+        return;
+      }
+      
+      const newValueAsISO = newDate.toISOString();
+      
+      // エディタを削除
+      const editor = cell.querySelector('.datetime-custom-editor');
+      if (editor) {
+        cell.removeChild(editor);
+      }
+      
+      // 元の表示に戻す
+      const container = cell.querySelector('.editable-container');
+      if (container) {
+        container.style.display = 'flex';
+        const displaySpan = container.querySelector('.editable-text');
+        if (displaySpan) {
+          displaySpan.textContent = formatDateTimeForDisplay(newValueAsISO);
+        }
+      }
+      
+      cell.classList.remove('editing-datetime-picker');
+      
+      // データを保存（変更があった場合のみ）
+      if (newValueAsISO !== originalValue) {
+        saveChange(tableName, id, field, newValueAsISO, originalValue);
+      }
+    }
+    
+    function cancelDateTimePicker(cell, container) {
+      const editor = cell.querySelector('.datetime-custom-editor');
+      if (editor) {
+        cell.removeChild(editor);
+      }
+      
+      if (container) {
+        container.style.display = 'flex';
+      }
+      
+      cell.classList.remove('editing-datetime-picker');
     }
   </script>
