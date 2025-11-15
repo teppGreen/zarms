@@ -640,21 +640,30 @@
       box-shadow: 0 0 0 3px var(--md-sys-color-primary-container);
     }
     
-    .datetime-custom-editor {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      font-family: 'Courier New', monospace;
-      font-size: 14px;
-      padding: 10px 14px;
-      margin: -12px -16px;
-      background-color: var(--md-sys-color-surface);
-      border: 2px solid var(--md-sys-color-primary);
-      border-radius: 4px;
-      white-space: nowrap;
-      box-sizing: border-box;
-      width: calc(100% + 32px);
-    }
+.datetime-custom-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  padding: 10px 14px;
+  margin: -12px -16px;
+  background-color: var(--md-sys-color-surface);
+  border: 2px solid var(--md-sys-color-primary);
+  border-radius: 4px;
+  white-space: nowrap;
+  box-sizing: border-box;
+  width: calc(100% + 32px);
+}
+
+.datetime-native-picker {
+  padding: 6px 8px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+}
     
     .datetime-segment {
       border: none;
@@ -1006,14 +1015,23 @@
 }
 
 .detail-section {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+}
+
+.detail-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 12px;
 }
 
 .detail-section h3 {
   font-size: 1.125rem;
   font-weight: 700;
-  margin-bottom: 12px;
+  margin: 0;
   color: var(--md-sys-color-on-surface);
+  flex-shrink: 0;
 }
 
 .rich-text-editor-wrapper {
@@ -1030,6 +1048,15 @@
   background-color: var(--md-sys-color-surface-variant);
   border-bottom: 1px solid var(--md-sys-color-outline);
   flex-wrap: wrap;
+}
+
+.compact-toolbar {
+  padding: 4px 8px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 6px;
+  background-color: var(--md-sys-color-surface);
+  border-bottom: none;
+  flex-shrink: 0;
 }
 
 .toolbar-btn {
@@ -1079,12 +1106,20 @@
 }
 
 .rich-text-editor {
-  min-height: 150px;
+  height: 120px;
+  max-height: 120px;
   padding: 12px;
   background-color: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
   outline: none;
   overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Works詳細画面のエディタは一画面で見えるように高さを調整 */
+#work-detail-overlay .rich-text-editor {
+  height: 120px;
+  max-height: 120px;
 }
 
 .rich-text-editor:focus {

@@ -1691,16 +1691,15 @@
       return config ? config.config_value : key;
     }
     function formatDate(dateString) {
-      if (!dateString) return '-';
-      try {
-        const dt = new Date(dateString);
-        const offset = dt.getTimezoneOffset() * 60000;
-        const localDate = new Date(dt.getTime() - offset);
-        return localDate.toISOString().slice(0,10);
-      } catch (e) { return dateString; }
+      // 日付のみが必要な場合でも、原則として日時形式で表示
+      return formatDateTimeForDisplay(dateString, false, true);
     }
-    function formatDateTimeForDisplay(dateString, includeSeconds = false) {
-      if (!dateString) return includeSeconds ? 'yyyy/mm/dd hh:mm:ss' : 'yyyy/mm/dd hh:mm';
+    
+    function formatDateTimeForDisplay(dateString, includeSeconds = false, dateOnly = false) {
+      if (!dateString) {
+        if (dateOnly) return '-';
+        return includeSeconds ? 'yyyy-mm-dd(?) hh:mm:ss' : 'yyyy-mm-dd(?) hh:mm';
+      }
       try {
         const dt = new Date(dateString);
         const year = dt.getFullYear();
@@ -1709,12 +1708,23 @@
         const hours = ('0' + dt.getHours()).slice(-2);
         const minutes = ('0' + dt.getMinutes()).slice(-2);
         const seconds = ('0' + dt.getSeconds()).slice(-2);
-        if (includeSeconds) {
-          return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+        
+        // 曜日を取得
+        const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+        const weekday = weekdays[dt.getDay()];
+        
+        if (dateOnly) {
+          // カラム幅が足りない場合のみ日付のみ表示
+          return `${year}-${month}-${day}(${weekday})`;
         }
-        return `${year}/${month}/${day} ${hours}:${minutes}`;
+        
+        if (includeSeconds) {
+          return `${year}-${month}-${day}(${weekday}) ${hours}:${minutes}:${seconds}`;
+        }
+        return `${year}-${month}-${day}(${weekday}) ${hours}:${minutes}`;
       } catch (e) {
-        return includeSeconds ? 'yyyy/mm/dd hh:mm:ss' : 'yyyy/mm/dd hh:mm';
+        if (dateOnly) return '-';
+        return includeSeconds ? 'yyyy-mm-dd(?) hh:mm:ss' : 'yyyy-mm-dd(?) hh:mm';
       }
     }
     function formatDateTimeForInput(dateString) {
@@ -1950,10 +1960,34 @@
         container.style.display = 'none';
       }
       
-      // カスタム日時入力フィールドを作成
+      // エディタコンテナを作成
       const editorDiv = document.createElement('div');
       editorDiv.className = 'datetime-custom-editor';
-      editorDiv.innerHTML = `
+      editorDiv.style.display = 'flex';
+      editorDiv.style.alignItems = 'center';
+      editorDiv.style.gap = '8px';
+      
+      // ブラウザのネイティブピッカーを追加
+      const nativePicker = document.createElement('input');
+      nativePicker.type = 'datetime-local';
+      nativePicker.className = 'datetime-native-picker';
+      nativePicker.value = formatDateTimeForInput(originalValue);
+      nativePicker.style.flex = '0 0 auto';
+      nativePicker.style.width = '180px';
+      nativePicker.addEventListener('change', (e) => {
+        const newValue = e.target.value ? new Date(e.target.value).toISOString() : '';
+        if (newValue !== originalValue) {
+          saveChange(tableName, id, field, newValue, originalValue);
+        }
+        cancelDateTimePicker(cell, container);
+      });
+      
+      // カスタムキーボード入力フィールド
+      const customEditor = document.createElement('div');
+      customEditor.style.display = 'flex';
+      customEditor.style.alignItems = 'center';
+      customEditor.style.gap = '2px';
+      customEditor.innerHTML = `
         <input type="text" class="datetime-segment" data-segment="yyyy" maxlength="4" value="${yyyy}" placeholder="yyyy" />
         <span class="datetime-separator">/</span>
         <input type="text" class="datetime-segment" data-segment="mm" maxlength="2" value="${mm}" placeholder="mm" />
@@ -1965,9 +1999,11 @@
         <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="${min}" placeholder="mm" />
       `;
       
+      editorDiv.appendChild(nativePicker);
+      editorDiv.appendChild(customEditor);
       cell.appendChild(editorDiv);
       
-      const inputs = editorDiv.querySelectorAll('.datetime-segment');
+      const inputs = customEditor.querySelectorAll('.datetime-segment');
       
       // 各inputにイベントリスナーを設定
       inputs.forEach((input, index) => {
