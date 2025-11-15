@@ -32,7 +32,8 @@ Creative Team Management System (CTMS) (v3)
 
 ### **2.1. projectsシート (案件DB)**
 
-* project\_id (主キー, UUID, 例: 7b9d6c11-536f-47c7-b083-f0b431718c3d)  
+* project\_id (主キー, プレフィックス + 連番形式, 例: P0001, P0002)  
+  * **【ロジック】** バックエンドで `generateNextId` 関数により自動生成される。プレフィックス 'P' + 4桁のゼロパディングされた連番。同時実行による重複を防ぐため、LockServiceを使用してロックを取得する。  
 * project\_title (案件タイトル, **【制約】** 他のprojectと重複できない)  
 * project\_detail (議事録用のリッチテキスト)  
 * created\_by (作成者, リレーション: membersシートのmember\_email)  
@@ -40,7 +41,8 @@ Creative Team Management System (CTMS) (v3)
 
 ### **2.2. worksシート (制作DB)**
 
-* work\_id (主キー,  UUID)  
+* work\_id (主キー, プレフィックス + 連番形式, 例: W0001, W0002)  
+  * **【ロジック】** バックエンドで `generateNextId` 関数により自動生成される。プレフィックス 'W' + 4桁のゼロパディングされた連番。同時実行による重複を防ぐため、LockServiceを使用してロックを取得する。  
 * project\_id (リレーション: projectsシート)  
 * work\_title (制作タイトル)  
 * work\_status\_key (リレーション: configシート, config\_type \= 'WORK\_STATUS')  
@@ -113,9 +115,10 @@ Creative Team Management System (CTMS) (v3)
 ### **2.8. configシート (設定マスタDB)**
 
 * config\_id (主キー, 自動採番)  
-* config\_type (カテゴリ名, 例: TASK\_STATUS, WORK\_TYPE, APP, TEAM, ROLE, NOTIFICATION\_EMAIL)  
-* config\_key (バックエンドで使う不変のキー, 例: TODO, VIDEO, FIGMA, TEAM\_1, ADMIN, PRIMARY\_CONTACT)  
-* config\_value (UIに表示する文字列, 例: 未着手, 動画, Figma, 1班, 管理者, admin@example.com)  
+* config\_type (カテゴリ名, 例: TASK\_STATUS, WORK\_TYPE, APP, TEAM, ROLE, NOTIFICATION\_EMAIL, FOLDER)  
+  * **FOLDER:** Google DriveのフォルダIDを保存するための設定タイプ。config\_key = 'WORK\_FOLDER\_PARENT' で親フォルダIDを指定する。  
+* config\_key (バックエンドで使う不変のキー, 例: TODO, VIDEO, FIGMA, TEAM\_1, ADMIN, PRIMARY\_CONTACT, WORK\_FOLDER\_PARENT)  
+* config\_value (UIに表示する文字列, 例: 未着手, 動画, Figma, 1班, 管理者, admin@example.com。FOLDERタイプの場合はGoogle DriveフォルダID)  
 * config\_preset\_value (work\_detail\_regulationのプリセット用, リッチテキスト)  
 * sort\_order (ドロップダウン等での表示順)  
 * is\_active (true/false, 選択肢として有効か)
@@ -142,7 +145,7 @@ Creative Team Management System (CTMS) (v3)
 ### **3.3. Works (制作管理)**
 
 * **一覧表示:**  
-  * 表示項目: work\_id (UUID), project\_title, work\_title, work\_status\_key (のconfig\_value), due\_datetime, work\_client\_email (のmember\_name), work\_folder\_id (リンク), created\_at, 担当者 (work\_assignmentsからアイコン一覧表示)  
+  * 表示項目: work\_id (プレフィックス + 連番形式, 例: W0001), project\_title, work\_title, work\_status\_key (のconfig\_value), due\_datetime, work\_client\_email (のmember\_name), work\_folder\_id (リンク), created\_at, 担当者 (work\_assignmentsからアイコン一覧表示)  
 * **詳細表示:** 一覧の行クリック（または「詳細」ボタン）で画面内オーバーレイを表示。  
   * work\_detail\_... のリッチテキスト群を表示・編集。  
   * タスク管理: このwork\_idに紐づくtasksを一覧表示。  
@@ -162,7 +165,7 @@ Creative Team Management System (CTMS) (v3)
   * works (このProjectに紐づくworksを簡易テーブル表示)  
 * **新規作成:**  
   * 右上に表示する「+ New」ボタンでモーダル表示。project\_title を入力。  
-  * **【ロジック】** project\_title の重複チェックを行う。project\_id（UUID）はバックエンドで自動生成する。
+  * **【ロジック】** project\_title の重複チェックを行う。project\_id（プレフィックス + 連番形式, 例: P0001）はバックエンドで自動生成する。
 
 ### **3.5. Members (メンバー管理)**
 
@@ -205,9 +208,10 @@ Creative Team Management System (CTMS) (v3)
   * **【ロジック】** work\_type\_key を選択した時点で、configシート(2.8)のconfig\_preset\_valueを参照し、work\_detail\_regulationにプリセット値を自動入力する。  
   * 3\. detail\_content 等のリッチテキストを入力。  
   * **【ロジック】** 送信時、バックエンドで以下の処理を実行する:  
-    1. work\_id（UUID）を自動生成する。  
+    1. work\_id（プレフィックス + 連番形式, 例: W0001）を自動生成する。  
     2. worksシートにデータを書き込む。  
-    3. Google Drive の指定の親フォルダ配下に、{project\_title}\_{work\_title} の名称で新しいフォルダを作成し、そのIDを work\_folder\_id に保存する。  
+    3. Google Drive の親フォルダ配下に、{project\_title}\_{work\_title} の名称で新しいフォルダを作成し、そのIDを work\_folder\_id に保存する。  
+      * **【ロジック】** 親フォルダIDは、configシート (2.8) で config\_type = 'FOLDER', config\_key = 'WORK\_FOLDER\_PARENT' に設定された config\_value から取得する。設定されていない場合は空文字列を返す。  
     4. configシート (2.8) で config\_type \= 'NOTIFICATION\_EMAIL' に設定されたメールアドレス宛に、GmailApp.sendEmail() を使用して新規依頼の通知メールを送信する。  
 * **(b) 新規「Project」作成:**  
   * Projectsタブ(3.2)の「+ New」ボタンから作成する  
