@@ -68,22 +68,29 @@ function getWorkById(workId) {
 
 function createWork(workData) {
   const userEmail = Session.getActiveUser().getEmail();
-  const workId = Utilities.getUuid();
+  const workId = generateNextId(SHEET_NAMES.WORKS, 'W'); // ★★★★★ 変更 ★★★★★
   const now = new Date();
 
+  // project_id を取得または新規作成
+  const projectId = getOrCreateProjectId(workData.project_title, workData.project_id);
+  if (!projectId) {
+    throw new Error('案件の取得または作成に失敗しました。');
+  }
+  const projectTitle = getProjectTitle(projectId);
+
   // 新規フォルダを作成
-  const folderId = createWorkFolder(workData.project_id, workData.work_title);
+  const folderId = createWorkFolder(projectTitle, workData.work_title);
 
   const newWork = {
     work_id: workId,
-    project_id: workData.project_id,
+    project_id: projectId,
     work_title: workData.work_title,
-    work_status_key: workData.work_status_key || 'TODO',
+    work_status_key: 'CREATE', // 仕様書では 'CREATE' が初期ステータス
     work_type_key: workData.work_type_key,
     priority_key: workData.priority_key || 'MEDIUM',
-    due_datetime: workData.due_datetime,
-    work_client_email: workData.work_client_email,
-    gdrive_folder_id: folderId,
+    due_datetime: workData.due_datetime || null,
+    work_client_email: workData.work_client_email || userEmail, // 依頼者が空なら作成者を入れる
+    work_folder_id: folderId,
     work_detail_content: workData.work_detail_content || '',
     work_detail_design: workData.work_detail_design || '',
     work_detail_regulation: workData.work_detail_regulation || '',
@@ -135,7 +142,7 @@ function getProjectById(projectId) {
 
 function createProject(projectTitle) {
   const userEmail = Session.getActiveUser().getEmail();
-  const projectId = Utilities.getUuid();
+  const projectId = generateNextId(SHEET_NAMES.PROJECTS, 'P'); // ★★★★★ 変更 ★★★★★
   const now = new Date();
   
   if (isProjectTitleDuplicate(projectTitle)) {
@@ -323,6 +330,35 @@ function getSummaryData() {
 }
 
 // ============================================
+// インライン編集用
+// ============================================
+function updateSingleField(tableName, id, field, value) {
+  if (!canEdit()) {
+    throw new Error('この操作には編集権限が必要です。');
+  }
+
+  const sheetNameMap = {
+    'works': SHEET_NAMES.WORKS,
+    'projects': SHEET_NAMES.PROJECTS,
+    'members': SHEET_NAMES.MEMBERS,
+  };
+
+  const sheetName = sheetNameMap[tableName];
+  if (!sheetName) {
+    throw new Error(`無効なテーブル名です: ${tableName}`);
+  }
+
+  // Membersシートでrole_keyを更新する場合、ADMIN権限が必要
+  if (sheetName === SHEET_NAMES.MEMBERS && field === 'role_key' && !isAdmin()) {
+    throw new Error('メンバーの権限変更にはADMIN権限が必要です。');
+  }
+
+  const updateObject = { [field]: value };
+
+  return updateData(sheetName, id, updateObject);
+}
+
+// ============================================
 // Home用データ
 // ============================================
 
@@ -350,6 +386,53 @@ function getHomeData() {
     memberName: member.member_name,
     works: assignedWorks || []
   });
+}
+
+// ============================================
+// ★★★★★ 追加 ★★★★★
+// 新しいIDを採番する
+// ============================================
+function generateNextId(sheetName, prefix) {
+  // 同時実行によるID重複を防ぐためにロックを取得
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000); // 最大30秒待機
+
+  try {
+    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(sheetName);
+    const lastRow = sheet.getLastRow();
+    
+    // ヘッダー行のインデックスを取得 (1行目と仮定)
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const idColumnName = ID_COLUMNS[sheetName];
+    const idColumnIndex = headers.indexOf(idColumnName) + 1;
+
+    if (idColumnIndex === 0) {
+      throw new Error(`ID列 '${idColumnName}' がシート '${sheetName}' に見つかりません。`);
+    }
+
+    let nextIdNumber = 1;
+
+    // データ行が存在する場合のみ最終IDを読み取る (lastRow > 1)
+    if (lastRow > 1) {
+      // 最終行のIDを取得
+      const lastId = sheet.getRange(lastRow, idColumnIndex).getValue();
+      if (lastId && typeof lastId === 'string' && lastId.startsWith(prefix)) {
+        const lastNumber = parseInt(lastId.substring(prefix.length), 10);
+        if (!isNaN(lastNumber)) {
+          nextIdNumber = lastNumber + 1;
+        }
+      }
+    }
+    
+    // 4桁のゼロパディング
+    const nextId = prefix + String(nextIdNumber).padStart(4, '0');
+    
+    return nextId;
+
+  } finally {
+    // 必ずロックを解放
+    lock.releaseLock();
+  }
 }
 
 // ============================================
@@ -389,6 +472,34 @@ function getProjectWorkStats(projectId) {
 
 function getWorksByProjectId(projectId) {
   return findData(SHEET_NAMES.WORKS, { project_id: projectId });
+}
+
+function getOrCreateProjectId(projectTitle, projectId) {
+  if (projectId) {
+    return projectId;
+  }
+  if (!projectTitle) {
+    return null;
+  }
+
+  const projects = findData(SHEET_NAMES.PROJECTS, { project_title: projectTitle });
+  if (projects.length > 0) {
+    return projects[0].project_id;
+  }
+
+  // プロジェクトが存在しない場合は新規作成
+  try {
+    return createProject(projectTitle);
+  } catch (e) {
+    // createProject が重複エラーを投げた場合、再度検索を試みる
+    if (e.message.includes('既に存在します')) {
+      const projects = findData(SHEET_NAMES.PROJECTS, { project_title: projectTitle });
+      if (projects.length > 0) {
+        return projects[0].project_id;
+      }
+    }
+    throw e; // その他のエラーは再スロー
+  }
 }
 
 // ============================================
@@ -481,7 +592,7 @@ function removeWorkApp(workId, appKey) {
   return deleteData(SHEET_NAMES.APP_ASSIGNMENTS, { work_id: workId, work_apps_key: appKey });
 }
 
-function createWorkFolder(projectId, workTitle) {
+function createWorkFolder(projectTitle, workTitle) {
   try {
     const parentFolderId = getConfigValue('WORK_FOLDER_PARENT', 'FOLDER');
     if (!parentFolderId) {
@@ -490,7 +601,6 @@ function createWorkFolder(projectId, workTitle) {
     }
     
     const parentFolder = DriveApp.getFolderById(parentFolderId);
-    const projectTitle = getProjectTitle(projectId);
     const folderName = `${projectTitle}_${workTitle}`;
     
     const newFolder = parentFolder.createFolder(folderName);
