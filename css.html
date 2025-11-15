@@ -227,6 +227,7 @@
     table {
       width: 100%;
       border-collapse: collapse;
+      table-layout: fixed;
     }
     
     th {
@@ -344,6 +345,8 @@
       border-bottom: 1px solid var(--md-sys-color-surface-variant);
       color: var(--md-sys-color-on-surface);
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     
     tr {
@@ -505,8 +508,8 @@
 
     .inline-edit-input {
       width: 100%;
-      padding: 0;
-      margin: 0;
+      padding: 10px 14px;
+      margin: -12px -16px;
       border: none;
       background: transparent;
       font-family: inherit;
@@ -514,6 +517,7 @@
       color: inherit;
       outline: 2px solid var(--md-sys-color-primary);
       border-radius: 4px;
+      box-sizing: border-box;
     }
 
     .editable-container {
@@ -546,18 +550,19 @@
       height: 28px;
       border: none;
       background: transparent;
-      pointer-events: none;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       color: var(--md-sys-color-on-surface-variant);
       cursor: pointer;
+      pointer-events: none;
       
       /* M3: Hide by default, show on hover */
       opacity: 0;
       transform: scale(0.8);
       transition: all 0.2s var(--ease-standard);
+      font-size: 14px;
     }
     
     /* datetime専用のスタイル */
@@ -635,6 +640,68 @@
       box-shadow: 0 0 0 3px var(--md-sys-color-primary-container);
     }
     
+    .datetime-custom-editor {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      padding: 10px 14px;
+      margin: -12px -16px;
+      background-color: var(--md-sys-color-surface);
+      border: 2px solid var(--md-sys-color-primary);
+      border-radius: 4px;
+      white-space: nowrap;
+      box-sizing: border-box;
+      width: calc(100% + 32px);
+    }
+    
+    .datetime-segment {
+      border: none;
+      background: transparent;
+      font-family: 'SF Mono', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      text-align: center;
+      outline: none;
+      padding: 1px 2px;
+      border-radius: 2px;
+      color: var(--md-sys-color-on-surface);
+      box-sizing: border-box;
+    }
+    
+    .datetime-segment:focus {
+      background-color: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+    }
+    
+    .datetime-segment[data-segment="yyyy"] {
+      width: 42px;
+    }
+    
+    .datetime-segment[data-segment="mm"],
+    .datetime-segment[data-segment="dd"],
+    .datetime-segment[data-segment="hh"],
+    .datetime-segment[data-segment="min"] {
+      width: 24px;
+    }
+    
+    .datetime-custom-editor .datetime-separator {
+      color: var(--md-sys-color-on-surface-variant);
+      user-select: none;
+      font-size: 13px;
+    }
+    
+    .editing-datetime-picker {
+      background-color: transparent !important;
+    }
+    
+    .editing-datetime-picker td {
+      overflow: visible;
+      white-space: nowrap;
+    }
+    
     .editing-datetime {
       background-color: var(--md-sys-color-surface-variant) !important;
       white-space: nowrap;
@@ -649,15 +716,15 @@
     }
     
     .datetime-editable .editable-text {
-      font-family: 'Courier New', monospace;
+      font-family: 'SF Mono', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
       font-size: 14px;
-      letter-spacing: 0;
+      letter-spacing: 0.5px;
+      font-weight: 500;
     }
     
-    .datetime-editable .editable-toggle-btn {
+    .datetime-editable:hover .editable-toggle-btn {
       opacity: 1;
       transform: scale(1);
-      pointer-events: auto;
     }
     
     .datetime-editable:hover {
@@ -669,10 +736,7 @@
       transform: scale(1);
     }
 
-    .editable-toggle-btn:hover {
-      background-color: var(--md-sys-color-secondary-container);
-      color: var(--md-sys-color-on-secondary-container);
-    }
+
 
     .popup-editor {
       position: absolute;
@@ -689,6 +753,7 @@
 
     .popup-editor-input {
       width: 100%;
+      min-width: 150px;
       border: none;
       background: transparent;
       font-family: inherit;
@@ -697,6 +762,7 @@
       outline: none;
       padding: 8px 12px;
       border-radius: 8px;
+      box-sizing: border-box;
     }
 
     .popup-editor-input:focus {
@@ -1049,23 +1115,6 @@
     text-overflow: ellipsis;
 }
 
-.editable-toggle-btn {
-    background: transparent;
-    border: 1px solid var(--md-sys-color-outline);
-    color: var(--md-sys-color-on-surface-variant);
-    cursor: pointer;
-    padding: 4px 6px;
-    margin: -4px 0;
-    border-radius: 6px;
-    line-height: 1;
-    font-size: 14px;
-    transition: background-color 0.2s;
-}
-
-.editable-toggle-btn:hover {
-    background-color: var(--md-sys-color-surface-variant);
-}
-
 .popup-editor {
     position: absolute;
     display: block;
@@ -1113,21 +1162,22 @@ td.editable:hover::after {
   right: 8px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-surface-variant);
   font-size: 14px;
-  opacity: 0.7;
+  opacity: 1;
 }
 
 .inline-edit-input {
   width: 100%;
-  padding: 8px;
-  margin: -9px -9px; /* tdのpaddingを打ち消す */
+  padding: 10px 14px;
+  margin: -12px -16px;
   border: 2px solid var(--md-sys-color-primary);
   border-radius: 4px;
   font-size: inherit;
   font-family: inherit;
   background-color: var(--md-sys-color-primary-container);
   outline: none;
+  box-sizing: border-box;
 }
 
 .popup-editor-option {
