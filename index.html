@@ -208,6 +208,16 @@
     </div>
   </div>
 
+  <div id="modal-member-detail" class="modal">
+    <div class="modal-content">
+      <h2 class="modal-title">メンバー詳細</h2>
+      <div id="member-detail-content"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-member-detail')">閉じる</button>
+      </div>
+    </div>
+  </div>
+
   <div id="modal-new-project" class="modal">
     <div class="modal-content">
       <div class="modal-form-content">
@@ -239,19 +249,87 @@
           <!-- work_detail_... のリッチテキスト群 -->
           <div class="detail-section">
             <h3>制作物の概要</h3>
-            <div id="work-detail-content-editor" class="rich-text-editor"></div>
+            <div class="rich-text-editor-wrapper">
+              <div class="rich-text-toolbar" data-editor="work-detail-content-editor">
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h1" title="見出し1">H1</button>
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h2" title="見出し2">H2</button>
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h3" title="見出し3">H3</button>
+                <span class="toolbar-separator"></span>
+                <button type="button" class="toolbar-btn" data-command="bold" title="太字"><b>B</b></button>
+                <button type="button" class="toolbar-btn" data-command="italic" title="斜体"><i>I</i></button>
+                <button type="button" class="toolbar-btn" data-command="strikeThrough" title="打ち消し線"><s>S</s></button>
+                <button type="button" class="toolbar-btn" data-command="underline" title="下線"><u>U</u></button>
+                <span class="toolbar-separator"></span>
+                <button type="button" class="toolbar-btn color-btn" data-color="#000000" title="黒" style="background: #000000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#FF0000" title="赤" style="background: #FF0000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#0000FF" title="青" style="background: #0000FF;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#008000" title="緑" style="background: #008000;"></button>
+              </div>
+              <div id="work-detail-content-editor" class="rich-text-editor" contenteditable="true" data-field="work_detail_content" data-work-id=""></div>
+            </div>
           </div>
           <div class="detail-section">
             <h3>デザイン要項</h3>
-            <div id="work-detail-design-editor" class="rich-text-editor"></div>
+            <div class="rich-text-editor-wrapper">
+              <div class="rich-text-toolbar" data-editor="work-detail-design-editor">
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h1" title="見出し1">H1</button>
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h2" title="見出し2">H2</button>
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h3" title="見出し3">H3</button>
+                <span class="toolbar-separator"></span>
+                <button type="button" class="toolbar-btn" data-command="bold" title="太字"><b>B</b></button>
+                <button type="button" class="toolbar-btn" data-command="italic" title="斜体"><i>I</i></button>
+                <button type="button" class="toolbar-btn" data-command="strikeThrough" title="打ち消し線"><s>S</s></button>
+                <button type="button" class="toolbar-btn" data-command="underline" title="下線"><u>U</u></button>
+                <span class="toolbar-separator"></span>
+                <button type="button" class="toolbar-btn color-btn" data-color="#000000" title="黒" style="background: #000000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#FF0000" title="赤" style="background: #FF0000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#0000FF" title="青" style="background: #0000FF;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#008000" title="緑" style="background: #008000;"></button>
+              </div>
+              <div id="work-detail-design-editor" class="rich-text-editor" contenteditable="true" data-field="work_detail_design" data-work-id=""></div>
+            </div>
           </div>
           <div class="detail-section">
             <h3>入稿規定</h3>
-            <div id="work-detail-regulation-editor" class="rich-text-editor"></div>
+            <div class="rich-text-editor-wrapper">
+              <div class="rich-text-toolbar" data-editor="work-detail-regulation-editor">
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h1" title="見出し1">H1</button>
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h2" title="見出し2">H2</button>
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h3" title="見出し3">H3</button>
+                <span class="toolbar-separator"></span>
+                <button type="button" class="toolbar-btn" data-command="bold" title="太字"><b>B</b></button>
+                <button type="button" class="toolbar-btn" data-command="italic" title="斜体"><i>I</i></button>
+                <button type="button" class="toolbar-btn" data-command="strikeThrough" title="打ち消し線"><s>S</s></button>
+                <button type="button" class="toolbar-btn" data-command="underline" title="下線"><u>U</u></button>
+                <span class="toolbar-separator"></span>
+                <button type="button" class="toolbar-btn color-btn" data-color="#000000" title="黒" style="background: #000000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#FF0000" title="赤" style="background: #FF0000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#0000FF" title="青" style="background: #0000FF;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#008000" title="緑" style="background: #008000;"></button>
+              </div>
+              <div id="work-detail-regulation-editor" class="rich-text-editor" contenteditable="true" data-field="work_detail_regulation" data-work-id=""></div>
+            </div>
           </div>
           <div class="detail-section">
             <h3>依頼者からの備考</h3>
-            <div id="work-detail-note-editor" class="rich-text-editor"></div>
+            <div class="rich-text-editor-wrapper">
+              <div class="rich-text-toolbar" data-editor="work-detail-note-editor">
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h1" title="見出し1">H1</button>
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h2" title="見出し2">H2</button>
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h3" title="見出し3">H3</button>
+                <span class="toolbar-separator"></span>
+                <button type="button" class="toolbar-btn" data-command="bold" title="太字"><b>B</b></button>
+                <button type="button" class="toolbar-btn" data-command="italic" title="斜体"><i>I</i></button>
+                <button type="button" class="toolbar-btn" data-command="strikeThrough" title="打ち消し線"><s>S</s></button>
+                <button type="button" class="toolbar-btn" data-command="underline" title="下線"><u>U</u></button>
+                <span class="toolbar-separator"></span>
+                <button type="button" class="toolbar-btn color-btn" data-color="#000000" title="黒" style="background: #000000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#FF0000" title="赤" style="background: #FF0000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#0000FF" title="青" style="background: #0000FF;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#008000" title="緑" style="background: #008000;"></button>
+              </div>
+              <div id="work-detail-note-editor" class="rich-text-editor" contenteditable="true" data-field="work_detail_note" data-work-id=""></div>
+            </div>
           </div>
         </div>
         <div class="overlay-side">
@@ -265,13 +343,11 @@
           <div class="detail-section">
             <h3>担当者</h3>
             <div id="work-assignees-container"></div>
-            <button class="btn btn-sm">+ Add Assignee</button>
           </div>
           <!-- 使用アプリ管理 -->
           <div class="detail-section">
             <h3>使用アプリ</h3>
             <div id="work-apps-container"></div>
-            <button class="btn btn-sm">+ Add App</button>
           </div>
         </div>
       </div>
@@ -306,6 +382,99 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-task')">キャンセル</button>
+            <button type="submit" class="btn btn-primary">作成</button>
+          </div>
+        </form>
+      </div>
+      <div class="modal-result-content" style="display: none;">
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-new-member" class="modal">
+    <div class="modal-content">
+      <div class="modal-form-content">
+        <h2 class="modal-title">新規メンバー登録</h2>
+        <form id="new-member-form" onsubmit="submitNewMember(event)">
+          <div class="form-group">
+            <label class="form-label">メールアドレス <span style="color: red;">*</span></label>
+            <input type="email" name="member_email" class="input-field" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">名前 <span style="color: red;">*</span></label>
+            <input type="text" name="member_name" class="input-field" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">SlackメンバーID</label>
+            <input type="text" name="slack_member_id" class="input-field">
+          </div>
+          <div class="form-group">
+            <label class="form-label">アイコンURL</label>
+            <input type="url" name="member_icon" class="input-field">
+          </div>
+          <div class="form-group">
+            <label class="form-label">チーム <span style="color: red;">*</span></label>
+            <select name="member_team_key" class="input-field" required></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">権限 <span style="color: red;">*</span></label>
+            <select name="role_key" class="input-field" required></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">備考</label>
+            <textarea name="member_notes" class="input-field" rows="4"></textarea>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-member')">キャンセル</button>
+            <button type="submit" class="btn btn-primary">登録</button>
+          </div>
+        </form>
+      </div>
+      <div class="modal-result-content" style="display: none;">
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-new-knowledge" class="modal">
+    <div class="modal-content">
+      <div class="modal-form-content">
+        <h2 class="modal-title">新規ナレッジ作成</h2>
+        <form id="new-knowledge-form" onsubmit="submitNewKnowledge(event)">
+          <div class="form-group">
+            <label class="form-label">ナレッジタイプ <span style="color: red;">*</span></label>
+            <select name="knowledge_type_key" class="input-field" required></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">紐づける制作物 <span style="color: red;">*</span></label>
+            <div class="combobox-container">
+              <input type="text" name="work_search" class="input-field" placeholder="制作物を検索..." oninput="searchWorksForKnowledge(this.value)" autocomplete="off">
+              <input type="hidden" name="work_id">
+              <div id="work-suggestions-knowledge" class="combobox-suggestions"></div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">内容 <span style="color: red;">*</span></label>
+            <div class="rich-text-editor-wrapper">
+              <div class="rich-text-toolbar" data-editor="knowledge-content-editor">
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h1" title="見出し1">H1</button>
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h2" title="見出し2">H2</button>
+                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h3" title="見出し3">H3</button>
+                <span class="toolbar-separator"></span>
+                <button type="button" class="toolbar-btn" data-command="bold" title="太字"><b>B</b></button>
+                <button type="button" class="toolbar-btn" data-command="italic" title="斜体"><i>I</i></button>
+                <button type="button" class="toolbar-btn" data-command="strikeThrough" title="打ち消し線"><s>S</s></button>
+                <button type="button" class="toolbar-btn" data-command="underline" title="下線"><u>U</u></button>
+                <span class="toolbar-separator"></span>
+                <button type="button" class="toolbar-btn color-btn" data-color="#000000" title="黒" style="background: #000000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#FF0000" title="赤" style="background: #FF0000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#0000FF" title="青" style="background: #0000FF;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#008000" title="緑" style="background: #008000;"></button>
+              </div>
+              <div id="knowledge-content-editor" class="rich-text-editor" contenteditable="true"></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-knowledge')">キャンセル</button>
             <button type="submit" class="btn btn-primary">作成</button>
           </div>
         </form>
