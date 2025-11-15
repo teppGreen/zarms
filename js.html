@@ -48,6 +48,31 @@
     window.onload = function() {
       loadInitialData();
       document.body.addEventListener('click', closeAllPopups);
+
+      // --- 新規作成ボタンのロジック ---
+      const mainButton = document.getElementById('new-button-main');
+      const triggerButton = document.getElementById('new-button-dropdown-trigger');
+      const dropdown = document.getElementById('new-button-dropdown');
+      const newButtonContainer = document.getElementById('new-button'); // 2つのspanの親
+
+      // 「+ 新規作成」テキスト部分のクリック
+      if (mainButton) {
+        mainButton.addEventListener('click', handleMainButtonClick);
+      }
+
+      // 「▼」アイコン部分のクリック
+      if (triggerButton) {
+        triggerButton.addEventListener('click', toggleNewButtonDropdown);
+      }
+
+      // ドキュメント全体（body）をクリックした時の動作
+      document.addEventListener('click', (event) => {
+        // ドロップダウンが表示されていて、かつ
+        // クリックされた場所がボタン（newButtonContainer）の外側の場合にドロップダウンを閉じる
+        if (dropdown && dropdown.classList.contains('show') && !newButtonContainer.contains(event.target)) {
+           closeNewButtonDropdown();
+        }
+      });
     };
 
     function loadInitialData() {
@@ -125,6 +150,55 @@
       hideLoading();
       console.error('GAS Error:', error);
       alert('エラーが発生しました: ' + error.message);
+    }
+
+    function closeNewButtonDropdown() {
+      const dropdown = document.getElementById('new-button-dropdown');
+      if (dropdown) {
+        dropdown.classList.remove('show');
+      }
+    }
+
+    // (前回の修正で追加した closeNewButtonDropdown 関数がここにあるはずです)
+    function closeNewButtonDropdown() {
+      const dropdown = document.getElementById('new-button-dropdown');
+      if (dropdown) {
+        dropdown.classList.remove('show');
+      }
+    }
+
+    // ★★★★★ 修正ここから ★★★★★
+    // 以下の2つの関数を新しく追加してください
+
+    /**
+     * 「+ 新規作成」ボタンのドロップダウンの表示/非表示を切り替えます。
+     */
+    function toggleNewButtonDropdown(event) {
+      event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
+      const dropdown = document.getElementById('new-button-dropdown');
+      if (dropdown) {
+        dropdown.classList.toggle('show');
+      }
+    }
+
+    /**
+     * メインの「+ 新規作成」ボタンがクリックされたときの処理
+     */
+    function handleMainButtonClick(event) {
+      event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
+      
+      // 他のポップアップは閉じる
+      closeAllPopups();
+      
+      // 表示中のタブを判定
+      if (document.getElementById('tab-works').style.display === 'block') {
+        openNewWorkModal();
+      } else if (document.getElementById('tab-projects').style.display === 'block') {
+        openNewProjectModal();
+      } else {
+        // それ以外のタブ（ホーム、メンバーなど）ではドロップダウンを表示
+        toggleNewButtonDropdown(event);
+      }
     }
 
     // ============================================
