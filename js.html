@@ -116,19 +116,6 @@
     function showLoading() {
       if (loadingTimeout) clearTimeout(loadingTimeout);
       
-      // サイドバーのローディングインジケーター
-      const indicator = document.getElementById('sidebar-loading-indicator');
-      if (indicator) {
-        const spinner = indicator.querySelector('.loading-spinner');
-        const checkmark = indicator.querySelector('.loading-checkmark');
-        indicator.style.transition = 'none';
-        indicator.style.display = 'inline-block';
-        indicator.style.opacity = '1';
-        spinner.style.display = 'inline-block';
-        checkmark.style.display = 'none';
-        indicator.style.transition = 'opacity 0.5s ease-in-out';
-      }
-      
       // 新規作成ボタンのローディング
       const newButton = document.getElementById('new-button');
       const newButtonLoading = document.getElementById('new-button-loading');
@@ -141,19 +128,6 @@
     }
 
     function hideLoading() {
-      // サイドバーのローディングインジケーター
-      const indicator = document.getElementById('sidebar-loading-indicator');
-      if (indicator) {
-        const spinner = indicator.querySelector('.loading-spinner');
-        const checkmark = indicator.querySelector('.loading-checkmark');
-        spinner.style.display = 'none';
-        checkmark.style.display = 'inline-block';
-        if (loadingTimeout) clearTimeout(loadingTimeout);
-        loadingTimeout = setTimeout(() => {
-          indicator.style.opacity = '0';
-        }, 1500);
-      }
-      
       // 新規作成ボタンのローディング
       const newButton = document.getElementById('new-button');
       const newButtonLoading = document.getElementById('new-button-loading');
