@@ -65,7 +65,10 @@
         // ドロップダウンが表示されていて、かつ
         // クリックされた場所がボタンコンテナの外側の場合にドロップダウンを閉じる
         if (dropdown && dropdown.classList.contains('show') && newButtonContainer && !newButtonContainer.contains(event.target)) {
-           closeNewButtonDropdown();
+          // 新規作成ボタン自体のクリックは除外
+          if (event.target !== newButton && !newButton.contains(event.target)) {
+            closeNewButtonDropdown();
+          }
         }
       });
       
@@ -205,10 +208,28 @@
      * 「+ 新規作成」ボタンのドロップダウンの表示/非表示を切り替えます。
      */
     function toggleNewButtonDropdown(event) {
-      event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
+      if (event) {
+        event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
+      }
       const dropdown = document.getElementById('new-button-dropdown');
       if (dropdown) {
         dropdown.classList.toggle('show');
+      }
+    }
+
+    /**
+     * 「+ 新規作成」ボタンのドロップダウンを表示します。
+     */
+    function showNewButtonDropdown(event) {
+      if (event) {
+        event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
+      }
+      const dropdown = document.getElementById('new-button-dropdown');
+      if (dropdown) {
+        // 少し遅延させてから表示することで、bodyのクリックイベントとの競合を避ける
+        setTimeout(() => {
+          dropdown.classList.add('show');
+        }, 10);
       }
     }
 
@@ -218,23 +239,33 @@
     function handleMainButtonClick(event) {
       event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
       
-      // 他のポップアップは閉じる
-      closeAllPopups();
-      
       // アクティブなタブを判定（より確実な方法：getComputedStyleを使用）
       const activeTab = getActiveTabName();
       
       if (activeTab === 'works') {
+        // 他のポップアップは閉じる
+        closeAllPopups();
         openNewWorkModal();
       } else if (activeTab === 'projects') {
+        // 他のポップアップは閉じる
+        closeAllPopups();
         openNewWorkModal();
       } else if (activeTab === 'members') {
+        // 他のポップアップは閉じる
+        closeAllPopups();
         openNewMemberModal();
       } else if (activeTab === 'knowledge') {
+        // 他のポップアップは閉じる
+        closeAllPopups();
         openNewKnowledgeModal();
       } else {
         // それ以外のタブ（ホーム、統計など）ではドロップダウンを表示
-        toggleNewButtonDropdown(event);
+        // 他のポップアップは閉じる（ドロップダウンは閉じない）
+        closeAllPopups();
+        // 少し遅延させてからドロップダウンを表示することで、bodyのクリックイベントとの競合を避ける
+        setTimeout(() => {
+          showNewButtonDropdown(event);
+        }, 0);
       }
     }
 
