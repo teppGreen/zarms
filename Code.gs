@@ -135,6 +135,15 @@ function updateWork(workId, workData) {
   return updateData(SHEET_NAMES.WORKS, workId, workData);
 }
 
+function updateWorkField(workId, field, value) {
+  if (!canEdit()) {
+    throw new Error('この操作には編集権限が必要です。');
+  }
+  
+  const updateObject = { [field]: value };
+  return updateData(SHEET_NAMES.WORKS, workId, updateObject);
+}
+
 // ============================================
 // Projects関連
 // ============================================
@@ -204,6 +213,19 @@ function getMembers() {
   });
   
   return sanitizeForClient(enrichedMembers);
+}
+
+function getMemberByEmail(memberEmail) {
+  const member = getDataById(SHEET_NAMES.MEMBERS, memberEmail);
+  if (!member) return null;
+  
+  // 担当しているWorksを取得
+  const assignments = findData(SHEET_NAMES.WORK_ASSIGNMENTS, { member_email: memberEmail });
+  const workIds = assignments.map(a => a.work_id);
+  const allWorks = getAllData(SHEET_NAMES.WORKS);
+  member.assigned_works = allWorks.filter(work => workIds.includes(work.work_id));
+  
+  return sanitizeForClient(member);
 }
 
 function createMember(memberData) {
@@ -400,7 +422,7 @@ function getHomeData() {
     });
   }
   
-  const assignedWorks = getAssignedWorksInProgress(userEmail);
+  const assignedWorks = getAssignedWorks(userEmail);
   
   const hour = new Date().getHours();
   let greeting = 'こんにちは';
@@ -685,7 +707,7 @@ function createWorkDocument(workId, workTitle, content, design, regulation, note
   }
 }
 
-function getAssignedWorksInProgress(memberEmail) {
+function getAssignedWorks(memberEmail) {
   const assignments = findData(SHEET_NAMES.WORK_ASSIGNMENTS, { member_email: memberEmail });
   const workIds = assignments.map(a => a.work_id);
   if (workIds.length === 0) return [];
@@ -693,7 +715,7 @@ function getAssignedWorksInProgress(memberEmail) {
   const allWorks = getAllData(SHEET_NAMES.WORKS);
   
   const works = allWorks.filter(work => 
-    workIds.includes(work.work_id) && work.work_status_key === 'CREATE'
+    workIds.includes(work.work_id) && ![`DELIVERED`,`CANCELED`].includes(work.work_status_key)
   );
 
   const enrichedWorks = works.map(work => {
