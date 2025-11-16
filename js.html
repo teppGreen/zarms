@@ -411,7 +411,10 @@
                 cell.innerHTML = `<div class="editable-container" onclick="showSelectEditor(event, '${name}', '${item[idKey]}', '${header.key}')"> <span class="editable-text">${getConfigLabel(currentValue, header.configType)}</span> <span class="editable-toggle-btn">✎</span> </div>`;
                 break;
               case 'datetime':
-                cell.innerHTML = `<div class="editable-container datetime-editable" onclick="openDateTimePicker(event, '${name}', '${item[idKey]}', '${header.key}')"><span class="editable-text">${formatDateTimeForDisplay(currentValue)}</span><span class="editable-toggle-btn">✎</span></div>`;
+                cell.innerHTML = `<div class="editable-container datetime-editable" onclick="openDateTimePicker(event, '${name}', '${item[idKey]}', '${header.key}')">
+                  <span class="editable-text">${formatDateTimeForDisplay(currentValue)}</span>
+                  <span class="editable-toggle-btn">✎</span>
+                </div>`;
                 break;
               default: // text
                 cell.textContent = currentValue;
@@ -1599,61 +1602,9 @@
 
     function buildNewWorkForm() {
       const formContainer = document.getElementById('new-work-form');
-      if (!formContainer) {
-        console.error('new-work-form element not found');
-        return;
-      }
       const workTypes = configData['WORK_TYPE'] || [];
-      const workTypeOptions = workTypes.map(wt => {
-        const key = escapeHtml(wt.config_key || '');
-        const value = escapeHtml(wt.config_value || '');
-        return `<option value="${key}">${value}</option>`;
-      }).join('');
-      formContainer.innerHTML = '<form id="new-work-form-element" onsubmit="submitNewWork(event)">' +
-        '<div class="form-group">' +
-        '<label class="form-label">案件タイトル</label>' +
-        '<div id="project-combobox" class="combobox-container">' +
-        '<input type="text" name="project_title" class="input-field" required placeholder="既存の案件タイトルで検索、または新規作成" oninput="searchProjects(this.value)" autocomplete="off">' +
-        '<input type="hidden" name="project_id">' +
-        '<div id="project-suggestions" class="combobox-suggestions"></div>' +
-        '</div>' +
-        '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">制作タイトル</label>' +
-        '<input type="text" name="work_title" class="input-field" required>' +
-        '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">制作種別</label>' +
-        '<select name="work_type_key" class="input-field" onchange="updateRegulationPreset(this.value)">' +
-        '<option value="">選択してください</option>' +
-        workTypeOptions +
-        '</select>' +
-        '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">納品期限</label>' +
-        '<input type="datetime-local" name="due_datetime" class="input-field">' +
-        '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">制作物の概要</label>' +
-        '<textarea name="work_detail_content" class="input-field" rows="4"></textarea>' +
-        '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">デザイン要項</label>' +
-        '<textarea name="work_detail_design" class="input-field" rows="4"></textarea>' +
-        '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">入稿規定</label>' +
-        '<textarea name="work_detail_regulation" class="input-field" rows="4"></textarea>' +
-        '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">依頼者からの備考</label>' +
-        '<textarea name="work_detail_note" class="input-field" rows="4"></textarea>' +
-        '</div>' +
-        '<div class="modal-footer">' +
-        '<button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal(\'modal-new-work\')">キャンセル</button>' +
-        '<button type="submit" class="btn btn-primary">作成</button>' +
-        '</div>' +
-        '</form>';
+      const workTypeOptions = workTypes.map(wt => `<option value="${wt.config_key}">${wt.config_value}</option>`).join('');
+      formContainer.innerHTML = `<form id="new-work-form-element" onsubmit="submitNewWork(event)"> <div class="form-group"> <label class="form-label">案件タイトル</label> <div id="project-combobox" class="combobox-container"> <input type="text" name="project_title" class="input-field" required placeholder="既存の案件タイトルで検索、または新規作成" oninput="searchProjects(this.value)" autocomplete="off"> <input type="hidden" name="project_id"> <div id="project-suggestions" class="combobox-suggestions"></div> </div> </div> <div class="form-group"> <label class="form-label">制作タイトル</label> <input type="text" name="work_title" class="input-field" required> </div> <div class="form-group"> <label class="form-label">制作種別</label> <select name="work_type_key" class="input-field" onchange="updateRegulationPreset(this.value)"> <option value="">選択してください</option> ${workTypeOptions} </select> </div> <div class="form-group"> <label class="form-label">納品期限</label> <input type="datetime-local" name="due_datetime" class="input-field"> </div> <div class="form-group"> <label class="form-label">制作物の概要</label> <textarea name="work_detail_content" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">デザイン要項</label> <textarea name="work_detail_design" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">入稿規定</label> <textarea name="work_detail_regulation" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">依頼者からの備考</label> <textarea name="work_detail_note" class="input-field" rows="4"></textarea> </div> <div class="modal-footer"> <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-work')">キャンセル</button> <button type="submit" class="btn btn-primary">作成</button> </div> </form>`;
     }
 
     function updateRegulationPreset(workTypeKey) {
