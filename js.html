@@ -499,6 +499,7 @@
         workTitleHeader.style.display = 'inline-block';
         const currentWorkTitle = work.work_title || '';
         workTitleHeader.textContent = currentWorkTitle;
+        const workIdForTitle = work.work_id; // クロージャで保持
         const setupWorkTitleEdit = () => {
           workTitleHeader.onclick = () => {
             const originalValue = workTitleHeader.textContent;
@@ -517,7 +518,7 @@
               const newValue = input.value.trim();
               if (newValue && newValue !== originalValue) {
                 showLoading();
-                callGAS('updateSingleField', 'works', work.work_id, 'work_title', newValue)
+                callGAS('updateSingleField', 'works', workIdForTitle, 'work_title', newValue)
                   .then(() => {
                     workTitleHeader.textContent = newValue;
                     setupWorkTitleEdit();
@@ -546,6 +547,7 @@
         assigneesContainer.innerHTML = '';
         assigneesContainer.style.display = 'inline-flex';
         assigneesContainer.style.alignItems = 'center';
+        assigneesContainer.style.verticalAlign = 'middle';
         if (work.assignees && work.assignees.length > 0) {
           work.assignees.forEach(assignee => {
             const icon = document.createElement('img');
@@ -555,6 +557,7 @@
             icon.style.height = '24px';
             icon.style.marginRight = '4px';
             icon.style.verticalAlign = 'middle';
+            icon.style.display = 'inline-block';
             icon.title = `${assignee.member_name} / ${assignee.member_team_value}`;
             assigneesContainer.appendChild(icon);
           });
@@ -583,39 +586,26 @@
         };
         assigneesContainer.appendChild(addIcon);
         
-        // URL発行ボタンを追加（既存のボタンを削除してから追加）
-        const headerInfo = document.querySelector('.overlay-header-info');
-        if (headerInfo) {
-          const existingUrlButton = headerInfo.querySelector('.url-copy-button');
-          if (existingUrlButton) {
-            existingUrlButton.remove();
-          }
-          const urlButton = document.createElement('button');
-          urlButton.textContent = 'URLをコピー';
-          urlButton.className = 'btn btn-sm url-copy-button';
-          urlButton.style.marginLeft = '16px';
-          urlButton.onclick = () => {
-            const url = `${window.location.origin}${window.location.pathname}?work_id=${work.work_id}`;
-            navigator.clipboard.writeText(url).then(() => {
-              alert('URLをクリップボードにコピーしました');
-            }).catch(() => {
-              // フォールバック
-              const textArea = document.createElement('textarea');
-              textArea.value = url;
-              document.body.appendChild(textArea);
-              textArea.select();
-              document.execCommand('copy');
-              document.body.removeChild(textArea);
-              alert('URLをクリップボードにコピーしました');
-            });
-          };
-          const closeBtn = headerInfo.querySelector('.close-btn');
-          if (closeBtn) {
-            headerInfo.insertBefore(urlButton, closeBtn);
-          }
-        }
         
-        // ステータスを表示・編集可能に
+        // ステータスを表示・編集可能に（header-contentエリア）
+        const statusTextHeader = document.getElementById('work-detail-status-text-header');
+        statusTextHeader.textContent = getConfigLabel(work.work_status_key, 'WORK_STATUS') || work.work_status_key || '';
+        const statusEditableHeader = document.getElementById('work-detail-status-editable-header');
+        statusEditableHeader.onclick = (e) => {
+          e.stopPropagation();
+          showSelectEditorForWorkDetailHeader(e, work.work_id, 'work_status_key', work.work_status_key, 'WORK_STATUS');
+        };
+        
+        // 納品期限を表示・編集可能に（header-contentエリア）
+        const dueTextHeader = document.getElementById('work-detail-due-text-header');
+        dueTextHeader.textContent = formatDateTimeForDisplay(work.due_datetime) || '';
+        const dueEditableHeader = document.getElementById('work-detail-due-editable-header');
+        dueEditableHeader.onclick = (e) => {
+          e.stopPropagation();
+          openDateTimePickerForWorkDetailHeader(e, work.work_id, 'due_datetime', work.due_datetime);
+        };
+        
+        // ステータスを表示・編集可能に（overlay-header-info）
         const statusText = document.getElementById('work-detail-status-text');
         statusText.textContent = getConfigLabel(work.work_status_key, 'WORK_STATUS') || work.work_status_key || '';
         const statusEditable = document.getElementById('work-detail-status-editable');
@@ -624,7 +614,7 @@
           showSelectEditorForWorkDetail(e, work.work_id, 'work_status_key', work.work_status_key, 'WORK_STATUS');
         };
         
-        // 納品期限を表示・編集可能に
+        // 納品期限を表示・編集可能に（overlay-header-info）
         const dueText = document.getElementById('work-detail-due-text');
         dueText.textContent = formatDateTimeForDisplay(work.due_datetime) || '';
         const dueEditable = document.getElementById('work-detail-due-editable');
@@ -632,6 +622,13 @@
           e.stopPropagation();
           openDateTimePickerForWorkDetail(e, work.work_id, 'due_datetime', work.due_datetime);
         };
+        
+        // URLコピーボタンを表示
+        const urlCopyButton = document.getElementById('work-detail-url-copy-button');
+        if (urlCopyButton) {
+          urlCopyButton.style.display = 'block';
+          urlCopyButton.dataset.workId = work.work_id;
+        }
         
         // Googleドキュメントを埋め込む
         const docContainer = document.getElementById('work-detail-document-container');
@@ -756,6 +753,29 @@
       if (headerInfoDiv) {
         headerInfoDiv.style.display = 'none';
       }
+      const urlCopyButton = document.getElementById('work-detail-url-copy-button');
+      if (urlCopyButton) {
+        urlCopyButton.style.display = 'none';
+      }
+    }
+    
+    function copyWorkDetailUrl() {
+      const urlCopyButton = document.getElementById('work-detail-url-copy-button');
+      if (!urlCopyButton || !urlCopyButton.dataset.workId) return;
+      const workId = urlCopyButton.dataset.workId;
+      const url = `${window.location.origin}${window.location.pathname}?work_id=${workId}`;
+      navigator.clipboard.writeText(url).then(() => {
+        alert('URLをクリップボードにコピーしました');
+      }).catch(() => {
+        // フォールバック
+        const textArea = document.createElement('textarea');
+        textArea.value = url;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('URLをクリップボードにコピーしました');
+      });
     }
     
     function searchProjectsForWorkDetail(query, workId) {
@@ -876,6 +896,47 @@
       createPopup(container, optionsContainer);
     }
     
+    function showSelectEditorForWorkDetailHeader(event, workId, field, currentValue, configType) {
+      event.stopPropagation();
+      const container = event.currentTarget;
+      
+      const optionsContainer = document.createElement('div');
+      optionsContainer.className = 'popup-editor';
+      optionsContainer.style.position = 'absolute';
+      optionsContainer.style.zIndex = '10000';
+      optionsContainer.style.backgroundColor = 'var(--md-sys-color-surface)';
+      optionsContainer.style.border = '1px solid var(--md-sys-color-outline)';
+      optionsContainer.style.borderRadius = '8px';
+      optionsContainer.style.padding = '8px';
+      
+      const options = configData[configType] || [];
+      options.forEach(opt => {
+        const optionDiv = document.createElement('div');
+        optionDiv.className = 'popup-editor-option';
+        optionDiv.textContent = opt.config_value;
+        optionDiv.dataset.value = opt.config_key;
+        if (opt.config_key === currentValue) {
+          optionDiv.classList.add('selected');
+        }
+        optionDiv.addEventListener('click', () => {
+          if (opt.config_key !== currentValue) {
+            showLoading();
+            callGAS('updateSingleField', 'works', workId, field, opt.config_key)
+              .then(() => {
+                document.getElementById('work-detail-status-text-header').textContent = opt.config_value;
+                document.getElementById('work-detail-status-text').textContent = opt.config_value;
+                hideLoading();
+              })
+              .catch(handleError);
+          }
+          closeAllPopups();
+        });
+        optionsContainer.appendChild(optionDiv);
+      });
+      
+      createPopup(container, optionsContainer);
+    }
+    
     function openDateTimePickerForWorkDetail(event, workId, field, originalValue) {
       event.stopPropagation();
       event.preventDefault();
@@ -964,6 +1025,94 @@
       }, 50);
     }
     
+    function openDateTimePickerForWorkDetailHeader(event, workId, field, originalValue) {
+      event.stopPropagation();
+      event.preventDefault();
+      
+      const container = event.currentTarget;
+      const textSpan = container.querySelector('.editable-text');
+      
+      let dateObj;
+      if (originalValue) {
+        dateObj = new Date(originalValue);
+      } else {
+        dateObj = new Date();
+      }
+      
+      const yyyy = dateObj.getFullYear().toString().padStart(4, '0');
+      const mm = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+      const dd = dateObj.getDate().toString().padStart(2, '0');
+      const hh = dateObj.getHours().toString().padStart(2, '0');
+      const min = dateObj.getMinutes().toString().padStart(2, '0');
+      
+      // 既存のコンテンツを非表示
+      container.style.display = 'none';
+      
+      // カスタム日時入力フィールドを作成
+      const editorDiv = document.createElement('div');
+      editorDiv.className = 'datetime-custom-editor';
+      editorDiv.style.position = 'absolute';
+      editorDiv.style.zIndex = '10000';
+      editorDiv.innerHTML = `
+        <input type="text" class="datetime-segment" data-segment="yyyy" maxlength="4" value="${yyyy}" placeholder="yyyy" />
+        <span class="datetime-separator">/</span>
+        <input type="text" class="datetime-segment" data-segment="mm" maxlength="2" value="${mm}" placeholder="mm" />
+        <span class="datetime-separator">/</span>
+        <input type="text" class="datetime-segment" data-segment="dd" maxlength="2" value="${dd}" placeholder="dd" />
+        <span class="datetime-separator"> </span>
+        <input type="text" class="datetime-segment" data-segment="hh" maxlength="2" value="${hh}" placeholder="hh" />
+        <span class="datetime-separator">:</span>
+        <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="${min}" placeholder="mm" />
+      `;
+      
+      const rect = container.getBoundingClientRect();
+      editorDiv.style.left = `${rect.left}px`;
+      editorDiv.style.top = `${rect.top}px`;
+      document.body.appendChild(editorDiv);
+      
+      const inputs = editorDiv.querySelectorAll('.datetime-segment');
+      
+      // 各inputにイベントリスナーを設定
+      inputs.forEach((input, index) => {
+        input.addEventListener('input', (e) => {
+          let value = e.target.value.replace(/[^0-9]/g, '');
+          const maxLength = parseInt(e.target.getAttribute('maxlength'));
+          if (value.length > maxLength) {
+            value = value.substring(0, maxLength);
+          }
+          e.target.value = value;
+          if (value.length >= maxLength && index < inputs.length - 1) {
+            inputs[index + 1].focus();
+            inputs[index + 1].select();
+          }
+        });
+        
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            saveWorkDetailDateTimeHeader(editorDiv, container, workId, field, originalValue, inputs);
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelWorkDetailDateTime(editorDiv, container);
+          }
+        });
+        
+        input.addEventListener('blur', (e) => {
+          setTimeout(() => {
+            const focusedElement = document.activeElement;
+            if (!focusedElement || !focusedElement.classList.contains('datetime-segment')) {
+              saveWorkDetailDateTimeHeader(editorDiv, container, workId, field, originalValue, inputs);
+            }
+          }, 100);
+        });
+      });
+      
+      setTimeout(() => {
+        inputs[0].focus();
+        inputs[0].select();
+      }, 50);
+    }
+    
     function saveWorkDetailDateTime(editorDiv, container, workId, field, originalValue, inputs) {
       const values = Array.from(inputs).map(input => input.value);
       const [yyyy, mm, dd, hh, min] = values;
@@ -1005,6 +1154,59 @@
             const textSpan = container.querySelector('.editable-text');
             if (textSpan) {
               textSpan.textContent = formatDateTimeForDisplay(newValueAsISO);
+            }
+            hideLoading();
+          })
+          .catch(handleError);
+      }
+    }
+    
+    function saveWorkDetailDateTimeHeader(editorDiv, container, workId, field, originalValue, inputs) {
+      const values = Array.from(inputs).map(input => input.value);
+      const [yyyy, mm, dd, hh, min] = values;
+      
+      const yearNum = parseInt(yyyy);
+      const monthNum = parseInt(mm);
+      const dayNum = parseInt(dd);
+      const hourNum = parseInt(hh);
+      const minuteNum = parseInt(min);
+      
+      if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100 ||
+          isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
+          isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
+          isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
+          isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
+        alert('無効な日時です');
+        cancelWorkDetailDateTime(editorDiv, container);
+        return;
+      }
+      
+      const newDateStr = `${yyyy.padStart(4, '0')}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T${hh.padStart(2, '0')}:${min.padStart(2, '0')}:00`;
+      const newDate = new Date(newDateStr);
+      
+      if (isNaN(newDate.getTime())) {
+        alert('無効な日時です');
+        cancelWorkDetailDateTime(editorDiv, container);
+        return;
+      }
+      
+      const newValueAsISO = newDate.toISOString();
+      
+      editorDiv.remove();
+      container.style.display = 'inline-flex';
+      
+      if (newValueAsISO !== originalValue) {
+        showLoading();
+        callGAS('updateSingleField', 'works', workId, field, newValueAsISO)
+          .then(() => {
+            const textSpanHeader = document.getElementById('work-detail-due-text-header');
+            const textSpan = document.getElementById('work-detail-due-text');
+            const formattedDate = formatDateTimeForDisplay(newValueAsISO);
+            if (textSpanHeader) {
+              textSpanHeader.textContent = formattedDate;
+            }
+            if (textSpan) {
+              textSpan.textContent = formattedDate;
             }
             hideLoading();
           })
