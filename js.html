@@ -450,23 +450,111 @@
           membersData = members;
         }
         
-        // ヘッダー情報を設定
-        document.getElementById('work-detail-project-id').textContent = work.project_id || '';
-        document.getElementById('work-detail-work-id').textContent = work.work_id || '';
-        document.getElementById('work-detail-project-title').textContent = work.project_title || '';
-        document.getElementById('work-detail-work-title').textContent = work.work_title || '';
+        // header-contentエリアに情報を表示
+        const headerInfoDiv = document.getElementById('work-detail-header-info');
+        headerInfoDiv.style.display = 'flex';
         
-        // 担当者を表示
-        const assigneesContainer = document.getElementById('work-detail-assignees-header');
+        // 案件IDと制作IDを表示
+        document.getElementById('work-detail-project-id-header').textContent = work.project_id || '';
+        document.getElementById('work-detail-work-id-header').textContent = work.work_id || '';
+        
+        // 案件タイトルを編集可能なコンボボックスとして表示
+        const projectTitleHeader = document.getElementById('work-detail-project-title-header');
+        projectTitleHeader.innerHTML = '';
+        const projectTitleContainer = document.createElement('div');
+        projectTitleContainer.className = 'combobox-container';
+        projectTitleContainer.style.position = 'relative';
+        projectTitleContainer.style.display = 'inline-block';
+        const projectTitleInput = document.createElement('input');
+        projectTitleInput.type = 'text';
+        projectTitleInput.className = 'input-field';
+        projectTitleInput.style.width = '200px';
+        projectTitleInput.style.padding = '4px 8px';
+        projectTitleInput.style.fontSize = '14px';
+        projectTitleInput.value = work.project_title || '';
+        projectTitleInput.dataset.projectId = work.project_id || '';
+        projectTitleInput.oninput = (e) => searchProjectsForWorkDetail(e.target.value, work.work_id);
+        projectTitleInput.onblur = () => {
+          setTimeout(() => {
+            const suggestions = projectTitleContainer.querySelector('.combobox-suggestions');
+            if (suggestions) {
+              suggestions.style.display = 'none';
+            }
+          }, 200);
+        };
+        const projectTitleSuggestions = document.createElement('div');
+        projectTitleSuggestions.className = 'combobox-suggestions';
+        projectTitleSuggestions.style.display = 'none';
+        projectTitleContainer.appendChild(projectTitleInput);
+        projectTitleContainer.appendChild(projectTitleSuggestions);
+        projectTitleHeader.appendChild(projectTitleContainer);
+        
+        // 制作タイトルを編集可能に
+        const workTitleHeader = document.getElementById('work-detail-work-title-header');
+        workTitleHeader.innerHTML = '';
+        workTitleHeader.style.cursor = 'text';
+        workTitleHeader.style.padding = '4px 8px';
+        workTitleHeader.style.borderRadius = '4px';
+        workTitleHeader.style.minWidth = '150px';
+        workTitleHeader.style.display = 'inline-block';
+        const currentWorkTitle = work.work_title || '';
+        workTitleHeader.textContent = currentWorkTitle;
+        const setupWorkTitleEdit = () => {
+          workTitleHeader.onclick = () => {
+            const originalValue = workTitleHeader.textContent;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = originalValue;
+            input.className = 'input-field';
+            input.style.width = '200px';
+            input.style.padding = '4px 8px';
+            input.style.fontSize = '14px';
+            workTitleHeader.innerHTML = '';
+            workTitleHeader.appendChild(input);
+            input.focus();
+            input.select();
+            input.onblur = () => {
+              const newValue = input.value.trim();
+              if (newValue && newValue !== originalValue) {
+                showLoading();
+                callGAS('updateSingleField', 'works', work.work_id, 'work_title', newValue)
+                  .then(() => {
+                    workTitleHeader.textContent = newValue;
+                    setupWorkTitleEdit();
+                    hideLoading();
+                  })
+                  .catch(handleError);
+              } else {
+                workTitleHeader.textContent = originalValue;
+                setupWorkTitleEdit();
+              }
+            };
+            input.onkeydown = (e) => {
+              if (e.key === 'Enter') {
+                input.blur();
+              } else if (e.key === 'Escape') {
+                workTitleHeader.textContent = originalValue;
+                setupWorkTitleEdit();
+              }
+            };
+          };
+        };
+        setupWorkTitleEdit();
+        
+        // 担当者を表示（アイコンをテキストと横揃え）
+        const assigneesContainer = document.getElementById('work-detail-assignees-header-info');
         assigneesContainer.innerHTML = '';
+        assigneesContainer.style.display = 'inline-flex';
+        assigneesContainer.style.alignItems = 'center';
         if (work.assignees && work.assignees.length > 0) {
           work.assignees.forEach(assignee => {
             const icon = document.createElement('img');
             icon.src = assignee.member_icon || 'https://via.placeholder.com/32';
             icon.className = 'avatar';
-            icon.style.width = '32px';
-            icon.style.height = '32px';
-            icon.style.marginRight = '8px';
+            icon.style.width = '24px';
+            icon.style.height = '24px';
+            icon.style.marginRight = '4px';
+            icon.style.verticalAlign = 'middle';
             icon.title = `${assignee.member_name} / ${assignee.member_team_value}`;
             assigneesContainer.appendChild(icon);
           });
@@ -475,52 +563,75 @@
         const addIcon = document.createElement('button');
         addIcon.innerHTML = '+';
         addIcon.className = 'btn-icon-add-assignee';
-        addIcon.style.width = '32px';
-        addIcon.style.height = '32px';
+        addIcon.style.width = '24px';
+        addIcon.style.height = '24px';
         addIcon.style.borderRadius = '50%';
         addIcon.style.border = 'none';
         addIcon.style.backgroundColor = 'var(--md-sys-color-primary)';
         addIcon.style.color = 'var(--md-sys-color-on-primary)';
         addIcon.style.cursor = 'pointer';
-        addIcon.style.marginLeft = '8px';
-        addIcon.style.display = 'flex';
+        addIcon.style.marginLeft = '4px';
+        addIcon.style.display = 'inline-flex';
         addIcon.style.alignItems = 'center';
         addIcon.style.justifyContent = 'center';
-        addIcon.style.fontSize = '20px';
+        addIcon.style.fontSize = '16px';
         addIcon.style.fontWeight = 'bold';
+        addIcon.style.verticalAlign = 'middle';
         addIcon.onclick = (e) => {
           e.stopPropagation();
           openAddAssigneeDropdown(e.target, work.work_id, work.assignees || []);
         };
         assigneesContainer.appendChild(addIcon);
         
-        // URL発行ボタンを追加
-        const urlButton = document.createElement('button');
-        urlButton.textContent = 'URLをコピー';
-        urlButton.className = 'btn btn-sm';
-        urlButton.style.marginLeft = '16px';
-        urlButton.onclick = () => {
-          const url = `${window.location.origin}${window.location.pathname}?work_id=${work.work_id}`;
-          navigator.clipboard.writeText(url).then(() => {
-            alert('URLをクリップボードにコピーしました');
-          }).catch(() => {
-            // フォールバック
-            const textArea = document.createElement('textarea');
-            textArea.value = url;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            alert('URLをクリップボードにコピーしました');
-          });
-        };
+        // URL発行ボタンを追加（既存のボタンを削除してから追加）
         const headerInfo = document.querySelector('.overlay-header-info');
         if (headerInfo) {
+          const existingUrlButton = headerInfo.querySelector('.url-copy-button');
+          if (existingUrlButton) {
+            existingUrlButton.remove();
+          }
+          const urlButton = document.createElement('button');
+          urlButton.textContent = 'URLをコピー';
+          urlButton.className = 'btn btn-sm url-copy-button';
+          urlButton.style.marginLeft = '16px';
+          urlButton.onclick = () => {
+            const url = `${window.location.origin}${window.location.pathname}?work_id=${work.work_id}`;
+            navigator.clipboard.writeText(url).then(() => {
+              alert('URLをクリップボードにコピーしました');
+            }).catch(() => {
+              // フォールバック
+              const textArea = document.createElement('textarea');
+              textArea.value = url;
+              document.body.appendChild(textArea);
+              textArea.select();
+              document.execCommand('copy');
+              document.body.removeChild(textArea);
+              alert('URLをクリップボードにコピーしました');
+            });
+          };
           const closeBtn = headerInfo.querySelector('.close-btn');
           if (closeBtn) {
             headerInfo.insertBefore(urlButton, closeBtn);
           }
         }
+        
+        // ステータスを表示・編集可能に
+        const statusText = document.getElementById('work-detail-status-text');
+        statusText.textContent = getConfigLabel(work.work_status_key, 'WORK_STATUS') || work.work_status_key || '';
+        const statusEditable = document.getElementById('work-detail-status-editable');
+        statusEditable.onclick = (e) => {
+          e.stopPropagation();
+          showSelectEditorForWorkDetail(e, work.work_id, 'work_status_key', work.work_status_key, 'WORK_STATUS');
+        };
+        
+        // 納品期限を表示・編集可能に
+        const dueText = document.getElementById('work-detail-due-text');
+        dueText.textContent = formatDateTimeForDisplay(work.due_datetime) || '';
+        const dueEditable = document.getElementById('work-detail-due-editable');
+        dueEditable.onclick = (e) => {
+          e.stopPropagation();
+          openDateTimePickerForWorkDetail(e, work.work_id, 'due_datetime', work.due_datetime);
+        };
         
         // Googleドキュメントを埋め込む
         const docContainer = document.getElementById('work-detail-document-container');
@@ -531,13 +642,6 @@
                                    <iframe src="${embedUrl}"></iframe>`;
         } else {
           docContainer.innerHTML = '<p style="color: #6b7280; padding: 24px;">ドキュメントが作成されていません</p>';
-        }
-        
-        // work_detail（プレーンテキストの備考）を設定
-        const detailInput = document.getElementById('work-detail-note-input');
-        if (detailInput) {
-          detailInput.value = work.work_detail || '';
-          detailInput.dataset.workId = workId;
         }
         
         renderWorkTasks(work.tasks);
@@ -648,24 +752,269 @@
 
     function closeWorkDetailOverlay() {
       document.getElementById('work-detail-overlay').classList.remove('show');
+      const headerInfoDiv = document.getElementById('work-detail-header-info');
+      if (headerInfoDiv) {
+        headerInfoDiv.style.display = 'none';
+      }
     }
     
-    function saveWorkDetail() {
-      const detailInput = document.getElementById('work-detail-note-input');
-      if (!detailInput || !detailInput.dataset.workId) return;
+    function searchProjectsForWorkDetail(query, workId) {
+      const projectTitleHeader = document.getElementById('work-detail-project-title-header');
+      const suggestionsContainer = projectTitleHeader.querySelector('.combobox-suggestions');
+      const projectTitleInput = projectTitleHeader.querySelector('input');
       
-      const workId = detailInput.dataset.workId;
-      const workDetail = detailInput.value;
+      if (!query) {
+        suggestionsContainer.style.display = 'none';
+        return;
+      }
       
-      showLoading();
-      callGAS('updateSingleField', 'works', workId, 'work_detail', workDetail)
-        .then(() => {
-          hideLoading();
-          alert('備考を保存しました');
-        })
-        .catch(error => {
-          handleError(error);
+      // projectsDataが取得されていない場合は取得
+      if (!projectsData || projectsData.length === 0) {
+        callGAS('getProjects').then(data => {
+          projectsData = data;
+          performProjectSearch(query, workId, suggestionsContainer, projectTitleInput);
+        }).catch(handleError);
+      } else {
+        performProjectSearch(query, workId, suggestionsContainer, projectTitleInput);
+      }
+    }
+    
+    function performProjectSearch(query, workId, suggestionsContainer, projectTitleInput) {
+      const lowerCaseQuery = query.toLowerCase();
+      const filteredProjects = (projectsData || []).filter(p => 
+        p.project_title.toLowerCase().includes(lowerCaseQuery)
+      );
+      
+      suggestionsContainer.innerHTML = '';
+      
+      filteredProjects.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'combobox-item';
+        item.textContent = p.project_title;
+        item.onclick = () => {
+          projectTitleInput.value = p.project_title;
+          const oldProjectId = projectTitleInput.dataset.projectId;
+          projectTitleInput.dataset.projectId = p.project_id;
+          suggestionsContainer.style.display = 'none';
+          // 案件IDを更新
+          if (p.project_id !== oldProjectId) {
+            showLoading();
+            callGAS('updateSingleField', 'works', workId, 'project_id', p.project_id)
+              .then(() => {
+                document.getElementById('work-detail-project-id-header').textContent = p.project_id;
+                hideLoading();
+              })
+              .catch(handleError);
+          }
+        };
+        suggestionsContainer.appendChild(item);
+      });
+      
+      const newItem = document.createElement('div');
+      newItem.className = 'combobox-item';
+      newItem.innerHTML = `+ 新規作成: <strong>${escapeHtml(query)}</strong>`;
+      newItem.onclick = () => {
+        showLoading();
+        callGAS('createProject', query).then(projectId => {
+          projectTitleInput.value = query;
+          projectTitleInput.dataset.projectId = projectId;
+          suggestionsContainer.style.display = 'none';
+          document.getElementById('work-detail-project-id-header').textContent = projectId;
+          // 案件IDを更新
+          callGAS('updateSingleField', 'works', workId, 'project_id', projectId)
+            .then(() => {
+              // projectsDataを更新
+              if (projectsData) {
+                projectsData.push({ project_id: projectId, project_title: query });
+              }
+              hideLoading();
+            })
+            .catch(handleError);
+        }).catch(handleError);
+      };
+      suggestionsContainer.appendChild(newItem);
+      suggestionsContainer.style.display = 'block';
+    }
+    
+    function showSelectEditorForWorkDetail(event, workId, field, currentValue, configType) {
+      event.stopPropagation();
+      const container = event.currentTarget;
+      
+      const optionsContainer = document.createElement('div');
+      optionsContainer.className = 'popup-editor';
+      optionsContainer.style.position = 'absolute';
+      optionsContainer.style.zIndex = '1000';
+      optionsContainer.style.backgroundColor = 'var(--md-sys-color-surface)';
+      optionsContainer.style.border = '1px solid var(--md-sys-color-outline)';
+      optionsContainer.style.borderRadius = '8px';
+      optionsContainer.style.padding = '8px';
+      
+      const options = configData[configType] || [];
+      options.forEach(opt => {
+        const optionDiv = document.createElement('div');
+        optionDiv.className = 'popup-editor-option';
+        optionDiv.textContent = opt.config_value;
+        optionDiv.dataset.value = opt.config_key;
+        if (opt.config_key === currentValue) {
+          optionDiv.classList.add('selected');
+        }
+        optionDiv.addEventListener('click', () => {
+          if (opt.config_key !== currentValue) {
+            showLoading();
+            callGAS('updateSingleField', 'works', workId, field, opt.config_key)
+              .then(() => {
+                document.getElementById('work-detail-status-text').textContent = opt.config_value;
+                hideLoading();
+              })
+              .catch(handleError);
+          }
+          closeAllPopups();
         });
+        optionsContainer.appendChild(optionDiv);
+      });
+      
+      createPopup(container, optionsContainer);
+    }
+    
+    function openDateTimePickerForWorkDetail(event, workId, field, originalValue) {
+      event.stopPropagation();
+      event.preventDefault();
+      
+      const container = event.currentTarget;
+      const textSpan = container.querySelector('.editable-text');
+      
+      let dateObj;
+      if (originalValue) {
+        dateObj = new Date(originalValue);
+      } else {
+        dateObj = new Date();
+      }
+      
+      const yyyy = dateObj.getFullYear().toString().padStart(4, '0');
+      const mm = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+      const dd = dateObj.getDate().toString().padStart(2, '0');
+      const hh = dateObj.getHours().toString().padStart(2, '0');
+      const min = dateObj.getMinutes().toString().padStart(2, '0');
+      
+      // 既存のコンテンツを非表示
+      container.style.display = 'none';
+      
+      // カスタム日時入力フィールドを作成
+      const editorDiv = document.createElement('div');
+      editorDiv.className = 'datetime-custom-editor';
+      editorDiv.style.position = 'absolute';
+      editorDiv.style.zIndex = '1000';
+      editorDiv.innerHTML = `
+        <input type="text" class="datetime-segment" data-segment="yyyy" maxlength="4" value="${yyyy}" placeholder="yyyy" />
+        <span class="datetime-separator">/</span>
+        <input type="text" class="datetime-segment" data-segment="mm" maxlength="2" value="${mm}" placeholder="mm" />
+        <span class="datetime-separator">/</span>
+        <input type="text" class="datetime-segment" data-segment="dd" maxlength="2" value="${dd}" placeholder="dd" />
+        <span class="datetime-separator"> </span>
+        <input type="text" class="datetime-segment" data-segment="hh" maxlength="2" value="${hh}" placeholder="hh" />
+        <span class="datetime-separator">:</span>
+        <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="${min}" placeholder="mm" />
+      `;
+      
+      const rect = container.getBoundingClientRect();
+      editorDiv.style.left = `${rect.left}px`;
+      editorDiv.style.top = `${rect.top}px`;
+      document.body.appendChild(editorDiv);
+      
+      const inputs = editorDiv.querySelectorAll('.datetime-segment');
+      
+      // 各inputにイベントリスナーを設定
+      inputs.forEach((input, index) => {
+        input.addEventListener('input', (e) => {
+          let value = e.target.value.replace(/[^0-9]/g, '');
+          const maxLength = parseInt(e.target.getAttribute('maxlength'));
+          if (value.length > maxLength) {
+            value = value.substring(0, maxLength);
+          }
+          e.target.value = value;
+          if (value.length >= maxLength && index < inputs.length - 1) {
+            inputs[index + 1].focus();
+            inputs[index + 1].select();
+          }
+        });
+        
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            saveWorkDetailDateTime(editorDiv, container, workId, field, originalValue, inputs);
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelWorkDetailDateTime(editorDiv, container);
+          }
+        });
+        
+        input.addEventListener('blur', (e) => {
+          setTimeout(() => {
+            const focusedElement = document.activeElement;
+            if (!focusedElement || !focusedElement.classList.contains('datetime-segment')) {
+              saveWorkDetailDateTime(editorDiv, container, workId, field, originalValue, inputs);
+            }
+          }, 100);
+        });
+      });
+      
+      setTimeout(() => {
+        inputs[0].focus();
+        inputs[0].select();
+      }, 50);
+    }
+    
+    function saveWorkDetailDateTime(editorDiv, container, workId, field, originalValue, inputs) {
+      const values = Array.from(inputs).map(input => input.value);
+      const [yyyy, mm, dd, hh, min] = values;
+      
+      const yearNum = parseInt(yyyy);
+      const monthNum = parseInt(mm);
+      const dayNum = parseInt(dd);
+      const hourNum = parseInt(hh);
+      const minuteNum = parseInt(min);
+      
+      if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100 ||
+          isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
+          isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
+          isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
+          isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
+        alert('無効な日時です');
+        cancelWorkDetailDateTime(editorDiv, container);
+        return;
+      }
+      
+      const newDateStr = `${yyyy.padStart(4, '0')}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T${hh.padStart(2, '0')}:${min.padStart(2, '0')}:00`;
+      const newDate = new Date(newDateStr);
+      
+      if (isNaN(newDate.getTime())) {
+        alert('無効な日時です');
+        cancelWorkDetailDateTime(editorDiv, container);
+        return;
+      }
+      
+      const newValueAsISO = newDate.toISOString();
+      
+      editorDiv.remove();
+      container.style.display = 'inline-flex';
+      
+      if (newValueAsISO !== originalValue) {
+        showLoading();
+        callGAS('updateSingleField', 'works', workId, field, newValueAsISO)
+          .then(() => {
+            const textSpan = container.querySelector('.editable-text');
+            if (textSpan) {
+              textSpan.textContent = formatDateTimeForDisplay(newValueAsISO);
+            }
+            hideLoading();
+          })
+          .catch(handleError);
+      }
+    }
+    
+    function cancelWorkDetailDateTime(editorDiv, container) {
+      editorDiv.remove();
+      container.style.display = 'inline-flex';
     }
 
     function renderWorkTasks(tasks) {
@@ -1173,6 +1522,51 @@
         .then(() => {
           hideLoading();
           if (currentWorkId) {
+            // 担当者表示を更新
+            callGAS('getWorkById', currentWorkId).then(work => {
+              const assigneesContainer = document.getElementById('work-detail-assignees-header-info');
+              if (assigneesContainer) {
+                assigneesContainer.innerHTML = '';
+                assigneesContainer.style.display = 'inline-flex';
+                assigneesContainer.style.alignItems = 'center';
+                if (work.assignees && work.assignees.length > 0) {
+                  work.assignees.forEach(assignee => {
+                    const icon = document.createElement('img');
+                    icon.src = assignee.member_icon || 'https://via.placeholder.com/32';
+                    icon.className = 'avatar';
+                    icon.style.width = '24px';
+                    icon.style.height = '24px';
+                    icon.style.marginRight = '4px';
+                    icon.style.verticalAlign = 'middle';
+                    icon.title = `${assignee.member_name} / ${assignee.member_team_value}`;
+                    assigneesContainer.appendChild(icon);
+                  });
+                }
+                // ＋アイコンを追加
+                const addIcon = document.createElement('button');
+                addIcon.innerHTML = '+';
+                addIcon.className = 'btn-icon-add-assignee';
+                addIcon.style.width = '24px';
+                addIcon.style.height = '24px';
+                addIcon.style.borderRadius = '50%';
+                addIcon.style.border = 'none';
+                addIcon.style.backgroundColor = 'var(--md-sys-color-primary)';
+                addIcon.style.color = 'var(--md-sys-color-on-primary)';
+                addIcon.style.cursor = 'pointer';
+                addIcon.style.marginLeft = '4px';
+                addIcon.style.display = 'inline-flex';
+                addIcon.style.alignItems = 'center';
+                addIcon.style.justifyContent = 'center';
+                addIcon.style.fontSize = '16px';
+                addIcon.style.fontWeight = 'bold';
+                addIcon.style.verticalAlign = 'middle';
+                addIcon.onclick = (e) => {
+                  e.stopPropagation();
+                  openAddAssigneeDropdown(e.target, work.work_id, work.assignees || []);
+                };
+                assigneesContainer.appendChild(addIcon);
+              }
+            });
             openWorkDetailOverlay(currentWorkId);
           }
         })
