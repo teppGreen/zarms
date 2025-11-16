@@ -123,7 +123,11 @@
         newButton.style.display = 'none';
       }
       if (newButtonLoading) {
+        const spinner = newButtonLoading.querySelector('.loading-spinner');
+        const checkmark = newButtonLoading.querySelector('.loading-checkmark');
         newButtonLoading.style.display = 'flex';
+        if (spinner) spinner.style.display = 'flex';
+        if (checkmark) checkmark.style.display = 'none';
       }
     }
 
@@ -132,10 +136,26 @@
       const newButton = document.getElementById('new-button');
       const newButtonLoading = document.getElementById('new-button-loading');
       if (newButtonLoading) {
-        newButtonLoading.style.display = 'none';
-      }
-      if (newButton) {
-        newButton.style.display = 'flex';
+        const spinner = newButtonLoading.querySelector('.loading-spinner');
+        const checkmark = newButtonLoading.querySelector('.loading-checkmark');
+        
+        // スピナーを非表示にしてチェックマークを表示
+        if (spinner) spinner.style.display = 'none';
+        if (checkmark) checkmark.style.display = 'flex';
+        
+        // チェックマークを表示してからボタンを表示
+        if (loadingTimeout) clearTimeout(loadingTimeout);
+        loadingTimeout = setTimeout(() => {
+          newButtonLoading.style.display = 'none';
+          if (newButton) {
+            newButton.style.display = 'flex';
+          }
+        }, 1500);
+      } else {
+        // ローディング要素がない場合は直接ボタンを表示
+        if (newButton) {
+          newButton.style.display = 'flex';
+        }
       }
     }
     
