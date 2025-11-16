@@ -289,9 +289,13 @@
           container.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
         } else {
           data.works.forEach(work => {
+<<<<<<< HEAD
             if (work && work.work_id) {
               container.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title || '')}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title || '')}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
             }
+=======
+            container.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
+>>>>>>> parent of 7d80fd8 (とりあえず仕様書の機能を全部実装)
           });
         }
         hideLoading();
@@ -457,11 +461,8 @@
       chart.draw(dataTable, options);
     }
 
-    let currentWorkId = null;
-
     function openWorkDetailOverlay(workId) {
       showLoading();
-      currentWorkId = workId;
       const promises = [ callGAS('getWorkById', workId) ];
       if (!membersData || membersData.length === 0) {
         promises.push(callGAS('getMembers'));
@@ -472,6 +473,7 @@
         if (!membersData || membersData.length === 0) {
           membersData = members;
         }
+<<<<<<< HEAD
         
         // header-contentエリアに情報を表示
         const headerInfoDiv = document.getElementById('work-detail-header-info');
@@ -649,6 +651,13 @@
           docContainer.innerHTML = '<p style="color: #6b7280; padding: 24px;">ドキュメントが作成されていません</p>';
         }
         
+=======
+        document.getElementById('work-detail-title').textContent = work.work_title;
+        document.getElementById('work-detail-content-editor').innerHTML = work.work_detail_content || '';
+        document.getElementById('work-detail-design-editor').innerHTML = work.work_detail_design || '';
+        document.getElementById('work-detail-regulation-editor').innerHTML = work.work_detail_regulation || '';
+        document.getElementById('work-detail-note-editor').innerHTML = work.work_detail_note || '';
+>>>>>>> parent of 7d80fd8 (とりあえず仕様書の機能を全部実装)
         renderWorkTasks(work.tasks);
         renderWorkAssignees(work.assignees);
         renderWorkApps(work.apps);
@@ -656,103 +665,6 @@
         document.getElementById('work-detail-overlay').classList.add('show');
         hideLoading();
       }).catch(handleError);
-    }
-
-    function initRichTextEditors() {
-      // すべてのリッチテキストエディタのツールバーを初期化
-      document.querySelectorAll('.rich-text-toolbar').forEach(toolbar => {
-        const editorId = toolbar.dataset.editor;
-        const editor = document.getElementById(editorId);
-        if (!editor) return;
-        
-        // ツールバーボタンのイベントリスナーを設定
-        toolbar.querySelectorAll('.toolbar-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const command = btn.dataset.command;
-            const value = btn.dataset.value;
-            const color = btn.dataset.color;
-            
-            editor.focus();
-            
-            if (color) {
-              // 色選択
-              document.execCommand('foreColor', false, color);
-            } else if (command === 'formatBlock' && value) {
-              // 見出し
-              document.execCommand('formatBlock', false, value);
-            } else {
-              // その他のコマンド（bold, italic, strikeThrough, underline）
-              document.execCommand(command, false, null);
-            }
-            
-            updateToolbarState(toolbar, editor);
-          });
-        });
-        
-        // エディタの変更を監視して自動保存
-        let saveTimeout = null;
-        editor.addEventListener('input', () => {
-          clearTimeout(saveTimeout);
-          saveTimeout = setTimeout(() => {
-            saveRichTextEditor(editor);
-          }, 2000); // 2秒後に自動保存
-        });
-        
-        // エディタのフォーカス時にツールバーの状態を更新
-        editor.addEventListener('focus', () => {
-          updateToolbarState(toolbar, editor);
-        });
-        
-        editor.addEventListener('keyup', () => {
-          updateToolbarState(toolbar, editor);
-        });
-      });
-    }
-
-    function updateToolbarState(toolbar, editor) {
-      // ツールバーボタンのアクティブ状態を更新
-      toolbar.querySelectorAll('.toolbar-btn').forEach(btn => {
-        const command = btn.dataset.command;
-        const value = btn.dataset.value;
-        
-        btn.classList.remove('active');
-        
-        if (command === 'formatBlock' && value) {
-          // 見出しの状態をチェック
-          const selection = window.getSelection();
-          if (selection.rangeCount > 0) {
-            const range = selection.getRangeAt(0);
-            const node = range.commonAncestorContainer;
-            const parent = node.nodeType === 1 ? node : node.parentElement;
-            if (parent && parent.tagName && parent.tagName.toLowerCase() === value) {
-              btn.classList.add('active');
-            }
-          }
-        } else if (command && !btn.dataset.color) {
-          // その他のコマンドの状態をチェック
-          if (document.queryCommandState(command)) {
-            btn.classList.add('active');
-          }
-        }
-      });
-    }
-
-    function saveRichTextEditor(editor) {
-      const workId = editor.dataset.workId;
-      const field = editor.dataset.field;
-      if (!workId || !field) return;
-      
-      const content = editor.innerHTML;
-      
-      // バックエンドに保存
-      callGAS('updateWorkField', workId, field, content)
-        .then(() => {
-          // 保存成功（必要に応じて通知を表示）
-        })
-        .catch(error => {
-          console.error('リッチテキスト保存エラー:', error);
-        });
     }
 
     function closeWorkDetailOverlay() {
@@ -1256,195 +1168,9 @@
       tasks.forEach(task => {
         const row = tbody.insertRow();
         row.className = 'border-b';
-        row.dataset.taskId = task.task_id;
-        
-        const titleCell = row.insertCell();
-        titleCell.className = 'py-2';
-        titleCell.textContent = task.task_title;
-        
-        const statusCell = row.insertCell();
-        statusCell.className = 'py-2';
-        statusCell.innerHTML = `<div class="editable-container" onclick="editTaskField(event, '${task.task_id}', 'status_key', '${task.status_key}', 'TASK_STATUS')"><span class="editable-text">${getConfigLabel(task.status_key, 'TASK_STATUS')}</span><span class="editable-toggle-btn">✎</span></div>`;
-        
-        const assigneeCell = row.insertCell();
-        assigneeCell.className = 'py-2';
-        assigneeCell.innerHTML = `<div class="editable-container" onclick="editTaskField(event, '${task.task_id}', 'assign_to', '${task.assign_to || ''}', 'MEMBER')"><span class="editable-text">${escapeHtml(getMemberNameById(task.assign_to))}</span><span class="editable-toggle-btn">✎</span></div>`;
-        
-        const dateCell = row.insertCell();
-        dateCell.className = 'py-2';
-        dateCell.innerHTML = `<div class="editable-container datetime-editable" onclick="openDateTimePicker(event, 'task', '${task.task_id}', 'planned_end_datetime')"><span class="editable-text">${formatDateTimeForDisplay(task.planned_end_datetime)}</span><span class="editable-toggle-btn">✎</span></div>`;
-        
-        const actionCell = row.insertCell();
-        actionCell.className = 'py-2 text-right';
-        const editBtn = document.createElement('button');
-        editBtn.className = 'btn btn-sm btn-secondary';
-        editBtn.textContent = '編集';
-        editBtn.onclick = () => openEditTaskModal(task);
-        actionCell.appendChild(editBtn);
+        row.innerHTML = `<td class="py-2">${escapeHtml(task.task_title)}</td><td class="py-2">${getConfigLabel(task.status_key, 'TASK_STATUS')}</td><td class="py-2">${escapeHtml(getMemberNameById(task.assign_to))}</td><td class="py-2">${formatDateTimeForDisplay(task.planned_end_datetime)}</td><td class="py-2 text-right"><button class="btn btn-sm btn-secondary">編集</button></td>`;
       });
       container.appendChild(table);
-    }
-
-    function editTaskField(event, taskId, field, currentValue, configType) {
-      event.stopPropagation();
-      const container = event.currentTarget;
-      
-      if (configType === 'MEMBER') {
-        // メンバー選択
-        const optionsContainer = document.createElement('div');
-        optionsContainer.className = 'popup-editor';
-        optionsContainer.style.position = 'absolute';
-        optionsContainer.style.zIndex = '1000';
-        optionsContainer.style.backgroundColor = 'var(--md-sys-color-surface)';
-        optionsContainer.style.border = '1px solid var(--md-sys-color-outline)';
-        optionsContainer.style.borderRadius = '8px';
-        optionsContainer.style.padding = '8px';
-        optionsContainer.style.maxHeight = '200px';
-        optionsContainer.style.overflowY = 'auto';
-        
-        const members = membersData || [];
-        members.forEach(member => {
-          const optionDiv = document.createElement('div');
-          optionDiv.className = 'popup-editor-option';
-          optionDiv.textContent = member.member_name;
-          optionDiv.dataset.value = member.member_email;
-          if (member.member_email === currentValue) {
-            optionDiv.classList.add('selected');
-          }
-          optionDiv.addEventListener('click', () => {
-            updateTaskField(taskId, field, member.member_email, currentValue);
-            closeAllPopups();
-          });
-          optionsContainer.appendChild(optionDiv);
-        });
-        
-        createPopup(container, optionsContainer);
-      } else {
-        // ステータス選択
-        const optionsContainer = document.createElement('div');
-        optionsContainer.className = 'popup-editor';
-        optionsContainer.style.position = 'absolute';
-        optionsContainer.style.zIndex = '1000';
-        optionsContainer.style.backgroundColor = 'var(--md-sys-color-surface)';
-        optionsContainer.style.border = '1px solid var(--md-sys-color-outline)';
-        optionsContainer.style.borderRadius = '8px';
-        optionsContainer.style.padding = '8px';
-        
-        const options = configData[configType] || [];
-        options.forEach(opt => {
-          const optionDiv = document.createElement('div');
-          optionDiv.className = 'popup-editor-option';
-          optionDiv.textContent = opt.config_value;
-          optionDiv.dataset.value = opt.config_key;
-          if (opt.config_key === currentValue) {
-            optionDiv.classList.add('selected');
-          }
-          optionDiv.addEventListener('click', () => {
-            updateTaskField(taskId, field, opt.config_key, currentValue);
-            closeAllPopups();
-          });
-          optionsContainer.appendChild(optionDiv);
-        });
-        
-        createPopup(container, optionsContainer);
-      }
-    }
-
-    function updateTaskField(taskId, field, newValue, oldValue) {
-      if (String(newValue) === String(oldValue)) return;
-      
-      showLoading();
-      callGAS('updateTask', taskId, { [field]: newValue })
-        .then(() => {
-          hideLoading();
-          // Work詳細を再読み込み
-          if (currentWorkId) {
-            openWorkDetailOverlay(currentWorkId);
-          }
-        })
-        .catch(error => {
-          handleError(error);
-        });
-    }
-
-    function openEditTaskModal(task) {
-      // タスク編集モーダルを開く（簡易版：新規作成モーダルを再利用）
-      const form = document.getElementById('new-task-form');
-      form.elements.work_id.value = task.work_id;
-      form.elements.task_title.value = task.task_title;
-      form.elements.task_detail.value = task.task_detail || '';
-      
-      // メンバー選択肢を設定
-      const assignToSelect = form.elements.assign_to;
-      assignToSelect.innerHTML = '<option value="">選択してください</option>';
-      if (membersData && membersData.length > 0) {
-        membersData.forEach(member => {
-          const option = document.createElement('option');
-          option.value = member.member_email;
-          option.textContent = member.member_name;
-          if (member.member_email === task.assign_to) {
-            option.selected = true;
-          }
-          assignToSelect.appendChild(option);
-        });
-      }
-      
-      // ステータス選択肢を設定
-      const statusSelect = form.elements.status_key;
-      statusSelect.innerHTML = '<option value="">選択してください</option>';
-      const taskStatuses = configData['TASK_STATUS'] || [];
-      taskStatuses.forEach(status => {
-        const option = document.createElement('option');
-        option.value = status.config_key;
-        option.textContent = status.config_value;
-        if (status.config_key === task.status_key) {
-          option.selected = true;
-        }
-        statusSelect.appendChild(option);
-      });
-      
-      // 優先度選択肢を設定
-      const prioritySelect = form.elements.priority_key;
-      prioritySelect.innerHTML = '<option value="">選択してください</option>';
-      const priorities = configData['TASK_PRIORITY'] || [];
-      priorities.forEach(priority => {
-        const option = document.createElement('option');
-        option.value = priority.config_key;
-        option.textContent = priority.config_value;
-        if (priority.config_key === task.priority_key) {
-          option.selected = true;
-        }
-        prioritySelect.appendChild(option);
-      });
-      
-      // 日時を設定
-      if (task.planned_end_datetime) {
-        form.elements.planned_end_datetime.value = formatDateTimeForInput(task.planned_end_datetime);
-      }
-      
-      // フォームの送信ハンドラを一時的に変更
-      form.onsubmit = (e) => {
-        e.preventDefault();
-        const formData = new FormData(form);
-        const taskData = Object.fromEntries(formData.entries());
-        taskData.task_id = task.task_id;
-        
-        showModalLoading('modal-new-task', 'タスクを更新しています');
-        callGAS('updateTask', task.task_id, taskData)
-          .then(() => {
-            showModalSuccess('modal-new-task', 'タスクを更新しました', () => {
-              if (currentWorkId) {
-                openWorkDetailOverlay(currentWorkId);
-              }
-            });
-          })
-          .catch(error => {
-            handleError(error);
-            resetModalState('modal-new-task');
-          });
-      };
-      
-      openModal('modal-new-task');
     }
 
     function getMemberNameById(email) {
@@ -1454,39 +1180,28 @@
     }
 
     function renderWorkAssignees(assignees) {
+<<<<<<< HEAD
       // 担当者はヘッダーに表示するため、この関数は使用しない
       // ただし、既存のコードとの互換性のために残す
+=======
+      const container = document.getElementById('work-assignees-container');
+      container.innerHTML = '';
+      if (!assignees || assignees.length === 0) {
+        container.innerHTML = '<p>担当者はいません。</p>';
+        return;
+      }
+      container.innerHTML = assignees.map(a => `<p>${a.member_name}</p>`).join('');
+>>>>>>> parent of 7d80fd8 (とりあえず仕様書の機能を全部実装)
     }
 
     function renderWorkApps(apps) {
       const container = document.getElementById('work-apps-container');
       container.innerHTML = '';
       if (!apps || apps.length === 0) {
-        container.innerHTML = '<p style="color: #6b7280; margin-bottom: 8px;">使用アプリはありません。</p>';
-      } else {
-        apps.forEach(app => {
-          const div = document.createElement('div');
-          div.style.display = 'flex';
-          div.style.alignItems = 'center';
-          div.style.justifyContent = 'space-between';
-          div.style.marginBottom = '8px';
-          div.style.padding = '8px';
-          div.style.backgroundColor = 'var(--md-sys-color-surface-variant)';
-          div.style.borderRadius = '8px';
-          
-          const nameSpan = document.createElement('span');
-          nameSpan.textContent = app.value || app.key;
-          
-          const removeBtn = document.createElement('button');
-          removeBtn.className = 'btn btn-sm btn-secondary';
-          removeBtn.textContent = '削除';
-          removeBtn.onclick = () => removeWorkApp(currentWorkId, app.key);
-          
-          div.appendChild(nameSpan);
-          div.appendChild(removeBtn);
-          container.appendChild(div);
-        });
+        container.innerHTML = '<p>使用アプリはありません。</p>';
+        return;
       }
+<<<<<<< HEAD
       
       // 追加ボタン
       const addBtn = container.querySelector('button[data-action="add-app"]');
@@ -1844,111 +1559,28 @@
         .catch(error => {
           handleError(error);
         });
+=======
+      container.innerHTML = apps.map(app => `<p>${app.value}</p>`).join('');
+>>>>>>> parent of 7d80fd8 (とりあえず仕様書の機能を全部実装)
     }
 
     function openMemberDetail(memberEmail) {
+      alert('メンバー詳細画面は未実装です: ' + memberEmail);
+    }
+
+<<<<<<< HEAD
+    // project詳細画面は廃止（テーブルに全カラムを表示）
+=======
+    function openProjectDetail(projectId) {
       showLoading();
-      callGAS('getMemberByEmail', memberEmail).then(member => {
-        if (!member) {
-          alert('メンバーが見つかりません');
-          hideLoading();
-          return;
-        }
-        
-        // 担当しているWorksを取得
-        const assignedWorks = (worksData || []).filter(work => {
-          return work.assignees && work.assignees.some(a => a.member_email === memberEmail);
-        });
-        
-        const content = document.getElementById('member-detail-content');
-        content.innerHTML = `
-          <div style="margin-bottom: 24px;">
-            <img src="${member.member_icon || 'https://via.placeholder.com/64'}" class="avatar" style="width: 64px; height: 64px; margin-bottom: 16px;" alt="">
-            <h3 style="margin: 0 0 8px 0;">${escapeHtml(member.member_name)}</h3>
-            <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>メール:</strong> ${escapeHtml(member.member_email)}</p>
-            <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>チーム:</strong> ${getConfigLabel(member.member_team_key, 'TEAM')}</p>
-            <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>権限:</strong> ${getConfigLabel(member.role_key, 'ROLE')}</p>
-            ${member.slack_member_id ? `<p style="margin: 0 0 4px 0; color: #6b7280;"><strong>Slack ID:</strong> ${escapeHtml(member.slack_member_id)}</p>` : ''}
-          </div>
-          <div class="detail-section">
-            <h3>備考</h3>
-            <div class="rich-text-editor-wrapper">
-              <div class="rich-text-toolbar" data-editor="member-notes-editor">
-                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h1" title="見出し1">H1</button>
-                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h2" title="見出し2">H2</button>
-                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h3" title="見出し3">H3</button>
-                <span class="toolbar-separator"></span>
-                <button type="button" class="toolbar-btn" data-command="bold" title="太字"><b>B</b></button>
-                <button type="button" class="toolbar-btn" data-command="italic" title="斜体"><i>I</i></button>
-                <button type="button" class="toolbar-btn" data-command="strikeThrough" title="打ち消し線"><s>S</s></button>
-                <button type="button" class="toolbar-btn" data-command="underline" title="下線"><u>U</u></button>
-                <span class="toolbar-separator"></span>
-                <button type="button" class="toolbar-btn color-btn" data-color="#000000" title="黒" style="background: #000000;"></button>
-                <button type="button" class="toolbar-btn color-btn" data-color="#FF0000" title="赤" style="background: #FF0000;"></button>
-                <button type="button" class="toolbar-btn color-btn" data-color="#0000FF" title="青" style="background: #0000FF;"></button>
-                <button type="button" class="toolbar-btn color-btn" data-color="#008000" title="緑" style="background: #008000;"></button>
-              </div>
-              <div id="member-notes-editor" class="rich-text-editor" contenteditable="true" data-field="member_notes" data-member-email="${memberEmail}"></div>
-            </div>
-          </div>
-          <div class="detail-section">
-            <h3>担当している制作物</h3>
-            ${assignedWorks.length === 0 ? '<p style="color: #6b7280;">担当している制作物はありません</p>' : `
-              <table class="table-full" style="margin-top: 12px;">
-                <thead>
-                  <tr>
-                    <th>案件</th>
-                    <th>制作物</th>
-                    <th>ステータス</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${assignedWorks.map(work => `
-                    <tr>
-                      <td>${escapeHtml(work.project_title)}</td>
-                      <td><button class="btn-link" onclick="openWorkDetailOverlay('${work.work_id}'); closeModal('modal-member-detail');">${escapeHtml(work.work_title)}</button></td>
-                      <td>${getConfigLabel(work.work_status_key, 'WORK_STATUS')}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            `}
-          </div>
-        `;
-        
-        // リッチテキストエディタにデータを設定
-        const notesEditor = document.getElementById('member-notes-editor');
-        if (notesEditor) {
-          notesEditor.innerHTML = member.member_notes || '';
-          // リッチテキストエディタの初期化
-          initRichTextEditors();
-          
-          // エディタの変更を監視して自動保存
-          let saveTimeout = null;
-          notesEditor.addEventListener('input', () => {
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(() => {
-              saveMemberNotes(memberEmail, notesEditor.innerHTML);
-            }, 2000);
-          });
-        }
-        
+      callGAS('getProjectById', projectId).then(project => {
+        const content = document.getElementById('project-detail-content');
+        content.innerHTML = `<h3>${escapeHtml(project.project_title)}</h3><p><strong>作成者:</strong> ${escapeHtml(project.creator_name)}</p><p><strong>作成日:</strong> ${formatDate(project.created_at)}</p><h4>関連Works</h4><ul>${project.works.map(w => `<li>${escapeHtml(w.work_title)}</li>`).join('')}</ul>`;
         hideLoading();
-        openModal('modal-member-detail');
+        openModal('modal-project-detail');
       }).catch(handleError);
     }
-
-    function saveMemberNotes(memberEmail, content) {
-      callGAS('updateMember', memberEmail, { member_notes: content })
-        .then(() => {
-          // 保存成功
-        })
-        .catch(error => {
-          console.error('メンバー備考保存エラー:', error);
-        });
-    }
-
-    // project詳細画面は廃止（テーブルに全カラムを表示）
+>>>>>>> parent of 7d80fd8 (とりあえず仕様書の機能を全部実装)
 
     function openNewWorkModal() {
       if (!projectsData || projectsData.length === 0) {
@@ -2099,217 +1731,8 @@
       document.getElementById('new-project-form').reset();
       openModal('modal-new-project');
     }
-    function openNewTaskModal(workId) {
-      const form = document.getElementById('new-task-form');
-      form.elements.work_id.value = workId;
-      
-      // メンバー選択肢を設定
-      const assignToSelect = form.elements.assign_to;
-      assignToSelect.innerHTML = '<option value="">選択してください</option>';
-      if (membersData && membersData.length > 0) {
-        membersData.forEach(member => {
-          const option = document.createElement('option');
-          option.value = member.member_email;
-          option.textContent = member.member_name;
-          assignToSelect.appendChild(option);
-        });
-      }
-      
-      // ステータス選択肢を設定
-      const statusSelect = form.elements.status_key;
-      statusSelect.innerHTML = '<option value="">選択してください</option>';
-      const taskStatuses = configData['TASK_STATUS'] || [];
-      taskStatuses.forEach(status => {
-        const option = document.createElement('option');
-        option.value = status.config_key;
-        option.textContent = status.config_value;
-        if (status.config_key === 'TODO') {
-          option.selected = true;
-        }
-        statusSelect.appendChild(option);
-      });
-      
-      // 優先度選択肢を設定
-      const prioritySelect = form.elements.priority_key;
-      prioritySelect.innerHTML = '<option value="">選択してください</option>';
-      const priorities = configData['TASK_PRIORITY'] || [];
-      priorities.forEach(priority => {
-        const option = document.createElement('option');
-        option.value = priority.config_key;
-        option.textContent = priority.config_value;
-        if (priority.config_key === 'MEDIUM') {
-          option.selected = true;
-        }
-        prioritySelect.appendChild(option);
-      });
-      
-      openModal('modal-new-task');
-    }
-
-    function submitNewTask(event) {
-      event.preventDefault();
-      const form = event.target;
-      const formData = new FormData(form);
-      const taskData = Object.fromEntries(formData.entries());
-      
-      showModalLoading('modal-new-task', '新規タスクを作成しています');
-      callGAS('createTask', taskData)
-        .then(taskId => {
-          showModalSuccess('modal-new-task', '新規タスクを作成しました', () => {
-            // Work詳細を再読み込み
-            if (currentWorkId) {
-              openWorkDetailOverlay(currentWorkId);
-            }
-          });
-        })
-        .catch(error => {
-          handleError(error);
-          resetModalState('modal-new-task');
-        });
-    }
-
-    function openNewMemberModal() {
-      const form = document.getElementById('new-member-form');
-      form.reset();
-      
-      // チーム選択肢を設定
-      const teamSelect = form.elements.member_team_key;
-      teamSelect.innerHTML = '<option value="">選択してください</option>';
-      const teams = configData['TEAM'] || [];
-      teams.forEach(team => {
-        const option = document.createElement('option');
-        option.value = team.config_key;
-        option.textContent = team.config_value;
-        teamSelect.appendChild(option);
-      });
-      
-      // 権限選択肢を設定
-      const roleSelect = form.elements.role_key;
-      roleSelect.innerHTML = '<option value="">選択してください</option>';
-      const roles = configData['ROLE'] || [];
-      roles.forEach(role => {
-        const option = document.createElement('option');
-        option.value = role.config_key;
-        option.textContent = role.config_value;
-        if (role.config_key === 'VIEWER') {
-          option.selected = true;
-        }
-        roleSelect.appendChild(option);
-      });
-      
-      openModal('modal-new-member');
-    }
-
-    function submitNewMember(event) {
-      event.preventDefault();
-      const form = event.target;
-      const formData = new FormData(form);
-      const memberData = Object.fromEntries(formData.entries());
-      
-      showModalLoading('modal-new-member', '新規メンバーを登録しています');
-      callGAS('createMember', memberData)
-        .then(() => {
-          showModalSuccess('modal-new-member', '新規メンバーを登録しました', () => {
-            if (document.getElementById('tab-members').style.display === 'block') {
-              loadMembersData();
-            }
-          });
-        })
-        .catch(error => {
-          handleError(error);
-          resetModalState('modal-new-member');
-        });
-    }
-    function openNewKnowledgeModal() {
-      const form = document.getElementById('new-knowledge-form');
-      form.reset();
-      document.getElementById('knowledge-content-editor').innerHTML = '';
-      
-      // ナレッジタイプ選択肢を設定
-      const typeSelect = form.elements.knowledge_type_key;
-      typeSelect.innerHTML = '<option value="">選択してください</option>';
-      const knowledgeTypes = configData['KNOWLEDGE_TYPE'] || [];
-      knowledgeTypes.forEach(type => {
-        const option = document.createElement('option');
-        option.value = type.config_key;
-        option.textContent = type.config_value;
-        typeSelect.appendChild(option);
-      });
-      
-      // Worksデータを取得（まだ取得していない場合）
-      if (!worksData || worksData.length === 0) {
-        showLoading();
-        callGAS('getWorks').then(data => {
-          worksData = data;
-          hideLoading();
-          openModal('modal-new-knowledge');
-          initRichTextEditors();
-        }).catch(handleError);
-      } else {
-        openModal('modal-new-knowledge');
-        initRichTextEditors();
-      }
-    }
-
-    function searchWorksForKnowledge(query) {
-      const suggestionsContainer = document.getElementById('work-suggestions-knowledge');
-      const workIdInput = document.querySelector('#new-knowledge-form input[name="work_id"]');
-      if (!query) {
-        suggestionsContainer.style.display = 'none';
-        return;
-      }
-      const lowerCaseQuery = query.toLowerCase();
-      const filteredWorks = (worksData || []).filter(w => 
-        w.work_title.toLowerCase().includes(lowerCaseQuery) ||
-        (w.project_title && w.project_title.toLowerCase().includes(lowerCaseQuery))
-      );
-      suggestionsContainer.innerHTML = '';
-      filteredWorks.forEach(work => {
-        const item = document.createElement('div');
-        item.className = 'combobox-item';
-        item.textContent = `${work.project_title} - ${work.work_title}`;
-        item.onclick = () => {
-          document.querySelector('#new-knowledge-form input[name="work_search"]').value = `${work.project_title} - ${work.work_title}`;
-          workIdInput.value = work.work_id;
-          suggestionsContainer.style.display = 'none';
-        };
-        suggestionsContainer.appendChild(item);
-      });
-      suggestionsContainer.style.display = filteredWorks.length > 0 ? 'block' : 'none';
-    }
-
-    function submitNewKnowledge(event) {
-      event.preventDefault();
-      const form = event.target;
-      const workId = form.elements.work_id.value;
-      const knowledgeTypeKey = form.elements.knowledge_type_key.value;
-      const knowledgeContent = document.getElementById('knowledge-content-editor').innerHTML;
-      
-      if (!workId) {
-        alert('制作物を選択してください');
-        return;
-      }
-      
-      const knowledgeData = {
-        work_id: workId,
-        knowledge_type_key: knowledgeTypeKey,
-        knowledge_content: knowledgeContent
-      };
-      
-      showModalLoading('modal-new-knowledge', '新規ナレッジを作成しています');
-      callGAS('createKnowledge', knowledgeData)
-        .then(() => {
-          showModalSuccess('modal-new-knowledge', '新規ナレッジを作成しました', () => {
-            if (document.getElementById('tab-knowledge').style.display === 'block') {
-              loadKnowledgeData();
-            }
-          });
-        })
-        .catch(error => {
-          handleError(error);
-          resetModalState('modal-new-knowledge');
-        });
-    }
+    function openNewMemberModal() { alert('新規Member登録は実装中です'); }
+    function openNewKnowledgeModal() { alert('新規Knowledge作成は実装中です'); }
     function openModal(modalId) { document.getElementById(modalId).classList.add('active'); }
     function showModalLoading(modalId, message) {
       const modal = document.getElementById(modalId);
@@ -2688,39 +2111,10 @@
       event.stopPropagation();
       event.preventDefault();
       
-      let originalValue = '';
-      if (tableName === 'task') {
-        // タスクの場合は、現在開いているWork詳細からタスクデータを取得
-        const container = document.getElementById('work-tasks-container');
-        const row = container.querySelector(`tr[data-task-id="${id}"]`);
-        if (row) {
-          // タスクデータを再取得する必要がある場合は、getWorkByIdを呼び出す
-          // 簡易版として、現在の表示から値を取得
-          const cell = row.querySelector(`td[data-field="${field}"]`);
-          if (cell) {
-            const textSpan = cell.querySelector('.editable-text');
-            if (textSpan) {
-              // 表示されているテキストから日時を推測するのは難しいので、
-              // バックエンドから再取得する
-              if (currentWorkId) {
-                callGAS('getWorkById', currentWorkId).then(work => {
-                  const task = work.tasks.find(t => t.task_id === id);
-                  if (task) {
-                    openDateTimePickerForTask(id, field, task[field] || '');
-                  }
-                });
-                return;
-              }
-            }
-          }
-        }
-        return;
-      }
-      
       const data = (tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : membersData);
       const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : 'project_id');
       const item = data.find(d => String(d[idKey]) === String(id));
-      originalValue = item ? item[field] : '';
+      const originalValue = item ? item[field] : '';
       
       // セルを取得
       const table = document.getElementById(`${tableName}-table`);
@@ -2917,13 +2311,13 @@
         cell.removeChild(editor);
       }
       
-      
       if (container) {
         container.style.display = 'flex';
       }
       
       cell.classList.remove('editing-datetime-picker');
     }
+<<<<<<< HEAD
 
     function openDateTimePickerForTask(taskId, field, originalValue) {
       // タスクの日時編集用のヘルパー関数
@@ -3076,3 +2470,6 @@
       cell.classList.remove('editing-datetime-picker');
     }
   </script>
+=======
+  </script>
+>>>>>>> parent of 7d80fd8 (とりあえず仕様書の機能を全部実装)
