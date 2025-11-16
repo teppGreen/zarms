@@ -98,7 +98,7 @@
         configData = groupConfigByType(config);
         
         if (role === 'ADMIN') {
-          document.getElementById('new-member-dropdown-item').style.display = 'block';
+          document.getElementById('new-member-dropdown-item').classList.remove('hidden');
         }
         
         hideLoading();
@@ -222,13 +222,13 @@
       closeAllPopups();
       
       // 表示中のタブを判定
-      if (document.getElementById('tab-works').style.display === 'block') {
+      if (document.getElementById('tab-works').classList.contains('active')) {
         openNewWorkModal();
-      } else if (document.getElementById('tab-projects').style.display === 'block') {
+      } else if (document.getElementById('tab-projects').classList.contains('active')) {
         openNewWorkModal();
-      } else if (document.getElementById('tab-members').style.display === 'block') {
+      } else if (document.getElementById('tab-members').classList.contains('active')) {
         openNewMemberModal();
-      } else if (document.getElementById('tab-knowledge').style.display === 'block') {
+      } else if (document.getElementById('tab-knowledge').classList.contains('active')) {
         openNewKnowledgeModal();
       } else {
         // それ以外のタブ（ホーム、統計など）ではドロップダウンを表示
@@ -244,8 +244,8 @@
       closeWorkDetailOverlay();
       document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
       document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`).classList.add('active');
-      document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
-      document.getElementById('tab-' + tabName).style.display = 'block';
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      document.getElementById('tab-' + tabName).classList.add('active');
       loadTabData(tabName);
     }
 
@@ -453,13 +453,13 @@
         // ヘッダータイトルを変更
         const headerTitleDefault = document.getElementById('header-title-default');
         const headerTitleWorkDetail = document.getElementById('header-title-work-detail');
-        headerTitleDefault.style.display = 'none';
-        headerTitleWorkDetail.style.display = 'flex';
+        headerTitleDefault.classList.add('hidden');
+        headerTitleWorkDetail.classList.remove('hidden');
         headerTitleWorkDetail.textContent = `${work.project_id || ''}-${work.work_id || ''}`;
         
         // header-contentエリアに情報を表示
         const headerInfoDiv = document.getElementById('work-detail-header-info');
-        headerInfoDiv.style.display = 'flex';
+        headerInfoDiv.classList.add('show');
         
         // 案件タイトルを編集可能なコンボボックスとして表示
         const projectTitleHeader = document.getElementById('work-detail-project-title-header');
@@ -623,7 +623,7 @@
         // URLコピーボタンを表示
         const urlCopyButton = document.getElementById('work-detail-url-copy-button');
         if (urlCopyButton) {
-          urlCopyButton.style.display = 'block';
+          urlCopyButton.classList.add('show');
           urlCopyButton.dataset.workId = work.work_id;
         }
         
@@ -751,19 +751,19 @@
       const headerTitleDefault = document.getElementById('header-title-default');
       const headerTitleWorkDetail = document.getElementById('header-title-work-detail');
       if (headerTitleDefault) {
-        headerTitleDefault.style.display = 'flex';
+        headerTitleDefault.classList.remove('hidden');
       }
       if (headerTitleWorkDetail) {
-        headerTitleWorkDetail.style.display = 'none';
+        headerTitleWorkDetail.classList.add('hidden');
       }
       
       const headerInfoDiv = document.getElementById('work-detail-header-info');
       if (headerInfoDiv) {
-        headerInfoDiv.style.display = 'none';
+        headerInfoDiv.classList.remove('show');
       }
       const urlCopyButton = document.getElementById('work-detail-url-copy-button');
       if (urlCopyButton) {
-        urlCopyButton.style.display = 'none';
+        urlCopyButton.classList.remove('show');
       }
       // ドロップダウンを削除
       const suggestions = document.getElementById('work-detail-project-suggestions');
