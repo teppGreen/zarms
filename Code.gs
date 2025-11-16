@@ -15,8 +15,15 @@ function doGet(e) {
       .setTitle('CTMS - アクセス拒否');
   }
 
+  // URLパラメータからwork_idを取得
+  const workId = e.parameter.work_id;
+  
   // メインUIを返す
-  return HtmlService.createTemplateFromFile("index").evaluate()
+  const template = HtmlService.createTemplateFromFile("index");
+  if (workId) {
+    template.workId = workId;
+  }
+  return template.evaluate()
     .setTitle('CTMS v3.0')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -63,6 +70,20 @@ function getWorkById(workId) {
   work.tasks = getTasksByWorkId(work.work_id);
   work.apps = getWorkApps(work.work_id);
   
+  // 担当者の詳細情報を追加（member_name, member_team_value）
+  if (work.assignees && work.assignees.length > 0) {
+    work.assignees = work.assignees.map(assignee => {
+      const member = getMemberByEmail(assignee.member_email);
+      return {
+        member_email: assignee.member_email,
+        member_name: member ? member.member_name : '',
+        member_team_key: member ? member.member_team_key : '',
+        member_team_value: member ? getConfigValue(member.member_team_key, 'TEAM') : '',
+        member_icon: member ? member.member_icon : ''
+      };
+    });
+  }
+  
   return sanitizeForClient(work);
 }
 
@@ -78,8 +99,11 @@ function createWork(workData) {
   }
   const projectTitle = getProjectTitle(projectId);
 
-  // 新規フォルダを作成
-  const folderId = createWorkFolder(projectTitle, workData.work_title);
+  // 新規フォルダを作成（フォルダ名は${work_id}_${work_title}）
+  const folderId = createWorkFolder(workId, workData.work_title);
+
+  // Googleドキュメントを作成
+  const docInfo = createWorkDocument(workId, workData.work_title, workData.work_detail_content || '', workData.work_detail_design || '', workData.work_detail_regulation || '', workData.work_detail_note || '', folderId);
 
   const newWork = {
     work_id: workId,
@@ -91,10 +115,9 @@ function createWork(workData) {
     due_datetime: workData.due_datetime || null,
     work_client_email: workData.work_client_email || userEmail, // 依頼者が空なら作成者を入れる
     work_folder_id: folderId,
-    work_detail_content: workData.work_detail_content || '',
-    work_detail_design: workData.work_detail_design || '',
-    work_detail_regulation: workData.work_detail_regulation || '',
-    work_detail_note: workData.work_detail_note || '',
+    work_document_id: docInfo.documentId,
+    work_document_tab_id: docInfo.tabId,
+    work_detail: '', // プレーンテキストの備考
     work_delivery_count: 0,
     created_by: userEmail,
     created_at: now,
@@ -133,6 +156,7 @@ function getProjects() {
     const workStats = getProjectWorkStats(project.project_id);
     project.works_count = workStats.count;
     project.works_status = workStats.status;
+    // project_detailも含めて返す（プレーンテキスト）
     return project;
   });
   
@@ -148,6 +172,8 @@ function getProjectById(projectId) {
   
   return sanitizeForClient(project);
 }
+
+// project_detailをプレーンテキストとして更新する関数（既存のupdateProjectを使用）
 
 function createProject(projectTitle) {
   const userEmail = Session.getActiveUser().getEmail();
@@ -614,7 +640,7 @@ function removeWorkApp(workId, appKey) {
   return deleteData(SHEET_NAMES.APP_ASSIGNMENTS, { work_id: workId, work_apps_key: appKey });
 }
 
-function createWorkFolder(projectTitle, workTitle) {
+function createWorkFolder(workId, workTitle) {
   try {
     const parentFolderId = getConfigValue('WORK_FOLDER_PARENT', 'FOLDER');
     if (!parentFolderId) {
@@ -623,13 +649,58 @@ function createWorkFolder(projectTitle, workTitle) {
     }
     
     const parentFolder = DriveApp.getFolderById(parentFolderId);
-    const folderName = `${projectTitle}_${workTitle}`;
+    const folderName = `${workId}_${workTitle}`;
     
     const newFolder = parentFolder.createFolder(folderName);
     return newFolder.getId();
   } catch (e) {
     Logger.log('フォルダ作成エラー: ' + e.message);
     return '';
+  }
+}
+
+// Googleドキュメントを作成する関数
+function createWorkDocument(workId, workTitle, content, design, regulation, note, folderId) {
+  try {
+    const docName = `${workId} ${workTitle} ドキュメント`;
+    const doc = DocumentApp.create(docName);
+    const docId = doc.getId();
+    const body = doc.getBody();
+    
+    // H2見出しとNormal textで内容を追加
+    body.appendParagraph('制作物の概要').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    body.appendParagraph(content || '').setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    
+    body.appendParagraph('デザイン要項').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    body.appendParagraph(design || '').setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    
+    body.appendParagraph('入稿規定').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    body.appendParagraph(regulation || '').setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    
+    body.appendParagraph('依頼者からの備考').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    body.appendParagraph(note || '').setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    
+    // ドキュメントをフォルダに移動
+    if (folderId) {
+      const file = DriveApp.getFileById(docId);
+      const folder = DriveApp.getFolderById(folderId);
+      file.moveTo(folder);
+    }
+    
+    // タブIDを取得（スプレッドシートのタブIDを取得する方法はないため、ドキュメントIDをそのまま使用）
+    // 実際には、Googleドキュメントにはタブの概念がないため、documentIdをそのまま使用
+    const tabId = docId;
+    
+    return {
+      documentId: docId,
+      tabId: tabId
+    };
+  } catch (e) {
+    Logger.log('ドキュメント作成エラー: ' + e.message);
+    return {
+      documentId: '',
+      tabId: ''
+    };
   }
 }
 
