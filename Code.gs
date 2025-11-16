@@ -667,6 +667,9 @@ function createWorkDocument(workId, workTitle, content, design, regulation, note
     const docId = doc.getId();
     const body = doc.getBody();
     
+    // ページ分けなしモードに設定（Googleドキュメントの設定を変更）
+    // 注: DocumentAppでは直接設定できないため、埋め込み時にURLパラメータで制御
+    
     // H2見出しとNormal textで内容を追加
     body.appendParagraph('制作物の概要').setHeading(DocumentApp.ParagraphHeading.HEADING2);
     body.appendParagraph(content || '').setHeading(DocumentApp.ParagraphHeading.NORMAL);
