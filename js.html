@@ -289,13 +289,9 @@
           container.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
         } else {
           data.works.forEach(work => {
-<<<<<<< HEAD
             if (work && work.work_id) {
               container.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title || '')}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title || '')}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
             }
-=======
-            container.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
->>>>>>> parent of 7d80fd8 (とりあえず仕様書の機能を全部実装)
           });
         }
         hideLoading();
@@ -654,13 +650,6 @@
           docContainer.innerHTML = '<p style="color: #6b7280; padding: 24px;">ドキュメントが作成されていません</p>';
         }
         
-=======
-        document.getElementById('work-detail-title').textContent = work.work_title;
-        document.getElementById('work-detail-content-editor').innerHTML = work.work_detail_content || '';
-        document.getElementById('work-detail-design-editor').innerHTML = work.work_detail_design || '';
-        document.getElementById('work-detail-regulation-editor').innerHTML = work.work_detail_regulation || '';
-        document.getElementById('work-detail-note-editor').innerHTML = work.work_detail_note || '';
->>>>>>> parent of 7d80fd8 (とりあえず仕様書の機能を全部実装)
         renderWorkTasks(work.tasks);
         renderWorkAssignees(work.assignees);
         renderWorkApps(work.apps);
@@ -1183,18 +1172,8 @@
     }
 
     function renderWorkAssignees(assignees) {
-<<<<<<< HEAD
       // 担当者はヘッダーに表示するため、この関数は使用しない
       // ただし、既存のコードとの互換性のために残す
-=======
-      const container = document.getElementById('work-assignees-container');
-      container.innerHTML = '';
-      if (!assignees || assignees.length === 0) {
-        container.innerHTML = '<p>担当者はいません。</p>';
-        return;
-      }
-      container.innerHTML = assignees.map(a => `<p>${a.member_name}</p>`).join('');
->>>>>>> parent of 7d80fd8 (とりあえず仕様書の機能を全部実装)
     }
 
     function renderWorkApps(apps) {
@@ -1204,7 +1183,6 @@
         container.innerHTML = '<p>使用アプリはありません。</p>';
         return;
       }
-<<<<<<< HEAD
       
       // 追加ボタン
       const addBtn = container.querySelector('button[data-action="add-app"]');
@@ -1562,28 +1540,13 @@
         .catch(error => {
           handleError(error);
         });
-=======
-      container.innerHTML = apps.map(app => `<p>${app.value}</p>`).join('');
->>>>>>> parent of 7d80fd8 (とりあえず仕様書の機能を全部実装)
     }
 
     function openMemberDetail(memberEmail) {
       alert('メンバー詳細画面は未実装です: ' + memberEmail);
     }
 
-<<<<<<< HEAD
     // project詳細画面は廃止（テーブルに全カラムを表示）
-=======
-    function openProjectDetail(projectId) {
-      showLoading();
-      callGAS('getProjectById', projectId).then(project => {
-        const content = document.getElementById('project-detail-content');
-        content.innerHTML = `<h3>${escapeHtml(project.project_title)}</h3><p><strong>作成者:</strong> ${escapeHtml(project.creator_name)}</p><p><strong>作成日:</strong> ${formatDate(project.created_at)}</p><h4>関連Works</h4><ul>${project.works.map(w => `<li>${escapeHtml(w.work_title)}</li>`).join('')}</ul>`;
-        hideLoading();
-        openModal('modal-project-detail');
-      }).catch(handleError);
-    }
->>>>>>> parent of 7d80fd8 (とりあえず仕様書の機能を全部実装)
 
     function openNewWorkModal() {
       if (!projectsData || projectsData.length === 0) {
@@ -2421,6 +2384,3 @@
       cell.classList.remove('editing-datetime-picker');
     }
   </script>
-=======
-  </script>
->>>>>>> parent of 7d80fd8 (とりあえず仕様書の機能を全部実装)
