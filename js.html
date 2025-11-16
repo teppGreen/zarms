@@ -434,17 +434,26 @@
         }
         document.getElementById('work-detail-title').textContent = work.work_title;
         
-        // GoogleドキュメントのURLを作成してiframeに設定
-        const iframe = document.getElementById('work-document-iframe');
-        if (work.work_document_id) {
-          const docUrl = `https://docs.google.com/document/d/${work.work_document_id}/edit?rm=minimal`;
-          iframe.src = docUrl;
-        } else {
-          iframe.src = '';
-          iframe.style.display = 'none';
-        }
+        // リッチテキストエディタにデータを設定
+        const contentEditor = document.getElementById('work-detail-content-editor');
+        const designEditor = document.getElementById('work-detail-design-editor');
+        const regulationEditor = document.getElementById('work-detail-regulation-editor');
+        const noteEditor = document.getElementById('work-detail-note-editor');
+        
+        contentEditor.innerHTML = work.work_detail_content || '';
+        contentEditor.dataset.workId = workId;
+        designEditor.innerHTML = work.work_detail_design || '';
+        designEditor.dataset.workId = workId;
+        regulationEditor.innerHTML = work.work_detail_regulation || '';
+        regulationEditor.dataset.workId = workId;
+        noteEditor.innerHTML = work.work_detail_note || '';
+        noteEditor.dataset.workId = workId;
+        
+        // リッチテキストエディタの初期化
+        initRichTextEditors();
         
         renderWorkTasks(work.tasks);
+        renderWorkAssignees(work.assignees);
         renderWorkApps(work.apps);
         document.getElementById('new-task-button').onclick = () => openNewTaskModal(work.work_id);
         document.getElementById('work-detail-overlay').classList.add('show');
