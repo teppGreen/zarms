@@ -450,13 +450,16 @@
           membersData = members;
         }
         
+        // ヘッダータイトルを変更
+        const headerTitleDefault = document.getElementById('header-title-default');
+        const headerTitleWorkDetail = document.getElementById('header-title-work-detail');
+        headerTitleDefault.style.display = 'none';
+        headerTitleWorkDetail.style.display = 'flex';
+        headerTitleWorkDetail.textContent = `${work.project_id || ''}-${work.work_id || ''}`;
+        
         // header-contentエリアに情報を表示
         const headerInfoDiv = document.getElementById('work-detail-header-info');
         headerInfoDiv.style.display = 'flex';
-        
-        // 案件IDと制作IDを表示
-        document.getElementById('work-detail-project-id-header').textContent = work.project_id || '';
-        document.getElementById('work-detail-work-id-header').textContent = work.work_id || '';
         
         // 案件タイトルを編集可能なコンボボックスとして表示
         const projectTitleHeader = document.getElementById('work-detail-project-title-header');
@@ -600,6 +603,10 @@
           showSelectEditorForWorkDetailHeader(e, work.work_id, 'work_status_key', work.work_status_key, 'WORK_STATUS');
         };
         
+        // 作成日を表示（編集不可）
+        const createdAtHeader = document.getElementById('work-detail-created-at-header');
+        createdAtHeader.textContent = formatDate(work.created_at) || '-';
+        
         // 納品期限を表示・編集可能に（header-contentエリア）
         const dueTextHeader = document.getElementById('work-detail-due-text-header');
         dueTextHeader.textContent = formatDateTimeForDisplay(work.due_datetime) || '';
@@ -608,6 +615,10 @@
           e.stopPropagation();
           openDateTimePickerForWorkDetailHeader(e, work.work_id, 'due_datetime', work.due_datetime);
         };
+        
+        // 残り日数を表示
+        const daysRemainingHeader = document.getElementById('work-detail-days-remaining-header');
+        daysRemainingHeader.textContent = calculateDaysRemaining(work.due_datetime);
         
         // URLコピーボタンを表示
         const urlCopyButton = document.getElementById('work-detail-url-copy-button');
@@ -735,6 +746,17 @@
 
     function closeWorkDetailOverlay() {
       document.getElementById('work-detail-overlay').classList.remove('show');
+      
+      // ヘッダータイトルを元に戻す
+      const headerTitleDefault = document.getElementById('header-title-default');
+      const headerTitleWorkDetail = document.getElementById('header-title-work-detail');
+      if (headerTitleDefault) {
+        headerTitleDefault.style.display = 'flex';
+      }
+      if (headerTitleWorkDetail) {
+        headerTitleWorkDetail.style.display = 'none';
+      }
+      
       const headerInfoDiv = document.getElementById('work-detail-header-info');
       if (headerInfoDiv) {
         headerInfoDiv.style.display = 'none';
@@ -1208,6 +1230,13 @@
             }
             if (textSpan) {
               textSpan.textContent = formattedDate;
+            }
+            // 残り日数も更新
+            if (field === 'due_datetime') {
+              const daysRemainingHeader = document.getElementById('work-detail-days-remaining-header');
+              if (daysRemainingHeader) {
+                daysRemainingHeader.textContent = calculateDaysRemaining(newValueAsISO);
+              }
             }
             hideLoading();
           })
@@ -2458,6 +2487,26 @@
         const localDate = new Date(dt.getTime() - offset);
         return localDate.toISOString().slice(0, 16);
       } catch (e) { return ''; }
+    }
+    function calculateDaysRemaining(dueDateString) {
+      if (!dueDateString) return '-';
+      try {
+        const dueDate = new Date(dueDateString);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        dueDate.setHours(0, 0, 0, 0);
+        const diffTime = dueDate - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) {
+          return `${Math.abs(diffDays)}日超過`;
+        } else if (diffDays === 0) {
+          return '今日';
+        } else {
+          return `${diffDays}日`;
+        }
+      } catch (e) {
+        return '-';
+      }
     }
     function escapeHtml(text) {
       if (text === null || typeof text === 'undefined') return '';
