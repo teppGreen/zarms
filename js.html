@@ -221,19 +221,49 @@
       // 他のポップアップは閉じる
       closeAllPopups();
       
-      // 表示中のタブを判定
-      if (document.getElementById('tab-works').style.display === 'block') {
+      // アクティブなタブを判定（より確実な方法：getComputedStyleを使用）
+      const activeTab = getActiveTabName();
+      
+      if (activeTab === 'works') {
         openNewWorkModal();
-      } else if (document.getElementById('tab-projects').style.display === 'block') {
+      } else if (activeTab === 'projects') {
         openNewWorkModal();
-      } else if (document.getElementById('tab-members').style.display === 'block') {
+      } else if (activeTab === 'members') {
         openNewMemberModal();
-      } else if (document.getElementById('tab-knowledge').style.display === 'block') {
+      } else if (activeTab === 'knowledge') {
         openNewKnowledgeModal();
       } else {
         // それ以外のタブ（ホーム、統計など）ではドロップダウンを表示
         toggleNewButtonDropdown(event);
       }
+    }
+
+    /**
+     * 現在アクティブなタブ名を取得する
+     */
+    function getActiveTabName() {
+      // アクティブなナビゲーションアイテムからタブ名を取得
+      const activeNavItem = document.querySelector('.nav-item.active');
+      if (activeNavItem && activeNavItem.getAttribute('onclick')) {
+        const match = activeNavItem.getAttribute('onclick').match(/switchTab\('(\w+)'\)/);
+        if (match && match[1]) {
+          return match[1];
+        }
+      }
+      
+      // フォールバック：getComputedStyleで表示されているタブを確認
+      const tabs = ['home', 'works', 'projects', 'members', 'knowledge', 'summary'];
+      for (const tabName of tabs) {
+        const tabElement = document.getElementById('tab-' + tabName);
+        if (tabElement) {
+          const computedStyle = window.getComputedStyle(tabElement);
+          if (computedStyle.display !== 'none') {
+            return tabName;
+          }
+        }
+      }
+      
+      return 'home'; // デフォルト
     }
 
     // ============================================
