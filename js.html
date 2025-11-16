@@ -28,6 +28,7 @@
     const projectsTableHeaders = [
       { key: 'project_id', label: 'ID', sortable: true },
       { key: 'project_title', label: '案件タイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
+      { key: 'project_detail', label: '備考', sortable: false, editable: true, editType: 'text' },
       { key: 'created_at', label: '作成日', sortable: true, editable: false },
       { key: 'creator_name', label: '作成者', sortable: true, filterable: true, editable: false },
       { key: 'works_count', label: '関連制作物', sortable: true, editable: false }
@@ -67,6 +68,16 @@
            closeNewButtonDropdown();
         }
       });
+      
+      // URLパラメータからwork_idを取得して詳細画面を開く
+      const urlParams = new URLSearchParams(window.location.search);
+      const workId = urlParams.get('work_id');
+      if (workId) {
+        // データ読み込み後に詳細画面を開く
+        setTimeout(() => {
+          openWorkDetailOverlay(workId);
+        }, 500);
+      }
     };
 
     function loadInitialData() {
@@ -255,7 +266,7 @@
           container.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
         } else {
           data.works.forEach(work => {
-            container.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;"><button class="btn-link" onclick="event.stopPropagation(); openProjectDetail('${work.project_id}');">${escapeHtml(work.project_title)}</button></p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
+            container.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
           });
         }
         hideLoading();
@@ -381,7 +392,7 @@
           } else {
             switch(header.key) {
               case 'work_id': content = `<button class="btn-link" onclick="openWorkDetailOverlay('${item.work_id}')">${item.work_id}</button>`; break;
-              case 'project_id': content = `<button class="btn-link" onclick="openProjectDetail('${item.project_id}')">${item.project_id}</button>`; break;
+              case 'project_id': content = `${item.project_id}`; break;
               case 'detail': content = `<button class="btn-link" onclick="openMemberDetail('${item.member_email}')">詳細</button>`; break;
               case 'assignees': content = renderAssignees(item.assignees); break;
               case 'avatar': content = `<img src="${item.member_icon || 'https://via.placeholder.com/32'}" class="avatar" alt="">`; break;
@@ -432,25 +443,45 @@
         if (!membersData || membersData.length === 0) {
           membersData = members;
         }
-        document.getElementById('work-detail-title').textContent = work.work_title;
         
-        // リッチテキストエディタにデータを設定
-        const contentEditor = document.getElementById('work-detail-content-editor');
-        const designEditor = document.getElementById('work-detail-design-editor');
-        const regulationEditor = document.getElementById('work-detail-regulation-editor');
-        const noteEditor = document.getElementById('work-detail-note-editor');
+        // ヘッダー情報を設定
+        document.getElementById('work-detail-project-id').textContent = work.project_id || '';
+        document.getElementById('work-detail-work-id').textContent = work.work_id || '';
+        document.getElementById('work-detail-project-title').textContent = work.project_title || '';
+        document.getElementById('work-detail-work-title').textContent = work.work_title || '';
         
-        contentEditor.innerHTML = work.work_detail_content || '';
-        contentEditor.dataset.workId = workId;
-        designEditor.innerHTML = work.work_detail_design || '';
-        designEditor.dataset.workId = workId;
-        regulationEditor.innerHTML = work.work_detail_regulation || '';
-        regulationEditor.dataset.workId = workId;
-        noteEditor.innerHTML = work.work_detail_note || '';
-        noteEditor.dataset.workId = workId;
+        // 担当者を表示
+        const assigneesContainer = document.getElementById('work-detail-assignees-header');
+        assigneesContainer.innerHTML = '';
+        if (work.assignees && work.assignees.length > 0) {
+          work.assignees.forEach(assignee => {
+            const icon = document.createElement('img');
+            icon.src = assignee.member_icon || 'https://via.placeholder.com/32';
+            icon.className = 'avatar';
+            icon.style.width = '32px';
+            icon.style.height = '32px';
+            icon.style.marginRight = '8px';
+            icon.title = `${assignee.member_name} / ${assignee.member_team_value}`;
+            assigneesContainer.appendChild(icon);
+          });
+        }
         
-        // リッチテキストエディタの初期化
-        initRichTextEditors();
+        // Googleドキュメントを埋め込む
+        const docContainer = document.getElementById('work-detail-document-container');
+        if (work.work_document_id) {
+          // Googleドキュメントを編集可能な状態で埋め込む
+          const embedUrl = `https://docs.google.com/document/d/${work.work_document_id}/edit?usp=sharing`;
+          docContainer.innerHTML = `<iframe src="${embedUrl}" style="width: 100%; height: 100%; min-height: 600px; border: 1px solid var(--md-sys-color-outline); border-radius: 8px;"></iframe>`;
+        } else {
+          docContainer.innerHTML = '<p style="color: #6b7280; padding: 24px;">ドキュメントが作成されていません</p>';
+        }
+        
+        // work_detail（プレーンテキストの備考）を設定
+        const detailInput = document.getElementById('work-detail-note-input');
+        if (detailInput) {
+          detailInput.value = work.work_detail || '';
+          detailInput.dataset.workId = workId;
+        }
         
         renderWorkTasks(work.tasks);
         renderWorkAssignees(work.assignees);
@@ -560,6 +591,24 @@
 
     function closeWorkDetailOverlay() {
       document.getElementById('work-detail-overlay').classList.remove('show');
+    }
+    
+    function saveWorkDetail() {
+      const detailInput = document.getElementById('work-detail-note-input');
+      if (!detailInput || !detailInput.dataset.workId) return;
+      
+      const workId = detailInput.dataset.workId;
+      const workDetail = detailInput.value;
+      
+      showLoading();
+      callGAS('updateSingleField', 'works', workId, 'work_detail', workDetail)
+        .then(() => {
+          hideLoading();
+          alert('備考を保存しました');
+        })
+        .catch(error => {
+          handleError(error);
+        });
     }
 
     function renderWorkTasks(tasks) {
@@ -774,45 +823,8 @@
     }
 
     function renderWorkAssignees(assignees) {
-      const container = document.getElementById('work-assignees-container');
-      container.innerHTML = '';
-      if (!assignees || assignees.length === 0) {
-        container.innerHTML = '<p style="color: #6b7280; margin-bottom: 8px;">担当者はいません。</p>';
-      } else {
-        assignees.forEach(assignee => {
-          const div = document.createElement('div');
-          div.style.display = 'flex';
-          div.style.alignItems = 'center';
-          div.style.justifyContent = 'space-between';
-          div.style.marginBottom = '8px';
-          div.style.padding = '8px';
-          div.style.backgroundColor = 'var(--md-sys-color-surface-variant)';
-          div.style.borderRadius = '8px';
-          
-          const nameSpan = document.createElement('span');
-          nameSpan.textContent = assignee.member_name || assignee.member_email;
-          
-          const removeBtn = document.createElement('button');
-          removeBtn.className = 'btn btn-sm btn-secondary';
-          removeBtn.textContent = '削除';
-          removeBtn.onclick = () => removeWorkAssignee(currentWorkId, assignee.member_email);
-          
-          div.appendChild(nameSpan);
-          div.appendChild(removeBtn);
-          container.appendChild(div);
-        });
-      }
-      
-      // 追加ボタン
-      const addBtn = container.querySelector('button[data-action="add-assignee"]');
-      if (!addBtn) {
-        const newAddBtn = document.createElement('button');
-        newAddBtn.className = 'btn btn-sm';
-        newAddBtn.textContent = '+ Add Assignee';
-        newAddBtn.dataset.action = 'add-assignee';
-        newAddBtn.onclick = () => openAddAssigneeModal();
-        container.appendChild(newAddBtn);
-      }
+      // 担当者はヘッダーに表示するため、この関数は使用しない
+      // ただし、既存のコードとの互換性のために残す
     }
 
     function renderWorkApps(apps) {
@@ -1125,93 +1137,7 @@
         });
     }
 
-    function openProjectDetail(projectId) {
-      showLoading();
-      callGAS('getProjectById', projectId).then(project => {
-        const content = document.getElementById('project-detail-content');
-        content.innerHTML = `
-          <div style="margin-bottom: 24px;">
-            <h3 style="margin: 0 0 8px 0;">${escapeHtml(project.project_title)}</h3>
-            <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>作成者:</strong> ${escapeHtml(project.creator_name)}</p>
-            <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>作成日:</strong> ${formatDate(project.created_at)}</p>
-          </div>
-          <div class="detail-section">
-            <h3>議事録</h3>
-            <div class="rich-text-editor-wrapper">
-              <div class="rich-text-toolbar" data-editor="project-detail-editor">
-                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h1" title="見出し1">H1</button>
-                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h2" title="見出し2">H2</button>
-                <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h3" title="見出し3">H3</button>
-                <span class="toolbar-separator"></span>
-                <button type="button" class="toolbar-btn" data-command="bold" title="太字"><b>B</b></button>
-                <button type="button" class="toolbar-btn" data-command="italic" title="斜体"><i>I</i></button>
-                <button type="button" class="toolbar-btn" data-command="strikeThrough" title="打ち消し線"><s>S</s></button>
-                <button type="button" class="toolbar-btn" data-command="underline" title="下線"><u>U</u></button>
-                <span class="toolbar-separator"></span>
-                <button type="button" class="toolbar-btn color-btn" data-color="#000000" title="黒" style="background: #000000;"></button>
-                <button type="button" class="toolbar-btn color-btn" data-color="#FF0000" title="赤" style="background: #FF0000;"></button>
-                <button type="button" class="toolbar-btn color-btn" data-color="#0000FF" title="青" style="background: #0000FF;"></button>
-                <button type="button" class="toolbar-btn color-btn" data-color="#008000" title="緑" style="background: #008000;"></button>
-              </div>
-              <div id="project-detail-editor" class="rich-text-editor" contenteditable="true" data-field="project_detail" data-project-id="${projectId}"></div>
-            </div>
-          </div>
-          <div class="detail-section">
-            <h3>関連Works</h3>
-            ${project.works && project.works.length > 0 ? `
-              <table class="table-full" style="margin-top: 12px;">
-                <thead>
-                  <tr>
-                    <th>制作物</th>
-                    <th>ステータス</th>
-                    <th>納期</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${project.works.map(work => `
-                    <tr>
-                      <td><button class="btn-link" onclick="openWorkDetailOverlay('${work.work_id}'); closeModal('modal-project-detail');">${escapeHtml(work.work_title)}</button></td>
-                      <td>${getConfigLabel(work.work_status_key, 'WORK_STATUS')}</td>
-                      <td>${formatDateTimeForDisplay(work.due_datetime)}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            ` : '<p style="color: #6b7280;">関連する制作物はありません</p>'}
-          </div>
-        `;
-        
-        // リッチテキストエディタにデータを設定
-        const detailEditor = document.getElementById('project-detail-editor');
-        if (detailEditor) {
-          detailEditor.innerHTML = project.project_detail || '';
-          // リッチテキストエディタの初期化
-          initRichTextEditors();
-          
-          // エディタの変更を監視して自動保存
-          let saveTimeout = null;
-          detailEditor.addEventListener('input', () => {
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(() => {
-              saveProjectDetail(projectId, detailEditor.innerHTML);
-            }, 2000);
-          });
-        }
-        
-        hideLoading();
-        openModal('modal-project-detail');
-      }).catch(handleError);
-    }
-
-    function saveProjectDetail(projectId, content) {
-      callGAS('updateProject', projectId, { project_detail: content })
-        .then(() => {
-          // 保存成功
-        })
-        .catch(error => {
-          console.error('案件議事録保存エラー:', error);
-        });
-    }
+    // project詳細画面は廃止（テーブルに全カラムを表示）
 
     function openNewWorkModal() {
       if (!projectsData || projectsData.length === 0) {
