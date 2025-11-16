@@ -50,26 +50,20 @@
       document.body.addEventListener('click', closeAllPopups);
 
       // --- 新規作成ボタンのロジック ---
-      const mainButton = document.getElementById('new-button-main');
-      const triggerButton = document.getElementById('new-button-dropdown-trigger');
+      const newButton = document.getElementById('new-button');
       const dropdown = document.getElementById('new-button-dropdown');
-      const newButtonContainer = document.getElementById('new-button'); // 2つのspanの親
+      const newButtonContainer = document.querySelector('.new-button-container');
 
-      // 「+ 新規作成」テキスト部分のクリック
-      if (mainButton) {
-        mainButton.addEventListener('click', handleMainButtonClick);
-      }
-
-      // 「▼」アイコン部分のクリック
-      if (triggerButton) {
-        triggerButton.addEventListener('click', toggleNewButtonDropdown);
+      // 新規作成ボタンのクリック
+      if (newButton) {
+        newButton.addEventListener('click', handleMainButtonClick);
       }
 
       // ドキュメント全体（body）をクリックした時の動作
       document.addEventListener('click', (event) => {
         // ドロップダウンが表示されていて、かつ
-        // クリックされた場所がボタン（newButtonContainer）の外側の場合にドロップダウンを閉じる
-        if (dropdown && dropdown.classList.contains('show') && !newButtonContainer.contains(event.target)) {
+        // クリックされた場所がボタンコンテナの外側の場合にドロップダウンを閉じる
+        if (dropdown && dropdown.classList.contains('show') && newButtonContainer && !newButtonContainer.contains(event.target)) {
            closeNewButtonDropdown();
         }
       });
@@ -121,29 +115,54 @@
 
     function showLoading() {
       if (loadingTimeout) clearTimeout(loadingTimeout);
+      
+      // サイドバーのローディングインジケーター
       const indicator = document.getElementById('sidebar-loading-indicator');
-      if (!indicator) return;
-      const spinner = indicator.querySelector('.loading-spinner');
-      const checkmark = indicator.querySelector('.loading-checkmark');
-      indicator.style.transition = 'none';
-      indicator.style.display = 'inline-block';
-      indicator.style.opacity = '1';
-      spinner.style.display = 'inline-block';
-      checkmark.style.display = 'none';
-      indicator.style.transition = 'opacity 0.5s ease-in-out'; 
+      if (indicator) {
+        const spinner = indicator.querySelector('.loading-spinner');
+        const checkmark = indicator.querySelector('.loading-checkmark');
+        indicator.style.transition = 'none';
+        indicator.style.display = 'inline-block';
+        indicator.style.opacity = '1';
+        spinner.style.display = 'inline-block';
+        checkmark.style.display = 'none';
+        indicator.style.transition = 'opacity 0.5s ease-in-out';
+      }
+      
+      // 新規作成ボタンのローディング
+      const newButton = document.getElementById('new-button');
+      const newButtonLoading = document.getElementById('new-button-loading');
+      if (newButton) {
+        newButton.style.display = 'none';
+      }
+      if (newButtonLoading) {
+        newButtonLoading.style.display = 'flex';
+      }
     }
 
     function hideLoading() {
+      // サイドバーのローディングインジケーター
       const indicator = document.getElementById('sidebar-loading-indicator');
-      if (!indicator) return;
-      const spinner = indicator.querySelector('.loading-spinner');
-      const checkmark = indicator.querySelector('.loading-checkmark');
-      spinner.style.display = 'none';
-      checkmark.style.display = 'inline-block';
-      if (loadingTimeout) clearTimeout(loadingTimeout);
-      loadingTimeout = setTimeout(() => {
-        indicator.style.opacity = '0';
-      }, 1500);
+      if (indicator) {
+        const spinner = indicator.querySelector('.loading-spinner');
+        const checkmark = indicator.querySelector('.loading-checkmark');
+        spinner.style.display = 'none';
+        checkmark.style.display = 'inline-block';
+        if (loadingTimeout) clearTimeout(loadingTimeout);
+        loadingTimeout = setTimeout(() => {
+          indicator.style.opacity = '0';
+        }, 1500);
+      }
+      
+      // 新規作成ボタンのローディング
+      const newButton = document.getElementById('new-button');
+      const newButtonLoading = document.getElementById('new-button-loading');
+      if (newButtonLoading) {
+        newButtonLoading.style.display = 'none';
+      }
+      if (newButton) {
+        newButton.style.display = 'flex';
+      }
     }
     
     function handleError(error) {
@@ -158,17 +177,6 @@
         dropdown.classList.remove('show');
       }
     }
-
-    // (前回の修正で追加した closeNewButtonDropdown 関数がここにあるはずです)
-    function closeNewButtonDropdown() {
-      const dropdown = document.getElementById('new-button-dropdown');
-      if (dropdown) {
-        dropdown.classList.remove('show');
-      }
-    }
-
-    // ★★★★★ 修正ここから ★★★★★
-    // 以下の2つの関数を新しく追加してください
 
     /**
      * 「+ 新規作成」ボタンのドロップダウンの表示/非表示を切り替えます。
@@ -194,9 +202,13 @@
       if (document.getElementById('tab-works').style.display === 'block') {
         openNewWorkModal();
       } else if (document.getElementById('tab-projects').style.display === 'block') {
-        openNewProjectModal();
+        openNewWorkModal();
+      } else if (document.getElementById('tab-members').style.display === 'block') {
+        openNewMemberModal();
+      } else if (document.getElementById('tab-knowledge').style.display === 'block') {
+        openNewKnowledgeModal();
       } else {
-        // それ以外のタブ（ホーム、メンバーなど）ではドロップダウンを表示
+        // それ以外のタブ（ホーム、統計など）ではドロップダウンを表示
         toggleNewButtonDropdown(event);
       }
     }
