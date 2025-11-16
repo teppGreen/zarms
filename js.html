@@ -243,10 +243,21 @@
     function switchTab(tabName) {
       closeWorkDetailOverlay();
       document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-      document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`).classList.add('active');
-      document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
-      document.getElementById('tab-' + tabName).style.display = 'block';
-      loadTabData(tabName);
+      const navItem = document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`);
+      if (navItem) {
+        navItem.classList.add('active');
+      }
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.style.display = 'none';
+      });
+      const targetTab = document.getElementById('tab-' + tabName);
+      if (targetTab) {
+        targetTab.style.display = 'block';
+        loadTabData(tabName);
+      } else {
+        console.error(`Tab 'tab-${tabName}' not found`);
+        hideLoading();
+      }
     }
 
     function loadTabData(tabName) {
@@ -265,18 +276,40 @@
 
     function loadHomeData() {
       callGAS('getHomeData').then(data => {
-        document.getElementById('home-greeting').textContent = `${data.greeting}、${data.memberName}さん。`;
+        if (!data) {
+          console.error('getHomeData returned no data');
+          hideLoading();
+          return;
+        }
+        const greetingEl = document.getElementById('home-greeting');
+        if (greetingEl && data.greeting && data.memberName) {
+          greetingEl.textContent = `${data.greeting}、${data.memberName}さん。`;
+        }
         const container = document.getElementById('home-works-container');
+        if (!container) {
+          console.error('home-works-container not found');
+          hideLoading();
+          return;
+        }
         container.innerHTML = '';
         if (!data.works || data.works.length === 0) {
           container.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
         } else {
           data.works.forEach(work => {
-            container.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
+            if (work && work.work_id) {
+              container.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title || '')}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title || '')}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
+            }
           });
         }
         hideLoading();
-      }).catch(handleError);
+      }).catch(error => {
+        console.error('Error loading home data:', error);
+        const container = document.getElementById('home-works-container');
+        if (container) {
+          container.innerHTML = '<p style="color: #ba1a1a;">データの読み込みに失敗しました。ページを再読み込みしてください。</p>';
+        }
+        handleError(error);
+      });
     }
 
     function loadWorksData() {
