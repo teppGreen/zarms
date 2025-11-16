@@ -476,7 +476,7 @@
         projectTitleInput.oninput = (e) => searchProjectsForWorkDetail(e.target.value, work.work_id);
         projectTitleInput.onblur = () => {
           setTimeout(() => {
-            const suggestions = projectTitleContainer.querySelector('.combobox-suggestions');
+            const suggestions = document.getElementById('work-detail-project-suggestions');
             if (suggestions) {
               suggestions.style.display = 'none';
             }
@@ -484,10 +484,14 @@
         };
         const projectTitleSuggestions = document.createElement('div');
         projectTitleSuggestions.className = 'combobox-suggestions';
+        projectTitleSuggestions.id = 'work-detail-project-suggestions';
         projectTitleSuggestions.style.display = 'none';
+        projectTitleSuggestions.style.position = 'fixed';
+        projectTitleSuggestions.style.zIndex = '99999';
         projectTitleContainer.appendChild(projectTitleInput);
-        projectTitleContainer.appendChild(projectTitleSuggestions);
         projectTitleHeader.appendChild(projectTitleContainer);
+        // ドロップダウンはbody直下に追加
+        document.body.appendChild(projectTitleSuggestions);
         
         // 制作タイトルを編集可能に
         const workTitleHeader = document.getElementById('work-detail-work-title-header');
@@ -603,24 +607,6 @@
         dueEditableHeader.onclick = (e) => {
           e.stopPropagation();
           openDateTimePickerForWorkDetailHeader(e, work.work_id, 'due_datetime', work.due_datetime);
-        };
-        
-        // ステータスを表示・編集可能に（overlay-header-info）
-        const statusText = document.getElementById('work-detail-status-text');
-        statusText.textContent = getConfigLabel(work.work_status_key, 'WORK_STATUS') || work.work_status_key || '';
-        const statusEditable = document.getElementById('work-detail-status-editable');
-        statusEditable.onclick = (e) => {
-          e.stopPropagation();
-          showSelectEditorForWorkDetail(e, work.work_id, 'work_status_key', work.work_status_key, 'WORK_STATUS');
-        };
-        
-        // 納品期限を表示・編集可能に（overlay-header-info）
-        const dueText = document.getElementById('work-detail-due-text');
-        dueText.textContent = formatDateTimeForDisplay(work.due_datetime) || '';
-        const dueEditable = document.getElementById('work-detail-due-editable');
-        dueEditable.onclick = (e) => {
-          e.stopPropagation();
-          openDateTimePickerForWorkDetail(e, work.work_id, 'due_datetime', work.due_datetime);
         };
         
         // URLコピーボタンを表示
@@ -757,6 +743,11 @@
       if (urlCopyButton) {
         urlCopyButton.style.display = 'none';
       }
+      // ドロップダウンを削除
+      const suggestions = document.getElementById('work-detail-project-suggestions');
+      if (suggestions) {
+        suggestions.remove();
+      }
     }
     
     function copyWorkDetailUrl() {
@@ -780,7 +771,7 @@
     
     function searchProjectsForWorkDetail(query, workId) {
       const projectTitleHeader = document.getElementById('work-detail-project-title-header');
-      const suggestionsContainer = projectTitleHeader.querySelector('.combobox-suggestions');
+      const suggestionsContainer = document.getElementById('work-detail-project-suggestions');
       const projectTitleInput = projectTitleHeader.querySelector('input');
       
       if (!query) {
@@ -806,6 +797,9 @@
       );
       
       suggestionsContainer.innerHTML = '';
+      
+      // 入力フィールドの位置を取得
+      const inputRect = projectTitleInput.getBoundingClientRect();
       
       filteredProjects.forEach(p => {
         const item = document.createElement('div');
@@ -853,6 +847,11 @@
         }).catch(handleError);
       };
       suggestionsContainer.appendChild(newItem);
+      
+      // 位置を設定
+      suggestionsContainer.style.left = `${inputRect.left}px`;
+      suggestionsContainer.style.top = `${inputRect.bottom + window.scrollY}px`;
+      suggestionsContainer.style.width = `${inputRect.width}px`;
       suggestionsContainer.style.display = 'block';
     }
     
@@ -978,8 +977,9 @@
       `;
       
       const rect = container.getBoundingClientRect();
-      editorDiv.style.left = `${rect.left}px`;
-      editorDiv.style.top = `${rect.top}px`;
+      editorDiv.style.left = `${rect.left + window.scrollX}px`;
+      editorDiv.style.top = `${rect.bottom + window.scrollY}px`;
+      editorDiv.style.zIndex = '99999';
       document.body.appendChild(editorDiv);
       
       const inputs = editorDiv.querySelectorAll('.datetime-segment');
@@ -1066,8 +1066,9 @@
       `;
       
       const rect = container.getBoundingClientRect();
-      editorDiv.style.left = `${rect.left}px`;
-      editorDiv.style.top = `${rect.top}px`;
+      editorDiv.style.left = `${rect.left + window.scrollX}px`;
+      editorDiv.style.top = `${rect.bottom + window.scrollY}px`;
+      editorDiv.style.zIndex = '99999';
       document.body.appendChild(editorDiv);
       
       const inputs = editorDiv.querySelectorAll('.datetime-segment');

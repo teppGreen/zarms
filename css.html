@@ -89,18 +89,18 @@
       -moz-osx-font-smoothing: grayscale;
     }
 
-    .app-header {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: var(--header-height);
-      background-color: var(--md-sys-color-surface);
-      border-bottom: 1px solid var(--md-sys-color-surface-variant);
-      z-index: 100;
-      display: flex;
-      align-items: center;
-    }
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: var(--header-height);
+  background-color: var(--md-sys-color-surface);
+  border-bottom: 1px solid var(--md-sys-color-surface-variant);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+}
 
 .header-content {
   position: relative;
@@ -112,6 +112,8 @@
   align-items: center;
   justify-content: flex-start;
   gap: 24px;
+  flex-wrap: wrap;
+  min-height: var(--header-height);
 }
 
 #work-detail-header-info {
@@ -121,10 +123,22 @@
   align-items: center;
   gap: 16px;
   font-size: 14px;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  min-height: var(--header-height);
 }
 
 #work-detail-header-info span {
+  white-space: nowrap;
+}
+
+#work-detail-header-info > span,
+#work-detail-header-info > div {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.work-detail-status-container,
+.work-detail-due-container {
   white-space: nowrap;
 }
 
@@ -1129,7 +1143,8 @@
   border-right: 2px solid var(--md-sys-color-outline);
   display: flex;
   flex-direction: column;
-  min-width: 0; /* フレックスアイテムの最小幅を0にして、中央で区切れるようにする */
+  min-width: 800px; /* 最小幅を固定 */
+  overflow-x: auto; /* 横スクロール対応 */
 }
 
 .overlay-side {
@@ -1138,7 +1153,8 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
-  min-width: 0; /* フレックスアイテムの最小幅を0にして、中央で区切れるようにする */
+  min-width: 400px; /* 最小幅を固定 */
+  overflow-x: auto; /* 横スクロール対応 */
 }
 
 .detail-section {
@@ -1257,17 +1273,14 @@
 
 .combobox-suggestions {
   display: none;
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
+  position: fixed;
   background-color: var(--md-sys-color-surface);
   border: 1px solid var(--md-sys-color-outline);
   border-radius: 8px;
   margin-top: 4px;
   max-height: 200px;
   overflow-y: auto;
-  z-index: 10000; /* 全ての要素より最上層に表示 */
+  z-index: 99999; /* 全ての要素より最上層に表示 */
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
