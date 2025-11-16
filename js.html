@@ -418,7 +418,7 @@
     }
 
     let currentWorkId = null;
-
+    
     function openWorkDetailOverlay(workId) {
       showLoading();
       currentWorkId = workId;
@@ -432,25 +432,194 @@
         if (!membersData || membersData.length === 0) {
           membersData = members;
         }
-        document.getElementById('work-detail-title').textContent = work.work_title;
         
-        // リッチテキストエディタにデータを設定
-        const contentEditor = document.getElementById('work-detail-content-editor');
-        const designEditor = document.getElementById('work-detail-design-editor');
-        const regulationEditor = document.getElementById('work-detail-regulation-editor');
-        const noteEditor = document.getElementById('work-detail-note-editor');
+        // ヘッダータイトルを変更
+        const headerTitleDefault = document.getElementById('header-title-default');
+        const headerTitleWorkDetail = document.getElementById('header-title-work-detail');
+        headerTitleDefault.style.display = 'none';
+        headerTitleWorkDetail.style.display = 'flex';
+        headerTitleWorkDetail.textContent = `${work.project_id || ''}-${work.work_id || ''}`;
         
-        contentEditor.innerHTML = work.work_detail_content || '';
-        contentEditor.dataset.workId = workId;
-        designEditor.innerHTML = work.work_detail_design || '';
-        designEditor.dataset.workId = workId;
-        regulationEditor.innerHTML = work.work_detail_regulation || '';
-        regulationEditor.dataset.workId = workId;
-        noteEditor.innerHTML = work.work_detail_note || '';
-        noteEditor.dataset.workId = workId;
+        // header-contentエリアに情報を表示
+        const headerInfoDiv = document.getElementById('work-detail-header-info');
+        headerInfoDiv.style.display = 'flex';
         
-        // リッチテキストエディタの初期化
-        initRichTextEditors();
+        // 案件タイトルを編集可能なコンボボックスとして表示
+        const projectTitleHeader = document.getElementById('work-detail-project-title-header');
+        projectTitleHeader.innerHTML = '';
+        const projectTitleContainer = document.createElement('div');
+        projectTitleContainer.className = 'combobox-container';
+        projectTitleContainer.style.position = 'relative';
+        projectTitleContainer.style.display = 'inline-block';
+        const projectTitleInput = document.createElement('input');
+        projectTitleInput.type = 'text';
+        projectTitleInput.className = 'input-field';
+        projectTitleInput.style.width = '200px';
+        projectTitleInput.style.padding = '4px 8px';
+        projectTitleInput.style.fontSize = '14px';
+        projectTitleInput.value = work.project_title || '';
+        projectTitleInput.dataset.projectId = work.project_id || '';
+        projectTitleInput.oninput = (e) => searchProjectsForWorkDetail(e.target.value, work.work_id);
+        projectTitleInput.onblur = () => {
+          setTimeout(() => {
+            const suggestions = document.getElementById('work-detail-project-suggestions');
+            if (suggestions) {
+              suggestions.style.display = 'none';
+            }
+          }, 200);
+        };
+        const projectTitleSuggestions = document.createElement('div');
+        projectTitleSuggestions.className = 'combobox-suggestions';
+        projectTitleSuggestions.id = 'work-detail-project-suggestions';
+        projectTitleSuggestions.style.display = 'none';
+        projectTitleSuggestions.style.position = 'fixed';
+        projectTitleSuggestions.style.zIndex = '99999';
+        projectTitleContainer.appendChild(projectTitleInput);
+        projectTitleHeader.appendChild(projectTitleContainer);
+        // ドロップダウンはbody直下に追加
+        document.body.appendChild(projectTitleSuggestions);
+        
+        // 制作タイトルを編集可能に
+        const workTitleHeader = document.getElementById('work-detail-work-title-header');
+        workTitleHeader.innerHTML = '';
+        workTitleHeader.style.cursor = 'text';
+        workTitleHeader.style.padding = '4px 8px';
+        workTitleHeader.style.borderRadius = '4px';
+        workTitleHeader.style.minWidth = '150px';
+        workTitleHeader.style.display = 'inline-block';
+        const currentWorkTitle = work.work_title || '';
+        workTitleHeader.textContent = currentWorkTitle;
+        const workIdForTitle = work.work_id; // クロージャで保持
+        const setupWorkTitleEdit = () => {
+          workTitleHeader.onclick = () => {
+            const originalValue = workTitleHeader.textContent;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = originalValue;
+            input.className = 'input-field';
+            input.style.width = '200px';
+            input.style.padding = '4px 8px';
+            input.style.fontSize = '14px';
+            workTitleHeader.innerHTML = '';
+            workTitleHeader.appendChild(input);
+            input.focus();
+            input.select();
+            input.onblur = () => {
+              const newValue = input.value.trim();
+              if (newValue && newValue !== originalValue) {
+                showLoading();
+                callGAS('updateSingleField', 'works', workIdForTitle, 'work_title', newValue)
+                  .then(() => {
+                    workTitleHeader.textContent = newValue;
+                    setupWorkTitleEdit();
+                    hideLoading();
+                  })
+                  .catch(handleError);
+              } else {
+                workTitleHeader.textContent = originalValue;
+                setupWorkTitleEdit();
+              }
+            };
+            input.onkeydown = (e) => {
+              if (e.key === 'Enter') {
+                input.blur();
+              } else if (e.key === 'Escape') {
+                workTitleHeader.textContent = originalValue;
+                setupWorkTitleEdit();
+              }
+            };
+          };
+        };
+        setupWorkTitleEdit();
+        
+        // 担当者を表示（アイコンをテキストと横揃え）
+        const assigneesContainer = document.getElementById('work-detail-assignees-header-info');
+        assigneesContainer.innerHTML = '';
+        assigneesContainer.style.display = 'inline-flex';
+        assigneesContainer.style.alignItems = 'center';
+        assigneesContainer.style.verticalAlign = 'middle';
+        if (work.assignees && work.assignees.length > 0) {
+          work.assignees.forEach(assignee => {
+            const icon = document.createElement('img');
+            icon.src = assignee.member_icon || 'https://via.placeholder.com/32';
+            icon.className = 'avatar';
+            icon.style.width = '24px';
+            icon.style.height = '24px';
+            icon.style.marginRight = '4px';
+            icon.style.verticalAlign = 'middle';
+            icon.style.display = 'inline-block';
+            icon.title = `${assignee.member_name} / ${assignee.member_team_value}`;
+            assigneesContainer.appendChild(icon);
+          });
+        }
+        // ＋アイコンを追加
+        const addIcon = document.createElement('button');
+        addIcon.innerHTML = '+';
+        addIcon.className = 'btn-icon-add-assignee';
+        addIcon.style.width = '24px';
+        addIcon.style.height = '24px';
+        addIcon.style.borderRadius = '50%';
+        addIcon.style.border = 'none';
+        addIcon.style.backgroundColor = 'var(--md-sys-color-primary)';
+        addIcon.style.color = 'var(--md-sys-color-on-primary)';
+        addIcon.style.cursor = 'pointer';
+        addIcon.style.marginLeft = '4px';
+        addIcon.style.display = 'inline-flex';
+        addIcon.style.alignItems = 'center';
+        addIcon.style.justifyContent = 'center';
+        addIcon.style.fontSize = '16px';
+        addIcon.style.fontWeight = 'bold';
+        addIcon.style.verticalAlign = 'middle';
+        addIcon.onclick = (e) => {
+          e.stopPropagation();
+          openAddAssigneeDropdown(e.target, work.work_id, work.assignees || []);
+        };
+        assigneesContainer.appendChild(addIcon);
+        
+        
+        // ステータスを表示・編集可能に（header-contentエリア）
+        const statusTextHeader = document.getElementById('work-detail-status-text-header');
+        statusTextHeader.textContent = getConfigLabel(work.work_status_key, 'WORK_STATUS') || work.work_status_key || '';
+        const statusEditableHeader = document.getElementById('work-detail-status-editable-header');
+        statusEditableHeader.onclick = (e) => {
+          e.stopPropagation();
+          showSelectEditorForWorkDetailHeader(e, work.work_id, 'work_status_key', work.work_status_key, 'WORK_STATUS');
+        };
+        
+        // 作成日を表示（編集不可）
+        const createdAtHeader = document.getElementById('work-detail-created-at-header');
+        createdAtHeader.textContent = formatDate(work.created_at) || '-';
+        
+        // 納品期限を表示・編集可能に（header-contentエリア）
+        const dueTextHeader = document.getElementById('work-detail-due-text-header');
+        dueTextHeader.textContent = formatDateTimeForDisplay(work.due_datetime) || '';
+        const dueEditableHeader = document.getElementById('work-detail-due-editable-header');
+        dueEditableHeader.onclick = (e) => {
+          e.stopPropagation();
+          openDateTimePickerForWorkDetailHeader(e, work.work_id, 'due_datetime', work.due_datetime);
+        };
+        
+        // 残り日数を表示
+        const daysRemainingHeader = document.getElementById('work-detail-days-remaining-header');
+        daysRemainingHeader.textContent = calculateDaysRemaining(work.due_datetime);
+        
+        // URLコピーボタンを表示
+        const urlCopyButton = document.getElementById('work-detail-url-copy-button');
+        if (urlCopyButton) {
+          urlCopyButton.style.display = 'block';
+          urlCopyButton.dataset.workId = work.work_id;
+        }
+        
+        // Googleドキュメントを埋め込む
+        const docContainer = document.getElementById('work-detail-document-container');
+        if (work.work_document_id) {
+          // Googleドキュメントを編集可能な状態で埋め込む（ページ分けなしモード、rm=minimalパラメータ追加）
+          const embedUrl = `https://docs.google.com/document/d/${work.work_document_id}/edit?rm=minimal&tab=${work.work_document_tab_id}`;
+          docContainer.innerHTML = `<style> iframe { width: 100%; height: 100%; border: none; } </style>
+                                   <iframe src="${embedUrl}"></iframe>`;
+        } else {
+          docContainer.innerHTML = '<p style="color: #6b7280; padding: 24px;">ドキュメントが作成されていません</p>';
+        }
         
         renderWorkTasks(work.tasks);
         renderWorkAssignees(work.assignees);
