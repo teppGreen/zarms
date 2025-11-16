@@ -73,10 +73,16 @@
       const urlParams = new URLSearchParams(window.location.search);
       const workId = urlParams.get('work_id');
       if (workId) {
-        // データ読み込み後に詳細画面を開く
-        setTimeout(() => {
-          openWorkDetailOverlay(workId);
-        }, 500);
+        // データ読み込み完了後に詳細画面を開く
+        // loadInitialDataの完了を待つ
+        const checkAndOpen = () => {
+          if (currentUser && configData && Object.keys(configData).length > 0) {
+            openWorkDetailOverlay(workId);
+          } else {
+            setTimeout(checkAndOpen, 100);
+          }
+        };
+        checkAndOpen();
       }
     };
 
@@ -465,12 +471,62 @@
             assigneesContainer.appendChild(icon);
           });
         }
+        // ＋アイコンを追加
+        const addIcon = document.createElement('button');
+        addIcon.innerHTML = '+';
+        addIcon.className = 'btn-icon-add-assignee';
+        addIcon.style.width = '32px';
+        addIcon.style.height = '32px';
+        addIcon.style.borderRadius = '50%';
+        addIcon.style.border = 'none';
+        addIcon.style.backgroundColor = 'var(--md-sys-color-primary)';
+        addIcon.style.color = 'var(--md-sys-color-on-primary)';
+        addIcon.style.cursor = 'pointer';
+        addIcon.style.marginLeft = '8px';
+        addIcon.style.display = 'flex';
+        addIcon.style.alignItems = 'center';
+        addIcon.style.justifyContent = 'center';
+        addIcon.style.fontSize = '20px';
+        addIcon.style.fontWeight = 'bold';
+        addIcon.onclick = (e) => {
+          e.stopPropagation();
+          openAddAssigneeDropdown(e.target, work.work_id, work.assignees || []);
+        };
+        assigneesContainer.appendChild(addIcon);
+        
+        // URL発行ボタンを追加
+        const urlButton = document.createElement('button');
+        urlButton.textContent = 'URLをコピー';
+        urlButton.className = 'btn btn-sm';
+        urlButton.style.marginLeft = '16px';
+        urlButton.onclick = () => {
+          const url = `${window.location.origin}${window.location.pathname}?work_id=${work.work_id}`;
+          navigator.clipboard.writeText(url).then(() => {
+            alert('URLをクリップボードにコピーしました');
+          }).catch(() => {
+            // フォールバック
+            const textArea = document.createElement('textarea');
+            textArea.value = url;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            alert('URLをクリップボードにコピーしました');
+          });
+        };
+        const headerInfo = document.querySelector('.overlay-header-info');
+        if (headerInfo) {
+          const closeBtn = headerInfo.querySelector('.close-btn');
+          if (closeBtn) {
+            headerInfo.insertBefore(urlButton, closeBtn);
+          }
+        }
         
         // Googleドキュメントを埋め込む
         const docContainer = document.getElementById('work-detail-document-container');
         if (work.work_document_id) {
-          // Googleドキュメントを編集可能な状態で埋め込む
-          const embedUrl = `https://docs.google.com/document/d/${work.work_document_id}/edit?usp=sharing`;
+          // Googleドキュメントを編集可能な状態で埋め込む（ページ分けなしモード、rm=minimalパラメータ追加）
+          const embedUrl = `https://docs.google.com/document/d/${work.work_document_id}/edit?rm=minimal&usp=sharing`;
           docContainer.innerHTML = `<iframe src="${embedUrl}" style="width: 100%; height: 100%; min-height: 600px; border: 1px solid var(--md-sys-color-outline); border-radius: 8px;"></iframe>`;
         } else {
           docContainer.innerHTML = '<p style="color: #6b7280; padding: 24px;">ドキュメントが作成されていません</p>';
@@ -869,6 +925,141 @@
       }
     }
 
+    function openAddAssigneeDropdown(buttonElement, workId, currentAssignees) {
+      // 既に割り当てられているメンバーを取得
+      const assignedEmails = (currentAssignees || []).map(a => a.member_email);
+      const availableMembers = (membersData || []).filter(m => !assignedEmails.includes(m.member_email));
+      
+      if (availableMembers.length === 0) {
+        alert('追加できるメンバーがいません');
+        return;
+      }
+      
+      // 既存のドロップダウンを閉じる
+      const existingDropdown = document.getElementById('assignee-dropdown');
+      if (existingDropdown) {
+        existingDropdown.remove();
+      }
+      
+      // ドロップダウンを作成
+      const dropdown = document.createElement('div');
+      dropdown.id = 'assignee-dropdown';
+      dropdown.className = 'assignee-dropdown';
+      dropdown.style.position = 'absolute';
+      dropdown.style.zIndex = '2000';
+      dropdown.style.backgroundColor = 'var(--md-sys-color-surface)';
+      dropdown.style.border = '1px solid var(--md-sys-color-outline)';
+      dropdown.style.borderRadius = '8px';
+      dropdown.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+      dropdown.style.maxHeight = '300px';
+      dropdown.style.overflowY = 'auto';
+      dropdown.style.minWidth = '250px';
+      dropdown.style.maxWidth = '400px';
+      
+      // 検索入力欄
+      const searchInput = document.createElement('input');
+      searchInput.type = 'text';
+      searchInput.placeholder = 'メンバーを検索...';
+      searchInput.className = 'input-field';
+      searchInput.style.margin = '8px';
+      searchInput.style.width = 'calc(100% - 16px)';
+      searchInput.style.boxSizing = 'border-box';
+      dropdown.appendChild(searchInput);
+      
+      // メンバーリストコンテナ
+      const membersList = document.createElement('div');
+      membersList.id = 'assignee-members-list';
+      dropdown.appendChild(membersList);
+      
+      // メンバーを表示する関数
+      const renderMembers = (members) => {
+        membersList.innerHTML = '';
+        if (members.length === 0) {
+          const noResult = document.createElement('div');
+          noResult.textContent = '該当するメンバーがいません';
+          noResult.style.padding = '12px';
+          noResult.style.color = 'var(--md-sys-color-on-surface-variant)';
+          noResult.style.textAlign = 'center';
+          membersList.appendChild(noResult);
+          return;
+        }
+        
+        members.forEach(member => {
+          const optionDiv = document.createElement('div');
+          optionDiv.className = 'popup-editor-option';
+          optionDiv.style.display = 'flex';
+          optionDiv.style.alignItems = 'center';
+          optionDiv.style.gap = '8px';
+          optionDiv.style.padding = '8px 12px';
+          optionDiv.style.cursor = 'pointer';
+          
+          const icon = document.createElement('img');
+          icon.src = member.member_icon || 'https://via.placeholder.com/24';
+          icon.className = 'avatar';
+          icon.style.width = '24px';
+          icon.style.height = '24px';
+          
+          const nameDiv = document.createElement('div');
+          nameDiv.textContent = member.member_name;
+          
+          const teamDiv = document.createElement('div');
+          teamDiv.textContent = getConfigLabel(member.member_team_key, 'TEAM');
+          teamDiv.style.fontSize = '12px';
+          teamDiv.style.color = 'var(--md-sys-color-on-surface-variant)';
+          
+          const infoDiv = document.createElement('div');
+          infoDiv.style.display = 'flex';
+          infoDiv.style.flexDirection = 'column';
+          infoDiv.appendChild(nameDiv);
+          infoDiv.appendChild(teamDiv);
+          
+          optionDiv.appendChild(icon);
+          optionDiv.appendChild(infoDiv);
+          
+          optionDiv.addEventListener('click', () => {
+            addWorkAssignee(workId, member.member_email);
+            dropdown.remove();
+          });
+          
+          membersList.appendChild(optionDiv);
+        });
+      };
+      
+      // 初期表示
+      renderMembers(availableMembers);
+      
+      // 検索機能
+      searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        const filtered = availableMembers.filter(m => 
+          m.member_name.toLowerCase().includes(query) ||
+          (m.member_email && m.member_email.toLowerCase().includes(query))
+        );
+        renderMembers(filtered);
+      });
+      
+      // 位置を設定
+      const rect = buttonElement.getBoundingClientRect();
+      dropdown.style.left = `${rect.right}px`;
+      dropdown.style.top = `${rect.top}px`;
+      
+      document.body.appendChild(dropdown);
+      
+      // 外側をクリックしたら閉じる
+      const closeOnOutsideClick = (e) => {
+        if (!dropdown.contains(e.target) && e.target !== buttonElement) {
+          dropdown.remove();
+          document.removeEventListener('click', closeOnOutsideClick);
+        }
+      };
+      setTimeout(() => {
+        document.addEventListener('click', closeOnOutsideClick);
+      }, 0);
+      
+      // 検索入力にフォーカス
+      searchInput.focus();
+    }
+    
     function openAddAssigneeModal() {
       if (!currentWorkId) return;
       
