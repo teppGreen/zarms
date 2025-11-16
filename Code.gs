@@ -422,7 +422,7 @@ function getHomeData() {
     });
   }
   
-  const assignedWorks = getAssignedWorksInProgress(userEmail);
+  const assignedWorks = getAssignedWorks(userEmail);
   
   const hour = new Date().getHours();
   let greeting = 'こんにちは';
@@ -707,7 +707,7 @@ function createWorkDocument(workId, workTitle, content, design, regulation, note
   }
 }
 
-function getAssignedWorksInProgress(memberEmail) {
+function getAssignedWorks(memberEmail) {
   const assignments = findData(SHEET_NAMES.WORK_ASSIGNMENTS, { member_email: memberEmail });
   const workIds = assignments.map(a => a.work_id);
   if (workIds.length === 0) return [];
@@ -715,7 +715,7 @@ function getAssignedWorksInProgress(memberEmail) {
   const allWorks = getAllData(SHEET_NAMES.WORKS);
   
   const works = allWorks.filter(work => 
-    workIds.includes(work.work_id) && work.work_status_key === 'CREATE'
+    workIds.includes(work.work_id) && ![`DELIVERED`,`CANCELED`].includes(work.work_status_key)
   );
 
   const enrichedWorks = works.map(work => {
