@@ -904,7 +904,14 @@
             showLoading();
             callGAS('updateSingleField', 'works', workId, field, opt.config_key)
               .then(() => {
-                document.getElementById('work-detail-status-text').textContent = opt.config_value;
+                const statusText = document.getElementById('work-detail-status-text');
+                if (statusText) {
+                  statusText.textContent = opt.config_value;
+                }
+                const statusTextHeader = document.getElementById('work-detail-status-text-header');
+                if (statusTextHeader) {
+                  statusTextHeader.textContent = opt.config_value;
+                }
                 hideLoading();
               })
               .catch(handleError);
@@ -944,8 +951,14 @@
             showLoading();
             callGAS('updateSingleField', 'works', workId, field, opt.config_key)
               .then(() => {
-                document.getElementById('work-detail-status-text-header').textContent = opt.config_value;
-                document.getElementById('work-detail-status-text').textContent = opt.config_value;
+                const statusTextHeader = document.getElementById('work-detail-status-text-header');
+                if (statusTextHeader) {
+                  statusTextHeader.textContent = opt.config_value;
+                }
+                const statusText = document.getElementById('work-detail-status-text');
+                if (statusText) {
+                  statusText.textContent = opt.config_value;
+                }
                 hideLoading();
               })
               .catch(handleError);
