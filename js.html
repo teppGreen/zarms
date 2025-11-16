@@ -241,21 +241,26 @@
     // ============================================
 
     function switchTab(tabName) {
-      closeWorkDetailOverlay();
-      document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-      const navItem = document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`);
-      if (navItem) {
-        navItem.classList.add('active');
-      }
-      document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.style.display = 'none';
-      });
-      const targetTab = document.getElementById('tab-' + tabName);
-      if (targetTab) {
-        targetTab.style.display = 'block';
-        loadTabData(tabName);
-      } else {
-        console.error(`Tab 'tab-${tabName}' not found`);
+      try {
+        closeWorkDetailOverlay();
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        const navItem = document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`);
+        if (navItem) {
+          navItem.classList.add('active');
+        }
+        document.querySelectorAll('.tab-content').forEach(tab => {
+          tab.style.display = 'none';
+        });
+        const targetTab = document.getElementById('tab-' + tabName);
+        if (targetTab) {
+          targetTab.style.display = 'block';
+          loadTabData(tabName);
+        } else {
+          console.error(`Tab element 'tab-${tabName}' not found`);
+          hideLoading();
+        }
+      } catch (error) {
+        console.error('Error in switchTab:', error);
         hideLoading();
       }
     }
@@ -287,7 +292,7 @@
         }
         const container = document.getElementById('home-works-container');
         if (!container) {
-          console.error('home-works-container not found');
+          console.error('home-works-container element not found');
           hideLoading();
           return;
         }
@@ -303,7 +308,7 @@
         }
         hideLoading();
       }).catch(error => {
-        console.error('Error loading home data:', error);
+        console.error('Error in loadHomeData:', error);
         const container = document.getElementById('home-works-container');
         if (container) {
           container.innerHTML = '<p style="color: #ba1a1a;">データの読み込みに失敗しました。ページを再読み込みしてください。</p>';
