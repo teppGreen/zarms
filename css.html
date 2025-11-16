@@ -1036,10 +1036,11 @@
   width: calc(100% - var(--sidebar-width));
   height: calc(100% - var(--header-height));
   background-color: var(--md-sys-color-surface);
-  z-index: 900;
+  z-index: 100;
   display: none;
   opacity: 0;
   transition: opacity 0.3s var(--ease-standard);
+  overflow-y: auto;
 }
 
 .overlay.show {
@@ -1089,18 +1090,19 @@
 .overlay-main {
   flex: 1;
   padding-right: 24px;
-  border-right: 1px solid var(--md-sys-color-surface-variant);
+  border-right: 2px solid var(--md-sys-color-outline);
   display: flex;
   flex-direction: column;
+  min-width: 0; /* フレックスアイテムの最小幅を0にして、中央で区切れるようにする */
 }
 
 .overlay-side {
-  width: 400px;
-  flex-shrink: 0;
+  flex: 1;
   padding-left: 24px;
   display: flex;
   flex-direction: column;
   gap: 24px;
+  min-width: 0; /* フレックスアイテムの最小幅を0にして、中央で区切れるようにする */
 }
 
 .detail-section {
