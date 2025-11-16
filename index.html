@@ -16,6 +16,13 @@
   <div class="app-header">
     <div class="header-content">
       <h1 class="header-title">CTMS v3.0</h1>
+      <div id="work-detail-header-info" style="display: none; flex: 1; margin-left: 24px; align-items: center; gap: 16px; font-size: 14px;">
+        <span><strong>案件ID:</strong> <span id="work-detail-project-id-header"></span></span>
+        <span><strong>制作ID:</strong> <span id="work-detail-work-id-header"></span></span>
+        <span><strong>案件:</strong> <span id="work-detail-project-title-header"></span></span>
+        <span><strong>制作:</strong> <span id="work-detail-work-title-header"></span></span>
+        <span><strong>担当者:</strong> <span id="work-detail-assignees-header-info" style="display: inline-flex; align-items: center;"></span></span>
+      </div>
     </div>
     <div class="new-button-container">
       <div id="new-button" class="new-button">
@@ -229,14 +236,23 @@
 
   <div id="work-detail-overlay" class="overlay">
     <div class="overlay-content">
-      <!-- app-headerの位置に情報を表示 -->
+      <!-- ステータスと納品期限を表示 -->
       <div class="overlay-header-info">
-        <div style="display: flex; align-items: center; gap: 16px; position: relative;">
-          <span><strong>案件ID:</strong> <span id="work-detail-project-id"></span></span>
-          <span><strong>制作ID:</strong> <span id="work-detail-work-id"></span></span>
-          <span><strong>案件:</strong> <span id="work-detail-project-title"></span></span>
-          <span><strong>制作:</strong> <span id="work-detail-work-title"></span></span>
-          <span><strong>担当者:</strong> <span id="work-detail-assignees-header" style="display: inline-flex; align-items: center;"></span></span>
+        <div style="display: flex; align-items: center; gap: 24px; flex-wrap: wrap;">
+          <div class="work-detail-status-container" style="display: flex; align-items: center; gap: 8px;">
+            <strong>ステータス:</strong>
+            <div class="editable-container" id="work-detail-status-editable" style="display: inline-flex; min-width: 120px;">
+              <span class="editable-text" id="work-detail-status-text"></span>
+              <span class="editable-toggle-btn">✎</span>
+            </div>
+          </div>
+          <div class="work-detail-due-container" style="display: flex; align-items: center; gap: 8px;">
+            <strong>納品期限:</strong>
+            <div class="editable-container datetime-editable" id="work-detail-due-editable" style="display: inline-flex; min-width: 180px;">
+              <span class="editable-text" id="work-detail-due-text"></span>
+              <span class="editable-toggle-btn">✎</span>
+            </div>
+          </div>
         </div>
         <button class="close-btn" onclick="closeWorkDetailOverlay()">&times;</button>
       </div>
@@ -244,12 +260,6 @@
         <!-- 左半分: ドキュメントの埋め込み -->
         <div class="overlay-main">
           <div id="work-detail-document-container" style="width: 100%; height: 100%; min-height: 600px;">
-          </div>
-          <!-- 備考（プレーンテキスト） -->
-          <div class="detail-section" style="margin-top: 24px;">
-            <h3>備考</h3>
-            <textarea id="work-detail-note-input" class="input-field" rows="3" placeholder="備考を入力（改行なし）" style="resize: vertical;"></textarea>
-            <button class="btn btn-sm" onclick="saveWorkDetail()" style="margin-top: 8px;">保存</button>
           </div>
         </div>
         <!-- 右半分: タスクと使用アプリ -->
