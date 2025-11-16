@@ -6,6 +6,7 @@
     let membersData = [];
     let knowledgeData = [];
     let configData = {};
+    let currentWorkId = null;
 
     // テーブルの状態管理（ソート、フィルター）
     let tableState = {
@@ -45,8 +46,18 @@
     ];
 
 
+    // グローバル変数: work_idパラメータを保持
+    let pendingWorkId = null;
+
     // 初期化
     window.onload = function() {
+      // URLパラメータからwork_idを取得
+      const urlParams = new URLSearchParams(window.location.search);
+      const workId = urlParams.get('work_id');
+      if (workId) {
+        pendingWorkId = workId;
+      }
+      
       loadInitialData();
       document.body.addEventListener('click', closeAllPopups);
 
@@ -68,22 +79,6 @@
            closeNewButtonDropdown();
         }
       });
-      
-      // URLパラメータからwork_idを取得して詳細画面を開く
-      const urlParams = new URLSearchParams(window.location.search);
-      const workId = urlParams.get('work_id');
-      if (workId) {
-        // データ読み込み完了後に詳細画面を開く
-        // loadInitialDataの完了を待つ
-        const checkAndOpen = () => {
-          if (currentUser && configData && Object.keys(configData).length > 0) {
-            openWorkDetailOverlay(workId);
-          } else {
-            setTimeout(checkAndOpen, 100);
-          }
-        };
-        checkAndOpen();
-      }
     };
 
     function loadInitialData() {
@@ -103,6 +98,15 @@
         
         hideLoading();
         switchTab('home');
+        
+        // work_idパラメータがある場合は、データ読み込み完了後に詳細画面を開く
+        if (pendingWorkId) {
+          // 少し遅延を入れて、ページの描画が完了してから詳細画面を開く
+          setTimeout(() => {
+            openWorkDetailOverlay(pendingWorkId);
+            pendingWorkId = null; // 一度開いたらクリア
+          }, 300);
+        }
       }).catch(handleError);
     }
 
@@ -461,6 +465,7 @@
     }
 
     function openWorkDetailOverlay(workId) {
+      currentWorkId = workId; // 現在のwork_idを保持
       showLoading();
       const promises = [ callGAS('getWorkById', workId) ];
       if (!membersData || membersData.length === 0) {
@@ -472,7 +477,6 @@
         if (!membersData || membersData.length === 0) {
           membersData = members;
         }
-<<<<<<< HEAD
         
         // header-contentエリアに情報を表示
         const headerInfoDiv = document.getElementById('work-detail-header-info');
@@ -660,6 +664,7 @@
     }
 
     function closeWorkDetailOverlay() {
+      currentWorkId = null; // 現在のwork_idをクリア
       document.getElementById('work-detail-overlay').classList.remove('show');
       const headerInfoDiv = document.getElementById('work-detail-header-info');
       if (headerInfoDiv) {
@@ -2231,7 +2236,6 @@
       
       cell.classList.remove('editing-datetime-picker');
     }
-<<<<<<< HEAD
 
     function openDateTimePickerForTask(taskId, field, originalValue) {
       // タスクの日時編集用のヘルパー関数
