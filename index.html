@@ -299,8 +299,7 @@
           <div class="detail-section">
             <h3>タスク</h3>
             <div id="work-tasks-container"></div>
-            <md-filled-button id="new-task-button">+ 新規</md-filled-button>
-            <button id="new-task-button" class="btn btn-sm">+ New Task</button>
+            <button id="new-task-button" class="btn btn-sm">+ 新規</button>
           </div>
         </div>
         <!-- 右1/3: レビュー依頼 -->
@@ -308,7 +307,7 @@
           <div class="detail-section">
             <h3>レビュー依頼</h3>
             <div id="work-review-requests-container"></div>
-            <md-filled-button id="new-review-request-button">+ 新規</md-filled-button>
+            <button id="new-review-request-button" class="btn btn-sm">+ 新規</button>
           </div>
         </div>
       </div>
@@ -377,22 +376,24 @@
   <div id="modal-new-review-request" class="modal">
     <div class="modal-content">
       <div class="modal-form-content">
-        <h2>新規レビュー依頼作成</h2>
+        <h2 class="modal-title">新規レビュー依頼作成</h2>
         <form id="new-review-request-form" onsubmit="submitNewReviewRequest(event)">
           <input type="hidden" name="work_id">
           <div class="form-group">
-            <md-filled-text-field name="review_title" label="タイトル" required></md-filled-text-field>
+            <label class="form-label">タイトル <span style="color: red;">*</span></label>
+            <input type="text" name="review_title" class="input-field" required>
           </div>
           <div class="form-group">
-            <md-filled-text-field name="review_comment" label="コメント" required multiline rows="4"></md-filled-text-field>
+            <label class="form-label">コメント <span style="color: red;">*</span></label>
+            <textarea name="review_comment" class="input-field" rows="4" required></textarea>
           </div>
           <div class="form-group">
-            <label style="display: block; margin-bottom: 8px; font-weight: 500;">ファイル（1つ以上）</label>
+            <label class="form-label">ファイル（1つ以上）</label>
             <div id="review-request-files-container" style="margin-bottom: 12px;">
               <div id="review-request-files-list" style="margin-bottom: 12px;"></div>
               <div style="display: flex; gap: 8px;">
-                <md-filled-tonal-button type="button" onclick="openGoogleDrivePicker()">Googleドライブから選択</md-filled-tonal-button>
-                <md-filled-tonal-button type="button" onclick="document.getElementById('review-request-file-input').click()">ファイルをアップロード</md-filled-tonal-button>
+                <button type="button" class="btn btn-secondary" onclick="openGoogleDrivePicker()">Googleドライブから選択</button>
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('review-request-file-input').click()">ファイルをアップロード</button>
               </div>
               <input type="file" id="review-request-file-input" multiple style="display: none;" onchange="handleFileUpload(event)">
             </div>
@@ -401,8 +402,8 @@
             </div>
           </div>
           <div class="modal-footer">
-            <md-filled-tonal-button type="button" onclick="closeModal('modal-new-review-request')">キャンセル</md-filled-tonal-button>
-            <md-filled-button type="submit">投稿</md-filled-button>
+            <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-review-request')">キャンセル</button>
+            <button type="submit" class="btn btn-primary">投稿</button>
           </div>
         </form>
       </div>
@@ -413,10 +414,10 @@
 
   <div id="modal-review-request-detail" class="modal">
     <div class="modal-content">
-      <h2>レビュー依頼詳細</h2>
+      <h2 class="modal-title">レビュー依頼詳細</h2>
       <div id="review-request-detail-content"></div>
       <div class="modal-footer">
-        <md-filled-tonal-button onclick="closeModal('modal-review-request-detail')">閉じる</md-filled-tonal-button>
+        <button class="btn btn-secondary" onclick="closeModal('modal-review-request-detail')">閉じる</button>
       </div>
     </div>
   </div>
@@ -2967,25 +2968,23 @@
         return;
       }
       
-      const titleField = form.querySelector('md-filled-text-field[name="review_title"]');
-      const commentField = form.querySelector('md-filled-text-field[name="review_comment"]');
+      const formData = new FormData(form);
+      const reviewRequestData = {
+        work_id: form.elements.work_id.value,
+        review_title: formData.get('review_title'),
+        review_comment: formData.get('review_comment'),
+        file_ids: reviewRequestFiles.map(f => f.file_id)
+      };
       
-      if (!titleField || !titleField.value) {
+      if (!reviewRequestData.review_title) {
         alert('タイトルを入力してください。');
         return;
       }
       
-      if (!commentField || !commentField.value) {
+      if (!reviewRequestData.review_comment) {
         alert('コメントを入力してください。');
         return;
       }
-      
-      const reviewRequestData = {
-        work_id: form.elements.work_id.value,
-        review_title: titleField.value,
-        review_comment: commentField.value,
-        file_ids: reviewRequestFiles.map(f => f.file_id)
-      };
       
       showModalLoading('modal-new-review-request', 'レビュー依頼を投稿しています');
       callGAS('createReviewRequest', reviewRequestData)
