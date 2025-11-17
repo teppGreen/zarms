@@ -15,8 +15,13 @@ function doGet(e) {
       .setTitle('CTMS - アクセス拒否');
   }
 
+  const urlParam = e.parameter;
+  
   // メインUIを返す
   const template = HtmlService.createTemplateFromFile("index");
+    template.urlParam = urlParam;
+    template.deployedUrl = ScriptApp.getService().getUrl();
+
   return template.evaluate()
     .setTitle('CTMS v3.0')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
