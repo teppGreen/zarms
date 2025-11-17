@@ -274,9 +274,15 @@ function getTasksByWorkId(workId) {
   return sanitizeForClient(enrichedTasks);
 }
 
+function getTaskById(taskId) {
+  const task = getDataById(SHEET_NAMES.TASKS, taskId);
+  if (!task) return null;
+  return sanitizeForClient(task);
+}
+
 function createTask(taskData) {
   const userEmail = Session.getActiveUser().getEmail();
-  const taskId = Utilities.getUuid();
+  const taskId = generateNextId(SHEET_NAMES.TASKS, 'T');
   const now = new Date();
   
   const newTask = {
@@ -672,7 +678,7 @@ function createWorkDocument(workId, workTitle, content, design, regulation, note
     
     // H2見出しとNormal textで内容を追加
     body.appendParagraph('制作物の概要').setHeading(DocumentApp.ParagraphHeading.HEADING2);
-    body.appendParagraph(content || '').setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    body.appendTable([[content || '']]);
     
     body.appendParagraph('デザイン要項').setHeading(DocumentApp.ParagraphHeading.HEADING2);
     body.appendParagraph(design || '').setHeading(DocumentApp.ParagraphHeading.NORMAL);
