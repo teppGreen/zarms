@@ -79,8 +79,17 @@
         <p class="main-subtitle">今日も良い一日を！</p>
       </md-filled-card>
       
-      <h2 class="section-title">あなたが担当者の制作物</h2>
-      <div id="home-works-container" class="grid-container">
+      <div style="display: flex; gap: 24px;">
+        <div style="flex: 1;">
+          <h2 class="section-title">あなたが担当者の制作物</h2>
+          <div id="home-works-container" class="grid-container">
+          </div>
+        </div>
+        <div style="flex: 1;">
+          <h2 class="section-title">レビュー依頼</h2>
+          <div id="home-review-requests-container" class="grid-container">
+          </div>
+        </div>
       </div>
     </div>
 
@@ -284,23 +293,25 @@
         <button class="close-btn" onclick="closeWorkDetailOverlay()">&times;</button>
       </div>
       <div class="overlay-body">
-        <!-- 左半分: ドキュメントの埋め込み -->
+        <!-- 左1/3: ドキュメントの埋め込み -->
         <div class="overlay-main">
           <div id="work-detail-document-container" style="width: 100%; height: 100%; min-height: 600px;">
           </div>
         </div>
-        <!-- 右半分: タスクと使用アプリ -->
-        <div class="overlay-side">
-          <!-- 右上半分: タスク -->
+        <!-- 中央1/3: タスク -->
+        <div class="overlay-center">
           <div class="detail-section">
             <h3>タスク</h3>
             <div id="work-tasks-container"></div>
-            <md-filled-button id="new-task-button">+ New Task</md-filled-button>
+            <md-filled-button id="new-task-button">+ 新規</md-filled-button>
           </div>
-          <!-- 右下半分: 使用アプリ -->
+        </div>
+        <!-- 右1/3: レビュー依頼 -->
+        <div class="overlay-side">
           <div class="detail-section">
-            <h3>使用アプリ</h3>
-            <div id="work-apps-container"></div>
+            <h3>レビュー依頼</h3>
+            <div id="work-review-requests-container"></div>
+            <md-filled-button id="new-review-request-button">+ 新規</md-filled-button>
           </div>
         </div>
       </div>
@@ -357,6 +368,53 @@
         </form>
       </div>
       <div class="modal-result-content" style="display: none;">
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-new-review-request" class="modal">
+    <div class="modal-content">
+      <div class="modal-form-content">
+        <h2>新規レビュー依頼作成</h2>
+        <form id="new-review-request-form" onsubmit="submitNewReviewRequest(event)">
+          <input type="hidden" name="work_id">
+          <div class="form-group">
+            <md-filled-text-field name="review_title" label="タイトル" required></md-filled-text-field>
+          </div>
+          <div class="form-group">
+            <md-filled-text-field name="review_comment" label="コメント" required multiline rows="4"></md-filled-text-field>
+          </div>
+          <div class="form-group">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500;">ファイル（1つ以上）</label>
+            <div id="review-request-files-container" style="margin-bottom: 12px;">
+              <div id="review-request-files-list" style="margin-bottom: 12px;"></div>
+              <div style="display: flex; gap: 8px;">
+                <md-filled-tonal-button type="button" onclick="openGoogleDrivePicker()">Googleドライブから選択</md-filled-tonal-button>
+                <md-filled-tonal-button type="button" onclick="document.getElementById('review-request-file-input').click()">ファイルをアップロード</md-filled-tonal-button>
+              </div>
+              <input type="file" id="review-request-file-input" multiple style="display: none;" onchange="handleFileUpload(event)">
+            </div>
+            <div id="review-request-file-dropzone" style="border: 2px dashed #ccc; border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; margin-top: 12px;" ondrop="handleFileDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+              <p style="margin: 0; color: #6b7280;">ファイルをドラッグアンドドロップ</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <md-filled-tonal-button type="button" onclick="closeModal('modal-new-review-request')">キャンセル</md-filled-tonal-button>
+            <md-filled-button type="submit">投稿</md-filled-button>
+          </div>
+        </form>
+      </div>
+      <div class="modal-result-content" style="display: none;">
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-review-request-detail" class="modal">
+    <div class="modal-content">
+      <h2>レビュー依頼詳細</h2>
+      <div id="review-request-detail-content"></div>
+      <div class="modal-footer">
+        <md-filled-tonal-button onclick="closeModal('modal-review-request-detail')">閉じる</md-filled-tonal-button>
       </div>
     </div>
   </div>
@@ -710,10 +768,12 @@
     function loadHomeData() {
       callGAS('getHomeData').then(data => {
         document.getElementById('home-greeting').textContent = `${data.greeting}、${data.memberName}さん。`;
-        const container = document.getElementById('home-works-container');
-        container.innerHTML = '';
+        
+        // 制作物を表示
+        const worksContainer = document.getElementById('home-works-container');
+        worksContainer.innerHTML = '';
         if (!data.works || data.works.length === 0) {
-          container.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
+          worksContainer.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
         } else {
           data.works.forEach(work => {
             const card = document.createElement('md-filled-card');
@@ -722,9 +782,34 @@
             card.style.marginBottom = '24px';
             card.onclick = () => openWorkDetailOverlay(work.work_id);
             card.innerHTML = `<h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div>`;
-            container.appendChild(card);
+            worksContainer.appendChild(card);
           });
         }
+        
+        // レビュー依頼を表示
+        const reviewRequestsContainer = document.getElementById('home-review-requests-container');
+        reviewRequestsContainer.innerHTML = '';
+        if (!data.review_requests || data.review_requests.length === 0) {
+          reviewRequestsContainer.innerHTML = '<p style="color: #6b7280;">レビュー依頼はありません</p>';
+        } else {
+          data.review_requests.forEach(reviewRequest => {
+            const card = document.createElement('md-filled-card');
+            card.style.cursor = 'pointer';
+            card.style.padding = '20px';
+            card.style.marginBottom = '24px';
+            card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
+            card.innerHTML = `
+              <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(reviewRequest.review_title)}</h3>
+              <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml((reviewRequest.review_comment || '').substring(0, 100))}${(reviewRequest.review_comment || '').length > 100 ? '...' : ''}</p>
+              <div style="font-size: 12px; color: #6b7280;">
+                <span>${reviewRequest.file_count || 0}個のファイル</span>
+                <span style="margin-left: 16px;">${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
+              </div>
+            `;
+            reviewRequestsContainer.appendChild(card);
+          });
+        }
+        
         hideLoading();
       }).catch(handleError);
     }
@@ -1090,7 +1175,9 @@
         renderWorkTasks(work.tasks);
         renderWorkAssignees(work.assignees);
         renderWorkApps(work.apps);
+        renderWorkReviewRequests(work.review_requests || []);
         document.getElementById('new-task-button').onclick = () => openNewTaskModal(work.work_id);
+        document.getElementById('new-review-request-button').onclick = () => openNewReviewRequestModal(work.work_id);
         document.getElementById('work-detail-overlay').classList.add('show');
         hideLoading();
       }).catch(handleError);
@@ -2049,6 +2136,51 @@
       // ただし、既存のコードとの互換性のために残す
     }
 
+    function renderWorkReviewRequests(reviewRequests) {
+      const container = document.getElementById('work-review-requests-container');
+      container.innerHTML = '';
+      if (!reviewRequests || reviewRequests.length === 0) {
+        container.innerHTML = '<p style="color: #6b7280; margin-bottom: 8px;">レビュー依頼はありません。</p>';
+        return;
+      }
+      
+      reviewRequests.forEach(reviewRequest => {
+        const card = document.createElement('md-filled-card');
+        card.style.cursor = 'pointer';
+        card.style.padding = '16px';
+        card.style.marginBottom = '12px';
+        card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
+        
+        const title = document.createElement('h4');
+        title.style.margin = '0 0 8px 0';
+        title.style.fontSize = '14px';
+        title.style.fontWeight = '600';
+        title.textContent = escapeHtml(reviewRequest.review_title);
+        
+        const commentPreview = document.createElement('p');
+        commentPreview.style.margin = '0 0 8px 0';
+        commentPreview.style.color = '#6b7280';
+        commentPreview.style.fontSize = '12px';
+        const commentText = reviewRequest.review_comment || '';
+        commentPreview.textContent = commentText.length > 50 ? commentText.substring(0, 50) + '...' : commentText;
+        
+        const meta = document.createElement('div');
+        meta.style.display = 'flex';
+        meta.style.justifyContent = 'space-between';
+        meta.style.fontSize = '11px';
+        meta.style.color = '#9ca3af';
+        meta.innerHTML = `
+          <span>${reviewRequest.file_count || 0}個のファイル</span>
+          <span>${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
+        `;
+        
+        card.appendChild(title);
+        card.appendChild(commentPreview);
+        card.appendChild(meta);
+        container.appendChild(card);
+      });
+    }
+
     function renderWorkApps(apps) {
       const container = document.getElementById('work-apps-container');
       container.innerHTML = '';
@@ -2844,6 +2976,220 @@
       }
       
       openModal('modal-new-task');
+    }
+
+    let reviewRequestFiles = [];
+    let currentReviewRequestWorkId = null;
+
+    function openNewReviewRequestModal(workId) {
+      currentReviewRequestWorkId = workId;
+      reviewRequestFiles = [];
+      const form = document.getElementById('new-review-request-form');
+      form.reset();
+      form.elements.work_id.value = workId;
+      updateReviewRequestFilesList();
+      openModal('modal-new-review-request');
+    }
+
+    function updateReviewRequestFilesList() {
+      const container = document.getElementById('review-request-files-list');
+      container.innerHTML = '';
+      if (reviewRequestFiles.length === 0) {
+        return;
+      }
+      reviewRequestFiles.forEach((file, index) => {
+        const fileDiv = document.createElement('div');
+        fileDiv.style.display = 'flex';
+        fileDiv.style.alignItems = 'center';
+        fileDiv.style.justifyContent = 'space-between';
+        fileDiv.style.padding = '8px';
+        fileDiv.style.marginBottom = '4px';
+        fileDiv.style.backgroundColor = '#f3f4f6';
+        fileDiv.style.borderRadius = '4px';
+        const fileNameSpan = document.createElement('span');
+        fileNameSpan.style.fontSize = '12px';
+        fileNameSpan.textContent = file.name || file.file_name || 'ファイル';
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.style.background = 'none';
+        removeBtn.style.border = 'none';
+        removeBtn.style.color = '#ef4444';
+        removeBtn.style.cursor = 'pointer';
+        removeBtn.style.fontSize = '18px';
+        removeBtn.textContent = '×';
+        removeBtn.onclick = () => removeReviewRequestFile(index);
+        
+        fileDiv.appendChild(fileNameSpan);
+        fileDiv.appendChild(removeBtn);
+        container.appendChild(fileDiv);
+      });
+    }
+
+    function removeReviewRequestFile(index) {
+      reviewRequestFiles.splice(index, 1);
+      updateReviewRequestFilesList();
+    }
+
+    function openGoogleDrivePicker() {
+      // Googleドライブのファイルピッカーを開く
+      // 注意: GASのHtmlServiceでは、Googleドライブのファイルピッカーを直接使用することはできません
+      // 代わりに、ユーザーにファイルIDを入力してもらうか、または別の方法を使用する必要があります
+      // ここでは、簡易的な実装として、ファイルIDを入力するプロンプトを表示します
+      const fileId = prompt('GoogleドライブのファイルIDを入力してください:');
+      if (fileId) {
+        // ファイル情報を取得
+        callGAS('getDriveFileInfo', fileId).then(fileInfo => {
+          reviewRequestFiles.push({
+            file_id: fileInfo.file_id,
+            file_name: fileInfo.file_name || 'ファイル',
+            file_url: fileInfo.file_url || ''
+          });
+          updateReviewRequestFilesList();
+        }).catch(error => {
+          alert('ファイルの取得に失敗しました: ' + error.message);
+        });
+      }
+    }
+
+    function handleFileUpload(event) {
+      const files = Array.from(event.target.files);
+      files.forEach(file => {
+        // ファイルをbase64エンコードして送信する準備
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Data = e.target.result.split(',')[1];
+          // ファイルをアップロード
+          if (currentReviewRequestWorkId) {
+            callGAS('uploadFileToWorkFolder', currentReviewRequestWorkId, base64Data, file.name, file.type)
+              .then(uploadedFile => {
+                reviewRequestFiles.push({
+                  file_id: uploadedFile.file_id,
+                  file_name: uploadedFile.file_name,
+                  file_url: uploadedFile.file_url
+                });
+                updateReviewRequestFilesList();
+              })
+              .catch(handleError);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+      event.target.value = '';
+    }
+
+    function handleFileDrop(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      const dropzone = event.currentTarget;
+      dropzone.style.borderColor = '#ccc';
+      const files = Array.from(event.dataTransfer.files);
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Data = e.target.result.split(',')[1];
+          if (currentReviewRequestWorkId) {
+            callGAS('uploadFileToWorkFolder', currentReviewRequestWorkId, base64Data, file.name, file.type)
+              .then(uploadedFile => {
+                reviewRequestFiles.push({
+                  file_id: uploadedFile.file_id,
+                  file_name: uploadedFile.file_name,
+                  file_url: uploadedFile.file_url
+                });
+                updateReviewRequestFilesList();
+              })
+              .catch(handleError);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function handleDragOver(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.style.borderColor = '#3b82f6';
+    }
+
+    function handleDragLeave(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.style.borderColor = '#ccc';
+    }
+
+    function submitNewReviewRequest(event) {
+      event.preventDefault();
+      const form = event.target;
+      
+      if (reviewRequestFiles.length === 0) {
+        alert('ファイルを1つ以上添付してください。');
+        return;
+      }
+      
+      const titleField = form.querySelector('md-filled-text-field[name="review_title"]');
+      const commentField = form.querySelector('md-filled-text-field[name="review_comment"]');
+      
+      if (!titleField || !titleField.value) {
+        alert('タイトルを入力してください。');
+        return;
+      }
+      
+      if (!commentField || !commentField.value) {
+        alert('コメントを入力してください。');
+        return;
+      }
+      
+      const reviewRequestData = {
+        work_id: form.elements.work_id.value,
+        review_title: titleField.value,
+        review_comment: commentField.value,
+        file_ids: reviewRequestFiles.map(f => f.file_id)
+      };
+      
+      showModalLoading('modal-new-review-request', 'レビュー依頼を投稿しています');
+      callGAS('createReviewRequest', reviewRequestData)
+        .then(reviewRequestId => {
+          showModalSuccess('modal-new-review-request', 'レビュー依頼を投稿しました', () => {
+            if (currentWorkId) {
+              openWorkDetailOverlay(currentWorkId);
+            }
+            if (document.getElementById('tab-home').style.display === 'block') {
+              loadHomeData();
+            }
+          });
+        })
+        .catch(error => {
+          handleError(error);
+          resetModalState('modal-new-review-request');
+        });
+    }
+
+    function openReviewRequestDetailModal(reviewRequestId) {
+      showLoading();
+      callGAS('getReviewRequestById', reviewRequestId).then(reviewRequest => {
+        const container = document.getElementById('review-request-detail-content');
+        container.innerHTML = `
+          <div style="margin-bottom: 24px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">${escapeHtml(reviewRequest.review_title)}</h3>
+            <p style="margin: 0; color: #6b7280; font-size: 14px;">${escapeHtml(reviewRequest.review_comment)}</p>
+          </div>
+          <div style="margin-bottom: 24px;">
+            <h4 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">ファイル</h4>
+            <div>
+              ${reviewRequest.files && reviewRequest.files.length > 0 
+                ? reviewRequest.files.map(file => 
+                    `<div style="margin-bottom: 8px;">
+                      <a href="${file.file_url}" target="_blank" style="color: #3b82f6; text-decoration: underline;">${escapeHtml(file.file_name)}</a>
+                    </div>`
+                  ).join('')
+                : '<p style="color: #6b7280;">ファイルはありません</p>'
+              }
+            </div>
+          </div>
+        `;
+        hideLoading();
+        openModal('modal-review-request-detail');
+      }).catch(handleError);
     }
 
     function submitNewTask(event) {

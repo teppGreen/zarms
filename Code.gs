@@ -68,6 +68,7 @@ function getWorkById(workId) {
   work.assignees = getWorkAssignees(work.work_id);
   work.tasks = getTasksByWorkId(work.work_id);
   work.apps = getWorkApps(work.work_id);
+  work.review_requests = getReviewRequestsByWorkId(work.work_id);
   
   // 担当者の詳細情報を追加（member_name, member_team_value）
   if (work.assignees && work.assignees.length > 0) {
@@ -423,11 +424,13 @@ function getHomeData() {
     return sanitizeForClient({
       greeting: 'こんにちは',
       memberName: 'ゲスト',
-      works: []
+      works: [],
+      review_requests: []
     });
   }
   
   const assignedWorks = getAssignedWorks(userEmail);
+  const reviewRequests = getReviewRequestsForUser(userEmail);
   
   const hour = new Date().getHours();
   let greeting = 'こんにちは';
@@ -437,7 +440,8 @@ function getHomeData() {
   return sanitizeForClient({
     greeting: greeting,
     memberName: member.member_name,
-    works: assignedWorks || []
+    works: assignedWorks || [],
+    review_requests: reviewRequests || []
   });
 }
 
@@ -845,6 +849,161 @@ function getMonthlyStats() {
   });
   
   return sortedStats;
+}
+
+// ============================================
+// Review Requests関連
+// ============================================
+
+function getReviewRequestsByWorkId(workId) {
+  const reviewRequests = findData(SHEET_NAMES.REVIEW_REQUESTS, { work_id: workId });
+  
+  const enrichedReviewRequests = reviewRequests.map(reviewRequest => {
+    reviewRequest.creator_name = getMemberName(reviewRequest.created_by);
+    reviewRequest.files = getReviewRequestFiles(reviewRequest.review_request_id);
+    reviewRequest.file_count = reviewRequest.files.length;
+    return reviewRequest;
+  });
+  
+  // created_atの降順でソート
+  enrichedReviewRequests.sort((a, b) => {
+    const dateA = new Date(a.created_at);
+    const dateB = new Date(b.created_at);
+    return dateB - dateA;
+  });
+  
+  return sanitizeForClient(enrichedReviewRequests);
+}
+
+function getReviewRequestById(reviewRequestId) {
+  const reviewRequest = getDataById(SHEET_NAMES.REVIEW_REQUESTS, reviewRequestId);
+  if (!reviewRequest) return null;
+  
+  reviewRequest.creator_name = getMemberName(reviewRequest.created_by);
+  reviewRequest.files = getReviewRequestFiles(reviewRequestId);
+  reviewRequest.work_title = getWorkTitle(reviewRequest.work_id);
+  reviewRequest.project_title = getProjectTitle(getDataById(SHEET_NAMES.WORKS, reviewRequest.work_id)?.project_id);
+  
+  return sanitizeForClient(reviewRequest);
+}
+
+function createReviewRequest(reviewRequestData) {
+  const userEmail = Session.getActiveUser().getEmail();
+  const reviewRequestId = generateNextId(SHEET_NAMES.REVIEW_REQUESTS, 'R');
+  const now = new Date();
+  
+  const newReviewRequest = {
+    review_request_id: reviewRequestId,
+    work_id: reviewRequestData.work_id,
+    review_title: reviewRequestData.review_title,
+    review_comment: reviewRequestData.review_comment || '',
+    created_by: userEmail,
+    created_at: now,
+  };
+  
+  createData(SHEET_NAMES.REVIEW_REQUESTS, newReviewRequest);
+  
+  // ファイルを追加
+  if (reviewRequestData.file_ids && reviewRequestData.file_ids.length > 0) {
+    reviewRequestData.file_ids.forEach(fileId => {
+      const newFile = {
+        file_id: fileId,
+        review_request_id: reviewRequestId,
+        created_by: userEmail,
+        created_at: now,
+      };
+      createData(SHEET_NAMES.REVIEW_REQUEST_FILES, newFile);
+    });
+  }
+  
+  return reviewRequestId;
+}
+
+function getReviewRequestFiles(reviewRequestId) {
+  const files = findData(SHEET_NAMES.REVIEW_REQUEST_FILES, { review_request_id: reviewRequestId });
+  
+  const enrichedFiles = files.map(file => {
+    try {
+      const driveFile = DriveApp.getFileById(file.file_id);
+      file.file_name = driveFile.getName();
+      file.file_url = driveFile.getUrl();
+      file.file_type = driveFile.getMimeType();
+    } catch (e) {
+      Logger.log('ファイル取得エラー: ' + e.message);
+      file.file_name = 'ファイルが見つかりません';
+      file.file_url = '';
+      file.file_type = '';
+    }
+    return file;
+  });
+  
+  return sanitizeForClient(enrichedFiles);
+}
+
+function getDriveFileInfo(fileId) {
+  try {
+    const driveFile = DriveApp.getFileById(fileId);
+    return sanitizeForClient({
+      file_id: fileId,
+      file_name: driveFile.getName(),
+      file_url: driveFile.getUrl(),
+      file_type: driveFile.getMimeType()
+    });
+  } catch (e) {
+    Logger.log('ファイル取得エラー: ' + e.message);
+    throw new Error('ファイルが見つかりません: ' + e.message);
+  }
+}
+
+function uploadFileToWorkFolder(workId, base64Data, fileName, mimeType) {
+  try {
+    const work = getDataById(SHEET_NAMES.WORKS, workId);
+    if (!work || !work.work_folder_id) {
+      throw new Error('制作物フォルダが見つかりません');
+    }
+    
+    const folder = DriveApp.getFolderById(work.work_folder_id);
+    const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType || 'application/octet-stream', fileName);
+    const uploadedFile = folder.createFile(blob);
+    
+    // ファイル名を設定
+    if (fileName) {
+      uploadedFile.setName(fileName);
+    }
+    
+    return {
+      file_id: uploadedFile.getId(),
+      file_name: uploadedFile.getName(),
+      file_url: uploadedFile.getUrl()
+    };
+  } catch (e) {
+    Logger.log('ファイルアップロードエラー: ' + e.message);
+    throw new Error('ファイルのアップロードに失敗しました: ' + e.message);
+  }
+}
+
+function getReviewRequestsForUser(userEmail) {
+  // ユーザーが担当者に割り当てられているworksを取得
+  const assignments = findData(SHEET_NAMES.WORK_ASSIGNMENTS, { member_email: userEmail });
+  const workIds = assignments.map(a => a.work_id);
+  
+  if (workIds.length === 0) return [];
+  
+  // 各workに紐づくレビュー依頼を取得
+  const allReviewRequests = [];
+  workIds.forEach(workId => {
+    const reviewRequests = getReviewRequestsByWorkId(workId);
+    allReviewRequests.push(...reviewRequests);
+  });
+  
+  // created_atの降順でソート
+  allReviewRequests.sort((a, b) => {
+    const dateA = new Date(a.created_at);
+    const dateB = new Date(b.created_at);
+    return dateB - dateA;
+  });
+  
+  return sanitizeForClient(allReviewRequests);
 }
 
 // ============================================
