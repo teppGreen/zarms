@@ -200,25 +200,23 @@ function updateData(sheetName, id, updateDataObject) {
     return false;
   }
   
-  // 更新を実行
+  // 更新を実行し、各フィールドごとにログを記録
   Object.keys(updateDataObject).forEach(key => {
     const colIndex = headers.indexOf(key);
     if (colIndex !== -1) {
+      // 更新前の値を取得
+      const oldValue = oldRecord[key];
+      
+      // 更新を実行
       sheet.getRange(rowIndex + 1, colIndex + 1).setValue(updateDataObject[key]);
+      
+      // 更新後の値を取得
+      const newValue = updateDataObject[key];
+      
+      // 各フィールドごとに個別のログを記録
+      logOperation('modified', sheetName, id, key, oldValue, newValue);
     }
   });
-  
-  // 更新後のデータを取得
-  const updatedData = sheet.getDataRange().getValues();
-  const newRecord = {};
-  headers.forEach((header, index) => {
-    newRecord[header] = updatedData[rowIndex][index];
-  });
-  
-  // ログ記録
-  const changedColumns = Object.keys(updateDataObject);
-  const columnId = changedColumns.join(',');
-  logOperation('modified', sheetName, id, columnId, oldRecord, newRecord);
   
   return true;
 }
@@ -320,9 +318,9 @@ function initializeLogSheet() {
  * @param {string} operationType - 操作種別（'add', 'modified', 'delete'）
  * @param {string} tableName - テーブル名（シート名）
  * @param {any} recordId - レコードID（主キー値）
- * @param {string|null} columnId - カラムID（更新時のみ、変更されたカラム名。複数カラム更新時はカンマ区切り）
- * @param {Object|null} oldValue - 変更前の値（更新・削除時のみ、JSON形式で保存）
- * @param {Object|null} newValue - 変更後の値（追加・更新時のみ、JSON形式で保存）
+ * @param {string|null} columnId - カラムID（更新時のみ、変更されたカラム名）
+ * @param {any|null} oldValue - 変更前の値（更新・削除時のみ。更新時は単一フィールドの値、削除時はレコード全体のJSON）
+ * @param {any|null} newValue - 変更後の値（追加・更新時のみ。更新時は単一フィールドの値、追加時はレコード全体のJSON）
  */
 function logOperation(operationType, tableName, recordId, columnId, oldValue, newValue) {
   // ログシートへの操作はログを記録しない（循環記録回避）
@@ -339,8 +337,19 @@ function logOperation(operationType, tableName, recordId, columnId, oldValue, ne
     const headers = getHeaders(logSheet);
     
     // 値をJSON形式に変換（Dateオブジェクトも含む）
-    const oldValueJson = oldValue ? JSON.stringify(sanitizeForClient(oldValue)) : '';
-    const newValueJson = newValue ? JSON.stringify(sanitizeForClient(newValue)) : '';
+    // modifiedの場合は単一フィールドの値、add/deleteの場合はレコード全体
+    let oldValueJson = '';
+    let newValueJson = '';
+    
+    if (operationType === 'modified') {
+      // 更新時は単一フィールドの値のみを保存
+      oldValueJson = oldValue !== null && oldValue !== undefined ? JSON.stringify(sanitizeForClient(oldValue)) : '';
+      newValueJson = newValue !== null && newValue !== undefined ? JSON.stringify(sanitizeForClient(newValue)) : '';
+    } else {
+      // add/delete時はレコード全体を保存
+      oldValueJson = oldValue ? JSON.stringify(sanitizeForClient(oldValue)) : '';
+      newValueJson = newValue ? JSON.stringify(sanitizeForClient(newValue)) : '';
+    }
     
     const logRow = headers.map(header => {
       switch (header) {
