@@ -1341,9 +1341,9 @@
       const urlCopyButton = document.getElementById('work-detail-url-copy-button');
       if (!urlCopyButton || !urlCopyButton.dataset.workId) return;
       const workId = urlCopyButton.dataset.workId;
-      const url = `${window.location.origin}${window.location.pathname}?work_id=${workId}`;
+      const url = `<?= deployedUrl ?>?work_id=${workId}`;
       navigator.clipboard.writeText(url).then(() => {
-        alert('URLをクリップボードにコピーしました');
+        // alert('URLをクリップボードにコピーしました');
       }).catch(() => {
         // フォールバック
         const textArea = document.createElement('textarea');
@@ -1352,7 +1352,7 @@
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        alert('URLをクリップボードにコピーしました');
+        // alert('URLをクリップボードにコピーしました');
       });
     }
     
