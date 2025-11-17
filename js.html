@@ -47,7 +47,39 @@
 
   // 初期化
   window.onload = function() {
-    loadInitialData();
+    // URLパラメータからwork_idを取得して詳細画面を開く（最優先処理）
+    const urlParams = new URLSearchParams(window.location.search);
+    const workId = urlParams.get('work_id');
+    if (workId) {
+      // URLからパラメータを削除
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+      
+      // 必要な最小限のデータを取得して詳細画面を開く（最優先処理）
+      showLoading();
+      Promise.all([
+        callGAS('getCurrentUser'),
+        callGAS('getConfig', null),
+        callGAS('getUserRole')
+      ]).then(([user, config, role]) => {
+        currentUser = user;
+        configData = groupConfigByType(config);
+        
+        if (role === 'ADMIN') {
+          document.getElementById('new-member-dropdown-item').style.display = 'block';
+        }
+        
+        hideLoading();
+        // 詳細画面を開く（最優先）
+        openWorkDetailOverlay(workId);
+        // その後、残りの初期化処理を実行（タブ切り替えはスキップ）
+        loadInitialData(false);
+      }).catch(handleError);
+    } else {
+      // work_idがない場合は通常の初期化処理を実行
+      loadInitialData();
+    }
+    
     document.body.addEventListener('click', closeAllPopups);
 
     // --- 新規作成ボタンのロジック ---
@@ -71,25 +103,17 @@
         }
       }
     });
-    
-    // URLパラメータからwork_idを取得して詳細画面を開く
-    const urlParams = new URLSearchParams(window.location.search);
-    const workId = urlParams.get('work_id');
-    if (workId) {
-      // データ読み込み完了後に詳細画面を開く
-      // loadInitialDataの完了を待つ
-      const checkAndOpen = () => {
-        if (currentUser && configData && Object.keys(configData).length > 0) {
-          openWorkDetailOverlay(workId);
-        } else {
-          setTimeout(checkAndOpen, 100);
-        }
-      };
-      checkAndOpen();
-    }
   };
 
-  function loadInitialData() {
+  function loadInitialData(shouldSwitchTab = true) {
+    // 既にデータが読み込まれている場合はスキップ
+    if (currentUser && configData && Object.keys(configData).length > 0) {
+      if (shouldSwitchTab) {
+        switchTab('home');
+      }
+      return;
+    }
+    
     showLoading();
     
     Promise.all([
@@ -105,7 +129,9 @@
       }
       
       hideLoading();
-      switchTab('home');
+      if (shouldSwitchTab) {
+        switchTab('home');
+      }
     }).catch(handleError);
   }
 

@@ -15,14 +15,8 @@ function doGet(e) {
       .setTitle('CTMS - アクセス拒否');
   }
 
-  // URLパラメータからwork_idを取得
-  const workId = e.parameter.work_id;
-  
   // メインUIを返す
   const template = HtmlService.createTemplateFromFile("index");
-  if (workId) {
-    template.workId = workId;
-  }
   return template.evaluate()
     .setTitle('CTMS v3.0')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -678,7 +672,7 @@ function createWorkDocument(workId, workTitle, content, design, regulation, note
     
     // H2見出しとNormal textで内容を追加
     body.appendParagraph('制作物の概要').setHeading(DocumentApp.ParagraphHeading.HEADING2);
-    body.appendTable([[content || '']]);
+    body.appendParagraph(content || '').setHeading(DocumentApp.ParagraphHeading.NORMAL);
     
     body.appendParagraph('デザイン要項').setHeading(DocumentApp.ParagraphHeading.HEADING2);
     body.appendParagraph(design || '').setHeading(DocumentApp.ParagraphHeading.NORMAL);
