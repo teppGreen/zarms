@@ -16,48 +16,6 @@
   <div class="app-header">
     <div class="header-content">
       <h1 class="header-title" id="header-title-default">CTMS v3.0</h1>
-      <h1 class="header-title" id="header-title-work-detail" style="display: none;"></h1>
-      <div id="work-detail-header-info" style="display: none; flex: 1; margin-left: 24px; flex-direction: column; gap: 8px; font-size: 14px;">
-        <div id="work-detail-header-row1" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <strong>案件:</strong>
-            <span id="work-detail-project-title-header"></span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <strong>制作:</strong>
-            <span id="work-detail-work-title-header"></span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <strong>担当者:</strong>
-            <span id="work-detail-assignees-header-info" style="display: inline-flex; align-items: center;"></span>
-          </div>
-        </div>
-        <div id="work-detail-header-row2" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-          <div class="work-detail-status-container" style="display: flex; align-items: center; gap: 8px;">
-            <strong>ステータス:</strong>
-            <div class="editable-container" id="work-detail-status-editable-header" style="display: inline-flex; min-width: 120px;">
-              <span class="editable-text" id="work-detail-status-text-header"></span>
-              <span class="editable-toggle-btn">✎</span>
-            </div>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <strong>作成日:</strong>
-            <span id="work-detail-created-at-header"></span>
-          </div>
-          <div class="work-detail-due-container" style="display: flex; align-items: center; gap: 8px;">
-            <strong>納品期限:</strong>
-            <div class="editable-container datetime-editable" id="work-detail-due-editable-header" style="display: inline-flex; min-width: 180px;">
-              <span class="editable-text" id="work-detail-due-text-header"></span>
-              <span class="editable-toggle-btn">✎</span>
-            </div>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <strong>残り日数:</strong>
-            <span id="work-detail-days-remaining-header"></span>
-          </div>
-        </div>
-      </div>
-      <button id="work-detail-url-copy-button" class="url-copy-button-header" style="display: none; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--md-sys-color-on-surface); padding: 0 16px; margin-left: auto;" onclick="copyWorkDetailUrl()">🔗</button>
       <div id="id-search-container" style="margin-left: 24px; display: flex; align-items: center;">
         <input type="text" id="id-search-input" placeholder="ID検索 (例: P0001, W0001, T0001)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; width: 300px; text-transform: uppercase;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)">
       </div>
@@ -274,7 +232,51 @@
 
   <div id="work-detail-overlay" class="overlay">
     <div class="overlay-content">
-      <div class="overlay-header-info">
+      <div class="overlay-header-info" style="display: flex; align-items: center; gap: 16px; width: 100%;">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+          <h1 class="header-title" id="header-title-work-detail" style="display: none;"></h1>
+          <div id="work-detail-header-info" style="display: none; flex-direction: column; gap: 8px; font-size: 14px;">
+            <div id="work-detail-header-row1" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <strong>案件:</strong>
+                <span id="work-detail-project-title-header"></span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <strong>制作:</strong>
+                <span id="work-detail-work-title-header"></span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <strong>担当者:</strong>
+                <span id="work-detail-assignees-header-info" style="display: inline-flex; align-items: center;"></span>
+              </div>
+            </div>
+            <div id="work-detail-header-row2" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+              <div class="work-detail-status-container" style="display: flex; align-items: center; gap: 8px;">
+                <strong>ステータス:</strong>
+                <div class="editable-container" id="work-detail-status-editable-header" style="display: inline-flex; min-width: 120px;">
+                  <span class="editable-text" id="work-detail-status-text-header"></span>
+                  <span class="editable-toggle-btn">✎</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <strong>作成日:</strong>
+                <span id="work-detail-created-at-header"></span>
+              </div>
+              <div class="work-detail-due-container" style="display: flex; align-items: center; gap: 8px;">
+                <strong>納品期限:</strong>
+                <div class="editable-container datetime-editable" id="work-detail-due-editable-header" style="display: inline-flex; min-width: 180px;">
+                  <span class="editable-text" id="work-detail-due-text-header"></span>
+                  <span class="editable-toggle-btn">✎</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <strong>残り日数:</strong>
+                <span id="work-detail-days-remaining-header"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button id="work-detail-url-copy-button" class="url-copy-button-header" style="display: none; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--md-sys-color-on-surface); padding: 0 16px;" onclick="copyWorkDetailUrl()">🔗</button>
         <button class="close-btn" onclick="closeWorkDetailOverlay()">&times;</button>
       </div>
       <div class="overlay-body">
