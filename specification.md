@@ -123,6 +123,22 @@ Creative Team Management System (CTMS) (v3)
 * sort\_order (ドロップダウン等での表示順)  
 * is\_active (true/false, 選択肢として有効か)
 
+### **2.9. review\_requestsシート (レビュー依頼DB)**
+
+* review\_request\_id (主キー, プレフィックス + 連番形式, 例: R0001, R0002)  
+* work\_id (リレーション: worksシート)  
+* review\_title (レビュー依頼のタイトル)  
+* review\_comment (レビュー依頼のコメント)  
+* created\_by (リレーション: membersシートのmember\_email)  
+* created\_at (作成日時)
+
+### **2.10. review\_request\_filesシート (レビュー依頼ファイル 紐付けDB)**
+
+* file\_id (主キー, GoogleドライブのファイルID)  
+* review\_request\_id (リレーション: review\_requestsシート)  
+* created\_by (リレーション: membersシートのmember\_email)  
+* created\_at (作成日時)
+
 ## **3\. 機能要件 (GAS Webアプリ)**
 
 ### **3.1. 共通UI**
@@ -137,23 +153,35 @@ Creative Team Management System (CTMS) (v3)
 * **表示項目:**  
   * \[おはようございます,こんにちは,こんばんは(時間帯に応じて変更)\]、\[ログインしているユーザーのmember\_name\]さん  
   * ユーザーが担当者に割り当てられており、かつwork\_statusが\[CREATE\]のworks (カード形式で一覧表示)  
+  * **レビュー依頼:** ユーザーが担当者に割り当てられているworksに紐づくreview\_requestsをカード形式で一覧表示（created\_atの降順）。「あなたが担当者の制作物」の隣に縦に並べて表示する。  
 * **詳細表示:** 一覧の行クリックで画面内オーバーレイを表示。  
   * 一覧項目  
   * project\_detail (リッチテキストエディタで表示・編集)  
-  * works (このProjectに紐づくworksを簡易テーブル表示)
+  * works (このProjectに紐づくworksを簡易テーブル表示)  
+* **レビュー依頼カード詳細表示:**  
+  * レビュー依頼のカードをクリックすると、モーダルで以下を表示:  
+    * review\_title (タイトル)  
+    * review\_comment (コメント全文)  
+    * review\_request\_filesから取得したGoogleドライブのファイルリンク（1つ以上）を表示。ユーザーはリンクをクリックしてGoogleドライブ上でコメント機能を使用してフィードバックを行う。
 
 ### **3.3. Works (制作管理)**
 
 * **一覧表示:**  
   * 表示項目: work\_id (プレフィックス + 連番形式, 例: W0001), project\_title, work\_title, work\_status\_key (のconfig\_value), due\_datetime, work\_client\_email (のmember\_name), work\_folder\_id (リンク), created\_at, 担当者 (work\_assignmentsからアイコン一覧表示)  
 * **詳細表示:** 一覧の行クリック（または「詳細」ボタン）で画面内オーバーレイを表示。  
+  * work\_overlay-content領域の横幅を1/3ずつ分割して表示:  
+    * **左側:** ドキュメント埋め込み領域（Googleドライブのファイル表示）  
+    * **中央:** タスク管理（このwork\_idに紐づくtasksを一覧表示）  
+      * task\_title, status\_key, priority\_key, assign\_to (担当者の名前), planned\_end\_datetime を表示。  
+      * 表示項目の編集が可能
+      * 「+ 新規」ボタン（タスク追加, モーダル表示）  
+    * **右側:** レビュー依頼（カード表示領域）  
+      * このwork\_idに紐づくreview\_requestsをカード形式で一覧表示（created\_atの降順）。  
+      * 各カードにはreview\_title、review\_commentの一部（プレビュー）、ファイル数が表示される。  
+      * カードをクリックすると詳細表示（review\_title、review\_comment全文、Googleドライブのファイルリンク一覧）が表示される。  
+      * 「+ 新規」ボタン（レビュー依頼作成, モーダル表示）  
   * work\_detail\_... のリッチテキスト群を表示・編集。  
-  * タスク管理: このwork\_idに紐づくtasksを一覧表示。  
-    * task\_title, status\_key, priority\_key, assign\_to (担当者の名前), planned\_end\_datetime を表示。  
-    * 各タスクのステータス変更、担当者変更、日付変更が可能。  
-    * 「+ New」ボタン（タスク追加, モーダル表示）  
   * 担当者管理: このwork\_idのwork\_assignmentsを管理。membersから検索して追加/削除が可能。  
-  * 使用アプリ管理: app\_assignmentsを管理。config (APP)から検索して追加/削除が可能。
 
 ### **3.4. Projects (案件管理)**
 
@@ -220,7 +248,18 @@ Creative Team Management System (CTMS) (v3)
 * **(c) 新規「Member」登録:**  
   * Membersタブ(3.4)の「+ New」ボタン（ADMINのみ可）からモーダルで登録する。  
 * **(d) 新規「Task」作成:**  
-  * 「Work詳細モーダル内のタスク追加ボタン」（3.3）から作成可能。
+  * 「Work詳細モーダル内のタスク追加ボタン」（3.3）から作成可能。  
+* **(e) 新規「レビュー依頼」作成:**  
+  * Work詳細画面（3.3）の右側「レビュー依頼」領域の「+ New」ボタンからモーダル表示。  
+  * **【ロジック】** 以下の処理を実行する:  
+    1. ユーザーがGoogleドライブからファイルを選択、またはドラッグアンドドロップでファイルを添付（1つ以上）。  
+    2. ドラッグアンドドロップで添付されたファイルは、バックエンドで該当workのwork\_folder\_idにアップロードし、Googleドライブ経由で再読み込みする。  
+    3. ユーザーがreview\_title（タイトル）とreview\_comment（コメント）を入力。  
+    4. 投稿ボタンを押すと、バックエンドで以下の処理を実行:  
+      * review\_request\_id（UUID）を自動生成する。  
+      * review\_requestsシートにデータを書き込む。  
+      * 添付されたファイルごとにreview\_request\_filesシートにレコードを作成（drive\_file\_id、file\_nameを保存）。  
+    5. 投稿後、work詳細画面とHomeタブにレビュー依頼が表示される。
 
 ### **4.2. 認証・認可（権限管理）**
 

@@ -13,6 +13,8 @@ const SHEET_NAMES = {
   CONFIG: 'config',
   WORK_ASSIGNMENTS: 'work_assignments',
   APP_ASSIGNMENTS: 'app_assignments',
+  REVIEW_REQUESTS: 'review_requests',
+  REVIEW_REQUEST_FILES: 'review_request_files',
   LOGS: 'logs',
 };
 
@@ -24,4 +26,6 @@ const ID_COLUMNS = {
   [SHEET_NAMES.KNOWLEDGE]: 'knowledge_id',
   [SHEET_NAMES.WORK_ASSIGNMENTS]: 'assignment_id',
   [SHEET_NAMES.APP_ASSIGNMENTS]: 'assignment_id',
+  [SHEET_NAMES.REVIEW_REQUESTS]: 'review_request_id',
+  [SHEET_NAMES.REVIEW_REQUEST_FILES]: 'file_id',
 };
