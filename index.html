@@ -8,11 +8,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  
-  <!-- Material Web Components -->
-  <script type="module" src="https://unpkg.com/@material/web@latest/all.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
 
   <script src="https://www.gstatic.com/charts/loader.js"></script>
   <?!= HtmlService.createHtmlOutputFromFile('css').getContent(); ?>
@@ -22,7 +17,7 @@
     <div class="header-content">
       <h1 class="header-title" id="header-title-default">CTMS v3.0</h1>
       <div id="id-search-container" style="margin-left: 24px; display: flex; align-items: center;">
-            <md-filled-text-field id="id-search-input" label="ID検索 (例: P0001, W0001, T0001)" style="width: 300px;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)"></md-filled-text-field>
+        <input type="text" id="id-search-input" placeholder="ID検索 (例: P0001, W0001, T0001)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; width: 300px; text-transform: uppercase;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)">
       </div>
     </div>
     <div class="new-button-container">
@@ -74,10 +69,10 @@
   <div class="main-content">
     
     <div id="tab-home" class="tab-content">
-      <md-filled-card>
+      <div class="card">
         <h1 id="home-greeting" class="main-title">こんにちは</h1>
         <p class="main-subtitle">今日も良い一日を！</p>
-      </md-filled-card>
+      </div>
       
       <h2 class="section-title">あなたが担当者の制作物</h2>
       <div id="home-works-container" class="grid-container">
@@ -86,7 +81,7 @@
 
     <div id="tab-works" class="tab-content" style="display: none;">
       
-      <md-filled-card>
+      <div class="card">
         <div class="table-container">
           <table id="works-table" class="table-full">
             <thead>
@@ -104,12 +99,12 @@
             </tbody>
           </table>
         </div>
-      </md-filled-card>
+      </div>
     </div>
 
     <div id="tab-projects" class="tab-content" style="display: none;">
       
-      <md-filled-card>
+      <div class="card">
         <div class="table-container">
           <table id="projects-table" class="table-full">
             <thead>
@@ -125,12 +120,12 @@
             </tbody>
           </table>
         </div>
-      </md-filled-card>
+      </div>
     </div>
 
     <div id="tab-members" class="tab-content" style="display: none;">
       
-      <md-filled-card>
+      <div class="card">
         <div class="table-container">
           <table id="members-table" class="table-full">
             <thead>
@@ -148,7 +143,7 @@
             </tbody>
           </table>
         </div>
-      </md-filled-card>
+      </div>
     </div>
 
     <div id="tab-knowledge" class="tab-content" style="display: none;">
@@ -160,35 +155,35 @@
     <div id="tab-summary" class="tab-content" style="display: none;">
       
       <div class="grid-container summary-grid">
-        <md-filled-card>
+        <div class="card">
           <h3 class="card-title">ステータス</h3>
           <div id="chart-work-status" class="chart-container"></div>
-        </md-filled-card>
+        </div>
         
-        <md-filled-card>
+        <div class="card">
           <h3 class="card-title">担当者</h3>
           <div id="chart-assignee" class="chart-container"></div>
-        </md-filled-card>
+        </div>
         
-        <md-filled-card>
+        <div class="card">
           <h3 class="card-title">タイプ</h3>
           <div id="chart-work-type" class="chart-container"></div>
-        </md-filled-card>
+        </div>
         
-        <md-filled-card>
+        <div class="card">
           <h3 class="card-title">月別依頼件数</h3>
           <div id="chart-monthly" class="chart-container"></div>
-        </md-filled-card>
+        </div>
       </div>
     </div>
   </div>
 
   <div id="modal-work-detail" class="modal">
     <div class="modal-content">
-      <h2>制作物詳細</h2>
+      <h2 class="modal-title">制作物詳細</h2>
       <div id="work-detail-content"></div>
       <div class="modal-footer">
-        <md-filled-tonal-button onclick="closeModal('modal-work-detail')">閉じる</md-filled-tonal-button>
+        <button class="btn btn-secondary" onclick="closeModal('modal-work-detail')">閉じる</button>
       </div>
     </div>
   </div>
@@ -196,7 +191,7 @@
   <div id="modal-new-work" class="modal">
     <div class="modal-content">
       <div class="modal-form-content">
-        <h2>新規制作物作成</h2>
+        <h2 class="modal-title">新規制作物作成</h2>
         <div id="new-work-form"></div>
       </div>
       <div class="modal-result-content" style="display: none;">
@@ -207,10 +202,10 @@
 
   <div id="modal-member-detail" class="modal">
     <div class="modal-content">
-      <h2>メンバー詳細</h2>
+      <h2 class="modal-title">メンバー詳細</h2>
       <div id="member-detail-content"></div>
       <div class="modal-footer">
-        <md-filled-tonal-button onclick="closeModal('modal-member-detail')">閉じる</md-filled-tonal-button>
+        <button class="btn btn-secondary" onclick="closeModal('modal-member-detail')">閉じる</button>
       </div>
     </div>
   </div>
@@ -218,14 +213,15 @@
   <div id="modal-new-project" class="modal">
     <div class="modal-content">
       <div class="modal-form-content">
-        <h2>新規案件作成</h2>
+        <h2 class="modal-title">新規案件作成</h2>
         <form id="new-project-form" onsubmit="submitNewProject(event)">
           <div class="form-group">
-            <md-filled-text-field name="project_title" label="案件タイトル" required></md-filled-text-field>
+            <label class="form-label">案件タイトル</label>
+            <input type="text" name="project_title" class="input-field" required>
           </div>
           <div class="modal-footer">
-            <md-filled-tonal-button onclick="closeModal('modal-new-project')">キャンセル</md-filled-tonal-button>
-            <md-filled-button type="submit">作成</md-filled-button>
+            <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-project')">キャンセル</button>
+            <button type="submit" class="btn btn-primary">作成</button>
           </div>
         </form>
       </div>
@@ -295,7 +291,7 @@
           <div class="detail-section">
             <h3>タスク</h3>
             <div id="work-tasks-container"></div>
-            <md-filled-button id="new-task-button">+ New Task</md-filled-button>
+            <button id="new-task-button" class="btn btn-sm">+ New Task</button>
           </div>
           <!-- 右下半分: 使用アプリ -->
           <div class="detail-section">
@@ -332,27 +328,32 @@
   <div id="modal-new-task" class="modal">
     <div class="modal-content">
       <div class="modal-form-content">
-        <h2>新規タスク作成</h2>
+        <h2 class="modal-title">新規タスク作成</h2>
         <form id="new-task-form" onsubmit="submitNewTask(event)">
           <input type="hidden" name="work_id">
           <div class="form-group">
-            <md-filled-text-field name="task_title" label="タスク名" required></md-filled-text-field>
+            <label class="form-label">タスク名</label>
+            <input type="text" name="task_title" class="input-field" required>
           </div>
           <div class="form-group">
-            <md-filled-select name="assign_to" label="担当者"></md-filled-select>
+            <label class="form-label">担当者</label>
+            <select name="assign_to" class="input-field"></select>
           </div>
           <div class="form-group">
-            <md-filled-select name="status_key" label="ステータス"></md-filled-select>
+            <label class="form-label">ステータス</label>
+            <select name="status_key" class="input-field"></select>
           </div>
           <div class="form-group">
-            <md-filled-select name="priority_key" label="優先度"></md-filled-select>
+            <label class="form-label">優先度</label>
+            <select name="priority_key" class="input-field"></select>
           </div>
           <div class="form-group">
-            <md-filled-text-field name="planned_end_datetime" label="終了予定日" type="datetime-local"></md-filled-text-field>
+            <label class="form-label">終了予定日</label>
+            <input type="datetime-local" name="planned_end_datetime" class="input-field">
           </div>
           <div class="modal-footer">
-            <md-filled-tonal-button onclick="closeModal('modal-new-task')">キャンセル</md-filled-tonal-button>
-            <md-filled-button type="submit">作成</md-filled-button>
+            <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-task')">キャンセル</button>
+            <button type="submit" class="btn btn-primary">作成</button>
           </div>
         </form>
       </div>
@@ -364,32 +365,39 @@
   <div id="modal-new-member" class="modal">
     <div class="modal-content">
       <div class="modal-form-content">
-        <h2>新規メンバー登録</h2>
+        <h2 class="modal-title">新規メンバー登録</h2>
         <form id="new-member-form" onsubmit="submitNewMember(event)">
           <div class="form-group">
-            <md-filled-text-field name="member_email" label="メールアドレス *" type="email" required></md-filled-text-field>
+            <label class="form-label">メールアドレス <span style="color: red;">*</span></label>
+            <input type="email" name="member_email" class="input-field" required>
           </div>
           <div class="form-group">
-            <md-filled-text-field name="member_name" label="名前 *" required></md-filled-text-field>
+            <label class="form-label">名前 <span style="color: red;">*</span></label>
+            <input type="text" name="member_name" class="input-field" required>
           </div>
           <div class="form-group">
-            <md-filled-text-field name="slack_member_id" label="SlackメンバーID"></md-filled-text-field>
+            <label class="form-label">SlackメンバーID</label>
+            <input type="text" name="slack_member_id" class="input-field">
           </div>
           <div class="form-group">
-            <md-filled-text-field name="member_icon" label="アイコンURL" type="url"></md-filled-text-field>
+            <label class="form-label">アイコンURL</label>
+            <input type="url" name="member_icon" class="input-field">
           </div>
           <div class="form-group">
-            <md-filled-select name="member_team_key" label="チーム *" required></md-filled-select>
+            <label class="form-label">チーム <span style="color: red;">*</span></label>
+            <select name="member_team_key" class="input-field" required></select>
           </div>
           <div class="form-group">
-            <md-filled-select name="role_key" label="権限 *" required></md-filled-select>
+            <label class="form-label">権限 <span style="color: red;">*</span></label>
+            <select name="role_key" class="input-field" required></select>
           </div>
           <div class="form-group">
-            <md-filled-text-field name="member_notes" label="備考"></md-filled-text-field>
+            <label class="form-label">備考</label>
+            <textarea name="member_notes" class="input-field" rows="4"></textarea>
           </div>
           <div class="modal-footer">
-            <md-filled-tonal-button onclick="closeModal('modal-new-member')">キャンセル</md-filled-tonal-button>
-            <md-filled-button type="submit">登録</md-filled-button>
+            <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-member')">キャンセル</button>
+            <button type="submit" class="btn btn-primary">登録</button>
           </div>
         </form>
       </div>
@@ -401,20 +409,22 @@
   <div id="modal-new-knowledge" class="modal">
     <div class="modal-content">
       <div class="modal-form-content">
-        <h2>新規ナレッジ作成</h2>
+        <h2 class="modal-title">新規ナレッジ作成</h2>
         <form id="new-knowledge-form" onsubmit="submitNewKnowledge(event)">
           <div class="form-group">
-            <md-filled-select name="knowledge_type_key" label="ナレッジタイプ *" required></md-filled-select>
+            <label class="form-label">ナレッジタイプ <span style="color: red;">*</span></label>
+            <select name="knowledge_type_key" class="input-field" required></select>
           </div>
           <div class="form-group">
+            <label class="form-label">紐づける制作物 <span style="color: red;">*</span></label>
             <div class="combobox-container">
-              <md-filled-text-field name="work_search" label="紐づける制作物 *" oninput="searchWorksForKnowledge(this.value)" autocomplete="off"></md-filled-text-field>
+              <input type="text" name="work_search" class="input-field" placeholder="制作物を検索..." oninput="searchWorksForKnowledge(this.value)" autocomplete="off">
               <input type="hidden" name="work_id">
               <div id="work-suggestions-knowledge" class="combobox-suggestions"></div>
             </div>
           </div>
           <div class="form-group">
-            <label>内容 <span style="color: red;">*</span></label>
+            <label class="form-label">内容 <span style="color: red;">*</span></label>
             <div class="rich-text-editor-wrapper">
               <div class="rich-text-toolbar" data-editor="knowledge-content-editor">
                 <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h1" title="見出し1">H1</button>
@@ -435,8 +445,8 @@
             </div>
           </div>
           <div class="modal-footer">
-            <md-filled-tonal-button onclick="closeModal('modal-new-knowledge')">キャンセル</md-filled-tonal-button>
-            <md-filled-button type="submit">作成</md-filled-button>
+            <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-knowledge')">キャンセル</button>
+            <button type="submit" class="btn btn-primary">作成</button>
           </div>
         </form>
       </div>
@@ -716,13 +726,7 @@
           container.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
         } else {
           data.works.forEach(work => {
-            const card = document.createElement('md-filled-card');
-            card.style.cursor = 'pointer';
-            card.style.padding = '20px';
-            card.style.marginBottom = '24px';
-            card.onclick = () => openWorkDetailOverlay(work.work_id);
-            card.innerHTML = `<h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div>`;
-            container.appendChild(card);
+            container.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
           });
         }
         hideLoading();
@@ -748,11 +752,7 @@
           container.innerHTML = '<p style="color: #6b7280; grid-column: 1 / -1;">データがありません</p>';
         } else {
           knowledgeData.forEach(item => {
-            const card = document.createElement('md-filled-card');
-            card.style.padding = '20px';
-            card.style.marginBottom = '24px';
-            card.innerHTML = `<div style="margin-bottom: 8px;"> <span class="badge" style="background: #fef3c7; color: #92400e;">${getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE')}</span> </div> <div style="margin-bottom: 12px; font-size: 14px; color: #6b7280;"> ${escapeHtml(item.work_title)} </div> <div style="margin-bottom: 12px;"> ${escapeHtml(item.knowledge_content.substring(0, 150))}... </div> <div style="font-size: 12px; color: #9ca3af;"> ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)} </div>`;
-            container.appendChild(card);
+            container.innerHTML += `<div class="card"> <div style="margin-bottom: 8px;"> <span class="badge" style="background: #fef3c7; color: #92400e;">${getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE')}</span> </div> <div style="margin-bottom: 12px; font-size: 14px; color: #6b7280;"> ${escapeHtml(item.work_title)} </div> <div style="margin-bottom: 12px;"> ${escapeHtml(item.knowledge_content.substring(0, 150))}... </div> <div style="font-size: 12px; color: #9ca3af;"> ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)} </div> </div>`;
           });
         }
         hideLoading();
@@ -920,21 +920,23 @@
         projectTitleContainer.className = 'combobox-container';
         projectTitleContainer.style.position = 'relative';
         projectTitleContainer.style.display = 'inline-block';
-        const projectTitleInput = document.createElement('md-filled-text-field');
-        projectTitleInput.name = 'project_title';
-        projectTitleInput.label = '案件タイトル';
+        const projectTitleInput = document.createElement('input');
+        projectTitleInput.type = 'text';
+        projectTitleInput.className = 'input-field';
         projectTitleInput.style.width = '200px';
+        projectTitleInput.style.padding = '4px 8px';
+        projectTitleInput.style.fontSize = '14px';
         projectTitleInput.value = work.project_title || '';
         projectTitleInput.dataset.projectId = work.project_id || '';
-        projectTitleInput.addEventListener('input', (e) => searchProjectsForWorkDetail(e.target.value, work.work_id));
-        projectTitleInput.addEventListener('blur', () => {
+        projectTitleInput.oninput = (e) => searchProjectsForWorkDetail(e.target.value, work.work_id);
+        projectTitleInput.onblur = () => {
           setTimeout(() => {
             const suggestions = document.getElementById('work-detail-project-suggestions');
             if (suggestions) {
               suggestions.style.display = 'none';
             }
           }, 200);
-        });
+        };
         const projectTitleSuggestions = document.createElement('div');
         projectTitleSuggestions.className = 'combobox-suggestions';
         projectTitleSuggestions.id = 'work-detail-project-suggestions';
@@ -960,17 +962,18 @@
         const setupWorkTitleEdit = () => {
           workTitleHeader.onclick = () => {
             const originalValue = workTitleHeader.textContent;
-            const input = document.createElement('md-filled-text-field');
-            input.label = '制作タイトル';
+            const input = document.createElement('input');
+            input.type = 'text';
             input.value = originalValue;
+            input.className = 'input-field';
             input.style.width = '200px';
+            input.style.padding = '4px 8px';
+            input.style.fontSize = '14px';
             workTitleHeader.innerHTML = '';
             workTitleHeader.appendChild(input);
-            setTimeout(() => {
-              input.focus();
-              input.select();
-            }, 100);
-            input.addEventListener('blur', () => {
+            input.focus();
+            input.select();
+            input.onblur = () => {
               const newValue = input.value.trim();
               if (newValue && newValue !== originalValue) {
                 showLoading();
@@ -985,15 +988,15 @@
                 workTitleHeader.textContent = originalValue;
                 setupWorkTitleEdit();
               }
-            });
-            input.addEventListener('keydown', (e) => {
+            };
+            input.onkeydown = (e) => {
               if (e.key === 'Enter') {
                 input.blur();
               } else if (e.key === 'Escape') {
                 workTitleHeader.textContent = originalValue;
                 setupWorkTitleEdit();
               }
-            });
+            };
           };
         };
         setupWorkTitleEdit();
@@ -1391,11 +1394,7 @@
         item.className = 'combobox-item';
         item.textContent = p.project_title;
         item.onclick = () => {
-          if (projectTitleInput.tagName === 'MD-FILLED-TEXT-FIELD') {
-            projectTitleInput.value = p.project_title;
-          } else {
-            projectTitleInput.value = p.project_title;
-          }
+          projectTitleInput.value = p.project_title;
           const oldProjectId = projectTitleInput.dataset.projectId;
           projectTitleInput.dataset.projectId = p.project_id;
           suggestionsContainer.style.display = 'none';
@@ -1419,11 +1418,7 @@
       newItem.onclick = () => {
         showLoading();
         callGAS('createProject', query).then(projectId => {
-          if (projectTitleInput.tagName === 'MD-FILLED-TEXT-FIELD') {
-            projectTitleInput.value = query;
-          } else {
-            projectTitleInput.value = query;
-          }
+          projectTitleInput.value = query;
           projectTitleInput.dataset.projectId = projectId;
           suggestionsContainer.style.display = 'none';
           document.getElementById('work-detail-project-id-header').textContent = projectId;
@@ -2126,7 +2121,7 @@
       const searchInput = document.createElement('input');
       searchInput.type = 'text';
       searchInput.placeholder = 'メンバーを検索...';
-      // Material Web Componentsを使用する場合は、md-filled-text-fieldを使用
+      searchInput.className = 'input-field';
       searchInput.style.margin = '8px';
       searchInput.style.width = 'calc(100% - 16px)';
       searchInput.style.boxSizing = 'border-box';
@@ -2559,131 +2554,15 @@
     function buildNewWorkForm() {
       const formContainer = document.getElementById('new-work-form');
       const workTypes = configData['WORK_TYPE'] || [];
-      
-      const form = document.createElement('form');
-      form.id = 'new-work-form-element';
-      form.onsubmit = submitNewWork;
-      
-      // 案件タイトル
-      const projectGroup = document.createElement('div');
-      projectGroup.className = 'form-group';
-      const projectCombobox = document.createElement('div');
-      projectCombobox.id = 'project-combobox';
-      projectCombobox.className = 'combobox-container';
-      const projectField = document.createElement('md-filled-text-field');
-      projectField.name = 'project_title';
-      projectField.label = '案件タイトル';
-      projectField.required = true;
-      projectField.addEventListener('input', (e) => searchProjects(e.target.value));
-      projectCombobox.appendChild(projectField);
-      const projectIdHidden = document.createElement('input');
-      projectIdHidden.type = 'hidden';
-      projectIdHidden.name = 'project_id';
-      projectCombobox.appendChild(projectIdHidden);
-      const projectSuggestions = document.createElement('div');
-      projectSuggestions.id = 'project-suggestions';
-      projectSuggestions.className = 'combobox-suggestions';
-      projectCombobox.appendChild(projectSuggestions);
-      projectGroup.appendChild(projectCombobox);
-      form.appendChild(projectGroup);
-      
-      // 制作タイトル
-      const workTitleGroup = document.createElement('div');
-      workTitleGroup.className = 'form-group';
-      const workTitleField = document.createElement('md-filled-text-field');
-      workTitleField.name = 'work_title';
-      workTitleField.label = '制作タイトル';
-      workTitleField.required = true;
-      workTitleGroup.appendChild(workTitleField);
-      form.appendChild(workTitleGroup);
-      
-      // 制作種別
-      const workTypeGroup = document.createElement('div');
-      workTypeGroup.className = 'form-group';
-      const workTypeSelect = document.createElement('md-filled-select');
-      workTypeSelect.name = 'work_type_key';
-      workTypeSelect.label = '制作種別';
-      workTypeSelect.addEventListener('change', (e) => updateRegulationPreset(e.target.value));
-      workTypes.forEach(wt => {
-        const option = document.createElement('md-select-option');
-        option.value = wt.config_key;
-        option.textContent = wt.config_value;
-        workTypeSelect.appendChild(option);
-      });
-      workTypeGroup.appendChild(workTypeSelect);
-      form.appendChild(workTypeGroup);
-      
-      // 納品期限
-      const dueGroup = document.createElement('div');
-      dueGroup.className = 'form-group';
-      const dueField = document.createElement('md-filled-text-field');
-      dueField.name = 'due_datetime';
-      dueField.label = '納品期限';
-      dueField.type = 'datetime-local';
-      dueGroup.appendChild(dueField);
-      form.appendChild(dueGroup);
-      
-      // 制作物の概要
-      const contentGroup = document.createElement('div');
-      contentGroup.className = 'form-group';
-      const contentField = document.createElement('md-filled-text-field');
-      contentField.name = 'work_detail_content';
-      contentField.label = '制作物の概要';
-      contentGroup.appendChild(contentField);
-      form.appendChild(contentGroup);
-      
-      // デザイン要項
-      const designGroup = document.createElement('div');
-      designGroup.className = 'form-group';
-      const designField = document.createElement('md-filled-text-field');
-      designField.name = 'work_detail_design';
-      designField.label = 'デザイン要項';
-      designGroup.appendChild(designField);
-      form.appendChild(designGroup);
-      
-      // 入稿規定
-      const regulationGroup = document.createElement('div');
-      regulationGroup.className = 'form-group';
-      const regulationField = document.createElement('md-filled-text-field');
-      regulationField.name = 'work_detail_regulation';
-      regulationField.label = '入稿規定';
-      regulationGroup.appendChild(regulationField);
-      form.appendChild(regulationGroup);
-      
-      // 依頼者からの備考
-      const noteGroup = document.createElement('div');
-      noteGroup.className = 'form-group';
-      const noteField = document.createElement('md-filled-text-field');
-      noteField.name = 'work_detail_note';
-      noteField.label = '依頼者からの備考';
-      noteGroup.appendChild(noteField);
-      form.appendChild(noteGroup);
-      
-      // フッター
-      const footer = document.createElement('div');
-      footer.className = 'modal-footer';
-      const cancelBtn = document.createElement('md-filled-tonal-button');
-      cancelBtn.textContent = 'キャンセル';
-      cancelBtn.onclick = () => closeModal('modal-new-work');
-      footer.appendChild(cancelBtn);
-      const submitBtn = document.createElement('md-filled-button');
-      submitBtn.type = 'submit';
-      submitBtn.textContent = '作成';
-      footer.appendChild(submitBtn);
-      form.appendChild(footer);
-      
-      formContainer.innerHTML = '';
-      formContainer.appendChild(form);
+      const workTypeOptions = workTypes.map(wt => `<option value="${wt.config_key}">${wt.config_value}</option>`).join('');
+      formContainer.innerHTML = `<form id="new-work-form-element" onsubmit="submitNewWork(event)"> <div class="form-group"> <label class="form-label">案件タイトル</label> <div id="project-combobox" class="combobox-container"> <input type="text" name="project_title" class="input-field" required placeholder="既存の案件タイトルで検索、または新規作成" oninput="searchProjects(this.value)" autocomplete="off"> <input type="hidden" name="project_id"> <div id="project-suggestions" class="combobox-suggestions"></div> </div> </div> <div class="form-group"> <label class="form-label">制作タイトル</label> <input type="text" name="work_title" class="input-field" required> </div> <div class="form-group"> <label class="form-label">制作種別</label> <select name="work_type_key" class="input-field" onchange="updateRegulationPreset(this.value)"> <option value="">選択してください</option> ${workTypeOptions} </select> </div> <div class="form-group"> <label class="form-label">納品期限</label> <input type="datetime-local" name="due_datetime" class="input-field"> </div> <div class="form-group"> <label class="form-label">制作物の概要</label> <textarea name="work_detail_content" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">デザイン要項</label> <textarea name="work_detail_design" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">入稿規定</label> <textarea name="work_detail_regulation" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">依頼者からの備考</label> <textarea name="work_detail_note" class="input-field" rows="4"></textarea> </div> <div class="modal-footer"> <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-work')">キャンセル</button> <button type="submit" class="btn btn-primary">作成</button> </div> </form>`;
     }
 
     function updateRegulationPreset(workTypeKey) {
       if (!workTypeKey) return;
       const workType = (configData['WORK_TYPE'] || []).find(wt => wt.config_key === workTypeKey);
       if (workType && workType.config_preset_value) {
-        const regulationField = document.querySelector('md-filled-text-field[name="work_detail_regulation"]');
-        if (regulationField) {
-          regulationField.value = workType.config_preset_value;
-        }
+        document.querySelector('textarea[name="work_detail_regulation"]').value = workType.config_preset_value;
       }
     }
 
@@ -2702,13 +2581,8 @@
         item.className = 'combobox-item';
         item.textContent = p.project_title;
         item.onclick = () => {
-          const projectTitleField = document.querySelector('#new-work-form-element md-filled-text-field[name="project_title"]');
-          if (projectTitleField) {
-            projectTitleField.value = p.project_title;
-          }
-          if (projectIdInput) {
-            projectIdInput.value = p.project_id;
-          }
+          document.querySelector('#new-work-form-element input[name="project_title"]').value = p.project_title;
+          projectIdInput.value = p.project_id;
           suggestionsContainer.style.display = 'none';
         };
         suggestionsContainer.appendChild(item);
@@ -2717,13 +2591,8 @@
       newItem.className = 'combobox-item';
       newItem.innerHTML = `+ 新規作成: <strong>${escapeHtml(query)}</strong>`;
       newItem.onclick = () => {
-        const projectTitleField = document.querySelector('#new-work-form-element md-filled-text-field[name="project_title"]');
-        if (projectTitleField) {
-          projectTitleField.value = query;
-        }
-        if (projectIdInput) {
-          projectIdInput.value = '';
-        }
+        document.querySelector('#new-work-form-element input[name="project_title"]').value = query;
+        projectIdInput.value = '';
         suggestionsContainer.style.display = 'none';
       };
       suggestionsContainer.appendChild(newItem);
@@ -2743,38 +2612,9 @@
     function submitNewWork(event) {
       event.preventDefault();
       const form = event.target;
-      const workData = {};
-      
-      // Material Web Componentsから値を取得
-      const projectTitleField = form.querySelector('md-filled-text-field[name="project_title"]');
-      if (projectTitleField) workData.project_title = projectTitleField.value;
-      
-      const workTitleField = form.querySelector('md-filled-text-field[name="work_title"]');
-      if (workTitleField) workData.work_title = workTitleField.value;
-      
-      const workTypeSelect = form.querySelector('md-filled-select[name="work_type_key"]');
-      if (workTypeSelect) workData.work_type_key = workTypeSelect.value;
-      
-      const dueField = form.querySelector('md-filled-text-field[name="due_datetime"]');
-      if (dueField) workData.due_datetime = dueField.value;
-      
-      const contentField = form.querySelector('md-filled-text-field[name="work_detail_content"]');
-      if (contentField) workData.work_detail_content = contentField.value;
-      
-      const designField = form.querySelector('md-filled-text-field[name="work_detail_design"]');
-      if (designField) workData.work_detail_design = designField.value;
-      
-      const regulationField = form.querySelector('md-filled-text-field[name="work_detail_regulation"]');
-      if (regulationField) workData.work_detail_regulation = regulationField.value;
-      
-      const noteField = form.querySelector('md-filled-text-field[name="work_detail_note"]');
-      if (noteField) workData.work_detail_note = noteField.value;
-      
-      // 隠しフィールドからproject_idを取得
-      const projectIdInput = form.querySelector('input[name="project_id"]');
-      if (projectIdInput) workData.project_id = projectIdInput.value;
-      
-      showModalLoading('modal-new-work', '新規制作物を作成しています');
+      const formData = new FormData(form);
+      const workData = Object.fromEntries(formData.entries());
+      showModalLoading('modal-new-work', `新規制作物を作成しています`);
       callGAS('createWork', workData)
         .then(workId => {
           showModalSuccess('modal-new-work', '新規制作物を作成しました', () => {
@@ -2798,50 +2638,44 @@
       form.elements.work_id.value = workId;
       
       // メンバー選択肢を設定
-      const assignToSelect = form.querySelector('md-filled-select[name="assign_to"]');
-      if (assignToSelect) {
-        assignToSelect.innerHTML = '';
-        if (membersData && membersData.length > 0) {
-          membersData.forEach(member => {
-            const option = document.createElement('md-select-option');
-            option.value = member.member_email;
-            option.textContent = member.member_name;
-            assignToSelect.appendChild(option);
-          });
-        }
+      const assignToSelect = form.elements.assign_to;
+      assignToSelect.innerHTML = '<option value="">選択してください</option>';
+      if (membersData && membersData.length > 0) {
+        membersData.forEach(member => {
+          const option = document.createElement('option');
+          option.value = member.member_email;
+          option.textContent = member.member_name;
+          assignToSelect.appendChild(option);
+        });
       }
       
       // ステータス選択肢を設定
-      const statusSelect = form.querySelector('md-filled-select[name="status_key"]');
-      if (statusSelect) {
-        statusSelect.innerHTML = '';
-        const taskStatuses = configData['TASK_STATUS'] || [];
-        taskStatuses.forEach(status => {
-          const option = document.createElement('md-select-option');
-          option.value = status.config_key;
-          option.textContent = status.config_value;
-          if (status.config_key === 'TODO') {
-            option.selected = true;
-          }
-          statusSelect.appendChild(option);
-        });
-      }
+      const statusSelect = form.elements.status_key;
+      statusSelect.innerHTML = '<option value="">選択してください</option>';
+      const taskStatuses = configData['TASK_STATUS'] || [];
+      taskStatuses.forEach(status => {
+        const option = document.createElement('option');
+        option.value = status.config_key;
+        option.textContent = status.config_value;
+        if (status.config_key === 'TODO') {
+          option.selected = true;
+        }
+        statusSelect.appendChild(option);
+      });
       
       // 優先度選択肢を設定
-      const prioritySelect = form.querySelector('md-filled-select[name="priority_key"]');
-      if (prioritySelect) {
-        prioritySelect.innerHTML = '';
-        const priorities = configData['TASK_PRIORITY'] || [];
-        priorities.forEach(priority => {
-          const option = document.createElement('md-select-option');
-          option.value = priority.config_key;
-          option.textContent = priority.config_value;
-          if (priority.config_key === 'MEDIUM') {
-            option.selected = true;
-          }
-          prioritySelect.appendChild(option);
-        });
-      }
+      const prioritySelect = form.elements.priority_key;
+      prioritySelect.innerHTML = '<option value="">選択してください</option>';
+      const priorities = configData['TASK_PRIORITY'] || [];
+      priorities.forEach(priority => {
+        const option = document.createElement('option');
+        option.value = priority.config_key;
+        option.textContent = priority.config_value;
+        if (priority.config_key === 'MEDIUM') {
+          option.selected = true;
+        }
+        prioritySelect.appendChild(option);
+      });
       
       openModal('modal-new-task');
     }
@@ -2849,26 +2683,8 @@
     function submitNewTask(event) {
       event.preventDefault();
       const form = event.target;
-      const taskData = {};
-      
-      // Material Web Componentsから値を取得
-      const taskTitleField = form.querySelector('md-filled-text-field[name="task_title"]');
-      if (taskTitleField) taskData.task_title = taskTitleField.value;
-      
-      const assignToSelect = form.querySelector('md-filled-select[name="assign_to"]');
-      if (assignToSelect) taskData.assign_to = assignToSelect.value;
-      
-      const statusSelect = form.querySelector('md-filled-select[name="status_key"]');
-      if (statusSelect) taskData.status_key = statusSelect.value;
-      
-      const prioritySelect = form.querySelector('md-filled-select[name="priority_key"]');
-      if (prioritySelect) taskData.priority_key = prioritySelect.value;
-      
-      const plannedEndField = form.querySelector('md-filled-text-field[name="planned_end_datetime"]');
-      if (plannedEndField) taskData.planned_end_datetime = plannedEndField.value;
-      
-      // 隠しフィールドからwork_idを取得
-      taskData.work_id = form.elements.work_id.value;
+      const formData = new FormData(form);
+      const taskData = Object.fromEntries(formData.entries());
       
       showModalLoading('modal-new-task', '新規タスクを作成しています');
       callGAS('createTask', taskData)
@@ -2891,33 +2707,29 @@
       form.reset();
       
       // チーム選択肢を設定
-      const teamSelect = form.querySelector('md-filled-select[name="member_team_key"]');
-      if (teamSelect) {
-        teamSelect.innerHTML = '';
-        const teams = configData['TEAM'] || [];
-        teams.forEach(team => {
-          const option = document.createElement('md-select-option');
-          option.value = team.config_key;
-          option.textContent = team.config_value;
-          teamSelect.appendChild(option);
-        });
-      }
+      const teamSelect = form.elements.member_team_key;
+      teamSelect.innerHTML = '<option value="">選択してください</option>';
+      const teams = configData['TEAM'] || [];
+      teams.forEach(team => {
+        const option = document.createElement('option');
+        option.value = team.config_key;
+        option.textContent = team.config_value;
+        teamSelect.appendChild(option);
+      });
       
       // 権限選択肢を設定
-      const roleSelect = form.querySelector('md-filled-select[name="role_key"]');
-      if (roleSelect) {
-        roleSelect.innerHTML = '';
-        const roles = configData['ROLE'] || [];
-        roles.forEach(role => {
-          const option = document.createElement('md-select-option');
-          option.value = role.config_key;
-          option.textContent = role.config_value;
-          if (role.config_key === 'VIEWER') {
-            option.selected = true;
-          }
-          roleSelect.appendChild(option);
-        });
-      }
+      const roleSelect = form.elements.role_key;
+      roleSelect.innerHTML = '<option value="">選択してください</option>';
+      const roles = configData['ROLE'] || [];
+      roles.forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.config_key;
+        option.textContent = role.config_value;
+        if (role.config_key === 'VIEWER') {
+          option.selected = true;
+        }
+        roleSelect.appendChild(option);
+      });
       
       openModal('modal-new-member');
     }
@@ -2925,29 +2737,8 @@
     function submitNewMember(event) {
       event.preventDefault();
       const form = event.target;
-      const memberData = {};
-      
-      // Material Web Componentsから値を取得
-      const emailField = form.querySelector('md-filled-text-field[name="member_email"]');
-      if (emailField) memberData.member_email = emailField.value;
-      
-      const nameField = form.querySelector('md-filled-text-field[name="member_name"]');
-      if (nameField) memberData.member_name = nameField.value;
-      
-      const slackField = form.querySelector('md-filled-text-field[name="slack_member_id"]');
-      if (slackField) memberData.slack_member_id = slackField.value;
-      
-      const iconField = form.querySelector('md-filled-text-field[name="member_icon"]');
-      if (iconField) memberData.member_icon = iconField.value;
-      
-      const teamSelect = form.querySelector('md-filled-select[name="member_team_key"]');
-      if (teamSelect) memberData.member_team_key = teamSelect.value;
-      
-      const roleSelect = form.querySelector('md-filled-select[name="role_key"]');
-      if (roleSelect) memberData.role_key = roleSelect.value;
-      
-      const notesField = form.querySelector('md-filled-text-field[name="member_notes"]');
-      if (notesField) memberData.member_notes = notesField.value;
+      const formData = new FormData(form);
+      const memberData = Object.fromEntries(formData.entries());
       
       showModalLoading('modal-new-member', '新規メンバーを登録しています');
       callGAS('createMember', memberData)
@@ -2969,17 +2760,15 @@
       document.getElementById('knowledge-content-editor').innerHTML = '';
       
       // ナレッジタイプ選択肢を設定
-      const typeSelect = form.querySelector('md-filled-select[name="knowledge_type_key"]');
-      if (typeSelect) {
-        typeSelect.innerHTML = '';
-        const knowledgeTypes = configData['KNOWLEDGE_TYPE'] || [];
-        knowledgeTypes.forEach(type => {
-          const option = document.createElement('md-select-option');
-          option.value = type.config_key;
-          option.textContent = type.config_value;
-          typeSelect.appendChild(option);
-        });
-      }
+      const typeSelect = form.elements.knowledge_type_key;
+      typeSelect.innerHTML = '<option value="">選択してください</option>';
+      const knowledgeTypes = configData['KNOWLEDGE_TYPE'] || [];
+      knowledgeTypes.forEach(type => {
+        const option = document.createElement('option');
+        option.value = type.config_key;
+        option.textContent = type.config_value;
+        typeSelect.appendChild(option);
+      });
       
       // Worksデータを取得（まだ取得していない場合）
       if (!worksData || worksData.length === 0) {
@@ -3014,10 +2803,7 @@
         item.className = 'combobox-item';
         item.textContent = `${work.project_title} - ${work.work_title}`;
         item.onclick = () => {
-          const workSearchField = document.querySelector('#new-knowledge-form md-filled-text-field[name="work_search"]');
-          if (workSearchField) {
-            workSearchField.value = `${work.project_title} - ${work.work_title}`;
-          }
+          document.querySelector('#new-knowledge-form input[name="work_search"]').value = `${work.project_title} - ${work.work_title}`;
           workIdInput.value = work.work_id;
           suggestionsContainer.style.display = 'none';
         };
@@ -3030,19 +2816,11 @@
       event.preventDefault();
       const form = event.target;
       const workId = form.elements.work_id.value;
-      
-      const knowledgeTypeSelect = form.querySelector('md-filled-select[name="knowledge_type_key"]');
-      const knowledgeTypeKey = knowledgeTypeSelect ? knowledgeTypeSelect.value : form.elements.knowledge_type_key?.value;
-      
+      const knowledgeTypeKey = form.elements.knowledge_type_key.value;
       const knowledgeContent = document.getElementById('knowledge-content-editor').innerHTML;
       
       if (!workId) {
         alert('制作物を選択してください');
-        return;
-      }
-      
-      if (!knowledgeTypeKey) {
-        alert('ナレッジタイプを選択してください');
         return;
       }
       
@@ -3103,14 +2881,8 @@
 
     function submitNewProject(event) {
       event.preventDefault();
-      const form = event.target;
-      const projectTitleField = form.querySelector('md-filled-text-field[name="project_title"]');
-      const projectTitle = projectTitleField ? projectTitleField.value : form.elements.project_title?.value;
-      if (!projectTitle) {
-        alert('案件タイトルを入力してください');
-        return;
-      }
-      showModalLoading('modal-new-project', 'プロジェクトを作成しています');
+      const projectTitle = event.target.elements.project_title.value;
+      showModalLoading('modal-new-project');
       callGAS('createProject', projectTitle).then(() => {
         showModalSuccess('modal-new-project', 'プロジェクトを作成しました', () => {
           loadProjectsData();
@@ -3166,8 +2938,9 @@
       popup.appendChild(content);
       const buttons = document.createElement('div');
       buttons.className = 'filter-popup-buttons';
-      const applyBtn = document.createElement('md-filled-button');
+      const applyBtn = document.createElement('button');
       applyBtn.textContent = '適用';
+      applyBtn.className = 'btn btn-primary';
       applyBtn.onclick = () => {
         const selectedValues = Array.from(content.querySelectorAll('input:checked')).map(cb => cb.value);
         if (selectedValues.length > 0) {
@@ -3182,8 +2955,9 @@
           dataLoaders[tableName]();
         }
       };
-      const clearBtn = document.createElement('md-filled-tonal-button');
+      const clearBtn = document.createElement('button');
       clearBtn.textContent = 'クリア';
+      clearBtn.className = 'btn btn-secondary';
       clearBtn.onclick = () => {
         delete state.filters[columnKey];
         closeFilterMenu();
