@@ -151,6 +151,14 @@ function createData(sheetName, dataObject) {
   const newRow = headers.map(header => dataObject[header] || '');
   
   sheet.appendRow(newRow);
+  
+  // ログ記録
+  const idColumn = ID_COLUMNS[sheetName];
+  const recordId = idColumn ? dataObject[idColumn] : '';
+  if (recordId) {
+    logOperation('add', sheetName, recordId, null, null, dataObject);
+  }
+  
   return true;
 }
 
@@ -172,19 +180,47 @@ function updateData(sheetName, id, updateDataObject) {
   const headers = data[0];
   const idIndex = headers.indexOf(idColumn);
   
+  // 更新前のデータを取得
+  let oldRecord = null;
+  let rowIndex = -1;
+  
   for (let i = 1; i < data.length; i++) {
     if (data[i][idIndex] === id) {
-      Object.keys(updateDataObject).forEach(key => {
-        const colIndex = headers.indexOf(key);
-        if (colIndex !== -1) {
-          sheet.getRange(i + 1, colIndex + 1).setValue(updateDataObject[key]);
-        }
+      rowIndex = i;
+      // 更新前のレコード全体を保存
+      oldRecord = {};
+      headers.forEach((header, index) => {
+        oldRecord[header] = data[i][index];
       });
-      return true;
+      break;
     }
   }
   
-  return false;
+  if (rowIndex === -1) {
+    return false;
+  }
+  
+  // 更新を実行
+  Object.keys(updateDataObject).forEach(key => {
+    const colIndex = headers.indexOf(key);
+    if (colIndex !== -1) {
+      sheet.getRange(rowIndex + 1, colIndex + 1).setValue(updateDataObject[key]);
+    }
+  });
+  
+  // 更新後のデータを取得
+  const updatedData = sheet.getDataRange().getValues();
+  const newRecord = {};
+  headers.forEach((header, index) => {
+    newRecord[header] = updatedData[rowIndex][index];
+  });
+  
+  // ログ記録
+  const changedColumns = Object.keys(updateDataObject);
+  const columnId = changedColumns.join(',');
+  logOperation('modified', sheetName, id, columnId, oldRecord, newRecord);
+  
+  return true;
 }
 
 /**
@@ -202,6 +238,8 @@ function deleteData(sheetName, condition) {
   const conditionIndexes = conditionKeys.map(key => headers.indexOf(key));
   
   let deleted = false;
+  const deletedRecords = []; // 削除されたレコードを保存
+  
   // 下からループして行のインデックスのずれを防ぐ
   for (let i = data.length - 1; i >= 1; i--) {
     const row = data[i];
@@ -214,10 +252,124 @@ function deleteData(sheetName, condition) {
       }
     }
     if (match) {
+      // 削除前にレコードを保存
+      const record = {};
+      headers.forEach((header, index) => {
+        record[header] = row[index];
+      });
+      deletedRecords.push(record);
+      
       sheet.deleteRow(i + 1);
       deleted = true;
     }
   }
   
+  // ログ記録（削除された各レコードに対して）
+  if (deleted && deletedRecords.length > 0) {
+    const idColumn = ID_COLUMNS[sheetName];
+    deletedRecords.forEach(record => {
+      const recordId = idColumn ? record[idColumn] : JSON.stringify(condition);
+      logOperation('delete', sheetName, recordId, null, record, null);
+    });
+  }
+  
   return deleted;
+}
+
+// ============================================
+// ログ記録機能
+// ============================================
+
+/**
+ * ログシートを初期化します（存在しない場合に作成）。
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} ログシート
+ */
+function initializeLogSheet() {
+  const ss = getSpreadsheet();
+  let logSheet = ss.getSheetByName(SHEET_NAMES.LOGS);
+  
+  if (!logSheet) {
+    logSheet = ss.insertSheet(SHEET_NAMES.LOGS);
+    const headers = [
+      'log_id',
+      'user_email',
+      'operation_type',
+      'table_name',
+      'record_id',
+      'column_id',
+      'old_value',
+      'new_value',
+      'created_at'
+    ];
+    logSheet.appendRow(headers);
+    
+    // ヘッダー行を固定
+    logSheet.setFrozenRows(1);
+    
+    // ヘッダー行のスタイル設定
+    const headerRange = logSheet.getRange(1, 1, 1, headers.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#f0f0f0');
+  }
+  
+  return logSheet;
+}
+
+/**
+ * 操作ログを記録します。
+ * @param {string} operationType - 操作種別（'add', 'modified', 'delete'）
+ * @param {string} tableName - テーブル名（シート名）
+ * @param {any} recordId - レコードID（主キー値）
+ * @param {string|null} columnId - カラムID（更新時のみ、変更されたカラム名。複数カラム更新時はカンマ区切り）
+ * @param {Object|null} oldValue - 変更前の値（更新・削除時のみ、JSON形式で保存）
+ * @param {Object|null} newValue - 変更後の値（追加・更新時のみ、JSON形式で保存）
+ */
+function logOperation(operationType, tableName, recordId, columnId, oldValue, newValue) {
+  // ログシートへの操作はログを記録しない（循環記録回避）
+  if (tableName === SHEET_NAMES.LOGS) {
+    return;
+  }
+  
+  try {
+    const userEmail = Session.getActiveUser().getEmail();
+    const logId = Utilities.getUuid();
+    const now = new Date();
+    
+    const logSheet = initializeLogSheet();
+    const headers = getHeaders(logSheet);
+    
+    // 値をJSON形式に変換（Dateオブジェクトも含む）
+    const oldValueJson = oldValue ? JSON.stringify(sanitizeForClient(oldValue)) : '';
+    const newValueJson = newValue ? JSON.stringify(sanitizeForClient(newValue)) : '';
+    
+    const logRow = headers.map(header => {
+      switch (header) {
+        case 'log_id':
+          return logId;
+        case 'user_email':
+          return userEmail;
+        case 'operation_type':
+          return operationType;
+        case 'table_name':
+          return tableName;
+        case 'record_id':
+          return recordId;
+        case 'column_id':
+          return columnId || '';
+        case 'old_value':
+          return oldValueJson;
+        case 'new_value':
+          return newValueJson;
+        case 'created_at':
+          return now;
+        default:
+          return '';
+      }
+    });
+    
+    logSheet.appendRow(logRow);
+  } catch (e) {
+    // ログ記録の失敗は本処理を止めない
+    Logger.log('ログ記録エラー: ' + e.message);
+  }
 }

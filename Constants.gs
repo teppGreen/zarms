@@ -13,6 +13,7 @@ const SHEET_NAMES = {
   CONFIG: 'config',
   WORK_ASSIGNMENTS: 'work_assignments',
   APP_ASSIGNMENTS: 'app_assignments',
+  LOGS: 'logs',
 };
 
 const ID_COLUMNS = {
