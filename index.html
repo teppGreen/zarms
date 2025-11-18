@@ -2348,7 +2348,6 @@
       recordJSInvocation('openProjectDetailOverlay', projectId);
       
       showLoading();
-      currentProjectId = projectId;
       callGAS('getProjectById', projectId).then(project => {
         if (!project) {
           alert('プロジェクトが見つかりません');
@@ -2358,6 +2357,7 @@
         
         // 別のオーバーレイ画面が開かれていたら一旦閉じる
         handleHeaderCloseClick();
+        currentProjectId = projectId;
         
         // ヘッダータイトルを変更
         // const headerTitleDefault = document.getElementById('header-title-default');
