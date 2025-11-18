@@ -1022,6 +1022,7 @@
     }
 
     let currentWorkId = null;
+    let currentWork = null;
     let currentProjectId = null;
 
     function openWorkDetailOverlay(workId) {
@@ -1040,6 +1041,9 @@
         if (!membersData || membersData.length === 0) {
           membersData = members;
         }
+        
+        // 現在のworkデータを保持
+        currentWork = work;
         
         // メインヘッダーを更新
         const headerTitleDefault = document.getElementById('header-title-default');
@@ -1363,6 +1367,7 @@
       
       // ID検索バーをクリア
       currentWorkId = null;
+      currentWork = null;
       clearIdSearchInput();
     }
 
@@ -4133,22 +4138,15 @@
       }
       
       // work詳細画面が表示中の場合
-      if (currentWorkId) {
+      if (currentWorkId && currentWork) {
         const workDetailOverlay = document.getElementById('work-detail-overlay');
         if (workDetailOverlay && workDetailOverlay.classList.contains('show')) {
           const headerTitle = document.getElementById('header-title-work-detail-header');
           if (headerTitle && headerTitle.textContent === 'CTMS v3.0') {
-            // work詳細画面が開いているので、IDを構築
-            callGAS('getWorkById', currentWorkId).then(work => {
-              if (work) {
-                const workIdForSearch = `${work.project_id || ''}-${work.work_id || ''}`;
-                const input = document.getElementById('id-search-input');
-                if (input && document.activeElement !== input) {
-                  input.value = workIdForSearch;
-                  input.removeAttribute('placeholder');
-                }
-              }
-            }).catch(handleError);
+            // 保持しているworkデータからIDを構築（APIリクエスト不要）
+            const workIdForSearch = `${currentWork.project_id || ''}-${currentWork.work_id || ''}`;
+            input.value = workIdForSearch;
+            input.removeAttribute('placeholder');
             return;
           }
         }
