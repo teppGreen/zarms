@@ -2561,6 +2561,39 @@
         existingDropdown.remove();
       }
       
+      // メンバーをソートする関数
+      const sortMembers = (members) => {
+        if (!currentUser) return members;
+        
+        const currentUserEmail = currentUser.member_email;
+        const currentUserTeam = currentUser.member_team_key;
+        
+        // 自分、同じTEAM、その他の順に分類
+        const myself = [];
+        const sameTeam = [];
+        const others = [];
+        
+        members.forEach(member => {
+          if (member.member_email === currentUserEmail) {
+            myself.push(member);
+          } else if (member.member_team_key === currentUserTeam) {
+            sameTeam.push(member);
+          } else {
+            others.push(member);
+          }
+        });
+        
+        // その他は名前降順でソート
+        others.sort((a, b) => {
+          const nameA = (a.member_name || '').toLowerCase();
+          const nameB = (b.member_name || '').toLowerCase();
+          return nameB.localeCompare(nameA, 'ja');
+        });
+        
+        // 順番に結合
+        return [...myself, ...sameTeam, ...others];
+      };
+      
       // ドロップダウンを作成
       const dropdown = document.createElement('div');
       dropdown.id = 'assignee-dropdown';
@@ -2571,10 +2604,10 @@
       dropdown.style.border = '1px solid var(--md-sys-color-outline)';
       dropdown.style.borderRadius = '8px';
       dropdown.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-      dropdown.style.maxHeight = '300px';
-      dropdown.style.overflowY = 'auto';
       dropdown.style.minWidth = '250px';
       dropdown.style.maxWidth = '400px';
+      dropdown.style.display = 'flex';
+      dropdown.style.flexDirection = 'column';
       
       // 検索入力欄
       const searchInput = document.createElement('input');
@@ -2584,11 +2617,15 @@
       searchInput.style.margin = '8px';
       searchInput.style.width = 'calc(100% - 16px)';
       searchInput.style.boxSizing = 'border-box';
+      searchInput.style.flexShrink = '0';
       dropdown.appendChild(searchInput);
       
-      // メンバーリストコンテナ
+      // メンバーリストコンテナ（スクロール可能）
       const membersList = document.createElement('div');
       membersList.id = 'assignee-members-list';
+      membersList.style.maxHeight = '300px';
+      membersList.style.overflowY = 'auto';
+      membersList.style.overflowX = 'hidden';
       dropdown.appendChild(membersList);
       
       // メンバーを表示する関数
@@ -2604,7 +2641,10 @@
           return;
         }
         
-        members.forEach(member => {
+        // ソートを適用
+        const sortedMembers = sortMembers(members);
+        
+        sortedMembers.forEach(member => {
           const optionDiv = document.createElement('div');
           optionDiv.className = 'popup-editor-option';
           optionDiv.style.display = 'flex';
@@ -2645,8 +2685,9 @@
         });
       };
       
-      // 初期表示
-      renderMembers(availableMembers);
+      // 初期表示（ソート済み）
+      const sortedAvailableMembers = sortMembers(availableMembers);
+      renderMembers(sortedAvailableMembers);
       
       // 検索機能
       searchInput.addEventListener('input', (e) => {
