@@ -284,28 +284,28 @@
         </div>
         <div class="workflow-status-item" id="workflow-status-request">
           <span class="workflow-status-icon-wrapper">
-            <span class="workflow-status-icon">✓</span>
+            <span class="workflow-status-icon"></span>
           </span>
           <span class="workflow-status-label">依頼:</span>
           <span class="workflow-status-date" id="workflow-date-request"></span>
         </div>
         <div class="workflow-status-item" id="workflow-status-production">
           <span class="workflow-status-icon-wrapper">
-            <span class="workflow-status-icon">✓</span>
+            <span class="workflow-status-icon"></span>
           </span>
           <span class="workflow-status-label">制作:</span>
           <span class="workflow-status-date" id="workflow-date-production"></span>
         </div>
         <div class="workflow-status-item" id="workflow-status-approval">
           <span class="workflow-status-icon-wrapper">
-            <span class="workflow-status-icon">></span>
+            <span class="workflow-status-icon"></span>
           </span>
           <span class="workflow-status-label">承認:</span>
           <span class="workflow-status-date" id="workflow-date-approval"></span>
         </div>
         <div class="workflow-status-item" id="workflow-status-delivery">
           <span class="workflow-status-icon-wrapper">
-            <span class="workflow-status-icon">○</span>
+            <span class="workflow-status-icon"></span>
           </span>
           <span class="workflow-status-label">納品:</span>
           <span class="workflow-status-date" id="workflow-date-delivery"></span>
@@ -1220,13 +1220,30 @@
           function updateWorkflowStatusDisplay(work, timestamps) {
             const currentStatus = work.work_status_key;
             
+            // アイコンの表示を背景色に応じて変更する関数
+            function updateIcon(iconElement, color) {
+              if (!iconElement) return;
+              if (color === '#4CAF50') {
+                // 緑: ✓
+                iconElement.textContent = '✓';
+              } else if (color === '#FF9800') {
+                // オレンジ: ＞
+                iconElement.textContent = '＞';
+              } else {
+                // 赤: 何もなし
+                iconElement.textContent = '';
+              }
+            }
+            
             // 依頼: 常に緑、形式: yyyy/mm/dd(曜日) hh:mm
             const requestItem = document.getElementById('workflow-status-request');
             const requestIconWrapper = requestItem ? requestItem.querySelector('.workflow-status-icon-wrapper') : null;
+            const requestIcon = requestItem ? requestItem.querySelector('.workflow-status-icon') : null;
             const requestDate = document.getElementById('workflow-date-request');
-            if (requestItem && requestIconWrapper) {
+            if (requestItem && requestIconWrapper && requestIcon) {
               const requestColor = '#4CAF50'; // 常に緑
               requestIconWrapper.style.backgroundColor = requestColor;
+              updateIcon(requestIcon, requestColor);
               // ブレード型の背景色も設定
               requestItem.style.setProperty('--blade-color', requestColor);
             }
@@ -1241,8 +1258,9 @@
             // 形式: yyyy/mm/dd(曜日) hh:mm ~
             const productionItem = document.getElementById('workflow-status-production');
             const productionIconWrapper = productionItem ? productionItem.querySelector('.workflow-status-icon-wrapper') : null;
+            const productionIcon = productionItem ? productionItem.querySelector('.workflow-status-icon') : null;
             const productionDate = document.getElementById('workflow-date-production');
-            if (productionItem && productionIconWrapper) {
+            if (productionItem && productionIconWrapper && productionIcon) {
               let productionColor = '#4CAF50'; // デフォルト: 緑
               if (currentStatus === 'TO-DO') {
                 productionColor = '#F44336'; // 赤
@@ -1250,6 +1268,7 @@
                 productionColor = '#FF9800'; // オレンジ
               }
               productionIconWrapper.style.backgroundColor = productionColor;
+              updateIcon(productionIcon, productionColor);
               // ブレード型の背景色も設定
               productionItem.style.setProperty('--blade-color', productionColor);
             }
@@ -1261,8 +1280,9 @@
             // 形式: 色がオレンジの場合は yyyy/mm/dd(曜日) hh:mm ~, 色が赤の場合は ~ yyyy/mm/dd(曜日) hh:mm
             const approvalItem = document.getElementById('workflow-status-approval');
             const approvalIconWrapper = approvalItem ? approvalItem.querySelector('.workflow-status-icon-wrapper') : null;
+            const approvalIcon = approvalItem ? approvalItem.querySelector('.workflow-status-icon') : null;
             const approvalDate = document.getElementById('workflow-date-approval');
-            if (approvalItem && approvalIconWrapper) {
+            if (approvalItem && approvalIconWrapper && approvalIcon) {
               let approvalColor = '#F44336'; // デフォルト: 赤
               if (currentStatus === 'REVIEW' || currentStatus === 'REVISION') {
                 approvalColor = '#FF9800'; // オレンジ
@@ -1270,6 +1290,7 @@
                 approvalColor = '#4CAF50'; // 緑
               }
               approvalIconWrapper.style.backgroundColor = approvalColor;
+              updateIcon(approvalIcon, approvalColor);
               // ブレード型の背景色も設定
               approvalItem.style.setProperty('--blade-color', approvalColor);
             }
@@ -1293,8 +1314,9 @@
             // 形式: 色が緑の場合は yyyy/mm/dd(曜日) hh:mm, 色が赤またはオレンジの場合は ~ yyyy/mm/dd(曜日) hh:mm
             const deliveryItem = document.getElementById('workflow-status-delivery');
             const deliveryIconWrapper = deliveryItem ? deliveryItem.querySelector('.workflow-status-icon-wrapper') : null;
+            const deliveryIcon = deliveryItem ? deliveryItem.querySelector('.workflow-status-icon') : null;
             const deliveryDate = document.getElementById('workflow-date-delivery');
-            if (deliveryItem && deliveryIconWrapper) {
+            if (deliveryItem && deliveryIconWrapper && deliveryIcon) {
               let deliveryColor = '#F44336'; // デフォルト: 赤
               if (currentStatus === 'DELIVERED') {
                 deliveryColor = '#4CAF50'; // 緑
@@ -1302,6 +1324,7 @@
                 deliveryColor = '#FF9800'; // オレンジ
               }
               deliveryIconWrapper.style.backgroundColor = deliveryColor;
+              updateIcon(deliveryIcon, deliveryColor);
               // ブレード型の背景色も設定
               deliveryItem.style.setProperty('--blade-color', deliveryColor);
             }
