@@ -18,8 +18,11 @@
       <button id="header-close-btn" class="header-close-btn" onclick="closeWorkDetailOverlay()" style="display: none;">✕</button>
       <h1 class="header-title" id="header-title-default">CTMS v3.0</h1>
       <h1 class="header-title" id="header-title-work-detail-header" style="display: none;"></h1>
-      <div id="id-search-container" style="position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center;">
-        <input type="text" id="id-search-input" placeholder="(例:P0001-W0001-T0001)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 1.5rem; width: 600px; text-transform: uppercase;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)" onfocus="handleIdSearchFocus(event)" onblur="handleIdSearchBlur(event)">
+      <div id="id-search-container" style="position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 0;">
+        <input type="text" id="id-search-input" placeholder="ID検索（例：P0001, W0001, T0001, R0001）" style="padding: 8px 12px; border: 1px solid #6b7280; border-right: none; border-radius: 50px 0 0 50px; font-size: 1.5rem; width: 600px; text-transform: uppercase; height: 48px; box-sizing: border-box;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)" onfocus="handleIdSearchFocus(event)" onblur="handleIdSearchBlur(event)">
+        <button id="id-search-button" type="button" onclick="handleIdSearchClick()" style="padding: 8px 16px; border: 1px solid #6b7280; border-left: none; border-radius: 0 50px 50px 0; background-color: #f9fafb; cursor: pointer; height: 48px; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
+          <span class="material-icons" style="font-size: 24px; color: #6b7280;">search</span>
+        </button>
       </div>
     </div>
     <div class="new-button-container">
@@ -1047,13 +1050,14 @@
         if (headerTitleDefault) headerTitleDefault.style.display = 'none';
         if (headerTitleWorkDetailHeader) {
           headerTitleWorkDetailHeader.style.display = 'flex';
-          headerTitleWorkDetailHeader.textContent = `${work.project_id || ''}-${work.work_id || ''}`;
+          headerTitleWorkDetailHeader.textContent = 'CTMS v3.0';
         }
         if (headerCloseBtn) headerCloseBtn.style.display = 'block';
         if (newButton) newButton.style.display = 'none';
         
         // ID検索バーにIDを表示
-        updateIdSearchInput();
+        const workIdForSearch = `${work.project_id || ''}-${work.work_id || ''}`;
+        updateIdSearchInput(workIdForSearch);
         
         // ワークフローステータスバーを表示
         const workflowStatusBar = document.getElementById('workflow-status-bar');
@@ -1465,7 +1469,7 @@
         document.getElementById('project-detail-overlay').classList.add('show');
         
         // ID検索バーにIDを表示
-        updateIdSearchInput();
+        updateIdSearchInput(projectId);
         
         hideLoading();
       }).catch(handleError);
@@ -4114,21 +4118,37 @@
     // ============================================
     // ID検索バー
     // ============================================
-    function updateIdSearchInput() {
+    function updateIdSearchInput(idValue) {
       const input = document.getElementById('id-search-input');
       if (!input) return;
       
       // フォーカス中は何もしない
       if (document.activeElement === input) return;
       
+      // idValueが直接指定された場合
+      if (idValue) {
+        input.value = idValue;
+        input.removeAttribute('placeholder');
+        return;
+      }
+      
       // work詳細画面が表示中の場合
       if (currentWorkId) {
         const workDetailOverlay = document.getElementById('work-detail-overlay');
         if (workDetailOverlay && workDetailOverlay.classList.contains('show')) {
           const headerTitle = document.getElementById('header-title-work-detail-header');
-          if (headerTitle && headerTitle.textContent) {
-            input.value = headerTitle.textContent;
-            input.removeAttribute('placeholder');
+          if (headerTitle && headerTitle.textContent === 'CTMS v3.0') {
+            // work詳細画面が開いているので、IDを構築
+            callGAS('getWorkById', currentWorkId).then(work => {
+              if (work) {
+                const workIdForSearch = `${work.project_id || ''}-${work.work_id || ''}`;
+                const input = document.getElementById('id-search-input');
+                if (input && document.activeElement !== input) {
+                  input.value = workIdForSearch;
+                  input.removeAttribute('placeholder');
+                }
+              }
+            }).catch(handleError);
             return;
           }
         }
@@ -4153,14 +4173,87 @@
       if (!input) return;
       
       input.value = '';
-      input.placeholder = '案件・制作物・タスク・レビュー依頼をID検索（例：P0001, W0001, T0001, R0001）';
+      input.placeholder = 'ID検索（例：P0001, W0001, T0001, R0001）';
     }
     
     function handleIdSearchFocus(event) {
       const input = event.target;
       // valueをクリアしてplaceholderを設定
       input.value = '';
-      input.placeholder = '案件・制作物・タスク・レビュー依頼をID検索（例：P0001, W0001, T0001, R0001）';
+      input.placeholder = 'ID検索（例：P0001, W0001, T0001, R0001）';
+    }
+    
+    function handleIdSearchClick() {
+      const input = document.getElementById('id-search-input');
+      if (!input) return;
+      
+      const searchValue = input.value.trim();
+      if (!searchValue) return;
+      
+      // 複数のIDが連なっている場合、最も小さな単位のIDのみを取り出す
+      // project_id > work_id > review_id > task_id の順で優先度が低い
+      let targetId = null;
+      let targetType = null;
+      
+      // task_idを検索 (T + 4桁の数字)
+      const taskIdMatch = searchValue.match(/T\d{4}/);
+      if (taskIdMatch) {
+        targetId = taskIdMatch[0];
+        targetType = 'task';
+      }
+      
+      // review_idを検索 (R + 4桁の数字)
+      const reviewIdMatch = searchValue.match(/R\d{4}/);
+      if (reviewIdMatch && !targetId) {
+        targetId = reviewIdMatch[0];
+        targetType = 'review';
+      }
+      
+      // work_idを検索 (W + 4桁の数字)
+      const workIdMatch = searchValue.match(/W\d{4}/);
+      if (workIdMatch && !targetId) {
+        targetId = workIdMatch[0];
+        targetType = 'work';
+      }
+      
+      // project_idを検索 (P + 4桁の数字)
+      const projectIdMatch = searchValue.match(/P\d{4}/);
+      if (projectIdMatch && !targetId) {
+        targetId = projectIdMatch[0];
+        targetType = 'project';
+      }
+      
+      if (!targetId) {
+        alert('有効なIDが見つかりません。P0001, W0001, T0001, R0001 の形式で入力してください。');
+        return;
+      }
+      
+      // 検索実行
+      if (targetType === 'task') {
+        // task_idの場合は、taskからwork_idを取得してwork詳細画面を開く
+        callGAS('getTaskById', targetId).then(task => {
+          if (!task) {
+            alert('タスクが見つかりません');
+            return;
+          }
+          openWorkDetailOverlay(task.work_id);
+        }).catch(handleError);
+      } else if (targetType === 'review') {
+        // review_idの場合は、reviewからwork_idを取得してwork詳細画面を開く
+        callGAS('getReviewRequestById', targetId).then(reviewRequest => {
+          if (!reviewRequest) {
+            alert('レビューリクエストが見つかりません');
+            return;
+          }
+          openWorkDetailOverlay(reviewRequest.work_id);
+        }).catch(handleError);
+      } else if (targetType === 'work') {
+        // work_idの場合はwork詳細画面を開く
+        openWorkDetailOverlay(targetId);
+      } else if (targetType === 'project') {
+        // project_idの場合はproject詳細画面を開く
+        openProjectDetailOverlay(targetId);
+      }
     }
     
     function handleIdSearchBlur(event) {
