@@ -898,6 +898,8 @@
             }
             
             // 成功時はポップアップを閉じる
+            lastCallGASInvocation = null;
+            lastJSInvocation = null;
             hideRetryPopup();
           })
           .catch((error) => {
@@ -909,6 +911,8 @@
               retryLastOperation();
             } else {
               // その他のエラーはポップアップを閉じて通常のエラー処理
+              lastCallGASInvocation = null;
+              lastJSInvocation = null;
               hideRetryPopup();
               handleError(error);
             }
@@ -928,7 +932,7 @@
       retryPopup.className = 'retry-popup';
       retryPopup.innerHTML = `
         <div class="retry-popup-content">
-          <div class="retry-popup-text">ネットワークエラーが発生したため復旧します<br>再度操作を行ってください</div>
+          <div class="retry-popup-text">ネットワークエラーが発生したため復旧します<br>少々お待ちください</div>
           <div class="retry-progress-container">
             <div class="retry-progress-bar">
               <div class="retry-progress-fill" style="width: 0%"></div>
@@ -1954,10 +1958,96 @@
         
         // Googleドキュメントを埋め込む
         const docContainer = document.getElementById('work-detail-document-container');
+        let currentDocumentClickHandler = null;
+        let containerClickHandler = null;
+        let observer = null;
+        
+        // 既存のイベントリスナーをクリーンアップ
+        if (docContainer._iframeActive !== undefined) {
+          if (docContainer._containerClickHandler) {
+            docContainer.removeEventListener('click', docContainer._containerClickHandler);
+          }
+          if (docContainer._documentClickHandler) {
+            document.removeEventListener('click', docContainer._documentClickHandler, true);
+          }
+          if (docContainer._observer) {
+            docContainer._observer.disconnect();
+          }
+        }
+        
         if (work.work_document_id) {
           // Googleドキュメントを編集可能な状態で埋め込む（rm=minimalパラメータ追加）
           const embedUrl = `https://docs.google.com/document/d/${work.work_document_id}/edit?rm=minimal&tab=${work.work_document_tab_id}`;
-          docContainer.innerHTML = `<iframe src="${embedUrl}" style="width: 100%; height: 100%; max-width: 100%; border: none; overflow-x: hidden; border-radius: 8px;"></iframe>`;
+          const iframe = document.createElement('iframe');
+          iframe.src = embedUrl;
+          iframe.style.cssText = 'width: 100%; height: 100%; max-width: 100%; border: none; overflow-x: hidden; border-radius: 8px; pointer-events: none;';
+          docContainer.innerHTML = '';
+          docContainer.appendChild(iframe);
+          
+          // iframeを無効化する関数
+          const deactivateIframe = function() {
+            iframe.style.pointerEvents = 'none';
+            if (currentDocumentClickHandler) {
+              document.removeEventListener('click', currentDocumentClickHandler, true);
+              currentDocumentClickHandler = null;
+            }
+            docContainer._iframeActive = false;
+          };
+          
+          // コンテナをクリックしたときにiframeを有効化
+          let isIframeActive = false;
+          containerClickHandler = function(e) {
+            // iframe内のクリックは無視（iframe自身が処理）
+            if (e.target === iframe) return;
+            
+            // コンテナをクリックした場合、iframeを有効化
+            if (!isIframeActive) {
+              iframe.style.pointerEvents = 'auto';
+              isIframeActive = true;
+              docContainer._iframeActive = true;
+              
+              // ドキュメント外をクリックしたときにiframeを無効化
+              currentDocumentClickHandler = function(e) {
+                // オーバーレイ内のクリックをチェック
+                const overlay = document.getElementById('work-detail-overlay');
+                if (overlay && overlay.contains(e.target)) {
+                  // work-detail-document-container外のクリックの場合のみ無効化
+                  if (!docContainer.contains(e.target) && e.target !== iframe) {
+                    isIframeActive = false;
+                    deactivateIframe();
+                  }
+                } else {
+                  // オーバーレイ外のクリックの場合は無効化
+                  isIframeActive = false;
+                  deactivateIframe();
+                }
+              };
+              
+              // 少し遅延させてからイベントリスナーを追加（iframe内のクリックイベントが先に処理されるように）
+              setTimeout(() => {
+                document.addEventListener('click', currentDocumentClickHandler, true);
+                docContainer._documentClickHandler = currentDocumentClickHandler;
+              }, 100);
+            }
+          };
+          
+          docContainer.addEventListener('click', containerClickHandler);
+          docContainer._containerClickHandler = containerClickHandler;
+          
+          // オーバーレイが閉じられたときにiframeを無効化
+          const overlay = document.getElementById('work-detail-overlay');
+          observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+              if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                if (!overlay.classList.contains('show')) {
+                  isIframeActive = false;
+                  deactivateIframe();
+                }
+              }
+            });
+          });
+          observer.observe(overlay, { attributes: true });
+          docContainer._observer = observer;
         } else {
           docContainer.innerHTML = '';
         }
