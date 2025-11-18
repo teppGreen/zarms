@@ -1271,17 +1271,15 @@
             const productionIcon = productionItem ? productionItem.querySelector('.workflow-status-icon') : null;
             const productionDate = document.getElementById('workflow-date-production');
             if (productionItem && productionIconWrapper && productionIcon) {
-              let productionColor = isCanceled ? canceledColor : '#4CAF50'; // CANCELEDの場合はgray、デフォルト: 緑
-              if (!isCanceled) {
-                // work_status_key が TO-DO の場合は赤
-                if (currentStatus === 'TO-DO') {
-                  productionColor = '#F44336'; // 赤
-                } 
-                // work_status_key が CREATE の場合はオレンジ
-                else if (currentStatus === 'CREATE') {
-                  productionColor = '#FF9800'; // オレンジ
-                }
-                // それ以外の場合は緑
+              let productionColor;
+              if (isCanceled) {
+                productionColor = canceledColor; // CANCELEDの場合はgray
+              } else if (currentStatus === 'TO-DO') {
+                productionColor = '#F44336'; // TO-DOの場合は赤
+              } else if (currentStatus === 'CREATE') {
+                productionColor = '#FF9800'; // CREATEの場合はオレンジ
+              } else {
+                productionColor = '#4CAF50'; // それ以外の場合は緑
               }
               productionIconWrapper.style.backgroundColor = productionColor;
               updateIcon(productionIcon, productionColor);
@@ -1400,6 +1398,20 @@
               }
               
               deliveryDate.textContent = dateText;
+              
+              // DELIVEREDでない場合のみ、日時部分をクリック可能にする
+              if (currentStatus !== 'DELIVERED') {
+                deliveryDate.style.cursor = 'pointer';
+                deliveryDate.classList.add('editable-datetime');
+                deliveryDate.onclick = (e) => {
+                  e.stopPropagation();
+                  openDeliveryDateTimePicker(deliveryDate, work.work_id, timestamps.delivery || work.due_datetime);
+                };
+              } else {
+                deliveryDate.style.cursor = 'default';
+                deliveryDate.classList.remove('editable-datetime');
+                deliveryDate.onclick = null;
+              }
             }
             
             // 残り日数を新しい要素に表示
@@ -1450,6 +1462,246 @@
           
           // ステータス表示を更新
           updateWorkflowStatusDisplay(work, timestamps);
+        }
+        
+        // 納品日時の日時選択ピッカーを開く関数
+        function openDeliveryDateTimePicker(dateElement, workId, originalValue) {
+          if (!dateElement || !workId) return;
+          
+          // 既に編集中なら何もしない
+          if (dateElement.classList.contains('editing-delivery-datetime')) return;
+          
+          // 編集中の状態にする
+          dateElement.classList.add('editing-delivery-datetime');
+          
+          // 現在の日時を取得してパース
+          let dateObj;
+          if (originalValue) {
+            dateObj = new Date(originalValue);
+          } else {
+            dateObj = new Date();
+          }
+          
+          const yyyy = dateObj.getFullYear().toString().padStart(4, '0');
+          const mm = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+          const dd = dateObj.getDate().toString().padStart(2, '0');
+          const hh = dateObj.getHours().toString().padStart(2, '0');
+          const min = dateObj.getMinutes().toString().padStart(2, '0');
+          
+          // 元のテキストを保存
+          const originalText = dateElement.textContent;
+          
+          // カスタム日時入力フィールドを作成
+          const editorDiv = document.createElement('div');
+          editorDiv.className = 'datetime-custom-editor';
+          editorDiv.style.position = 'absolute';
+          editorDiv.style.zIndex = '1000';
+          editorDiv.style.backgroundColor = 'var(--md-sys-color-surface)';
+          editorDiv.style.border = '2px solid var(--md-sys-color-primary)';
+          editorDiv.style.borderRadius = '8px';
+          editorDiv.style.padding = '8px';
+          editorDiv.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+          editorDiv.innerHTML = `
+            <input type="text" class="datetime-segment" data-segment="yyyy" maxlength="4" value="${yyyy}" placeholder="yyyy" />
+            <span class="datetime-separator">/</span>
+            <input type="text" class="datetime-segment" data-segment="mm" maxlength="2" value="${mm}" placeholder="mm" />
+            <span class="datetime-separator">/</span>
+            <input type="text" class="datetime-segment" data-segment="dd" maxlength="2" value="${dd}" placeholder="dd" />
+            <span class="datetime-separator"> </span>
+            <input type="text" class="datetime-segment" data-segment="hh" maxlength="2" value="${hh}" placeholder="hh" />
+            <span class="datetime-separator">:</span>
+            <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="${min}" placeholder="mm" />
+          `;
+          
+          // 位置を計算（dateElementの位置に合わせる）
+          const rect = dateElement.getBoundingClientRect();
+          const deliveryItem = document.getElementById('workflow-status-delivery');
+          if (!deliveryItem) return;
+          
+          // deliveryItemにposition: relativeを設定
+          const originalPosition = deliveryItem.style.position;
+          if (!deliveryItem.style.position || deliveryItem.style.position === 'static') {
+            deliveryItem.style.position = 'relative';
+          }
+          
+          // 一時的にテキストを非表示（opacityで非表示にしてレイアウトを維持）
+          dateElement.style.opacity = '0';
+          
+          // エディタを追加（deliveryItem内に配置）
+          deliveryItem.appendChild(editorDiv);
+          
+          // 位置を計算（dateElementの相対位置）
+          const itemRect = deliveryItem.getBoundingClientRect();
+          const dateRect = dateElement.getBoundingClientRect();
+          editorDiv.style.position = 'absolute';
+          editorDiv.style.top = (dateRect.top - itemRect.top + dateRect.height + 4) + 'px';
+          editorDiv.style.left = (dateRect.left - itemRect.left) + 'px';
+          
+          const inputs = editorDiv.querySelectorAll('.datetime-segment');
+          
+          // 各inputにイベントリスナーを設定
+          inputs.forEach((input, index) => {
+            // 数字のみ入力可能
+            input.addEventListener('input', (e) => {
+              let value = e.target.value.replace(/[^0-9]/g, '');
+              const maxLength = parseInt(e.target.getAttribute('maxlength'));
+              
+              if (value.length > maxLength) {
+                value = value.substring(0, maxLength);
+              }
+              
+              e.target.value = value;
+              
+              // 最大桁数に達したら次のフィールドへ
+              if (value.length >= maxLength && index < inputs.length - 1) {
+                inputs[index + 1].focus();
+                inputs[index + 1].select();
+              }
+            });
+            
+            // キーボード操作
+            input.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter' && !e.isComposing) {
+                e.preventDefault();
+                saveDeliveryDateTime(editorDiv, dateElement, workId, originalValue, inputs);
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelDeliveryDateTime(editorDiv, dateElement, originalText);
+              } else if (e.key === 'Tab') {
+                // Tabキーは自然な動作を許可
+                if (!e.shiftKey && index === inputs.length - 1) {
+                  // 最後のフィールドでTabを押したら保存
+                  e.preventDefault();
+                  saveDeliveryDateTime(editorDiv, dateElement, workId, originalValue, inputs);
+                }
+              } else if (e.key === 'ArrowRight' && e.target.selectionStart === e.target.value.length) {
+                // カーソルが末尾にある場合は次のフィールドへ
+                if (index < inputs.length - 1) {
+                  e.preventDefault();
+                  inputs[index + 1].focus();
+                  inputs[index + 1].setSelectionRange(0, 0);
+                }
+              } else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) {
+                // カーソルが先頭にある場合は前のフィールドへ
+                if (index > 0) {
+                  e.preventDefault();
+                  const prevInput = inputs[index - 1];
+                  prevInput.focus();
+                  prevInput.setSelectionRange(prevInput.value.length, prevInput.value.length);
+                }
+              }
+            });
+            
+            // フォーカスアウト時の処理
+            input.addEventListener('blur', (e) => {
+              setTimeout(() => {
+                // 次のフォーカスがdatetime-segment内かチェック
+                const focusedElement = document.activeElement;
+                if (!focusedElement || !focusedElement.classList.contains('datetime-segment') || !editorDiv.contains(focusedElement)) {
+                  saveDeliveryDateTime(editorDiv, dateElement, workId, originalValue, inputs);
+                }
+              }, 100);
+            });
+          });
+          
+          // クリックアウトサイドで閉じる
+          const clickOutsideHandler = (e) => {
+            if (!editorDiv.contains(e.target) && e.target !== dateElement) {
+              saveDeliveryDateTime(editorDiv, dateElement, workId, originalValue, inputs);
+              document.removeEventListener('click', clickOutsideHandler);
+            }
+          };
+          setTimeout(() => {
+            document.addEventListener('click', clickOutsideHandler);
+          }, 100);
+          
+          // 最初のフィールドにフォーカス
+          setTimeout(() => {
+            inputs[0].focus();
+            inputs[0].select();
+          }, 50);
+        }
+        
+        function saveDeliveryDateTime(editorDiv, dateElement, workId, originalValue, inputs) {
+          const values = Array.from(inputs).map(input => input.value);
+          const [yyyy, mm, dd, hh, min] = values;
+          
+          // バリデーション
+          const yearNum = parseInt(yyyy);
+          const monthNum = parseInt(mm);
+          const dayNum = parseInt(dd);
+          const hourNum = parseInt(hh);
+          const minuteNum = parseInt(min);
+          
+          if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100 ||
+              isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
+              isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
+              isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
+              isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
+            alert('無効な日時です');
+            cancelDeliveryDateTime(editorDiv, dateElement, dateElement.textContent);
+            return;
+          }
+          
+          // ISO形式の日時文字列を作成（秒は00固定）
+          const paddedYyyy = yyyy.padStart(4, '0');
+          const paddedMm = mm.padStart(2, '0');
+          const paddedDd = dd.padStart(2, '0');
+          const paddedHh = hh.padStart(2, '0');
+          const paddedMin = min.padStart(2, '0');
+          
+          const newDateStr = `${paddedYyyy}-${paddedMm}-${paddedDd}T${paddedHh}:${paddedMin}:00`;
+          const newDate = new Date(newDateStr);
+          
+          if (isNaN(newDate.getTime())) {
+            alert('無効な日時です');
+            cancelDeliveryDateTime(editorDiv, dateElement, dateElement.textContent);
+            return;
+          }
+          
+          const newValueAsISO = newDate.toISOString();
+          
+          // エディタを削除
+          if (editorDiv && editorDiv.parentNode) {
+            editorDiv.parentNode.removeChild(editorDiv);
+          }
+          
+          // テキストを再表示
+          dateElement.style.opacity = '1';
+          dateElement.classList.remove('editing-delivery-datetime');
+          
+          // deliveryItemのpositionを元に戻す
+          const deliveryItem = document.getElementById('workflow-status-delivery');
+          if (deliveryItem) {
+            deliveryItem.style.position = '';
+          }
+          
+          // データを保存（変更があった場合のみ）
+          if (newValueAsISO !== originalValue) {
+            showLoading();
+            callGAS('updateSingleField', 'works', workId, 'due_datetime', newValueAsISO)
+              .then(() => {
+                hideLoading();
+                // 画面を再読み込みしてステータスの日時を更新
+                openWorkDetailOverlay(workId);
+              })
+              .catch(handleError);
+          }
+        }
+        
+        function cancelDeliveryDateTime(editorDiv, dateElement, originalText) {
+          if (editorDiv && editorDiv.parentNode) {
+            editorDiv.parentNode.removeChild(editorDiv);
+          }
+          
+          dateElement.style.opacity = '1';
+          dateElement.classList.remove('editing-delivery-datetime');
+          
+          // deliveryItemのpositionを元に戻す
+          const deliveryItem = document.getElementById('workflow-status-delivery');
+          if (deliveryItem) {
+            deliveryItem.style.position = '';
+          }
         }
         
         // overlay-body内の案件情報列にデータを表示
