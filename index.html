@@ -1868,13 +1868,21 @@
           
           // フォーカスが当たったときにドロップダウンを表示
           projectTitleInput.onfocus = (e) => {
+            console.log('[DEBUG] onfocus triggered', {
+              value: e.target.value,
+              blurTimeoutId: blurTimeoutId,
+              activeElement: document.activeElement === projectTitleInput
+            });
+            
             // 既存のblurタイマーをキャンセル
             if (blurTimeoutId) {
+              console.log('[DEBUG] Cancelling blur timeout');
               clearTimeout(blurTimeoutId);
               blurTimeoutId = null;
             }
             
             const currentValue = e.target.value.trim();
+            console.log('[DEBUG] onfocus currentValue:', currentValue);
             if (currentValue) {
               searchProjectsForOverlayProjectTitle(currentValue, work.work_id, work.project_id);
             }
@@ -1882,22 +1890,56 @@
           
           // フォーカスが外れたときに元の値に戻す
           projectTitleInput.onblur = (e) => {
+            console.log('[DEBUG] onblur triggered', {
+              value: e.target.value,
+              relatedTarget: e.relatedTarget,
+              activeElement: document.activeElement,
+              relatedTargetIsDropdown: e.relatedTarget && e.relatedTarget.closest('.overlay-project-title-dropdown')
+            });
+            
+            // ドロップダウン内をクリックした場合は処理をスキップ
+            if (e.relatedTarget && e.relatedTarget.closest('.overlay-project-title-dropdown')) {
+              console.log('[DEBUG] Clicked on dropdown, skipping blur processing');
+              return;
+            }
+            
             // 少し遅延させて、ドロップダウンのクリックイベントが先に処理されるようにする
             blurTimeoutId = setTimeout(() => {
+              console.log('[DEBUG] blur timeout executed', {
+                activeElement: document.activeElement,
+                isInputFocused: document.activeElement === projectTitleInput,
+                dropdownSelected: projectTitleInput.dataset.dropdownSelected
+              });
+              
               // フォーカスが再度当たっている場合は処理をスキップ
               if (document.activeElement === projectTitleInput) {
+                console.log('[DEBUG] Input is focused again, skipping blur processing');
                 blurTimeoutId = null;
                 return;
               }
               
               const dropdownContainer = overlayProjectTitle.querySelector('.overlay-project-title-dropdown');
               const currentValue = projectTitleInput.value.trim();
+              const dropdownDisplay = dropdownContainer ? dropdownContainer.style.display : 'not found';
+              const isDropdownVisible = dropdownContainer && dropdownContainer.style.display !== 'none';
               
-              // ドロップダウンが選択されていない場合、かつ値が変更されている場合は元の値に戻す
+              console.log('[DEBUG] blur processing', {
+                dropdownSelected: projectTitleInput.dataset.dropdownSelected,
+                dropdownDisplay: dropdownDisplay,
+                isDropdownVisible: isDropdownVisible,
+                currentValue: currentValue,
+                originalProjectTitle: originalProjectTitle,
+                shouldReset: projectTitleInput.dataset.dropdownSelected !== 'true' && 
+                            !isDropdownVisible &&
+                            currentValue !== originalProjectTitle
+              });
+              
+              // ドロップダウンが選択されていない場合、かつドロップダウンが非表示で、かつ値が変更されている場合は元の値に戻す
               if (projectTitleInput.dataset.dropdownSelected !== 'true' && 
-                  (!dropdownContainer || dropdownContainer.style.display === 'none') &&
+                  !isDropdownVisible &&
                   currentValue !== originalProjectTitle) {
                 // 値が変更されているが、ドロップダウンで選択されなかった場合は元の値に戻す
+                console.log('[DEBUG] Resetting value to original');
                 projectTitleInput.value = originalProjectTitle;
                 projectTitleInput.dataset.projectId = originalProjectId;
               }
@@ -2552,13 +2594,28 @@
     }
     
     function searchProjectsForOverlayProjectTitle(query, workId, currentProjectId) {
+      console.log('[DEBUG] searchProjectsForOverlayProjectTitle called', {
+        query: query,
+        workId: workId,
+        currentProjectId: currentProjectId
+      });
+      
       const overlayProjectTitle = document.getElementById('overlay-project-title');
-      if (!overlayProjectTitle) return;
+      if (!overlayProjectTitle) {
+        console.log('[DEBUG] overlayProjectTitle not found');
+        return;
+      }
       
       const dropdownContainer = overlayProjectTitle.querySelector('.overlay-project-title-dropdown');
       const projectTitleInput = overlayProjectTitle.querySelector('input');
       
+      console.log('[DEBUG] Elements found', {
+        dropdownContainer: !!dropdownContainer,
+        projectTitleInput: !!projectTitleInput
+      });
+      
       if (!query || !query.trim()) {
+        console.log('[DEBUG] Query is empty, hiding dropdown');
         if (dropdownContainer) {
           dropdownContainer.style.display = 'none';
         }
@@ -2568,6 +2625,7 @@
       const trimmedQuery = query.trim();
       
       // 即座にドロップダウンを表示（検索結果を待たずに）
+      console.log('[DEBUG] Calling performOverlayProjectTitleSearchImmediate');
       performOverlayProjectTitleSearchImmediate(trimmedQuery, workId, currentProjectId, dropdownContainer, projectTitleInput);
       
       // projectsDataが取得されていない場合は取得してから検索結果を更新
@@ -2582,7 +2640,16 @@
     }
     
     function performOverlayProjectTitleSearchImmediate(query, workId, currentProjectId, dropdownContainer, projectTitleInput) {
-      if (!dropdownContainer || !projectTitleInput) return;
+      console.log('[DEBUG] performOverlayProjectTitleSearchImmediate called', {
+        query: query,
+        dropdownContainer: !!dropdownContainer,
+        projectTitleInput: !!projectTitleInput
+      });
+      
+      if (!dropdownContainer || !projectTitleInput) {
+        console.log('[DEBUG] Missing container or input, returning');
+        return;
+      }
       
       dropdownContainer.innerHTML = '';
       dropdownContainer.className = 'overlay-project-title-dropdown popup-editor';
@@ -2695,11 +2762,29 @@
       dropdownContainer.style.zIndex = '1000';
       dropdownContainer.style.display = 'block';
       
+      console.log('[DEBUG] Dropdown displayed', {
+        display: dropdownContainer.style.display,
+        position: dropdownContainer.style.position,
+        top: dropdownContainer.style.top,
+        left: dropdownContainer.style.left,
+        width: dropdownContainer.style.width,
+        zIndex: dropdownContainer.style.zIndex
+      });
+      
       // 最初の項目を選択状態にする
       const firstOption = dropdownContainer.querySelector('.popup-editor-option');
       if (firstOption) {
         firstOption.classList.add('selected');
       }
+      
+      // ドロップダウンが非表示になっていないか監視
+      setTimeout(() => {
+        const currentDisplay = dropdownContainer.style.display;
+        console.log('[DEBUG] Dropdown display after 100ms:', currentDisplay);
+        if (currentDisplay === 'none') {
+          console.log('[DEBUG] WARNING: Dropdown was hidden after display!');
+        }
+      }, 100);
     }
     
     function performOverlayProjectTitleSearchUpdate(query, workId, currentProjectId, dropdownContainer, projectTitleInput) {
