@@ -1071,7 +1071,9 @@
       position: relative;
       padding: 8px 16px;
       border-radius: 4px;
-      margin-right: -8px; /* ブレード間のスペースをなくす */
+      margin-right: -4px; /* ブレード間のスペースをなくす */
+      min-height: 40px; /* 縦の幅を統一 */
+      box-sizing: border-box;
     }
 
     /* 依頼: 右側のみ切り欠き、右側に8pxのパディング */
@@ -1144,6 +1146,11 @@
 
     #workflow-status-delivery.overdue .workflow-status-icon-wrapper {
       opacity: 1;
+      background-color: #FFFFFF !important;
+    }
+
+    #workflow-status-delivery.overdue .workflow-status-icon {
+      color: var(--blade-color, #F44336);
     }
 
     /* ブレード型の背景図形 - 依頼（右側のみ切り欠き） */
@@ -1222,6 +1229,8 @@
       cursor: pointer;
       position: relative;
       z-index: 1;
+      min-height: 24px; /* 縦の幅を統一 */
+      box-sizing: border-box;
     }
 
     .workflow-status-label {
@@ -1230,6 +1239,17 @@
 
     .workflow-status-date {
       color: var(--md-sys-color-on-surface-variant);
+    }
+
+    .workflow-status-date.editable-datetime {
+      cursor: pointer;
+      transition: background-color 0.2s;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+
+    .workflow-status-date.editable-datetime:hover {
+      background-color: var(--md-sys-color-surface-variant);
     }
 
     .workflow-status-icon {
