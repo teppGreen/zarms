@@ -17,7 +17,7 @@
     <div class="header-content">
       <h1 class="header-title" id="header-title-default">CTMS v3.0</h1>
       <div id="id-search-container" style="margin-left: 24px; display: flex; align-items: center;">
-        <input type="text" id="id-search-input" placeholder="ID検索 (例: P0001, W0001, T0001)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; width: 300px; text-transform: uppercase;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)">
+        <input type="text" id="id-search-input" placeholder="ID検索 (例: P0001, W0001, T0001, R0001)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; width: 300px; text-transform: uppercase;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)">
       </div>
     </div>
     <div class="new-button-container">
@@ -1734,23 +1734,28 @@
       const hh = dateObj.getHours().toString().padStart(2, '0');
       const min = dateObj.getMinutes().toString().padStart(2, '0');
       
-      // 既存のコンテンツを非表示
-      container.style.display = 'none';
-      
       // containerにposition: relativeを設定（まだ設定されていない場合）
       const originalPosition = container.style.position;
       if (!container.style.position || container.style.position === 'static') {
         container.style.position = 'relative';
       }
       
+      // 既存のテキストを非表示
+      if (textSpan) {
+        textSpan.style.display = 'none';
+      }
+      const toggleBtn = container.querySelector('.editable-toggle-btn');
+      if (toggleBtn) {
+        toggleBtn.style.display = 'none';
+      }
+      
       // カスタム日時入力フィールドを作成
       const editorDiv = document.createElement('div');
       editorDiv.className = 'datetime-custom-editor';
       editorDiv.style.position = 'absolute';
-      editorDiv.style.top = '100%';
+      editorDiv.style.top = '0';
       editorDiv.style.left = '0';
       editorDiv.style.zIndex = '10000';
-      editorDiv.style.marginTop = '4px';
       editorDiv.innerHTML = `
         <input type="text" class="datetime-segment" data-segment="yyyy" maxlength="4" value="${yyyy}" placeholder="yyyy" />
         <span class="datetime-separator">/</span>
@@ -1763,14 +1768,8 @@
         <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="${min}" placeholder="mm" />
       `;
       
-      // containerの親要素に追加
-      const parentElement = container.parentElement;
-      if (parentElement) {
-        parentElement.appendChild(editorDiv);
-      } else {
-        // フォールバック: containerに直接追加
-        container.appendChild(editorDiv);
-      }
+      // container内に直接追加
+      container.appendChild(editorDiv);
       
       const inputs = editorDiv.querySelectorAll('.datetime-segment');
       
@@ -1894,8 +1893,18 @@
       
       const newValueAsISO = newDate.toISOString();
       
+      // テキストとボタンを再表示（先に表示を戻す）
+      const textSpan = container.querySelector('.editable-text');
+      if (textSpan) {
+        textSpan.style.display = '';
+      }
+      const toggleBtn = container.querySelector('.editable-toggle-btn');
+      if (toggleBtn) {
+        toggleBtn.style.display = '';
+      }
+      
+      // ピッカーを削除
       editorDiv.remove();
-      container.style.display = 'inline-flex';
       
       if (newValueAsISO !== originalValue) {
         showLoading();
@@ -1925,7 +1934,16 @@
     
     function cancelWorkDetailDateTime(editorDiv, container) {
       editorDiv.remove();
-      container.style.display = 'inline-flex';
+      
+      // テキストとボタンを再表示
+      const textSpan = container.querySelector('.editable-text');
+      if (textSpan) {
+        textSpan.style.display = '';
+      }
+      const toggleBtn = container.querySelector('.editable-toggle-btn');
+      if (toggleBtn) {
+        toggleBtn.style.display = '';
+      }
     }
 
     function renderWorkTasks(tasks) {
@@ -4035,8 +4053,8 @@
     // ============================================
     function handleIdSearchInput(event) {
       const input = event.target;
-      // 半角英数に変換し、大文字にする
-      let value = input.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+      // 半角英数とハイフンに変換し、大文字にする
+      let value = input.value.replace(/[^A-Za-z0-9-]/g, '').toUpperCase();
       input.value = value;
     }
 
@@ -4048,7 +4066,7 @@
         if (!searchValue) return;
         
         // 複数のIDが連なっている場合、最も小さな単位のIDのみを取り出す
-        // project_id > work_id > task_id の順で優先度が低い
+        // project_id > work_id > review_id > task_id の順で優先度が低い
         let targetId = null;
         let targetType = null;
         
@@ -4057,6 +4075,13 @@
         if (taskIdMatch) {
           targetId = taskIdMatch[0];
           targetType = 'task';
+        }
+        
+        // review_idを検索 (R + 4桁の数字)
+        const reviewIdMatch = searchValue.match(/R\d{4}/);
+        if (reviewIdMatch && !targetId) {
+          targetId = reviewIdMatch[0];
+          targetType = 'review';
         }
         
         // work_idを検索 (W + 4桁の数字)
@@ -4074,7 +4099,7 @@
         }
         
         if (!targetId) {
-          alert('有効なIDが見つかりません。P0001, W0001, T0001 の形式で入力してください。');
+          alert('有効なIDが見つかりません。P0001, W0001, T0001, R0001 の形式で入力してください。');
           return;
         }
         
@@ -4087,6 +4112,15 @@
               return;
             }
             openWorkDetailOverlay(task.work_id);
+          }).catch(handleError);
+        } else if (targetType === 'review') {
+          // review_idの場合は、reviewからwork_idを取得してwork詳細画面を開く
+          callGAS('getReviewRequestById', targetId).then(reviewRequest => {
+            if (!reviewRequest) {
+              alert('レビューリクエストが見つかりません');
+              return;
+            }
+            openWorkDetailOverlay(reviewRequest.work_id);
           }).catch(handleError);
         } else if (targetType === 'work') {
           // work_idの場合はwork詳細画面を開く
