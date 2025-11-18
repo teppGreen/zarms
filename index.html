@@ -783,14 +783,23 @@
       event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
       closeAllPopups();
       
-      // 表示中のタブを判定
-      if (document.getElementById('tab-works').style.display === 'block') {
+      // アクティブなナビゲーションアイテムを確認してタブを判定
+      const activeNavItem = document.querySelector('.nav-item.active');
+      if (!activeNavItem) {
+        // アクティブなタブが見つからない場合はドロップダウンを表示
+        toggleNewButtonDropdown(event);
+        return;
+      }
+      
+      const navItemId = activeNavItem.id;
+      
+      if (navItemId === 'works-nav') {
         openNewWorkModal();
-      } else if (document.getElementById('tab-projects').style.display === 'block') {
+      } else if (navItemId === 'projects-nav') {
         openNewWorkModal();
-      } else if (document.getElementById('tab-members').style.display === 'block') {
+      } else if (navItemId === 'members-nav') {
         openNewMemberModal();
-      } else if (document.getElementById('tab-knowledge').style.display === 'block') {
+      } else if (navItemId === 'knowledge-nav') {
         openNewKnowledgeModal();
       } else {
         // それ以外のタブ（ホーム、統計など）ではドロップダウンを表示
