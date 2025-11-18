@@ -1863,8 +1863,17 @@
             searchProjectsForOverlayProjectTitle(e.target.value, work.work_id, work.project_id);
           };
           
+          // onblurのsetTimeoutをキャンセルするための変数
+          let blurTimeoutId = null;
+          
           // フォーカスが当たったときにドロップダウンを表示
           projectTitleInput.onfocus = (e) => {
+            // 既存のblurタイマーをキャンセル
+            if (blurTimeoutId) {
+              clearTimeout(blurTimeoutId);
+              blurTimeoutId = null;
+            }
+            
             const currentValue = e.target.value.trim();
             if (currentValue) {
               searchProjectsForOverlayProjectTitle(currentValue, work.work_id, work.project_id);
@@ -1874,15 +1883,27 @@
           // フォーカスが外れたときに元の値に戻す
           projectTitleInput.onblur = (e) => {
             // 少し遅延させて、ドロップダウンのクリックイベントが先に処理されるようにする
-            setTimeout(() => {
+            blurTimeoutId = setTimeout(() => {
+              // フォーカスが再度当たっている場合は処理をスキップ
+              if (document.activeElement === projectTitleInput) {
+                blurTimeoutId = null;
+                return;
+              }
+              
               const dropdownContainer = overlayProjectTitle.querySelector('.overlay-project-title-dropdown');
-              // ドロップダウンが選択されていない場合、元の値に戻す
-              if (projectTitleInput.dataset.dropdownSelected !== 'true' && (!dropdownContainer || dropdownContainer.style.display === 'none')) {
+              const currentValue = projectTitleInput.value.trim();
+              
+              // ドロップダウンが選択されていない場合、かつ値が変更されている場合は元の値に戻す
+              if (projectTitleInput.dataset.dropdownSelected !== 'true' && 
+                  (!dropdownContainer || dropdownContainer.style.display === 'none') &&
+                  currentValue !== originalProjectTitle) {
+                // 値が変更されているが、ドロップダウンで選択されなかった場合は元の値に戻す
                 projectTitleInput.value = originalProjectTitle;
                 projectTitleInput.dataset.projectId = originalProjectId;
               }
               // フラグをリセット
               projectTitleInput.dataset.dropdownSelected = 'false';
+              blurTimeoutId = null;
             }, 200);
           };
           
