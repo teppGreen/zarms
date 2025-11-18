@@ -1080,7 +1080,7 @@
               }
             };
             input.onkeydown = (e) => {
-              if (e.key === 'Enter' && !e.isComposing) {
+              if (e.key === 'Enter') {
                 input.blur();
               } else if (e.key === 'Escape') {
                 workTitleHeader.textContent = originalValue;
@@ -1692,7 +1692,7 @@
         });
         
         input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && !e.isComposing) {
+          if (e.key === 'Enter') {
             e.preventDefault();
             saveWorkDetailDateTime(editorDiv, container, workId, field, originalValue, inputs);
           } else if (e.key === 'Escape') {
@@ -1781,7 +1781,7 @@
         });
         
         input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && !e.isComposing) {
+          if (e.key === 'Enter') {
             e.preventDefault();
             saveWorkDetailDateTimeHeader(editorDiv, container, workId, field, originalValue, inputs);
           } else if (e.key === 'Escape') {
@@ -2692,19 +2692,6 @@
       const workTypes = configData['WORK_TYPE'] || [];
       const workTypeOptions = workTypes.map(wt => `<option value="${wt.config_key}">${wt.config_value}</option>`).join('');
       formContainer.innerHTML = `<form id="new-work-form-element" onsubmit="submitNewWork(event)"> <div class="form-group"> <label class="form-label">案件タイトル</label> <div id="project-combobox" class="combobox-container"> <input type="text" name="project_title" class="input-field" required placeholder="既存の案件タイトルで検索、または新規作成" oninput="searchProjects(this.value)" autocomplete="off"> <input type="hidden" name="project_id"> <div id="project-suggestions" class="combobox-suggestions"></div> </div> </div> <div class="form-group"> <label class="form-label">制作タイトル</label> <input type="text" name="work_title" class="input-field" required> </div> <div class="form-group"> <label class="form-label">制作種別</label> <select name="work_type_key" class="input-field" onchange="updateRegulationPreset(this.value)"> <option value="">選択してください</option> ${workTypeOptions} </select> </div> <div class="form-group"> <label class="form-label">納品期限</label> <input type="datetime-local" name="due_datetime" class="input-field"> </div> <div class="form-group"> <label class="form-label">制作物の概要</label> <textarea name="work_detail_content" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">デザイン要項</label> <textarea name="work_detail_design" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">入稿規定</label> <textarea name="work_detail_regulation" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">依頼者からの備考</label> <textarea name="work_detail_note" class="input-field" rows="4"></textarea> </div> <div class="modal-footer"> <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-work')">キャンセル</button> <button type="submit" class="btn btn-primary">作成</button> </div> </form>`;
-      
-      // IME変換確定時のEnterキーを無視する処理を追加
-      const form = document.getElementById('new-work-form-element');
-      if (form) {
-        const textInputs = form.querySelectorAll('input[type="text"], textarea');
-        textInputs.forEach(input => {
-          input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.isComposing) {
-              e.stopPropagation();
-            }
-          });
-        });
-      }
     }
 
     function updateRegulationPreset(workTypeKey) {
@@ -2779,32 +2766,12 @@
     }
 
     function openNewProjectModal() {
-      const form = document.getElementById('new-project-form');
-      form.reset();
-      // IME変換確定時のEnterキーを無視する処理を追加
-      const textInputs = form.querySelectorAll('input[type="text"], textarea');
-      textInputs.forEach(input => {
-        input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && e.isComposing) {
-            e.stopPropagation();
-          }
-        });
-      });
+      document.getElementById('new-project-form').reset();
       openModal('modal-new-project');
     }
     function openNewTaskModal(workId) {
       const form = document.getElementById('new-task-form');
       form.elements.work_id.value = workId;
-      
-      // IME変換確定時のEnterキーを無視する処理を追加
-      const textInputs = form.querySelectorAll('input[type="text"], textarea');
-      textInputs.forEach(input => {
-        input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && e.isComposing) {
-            e.stopPropagation();
-          }
-        });
-      });
       
       // メンバー選択肢を設定
       const assignToSelect = form.elements.assign_to;
@@ -2858,17 +2825,6 @@
       const form = document.getElementById('new-review-request-form');
       form.reset();
       form.elements.work_id.value = workId;
-      
-      // IME変換確定時のEnterキーを無視する処理を追加
-      const textInputs = form.querySelectorAll('input[type="text"], textarea');
-      textInputs.forEach(input => {
-        input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && e.isComposing) {
-            e.stopPropagation();
-          }
-        });
-      });
-      
       updateReviewRequestFilesList();
       openModal('modal-new-review-request');
     }
@@ -3584,7 +3540,7 @@
       };
       input.addEventListener('blur', onSave);
       input.addEventListener('keydown', e => {
-        if (e.key === 'Enter' && !e.isComposing) input.blur();
+        if (e.key === 'Enter') input.blur();
         if (e.key === 'Escape') {
           cell.innerHTML = escapeHtml(originalValue);
           cell.classList.remove('editing');
@@ -3744,7 +3700,7 @@
         
         // キーボード操作
         input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && !e.isComposing) {
+          if (e.key === 'Enter') {
             e.preventDefault();
             saveDateTimePicker(cell, tableName, id, field, originalValue, inputs);
           } else if (e.key === 'Escape') {
@@ -3934,7 +3890,7 @@
         });
         
         input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && !e.isComposing) {
+          if (e.key === 'Enter') {
             e.preventDefault();
             saveTaskDateTimePicker(cell, taskId, field, originalValue, inputs);
           } else if (e.key === 'Escape') {
@@ -4032,7 +3988,7 @@
     }
 
     function handleIdSearchKeydown(event) {
-      if (event.key === 'Enter' && !event.isComposing) {
+      if (event.key === 'Enter') {
         event.preventDefault();
         const input = event.target;
         const searchValue = input.value.trim();
