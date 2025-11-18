@@ -4464,49 +4464,35 @@
       
       // 検索実行
       if (targetType === 'task') {
-        // ローディングアニメーションを表示
-        showIdSearchLoading();
         // task_idの場合は、taskからwork_idを取得してwork詳細画面を開く
         callGAS('getTaskById', targetId).then(task => {
           if (!task) {
             alert('タスクが見つかりません');
-            hideIdSearchLoading();
             return;
           }
           openWorkDetailOverlay(task.work_id);
-          hideIdSearchLoading();
-        }).catch(error => {
-          handleError(error);
-          hideIdSearchLoading();
-        });
+        }).catch(handleError);
       } else if (targetType === 'review') {
-        // ローディングアニメーションを表示
-        showIdSearchLoading();
         // review_idの場合は、reviewからwork_idを取得してwork詳細画面を開く
+        // new-buttonのスピナーをすぐに表示
+        showLoading();
         callGAS('getReviewRequestById', targetId).then(reviewRequest => {
           if (!reviewRequest) {
             alert('レビューリクエストが見つかりません');
-            hideIdSearchLoading();
+            hideLoading();
             return;
           }
           openWorkDetailOverlay(reviewRequest.work_id);
-          hideIdSearchLoading();
         }).catch(error => {
           handleError(error);
-          hideIdSearchLoading();
+          hideLoading();
         });
       } else if (targetType === 'work') {
-        // ローディングアニメーションを表示
-        showIdSearchLoading();
         // work_idの場合はwork詳細画面を開く
         openWorkDetailOverlay(targetId);
-        hideIdSearchLoading();
       } else if (targetType === 'project') {
-        // ローディングアニメーションを表示
-        showIdSearchLoading();
         // project_idの場合はproject詳細画面を開く
         openProjectDetailOverlay(targetId);
-        hideIdSearchLoading();
       }
     }
     
@@ -4570,49 +4556,35 @@
         
         // 検索実行
         if (targetType === 'task') {
-          // ローディングアニメーションを表示
-          showIdSearchLoading();
           // task_idの場合は、taskからwork_idを取得してwork詳細画面を開く
           callGAS('getTaskById', targetId).then(task => {
             if (!task) {
               alert('タスクが見つかりません');
-              hideIdSearchLoading();
               return;
             }
             openWorkDetailOverlay(task.work_id);
-            hideIdSearchLoading();
-          }).catch(error => {
-            handleError(error);
-            hideIdSearchLoading();
-          });
+          }).catch(handleError);
         } else if (targetType === 'review') {
-          // ローディングアニメーションを表示
-          showIdSearchLoading();
           // review_idの場合は、reviewからwork_idを取得してwork詳細画面を開く
+          // new-buttonのスピナーをすぐに表示
+          showLoading();
           callGAS('getReviewRequestById', targetId).then(reviewRequest => {
             if (!reviewRequest) {
               alert('レビューリクエストが見つかりません');
-              hideIdSearchLoading();
+              hideLoading();
               return;
             }
             openWorkDetailOverlay(reviewRequest.work_id);
-            hideIdSearchLoading();
           }).catch(error => {
             handleError(error);
-            hideIdSearchLoading();
+            hideLoading();
           });
         } else if (targetType === 'work') {
-          // ローディングアニメーションを表示
-          showIdSearchLoading();
           // work_idの場合はwork詳細画面を開く
           openWorkDetailOverlay(targetId);
-          hideIdSearchLoading();
         } else if (targetType === 'project') {
-          // ローディングアニメーションを表示
-          showIdSearchLoading();
           // project_idの場合はproject詳細画面を開く
           openProjectDetailOverlay(targetId);
-          hideIdSearchLoading();
         }
       }
     }
