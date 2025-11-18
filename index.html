@@ -652,14 +652,18 @@
       const newButton = document.getElementById('new-button');
       const newButtonLoading = document.getElementById('new-button-loading');
       if (newButton) {
-        newButton.style.display = 'none';
+        newButton.classList.add('hidden');
       }
       if (newButtonLoading) {
         const spinner = newButtonLoading.querySelector('.loading-spinner');
         const checkmark = newButtonLoading.querySelector('.loading-checkmark');
-        newButtonLoading.style.display = 'flex';
-        if (spinner) spinner.style.display = 'flex';
-        if (checkmark) checkmark.style.display = 'none';
+        newButtonLoading.classList.remove('hidden');
+        if (spinner) {
+          spinner.classList.remove('hidden');
+        }
+        if (checkmark) {
+          checkmark.classList.add('hidden');
+        }
       }
     }
 
@@ -672,15 +676,15 @@
         const checkmark = newButtonLoading.querySelector('.loading-checkmark');
         
         // スピナーを非表示にしてチェックマークを表示
-        if (spinner) spinner.style.display = 'none';
-        if (checkmark) checkmark.style.display = 'flex';
+        if (spinner) spinner.classList.add('hidden');
+        if (checkmark) checkmark.classList.remove('hidden');
         
         // チェックマークを表示してからボタンを表示
         if (loadingTimeout) clearTimeout(loadingTimeout);
         loadingTimeout = setTimeout(() => {
-          newButtonLoading.style.display = 'none';
+          newButtonLoading.classList.add('hidden');
           if (newButton) {
-            newButton.style.display = 'flex';
+            newButton.classList.remove('hidden');
             // バウンドアニメーションを追加
             newButton.classList.add('animate-bounce-in');
             // アニメーション終了後にクラスを削除（次回のアニメーションのため）
@@ -692,7 +696,7 @@
       } else {
         // ローディング要素がない場合は直接ボタンを表示
         if (newButton) {
-          newButton.style.display = 'flex';
+          newButton.classList.remove('hidden');
           // バウンドアニメーションを追加
           newButton.classList.add('animate-bounce-in');
           // アニメーション終了後にクラスを削除（次回のアニメーションのため）
