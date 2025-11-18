@@ -845,6 +845,8 @@
           clearInterval(retryProgressInterval);
           retryProgressInterval = null;
         }
+
+        console.log('lastCallGASInvocation:', lastCallGASInvocation);
         
         // 直前の操作を再試行
         const { functionName, args } = lastCallGASInvocation;
@@ -881,7 +883,7 @@
       retryPopup.className = 'retry-popup';
       retryPopup.innerHTML = `
         <div class="retry-popup-content">
-          <div class="retry-popup-text">ネットワークエラーが発生したため再試行します。少々お待ちください</div>
+          <div class="retry-popup-text">ネットワークエラーが発生したため再試行します<br>少々お待ちください</div>
           <div class="retry-progress-container">
             <div class="retry-progress-bar">
               <div class="retry-progress-fill" style="width: 0%"></div>
