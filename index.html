@@ -1737,11 +1737,20 @@
       // 既存のコンテンツを非表示
       container.style.display = 'none';
       
+      // containerにposition: relativeを設定（まだ設定されていない場合）
+      const originalPosition = container.style.position;
+      if (!container.style.position || container.style.position === 'static') {
+        container.style.position = 'relative';
+      }
+      
       // カスタム日時入力フィールドを作成
       const editorDiv = document.createElement('div');
       editorDiv.className = 'datetime-custom-editor';
       editorDiv.style.position = 'absolute';
+      editorDiv.style.top = '100%';
+      editorDiv.style.left = '0';
       editorDiv.style.zIndex = '10000';
+      editorDiv.style.marginTop = '4px';
       editorDiv.innerHTML = `
         <input type="text" class="datetime-segment" data-segment="yyyy" maxlength="4" value="${yyyy}" placeholder="yyyy" />
         <span class="datetime-separator">/</span>
@@ -1754,11 +1763,14 @@
         <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="${min}" placeholder="mm" />
       `;
       
-      const rect = container.getBoundingClientRect();
-      editorDiv.style.left = `${rect.left + window.scrollX}px`;
-      editorDiv.style.top = `${rect.bottom + window.scrollY}px`;
-      editorDiv.style.zIndex = '99999';
-      document.body.appendChild(editorDiv);
+      // containerの親要素に追加
+      const parentElement = container.parentElement;
+      if (parentElement) {
+        parentElement.appendChild(editorDiv);
+      } else {
+        // フォールバック: containerに直接追加
+        container.appendChild(editorDiv);
+      }
       
       const inputs = editorDiv.querySelectorAll('.datetime-segment');
       
