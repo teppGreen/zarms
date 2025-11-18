@@ -1071,24 +1071,61 @@
       position: relative;
       padding: 8px 16px;
       border-radius: 4px;
+      margin-right: -8px; /* ブレード間のスペースをなくす */
     }
 
     /* 依頼: 右側のみ切り欠き、右側に8pxのパディング */
     #workflow-status-request {
-      padding-right: 24px; /* 16px + 8px */
+      padding-right: 24px; /* 8px(パディング) + 16px(基本パディング) */
     }
 
     /* 制作・承認: 左右両方に切り欠き、左側に切り欠き分のパディングを追加、左右に8pxのパディング */
     #workflow-status-production,
     #workflow-status-approval {
-      padding-left: 40px; /* 16px(切り欠き) + 8px(パディング) + 16px(基本パディング) */
-      padding-right: 24px; /* 16px + 8px */
+      padding-left: 24px; /* 8px(パディング) + 16px(基本パディング) */
+      padding-right: 24px; /* 8px(パディング) + 16px(基本パディング) */
     }
 
     /* 納品: 左側のみ切り欠き、左側に切り欠き分のパディングを追加 */
     #workflow-status-delivery {
-      padding-left: 40px; /* 16px(切り欠き) + 8px(パディング) + 16px(基本パディング) */
+      padding-left: 24px; /* 8px(パディング) + 16px(基本パディング) */
       padding-right: 16px;
+    }
+
+    /* 残り日数表示: 切り欠きなし */
+    #workflow-status-days-remaining {
+      padding-left: 16px;
+      padding-right: 16px;
+    }
+
+    #workflow-status-days-remaining::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 0;
+      border-radius: 4px;
+      opacity: 0.15;
+      background-color: var(--blade-color, #E1E2EC);
+    }
+
+    #workflow-status-days-remaining.overdue {
+      color: #FFFFFF;
+    }
+
+    #workflow-status-days-remaining.overdue .workflow-status-days-text {
+      color: #FFFFFF;
+    }
+
+    #workflow-status-days-remaining.overdue::before {
+      opacity: 1;
+    }
+
+    .workflow-status-days-text {
+      position: relative;
+      z-index: 1;
     }
 
     /* 納品が期限超過の場合のスタイル */
@@ -1118,7 +1155,7 @@
       right: 0;
       bottom: 0;
       z-index: 0;
-      clip-path: polygon(0 0, calc(100% - 16px) 0, calc(100% - 8px) 50%, calc(100% - 16px) 100%, 0 100%);
+      clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%);
       border-radius: 4px;
       opacity: 0.15;
       background-color: var(--blade-color, #E1E2EC);
@@ -1134,7 +1171,7 @@
       right: 0;
       bottom: 0;
       z-index: 0;
-      clip-path: polygon(16px 0, calc(100% - 16px) 0, calc(100% - 8px) 50%, calc(100% - 16px) 100%, 16px 100%, 24px 50%);
+      clip-path: polygon(8px 50%, 0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%);
       border-radius: 4px;
       opacity: 0.15;
       background-color: var(--blade-color, #E1E2EC);
@@ -1149,7 +1186,7 @@
       right: 0;
       bottom: 0;
       z-index: 0;
-      clip-path: polygon(16px 0, 100% 0, 100% 100%, 16px 100%, 24px 50%);
+      clip-path: polygon(8px 50%, 0 0, 100% 0, 100% 100%, 0 100%);
       border-radius: 4px;
       opacity: 0.15;
       background-color: var(--blade-color, #E1E2EC);
