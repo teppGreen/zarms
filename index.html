@@ -5597,27 +5597,48 @@
       }
       
       // work詳細画面が表示中の場合
-      if (currentWorkId && currentWork) {
-        const workDetailOverlay = document.getElementById('work-detail-overlay');
-        const isOverlayVisible = workDetailOverlay && workDetailOverlay.classList.contains('show');
-        const headerTitle = document.getElementById('header-title-work-detail-header');
-        const headerTitleText = headerTitle ? headerTitle.textContent : null;
-        
-        console.log('[DEBUG] updateIdSearchInput: checking work detail', {
-          isOverlayVisible: isOverlayVisible,
-          headerTitleText: headerTitleText,
-          shouldSetWorkId: isOverlayVisible && headerTitleText === 'CTMS v3.0'
-        });
-        
-        if (isOverlayVisible) {
-          if (headerTitle && headerTitle.textContent === 'CTMS v3.0') {
-            // 保持しているworkデータからIDを構築（APIリクエスト不要）
-            const workIdForSearch = `${currentWork.project_id || ''}-${currentWork.work_id || ''}`;
-            console.log('[DEBUG] updateIdSearchInput: setting workIdForSearch', workIdForSearch);
-            input.value = workIdForSearch;
-            input.removeAttribute('placeholder');
-            return;
+      // currentWorkIdやcurrentWorkがnullでも、オーバーレイが表示されていればIDを設定
+      const workDetailOverlay = document.getElementById('work-detail-overlay');
+      const isOverlayVisible = workDetailOverlay && workDetailOverlay.classList.contains('show');
+      const headerTitle = document.getElementById('header-title-work-detail-header');
+      const headerTitleText = headerTitle ? headerTitle.textContent : null;
+      
+      console.log('[DEBUG] updateIdSearchInput: checking work detail', {
+        isOverlayVisible: isOverlayVisible,
+        headerTitleText: headerTitleText,
+        currentWorkId: currentWorkId,
+        hasCurrentWork: !!currentWork,
+        shouldSetWorkId: isOverlayVisible && headerTitleText === 'CTMS v3.0'
+      });
+      
+      if (isOverlayVisible && headerTitle && headerTitle.textContent === 'CTMS v3.0') {
+        // currentWorkが存在する場合はそれを使用、存在しない場合はwork-detail-overlayから取得を試みる
+        if (currentWorkId && currentWork) {
+          // 保持しているworkデータからIDを構築（APIリクエスト不要）
+          const workIdForSearch = `${currentWork.project_id || ''}-${currentWork.work_id || ''}`;
+          console.log('[DEBUG] updateIdSearchInput: setting workIdForSearch from currentWork', workIdForSearch);
+          input.value = workIdForSearch;
+          input.removeAttribute('placeholder');
+          return;
+        } else if (currentWorkId) {
+          // currentWorkIdだけが存在する場合（currentWorkがnullの場合）
+          // work-detail-overlay内のinputからproject_idを取得を試みる
+          const overlayProjectTitle = document.getElementById('overlay-project-title');
+          if (overlayProjectTitle) {
+            const projectTitleInput = overlayProjectTitle.querySelector('input');
+            if (projectTitleInput && projectTitleInput.dataset.projectId) {
+              const workIdForSearch = `${projectTitleInput.dataset.projectId}-${currentWorkId}`;
+              console.log('[DEBUG] updateIdSearchInput: setting workIdForSearch from overlay input', workIdForSearch);
+              input.value = workIdForSearch;
+              input.removeAttribute('placeholder');
+              return;
+            }
           }
+          // フォールバック: workIdだけを使用
+          console.log('[DEBUG] updateIdSearchInput: setting workId only (fallback)', currentWorkId);
+          input.value = currentWorkId;
+          input.removeAttribute('placeholder');
+          return;
         }
       }
       
