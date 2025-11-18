@@ -1068,6 +1068,68 @@
       align-items: center;
       gap: 8px;
       font-size: 14px;
+      position: relative;
+      padding: 8px 16px;
+      border-radius: 4px;
+    }
+
+    /* ブレード型の背景図形 */
+    .workflow-status-item::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 0;
+      clip-path: polygon(0 0, calc(100% - 16px) 0, calc(100% - 8px) 50%, calc(100% - 16px) 100%, 0 100%);
+      border-radius: 4px;
+      opacity: 0.15;
+    }
+
+    /* 完了状態（依頼・制作）: 緑のブレード */
+    #workflow-status-request::before,
+    #workflow-status-production::before {
+      background-color: #4CAF50;
+    }
+
+    /* 進行中状態（承認）: オレンジのブレード */
+    #workflow-status-approval::before {
+      background-color: #FF9800;
+      opacity: 0.2;
+    }
+
+    /* 未完了状態（納品）: 赤のブレード */
+    #workflow-status-delivery::before {
+      background-color: #F44336;
+      opacity: 0.15;
+    }
+
+    /* 現在のステータスをハイライト */
+    #workflow-status-request.current-status::before {
+      background-color: #4CAF50;
+      opacity: 0.25;
+    }
+
+    #workflow-status-production.current-status::before {
+      background-color: #4CAF50;
+      opacity: 0.25;
+    }
+
+    #workflow-status-approval.current-status::before {
+      background-color: #FF9800;
+      opacity: 0.3;
+    }
+
+    #workflow-status-delivery.current-status::before {
+      background-color: #FFC107;
+      opacity: 0.3;
+    }
+
+    /* テキストとアイコンを前面に */
+    .workflow-status-item > * {
+      position: relative;
+      z-index: 1;
     }
 
     .workflow-status-dropdown {
@@ -1077,6 +1139,8 @@
       background-color: var(--md-sys-color-surface);
       font-size: 14px;
       cursor: pointer;
+      position: relative;
+      z-index: 1;
     }
 
     .workflow-status-label {
@@ -1096,8 +1160,28 @@
       color: #4CAF50;
     }
 
-    #workflow-status-approval .workflow-status-icon,
+    #workflow-status-approval .workflow-status-icon {
+      color: #FF9800;
+    }
+
     #workflow-status-delivery .workflow-status-icon {
+      color: #F44336;
+    }
+
+    /* 現在のステータスのアイコン色 */
+    #workflow-status-request.current-status .workflow-status-icon {
+      color: #4CAF50;
+    }
+
+    #workflow-status-production.current-status .workflow-status-icon {
+      color: #4CAF50;
+    }
+
+    #workflow-status-approval.current-status .workflow-status-icon {
+      color: #FF9800;
+    }
+
+    #workflow-status-delivery.current-status .workflow-status-icon {
       color: #FFC107;
     }
 
