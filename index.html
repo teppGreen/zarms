@@ -15,9 +15,11 @@
 <body>
   <div class="app-header">
     <div class="header-content">
+      <button id="header-close-btn" class="header-close-btn" onclick="closeWorkDetailOverlay()" style="display: none;">✕</button>
       <h1 class="header-title" id="header-title-default">CTMS v3.0</h1>
-      <div id="id-search-container" style="margin-left: 24px; display: flex; align-items: center;">
-        <input type="text" id="id-search-input" placeholder="ID検索 (例: P0001, W0001, T0001, R0001)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; width: 300px; text-transform: uppercase;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)">
+      <h1 class="header-title" id="header-title-work-detail-header" style="display: none;"></h1>
+      <div id="id-search-container" style="margin-left: auto; display: flex; align-items: center;">
+        <input type="text" id="id-search-input" placeholder="(例:P0001-W0001-T0001)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; width: 300px; text-transform: uppercase;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)">
       </div>
     </div>
     <div class="new-button-container">
@@ -64,6 +66,34 @@
         <span>統計</span>
       </div>
     </nav>
+    <div id="sidebar-project-detail" class="sidebar-project-detail" style="display: none;">
+      <div class="project-detail-field">
+        <label>案件タイトル</label>
+        <div id="sidebar-project-title" class="project-detail-value"></div>
+      </div>
+      <div class="project-detail-field">
+        <label>制作タイトル</label>
+        <div id="sidebar-work-title" class="project-detail-value"></div>
+      </div>
+      <div class="project-detail-field">
+        <label>制作物種別</label>
+        <div id="sidebar-work-type" class="project-detail-value"></div>
+      </div>
+      <div class="project-detail-field">
+        <label>依頼受付優先度</label>
+        <div id="sidebar-priority" class="project-detail-value"></div>
+      </div>
+      <div class="project-detail-separator"></div>
+      <div class="project-detail-field">
+        <label>依頼者</label>
+        <div id="sidebar-client" class="project-detail-value"></div>
+      </div>
+      <div class="project-detail-field">
+        <label>担当者</label>
+        <button id="sidebar-add-assignee-btn" class="project-detail-add-btn">+追加</button>
+        <div id="sidebar-assignees" class="project-detail-assignees"></div>
+      </div>
+    </div>
   </div>
 
   <div class="main-content">
@@ -241,73 +271,53 @@
 
   <div id="work-detail-overlay" class="overlay">
     <div class="overlay-content">
-      <div class="overlay-header-info" style="display: flex; align-items: center; gap: 16px; width: 100%;">
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
-          <h1 class="header-title" id="header-title-work-detail" style="display: none;"></h1>
-          <div id="work-detail-header-info" style="display: none; flex-direction: column; gap: 8px; font-size: 14px;">
-            <div id="work-detail-header-row1" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <strong>案件:</strong>
-                <span id="work-detail-project-title-header"></span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <strong>制作:</strong>
-                <span id="work-detail-work-title-header"></span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <strong>担当者:</strong>
-                <span id="work-detail-assignees-header-info" style="display: inline-flex; align-items: center;"></span>
-              </div>
-            </div>
-            <div id="work-detail-header-row2" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-              <div class="work-detail-status-container" style="display: flex; align-items: center; gap: 8px;">
-                <strong>ステータス:</strong>
-                <div class="editable-container" id="work-detail-status-editable-header" style="display: inline-flex; min-width: 120px;">
-                  <span class="editable-text" id="work-detail-status-text-header"></span>
-                  <span class="editable-toggle-btn">✎</span>
-                </div>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <strong>作成日:</strong>
-                <span id="work-detail-created-at-header"></span>
-              </div>
-              <div class="work-detail-due-container" style="display: flex; align-items: center; gap: 8px;">
-                <strong>納品期限:</strong>
-                <div class="editable-container datetime-editable" id="work-detail-due-editable-header" style="display: inline-flex; min-width: 180px;">
-                  <span class="editable-text" id="work-detail-due-text-header"></span>
-                  <span class="editable-toggle-btn">✎</span>
-                </div>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <strong>残り日数:</strong>
-                <span id="work-detail-days-remaining-header"></span>
-              </div>
-            </div>
-          </div>
+      <div class="workflow-status-bar" id="workflow-status-bar" style="display: none;">
+        <div class="workflow-status-item">
+          <select id="workflow-status-dropdown" class="workflow-status-dropdown">
+            <option value="承認中">承認中</option>
+          </select>
         </div>
-        <button id="work-detail-url-copy-button" class="url-copy-button-header" style="display: none; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--md-sys-color-on-surface); padding: 0 16px;" onclick="copyWorkDetailUrl()">🔗</button>
-        <button class="close-btn" onclick="closeWorkDetailOverlay()">&times;</button>
+        <div class="workflow-status-item" id="workflow-status-request">
+          <span class="workflow-status-label">依頼:</span>
+          <span class="workflow-status-date" id="workflow-date-request"></span>
+          <span class="workflow-status-icon">✓</span>
+        </div>
+        <div class="workflow-status-item" id="workflow-status-production">
+          <span class="workflow-status-label">制作:</span>
+          <span class="workflow-status-date" id="workflow-date-production"></span>
+          <span class="workflow-status-icon">✓</span>
+        </div>
+        <div class="workflow-status-item" id="workflow-status-approval">
+          <span class="workflow-status-label">承認:</span>
+          <span class="workflow-status-date" id="workflow-date-approval"></span>
+          <span class="workflow-status-icon">○</span>
+        </div>
+        <div class="workflow-status-item" id="workflow-status-delivery">
+          <span class="workflow-status-label">納品:</span>
+          <span class="workflow-status-date" id="workflow-date-delivery"></span>
+          <span class="workflow-status-icon">○</span>
+        </div>
       </div>
       <div class="overlay-body">
-        <!-- 左1/3: ドキュメントの埋め込み -->
+        <!-- 左: ドキュメントの埋め込み -->
         <div class="overlay-main">
           <div id="work-detail-document-container" style="width: 100%; height: 100%;">
           </div>
         </div>
-        <!-- 中央1/3: タスク -->
-        <div class="overlay-center">
-          <div class="detail-section">
-            <h3>タスク</h3>
-            <div id="work-tasks-container"></div>
-            <button id="new-task-button" class="btn btn-sm">+ 新規</button>
-          </div>
-        </div>
-        <!-- 右1/3: レビュー依頼 -->
+        <!-- 右: タスクとレビューを縦並び -->
         <div class="overlay-side">
           <div class="detail-section">
-            <h3>レビュー依頼</h3>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <h3 style="margin: 0;">タスク</h3>
+              <button class="btn btn-sm" style="font-size: 12px;">▼フィルタ</button>
+            </div>
+            <div id="work-tasks-container"></div>
+            <button id="new-task-button" class="btn btn-sm">+追加</button>
+          </div>
+          <div class="detail-section">
+            <h3>レビュー</h3>
             <div id="work-review-requests-container"></div>
-            <button id="new-review-request-button" class="btn btn-sm">+ 新規</button>
+            <button id="new-review-request-button" class="btn btn-sm">+追加</button>
           </div>
         </div>
       </div>
@@ -979,190 +989,195 @@
     function openWorkDetailOverlay(workId) {
       showLoading();
       currentWorkId = workId;
-      const promises = [ callGAS('getWorkById', workId) ];
+      const promises = [ 
+        callGAS('getWorkById', workId),
+        callGAS('getWorkflowTimestamps', workId)
+      ];
       if (!membersData || membersData.length === 0) {
         promises.push(callGAS('getMembers'));
       } else {
         promises.push(Promise.resolve(membersData));
       }
-      Promise.all(promises).then(([work, members]) => {
+      Promise.all(promises).then(([work, timestamps, members]) => {
         if (!membersData || membersData.length === 0) {
           membersData = members;
         }
         
-        // ヘッダータイトルを変更
-        const headerTitleWorkDetail = document.getElementById('header-title-work-detail');
-        headerTitleWorkDetail.style.display = 'flex';
-        headerTitleWorkDetail.textContent = `${work.project_id || ''}-${work.work_id || ''}`;
+        // メインヘッダーを更新
+        const headerTitleDefault = document.getElementById('header-title-default');
+        const headerTitleWorkDetailHeader = document.getElementById('header-title-work-detail-header');
+        const headerCloseBtn = document.getElementById('header-close-btn');
+        const newButton = document.getElementById('new-button');
         
-        // header-contentエリアに情報を表示
-        const headerInfoDiv = document.getElementById('work-detail-header-info');
-        headerInfoDiv.style.display = 'flex';
+        if (headerTitleDefault) headerTitleDefault.style.display = 'none';
+        if (headerTitleWorkDetailHeader) {
+          headerTitleWorkDetailHeader.style.display = 'flex';
+          headerTitleWorkDetailHeader.textContent = `${work.project_id || ''}-${work.work_id || ''}`;
+        }
+        if (headerCloseBtn) headerCloseBtn.style.display = 'block';
+        if (newButton) newButton.style.display = 'none';
         
-        // 案件タイトルを編集可能なコンボボックスとして表示
-        const projectTitleHeader = document.getElementById('work-detail-project-title-header');
-        projectTitleHeader.innerHTML = '';
-        const projectTitleContainer = document.createElement('div');
-        projectTitleContainer.className = 'combobox-container';
-        projectTitleContainer.style.position = 'relative';
-        projectTitleContainer.style.display = 'inline-block';
-        const projectTitleInput = document.createElement('input');
-        projectTitleInput.type = 'text';
-        projectTitleInput.className = 'input-field';
-        projectTitleInput.style.width = '200px';
-        projectTitleInput.style.padding = '4px 8px';
-        projectTitleInput.style.fontSize = '14px';
-        projectTitleInput.value = work.project_title || '';
-        projectTitleInput.dataset.projectId = work.project_id || '';
-        projectTitleInput.oninput = (e) => searchProjectsForWorkDetail(e.target.value, work.work_id);
-        projectTitleInput.onblur = () => {
-          setTimeout(() => {
-            const suggestions = document.getElementById('work-detail-project-suggestions');
-            if (suggestions) {
-              suggestions.style.display = 'none';
-            }
-          }, 200);
-        };
-        const projectTitleSuggestions = document.createElement('div');
-        projectTitleSuggestions.className = 'combobox-suggestions';
-        projectTitleSuggestions.id = 'work-detail-project-suggestions';
-        projectTitleSuggestions.style.display = 'none';
-        projectTitleSuggestions.style.position = 'fixed';
-        projectTitleSuggestions.style.zIndex = '99999';
-        projectTitleContainer.appendChild(projectTitleInput);
-        projectTitleHeader.appendChild(projectTitleContainer);
-        // ドロップダウンはbody直下に追加
-        document.body.appendChild(projectTitleSuggestions);
+        // ワークフローステータスバーを表示
+        const workflowStatusBar = document.getElementById('workflow-status-bar');
+        if (workflowStatusBar && timestamps) {
+          workflowStatusBar.style.display = 'flex';
+          
+          // 日時をフォーマットする関数
+          const formatWorkflowDate = (dateStr) => {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            const days = ['日', '月', '火', '水', '木', '金', '土'];
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            const dayOfWeek = days[date.getDay()];
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${month}/${day}(${dayOfWeek}) ${hours}:${minutes}`;
+          };
+          
+          // 依頼
+          const requestDate = document.getElementById('workflow-date-request');
+          if (requestDate && timestamps.request) {
+            requestDate.textContent = formatWorkflowDate(timestamps.request);
+          }
+          
+          // 制作
+          const productionDate = document.getElementById('workflow-date-production');
+          if (productionDate && timestamps.production) {
+            productionDate.textContent = formatWorkflowDate(timestamps.production) + '~';
+          }
+          
+          // 承認
+          const approvalDate = document.getElementById('workflow-date-approval');
+          if (approvalDate && timestamps.approval) {
+            approvalDate.textContent = formatWorkflowDate(timestamps.approval) + '~';
+          }
+          
+          // 納品
+          const deliveryDate = document.getElementById('workflow-date-delivery');
+          if (deliveryDate && timestamps.delivery) {
+            deliveryDate.textContent = '~' + formatWorkflowDate(timestamps.delivery);
+          }
+        }
         
-        // 制作タイトルを編集可能に
-        const workTitleHeader = document.getElementById('work-detail-work-title-header');
-        workTitleHeader.innerHTML = '';
-        workTitleHeader.style.cursor = 'text';
-        workTitleHeader.style.padding = '4px 8px';
-        workTitleHeader.style.borderRadius = '4px';
-        workTitleHeader.style.minWidth = '150px';
-        workTitleHeader.style.display = 'inline-block';
-        const currentWorkTitle = work.work_title || '';
-        workTitleHeader.textContent = currentWorkTitle;
-        const workIdForTitle = work.work_id; // クロージャで保持
-        const setupWorkTitleEdit = () => {
-          workTitleHeader.onclick = () => {
-            const originalValue = workTitleHeader.textContent;
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = originalValue;
-            input.className = 'input-field';
-            input.style.width = '200px';
-            input.style.padding = '4px 8px';
-            input.style.fontSize = '14px';
-            workTitleHeader.innerHTML = '';
-            workTitleHeader.appendChild(input);
-            input.focus();
-            input.select();
-            input.onblur = () => {
-              const newValue = input.value.trim();
-              if (newValue && newValue !== originalValue) {
+        // 左サイドバーのプロジェクト詳細セクションを表示
+        const sidebarProjectDetail = document.getElementById('sidebar-project-detail');
+        if (sidebarProjectDetail) {
+          sidebarProjectDetail.style.display = 'block';
+          
+          // 案件タイトル（編集可能）
+          const sidebarProjectTitle = document.getElementById('sidebar-project-title');
+          if (sidebarProjectTitle) {
+            sidebarProjectTitle.innerHTML = '';
+            const projectTitleInput = document.createElement('input');
+            projectTitleInput.type = 'text';
+            projectTitleInput.className = 'input-field';
+            projectTitleInput.style.width = '100%';
+            projectTitleInput.value = work.project_title || '';
+            projectTitleInput.dataset.projectId = work.project_id || '';
+            projectTitleInput.oninput = (e) => searchProjectsForWorkDetail(e.target.value, work.work_id);
+            sidebarProjectTitle.appendChild(projectTitleInput);
+          }
+          
+          // 制作タイトル（編集可能）
+          const sidebarWorkTitle = document.getElementById('sidebar-work-title');
+          if (sidebarWorkTitle) {
+            sidebarWorkTitle.innerHTML = '';
+            const workTitleInput = document.createElement('input');
+            workTitleInput.type = 'text';
+            workTitleInput.className = 'input-field';
+            workTitleInput.style.width = '100%';
+            workTitleInput.value = work.work_title || '';
+            workTitleInput.onblur = () => {
+              const newValue = workTitleInput.value.trim();
+              if (newValue && newValue !== work.work_title) {
                 showLoading();
-                callGAS('updateSingleField', 'works', workIdForTitle, 'work_title', newValue)
+                callGAS('updateSingleField', 'works', work.work_id, 'work_title', newValue)
                   .then(() => {
-                    workTitleHeader.textContent = newValue;
-                    setupWorkTitleEdit();
                     hideLoading();
                   })
                   .catch(handleError);
-              } else {
-                workTitleHeader.textContent = originalValue;
-                setupWorkTitleEdit();
               }
             };
-            input.onkeydown = (e) => {
-              if (e.key === 'Enter' && !e.isComposing) {
-                input.blur();
-              } else if (e.key === 'Escape') {
-                workTitleHeader.textContent = originalValue;
-                setupWorkTitleEdit();
-              }
+            sidebarWorkTitle.appendChild(workTitleInput);
+          }
+          
+          // 制作物種別
+          const sidebarWorkType = document.getElementById('sidebar-work-type');
+          if (sidebarWorkType) {
+            sidebarWorkType.textContent = getConfigLabel(work.work_type_key, 'WORK_TYPE') || work.work_type_key || '';
+          }
+          
+          // 依頼受付優先度
+          const sidebarPriority = document.getElementById('sidebar-priority');
+          if (sidebarPriority) {
+            sidebarPriority.textContent = getConfigLabel(work.priority_key, 'TASK_PRIORITY') || work.priority_key || '';
+          }
+          
+          // 依頼者
+          const sidebarClient = document.getElementById('sidebar-client');
+          if (sidebarClient) {
+            const clientMember = membersData.find(m => m.member_email === work.work_client_email);
+            sidebarClient.textContent = clientMember ? `${clientMember.member_name}/${getConfigLabel(clientMember.member_team_key, 'TEAM')}` : work.work_client_email || '';
+          }
+          
+          // 担当者
+          const sidebarAssignees = document.getElementById('sidebar-assignees');
+          if (sidebarAssignees) {
+            sidebarAssignees.innerHTML = '';
+            if (work.assignees && work.assignees.length > 0) {
+              work.assignees.forEach(assignee => {
+                const assigneeDiv = document.createElement('div');
+                assigneeDiv.className = 'project-detail-assignee-item';
+                assigneeDiv.style.display = 'flex';
+                assigneeDiv.style.alignItems = 'center';
+                assigneeDiv.style.gap = '8px';
+                assigneeDiv.style.marginBottom = '4px';
+                
+                const icon = document.createElement('img');
+                icon.src = assignee.member_icon || 'https://via.placeholder.com/32';
+                icon.className = 'avatar';
+                icon.style.width = '20px';
+                icon.style.height = '20px';
+                icon.style.borderRadius = '50%';
+                
+                const name = document.createElement('span');
+                name.textContent = `${assignee.member_name}/${assignee.member_team_value}`;
+                name.style.fontSize = '12px';
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '一削除';
+                deleteBtn.className = 'project-detail-delete-btn';
+                deleteBtn.style.fontSize = '12px';
+                deleteBtn.style.padding = '2px 8px';
+                deleteBtn.style.border = 'none';
+                deleteBtn.style.background = 'none';
+                deleteBtn.style.cursor = 'pointer';
+                deleteBtn.style.color = 'var(--md-sys-color-error)';
+                deleteBtn.onclick = () => {
+                  showLoading();
+                  callGAS('removeWorkAssignee', work.work_id, assignee.member_email)
+                    .then(() => {
+                      openWorkDetailOverlay(work.work_id);
+                    })
+                    .catch(handleError);
+                };
+                
+                assigneeDiv.appendChild(icon);
+                assigneeDiv.appendChild(name);
+                assigneeDiv.appendChild(deleteBtn);
+                sidebarAssignees.appendChild(assigneeDiv);
+              });
+            }
+          }
+          
+          // +追加ボタン
+          const sidebarAddAssigneeBtn = document.getElementById('sidebar-add-assignee-btn');
+          if (sidebarAddAssigneeBtn) {
+            sidebarAddAssigneeBtn.onclick = (e) => {
+              openAddAssigneeDropdown(e.target, work.work_id, work.assignees || []);
             };
-          };
-        };
-        setupWorkTitleEdit();
-        
-        // 担当者を表示（アイコンをテキストと横揃え）
-        const assigneesContainer = document.getElementById('work-detail-assignees-header-info');
-        assigneesContainer.innerHTML = '';
-        assigneesContainer.style.display = 'inline-flex';
-        assigneesContainer.style.alignItems = 'center';
-        assigneesContainer.style.verticalAlign = 'middle';
-        if (work.assignees && work.assignees.length > 0) {
-          work.assignees.forEach(assignee => {
-            const icon = document.createElement('img');
-            icon.src = assignee.member_icon || 'https://via.placeholder.com/32';
-            icon.className = 'avatar';
-            icon.style.width = '24px';
-            icon.style.height = '24px';
-            icon.style.marginRight = '4px';
-            icon.style.verticalAlign = 'middle';
-            icon.style.display = 'inline-block';
-            icon.title = `${assignee.member_name} / ${assignee.member_team_value}`;
-            assigneesContainer.appendChild(icon);
-          });
-        }
-        // ＋アイコンを追加
-        const addIcon = document.createElement('button');
-        addIcon.innerHTML = '+';
-        addIcon.className = 'btn-icon-add-assignee';
-        addIcon.style.width = '24px';
-        addIcon.style.height = '24px';
-        addIcon.style.borderRadius = '50%';
-        addIcon.style.border = 'none';
-        addIcon.style.backgroundColor = 'var(--md-sys-color-primary)';
-        addIcon.style.color = 'var(--md-sys-color-on-primary)';
-        addIcon.style.cursor = 'pointer';
-        addIcon.style.marginLeft = '4px';
-        addIcon.style.display = 'inline-flex';
-        addIcon.style.alignItems = 'center';
-        addIcon.style.justifyContent = 'center';
-        addIcon.style.fontSize = '16px';
-        addIcon.style.fontWeight = 'bold';
-        addIcon.style.verticalAlign = 'middle';
-        addIcon.onclick = (e) => {
-          e.stopPropagation();
-          openAddAssigneeDropdown(e.target, work.work_id, work.assignees || []);
-        };
-        assigneesContainer.appendChild(addIcon);
-        
-        
-        // ステータスを表示・編集可能に（header-contentエリア）
-        const statusTextHeader = document.getElementById('work-detail-status-text-header');
-        statusTextHeader.textContent = getConfigLabel(work.work_status_key, 'WORK_STATUS') || work.work_status_key || '';
-        const statusEditableHeader = document.getElementById('work-detail-status-editable-header');
-        statusEditableHeader.onclick = (e) => {
-          e.stopPropagation();
-          showSelectEditorForWorkDetailHeader(e, work.work_id, 'work_status_key', work.work_status_key, 'WORK_STATUS');
-        };
-        
-        // 作成日を表示（編集不可）
-        const createdAtHeader = document.getElementById('work-detail-created-at-header');
-        createdAtHeader.textContent = formatDate(work.created_at) || '-';
-        
-        // 納品期限を表示・編集可能に（header-contentエリア）
-        const dueTextHeader = document.getElementById('work-detail-due-text-header');
-        dueTextHeader.textContent = formatDateTimeForDisplay(work.due_datetime) || '';
-        const dueEditableHeader = document.getElementById('work-detail-due-editable-header');
-        dueEditableHeader.onclick = (e) => {
-          e.stopPropagation();
-          openDateTimePickerForWorkDetailHeader(e, work.work_id, 'due_datetime', work.due_datetime);
-        };
-        
-        // 残り日数を表示
-        const daysRemainingHeader = document.getElementById('work-detail-days-remaining-header');
-        daysRemainingHeader.textContent = calculateDaysRemaining(work.due_datetime);
-        
-        // URLコピーボタンを表示
-        const urlCopyButton = document.getElementById('work-detail-url-copy-button');
-        if (urlCopyButton) {
-          urlCopyButton.style.display = 'block';
-          urlCopyButton.dataset.workId = work.work_id;
+          }
         }
         
         // Googleドキュメントを埋め込む
@@ -1287,20 +1302,29 @@
     function closeWorkDetailOverlay() {
       document.getElementById('work-detail-overlay').classList.remove('show');
       
-      // ヘッダータイトルを元に戻す
-      const headerTitleWorkDetail = document.getElementById('header-title-work-detail');
-      if (headerTitleWorkDetail) {
-        headerTitleWorkDetail.style.display = 'none';
+      // メインヘッダーを元に戻す
+      const headerTitleDefault = document.getElementById('header-title-default');
+      const headerTitleWorkDetailHeader = document.getElementById('header-title-work-detail-header');
+      const headerCloseBtn = document.getElementById('header-close-btn');
+      const newButton = document.getElementById('new-button');
+      
+      if (headerTitleDefault) headerTitleDefault.style.display = 'flex';
+      if (headerTitleWorkDetailHeader) headerTitleWorkDetailHeader.style.display = 'none';
+      if (headerCloseBtn) headerCloseBtn.style.display = 'none';
+      if (newButton) newButton.style.display = 'flex';
+      
+      // ワークフローステータスバーを非表示
+      const workflowStatusBar = document.getElementById('workflow-status-bar');
+      if (workflowStatusBar) {
+        workflowStatusBar.style.display = 'none';
       }
       
-      const headerInfoDiv = document.getElementById('work-detail-header-info');
-      if (headerInfoDiv) {
-        headerInfoDiv.style.display = 'none';
+      // 左サイドバーのプロジェクト詳細セクションを非表示
+      const sidebarProjectDetail = document.getElementById('sidebar-project-detail');
+      if (sidebarProjectDetail) {
+        sidebarProjectDetail.style.display = 'none';
       }
-      const urlCopyButton = document.getElementById('work-detail-url-copy-button');
-      if (urlCopyButton) {
-        urlCopyButton.style.display = 'none';
-      }
+      
       // ドロップダウンを削除
       const suggestions = document.getElementById('work-detail-project-suggestions');
       if (suggestions) {

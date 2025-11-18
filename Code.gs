@@ -87,6 +87,79 @@ function getWorkById(workId) {
   return sanitizeForClient(work);
 }
 
+function getWorkflowTimestamps(workId) {
+  const work = getDataById(SHEET_NAMES.WORKS, workId);
+  if (!work) return null;
+  
+  // logsテーブルから該当するレコードを取得
+  const logs = getAllData(SHEET_NAMES.LOGS);
+  
+  // record_id = work_id かつ column_id = 'work_status_key' のレコードをフィルタ
+  const statusLogs = logs.filter(log => 
+    log.record_id === workId && 
+    log.column_id === 'work_status_key' &&
+    log.new_value
+  );
+  
+  // created_atを降順でソート
+  statusLogs.sort((a, b) => {
+    const dateA = new Date(a.created_at);
+    const dateB = new Date(b.created_at);
+    return dateB - dateA;
+  });
+  
+  // new_valueをパース（JSON文字列の場合）
+  const parseValue = (value) => {
+    if (!value) return null;
+    try {
+      const parsed = JSON.parse(value);
+      return typeof parsed === 'string' ? parsed : value;
+    } catch (e) {
+      return value;
+    }
+  };
+  
+  const timestamps = {
+    request: null,      // TO-DO
+    production: null,   // CREATE
+    approval: null,     // APPROVED or REVIEW
+    delivery: null      // DELIVERED or due_datetime
+  };
+  
+  // 依頼: TO-DO
+  const requestLog = statusLogs.find(log => parseValue(log.new_value) === 'TO-DO');
+  if (requestLog) {
+    timestamps.request = requestLog.created_at;
+  }
+  
+  // 制作: CREATE
+  const productionLog = statusLogs.find(log => parseValue(log.new_value) === 'CREATE');
+  if (productionLog) {
+    timestamps.production = productionLog.created_at;
+  }
+  
+  // 承認: APPROVED（なければREVIEW）
+  const approvalLog = statusLogs.find(log => {
+    const value = parseValue(log.new_value);
+    return value === 'APPROVED' || value === 'REVIEW';
+  });
+  if (approvalLog) {
+    // APPROVEDを優先
+    const approvedLog = statusLogs.find(log => parseValue(log.new_value) === 'APPROVED');
+    timestamps.approval = approvedLog ? approvedLog.created_at : approvalLog.created_at;
+  }
+  
+  // 納品: DELIVERED（なければdue_datetime）
+  const deliveryLog = statusLogs.find(log => parseValue(log.new_value) === 'DELIVERED');
+  if (deliveryLog) {
+    timestamps.delivery = deliveryLog.created_at;
+  } else if (work.due_datetime) {
+    timestamps.delivery = work.due_datetime;
+  }
+  
+  return sanitizeForClient(timestamps);
+}
+
 function createWork(workData) {
   const userEmail = Session.getActiveUser().getEmail();
   const workId = generateNextId(SHEET_NAMES.WORKS, 'W'); // ★★★★★ 変更 ★★★★★
