@@ -667,20 +667,38 @@
     // 初期化
     function initializeApp() {
       console.log('initializeApp が呼び出されました');
-      loadInitialData();
-
-      // URLパラメータからwork_idを取得して詳細画面を開く（最優先処理）
-      const workId = JSON.parse(<?= JSON.stringify(urlParam.work_id) ?>);
-      if (workId) {
-        // // URLからパラメータを削除
-        // console.log(`workId: ${workId}`);
-        // const newUrl = <?= deployedUrl ?>;
-        // window.history.replaceState({}, document.title, newUrl);
-        openWorkDetailOverlay(workId);
+      
+      try {
+        // 新規作成ボタンを最初に初期化（DOMが利用可能な状態で確実に実行）
+        console.log('initializeNewButton を呼び出します');
+        initializeNewButton();
+      } catch (error) {
+        console.error('initializeNewButton でエラーが発生しました:', error);
       }
 
-      // 新規作成ボタンを初期化
-      initializeNewButton();
+      try {
+        loadInitialData();
+      } catch (error) {
+        console.error('loadInitialData でエラーが発生しました:', error);
+      }
+
+      try {
+        // URLパラメータからwork_idを取得して詳細画面を開く（最優先処理）
+        const workIdParam = <?= JSON.stringify(urlParam.work_id) ?>;
+        console.log('workIdParam:', workIdParam);
+        if (workIdParam) {
+          const workId = typeof workIdParam === 'string' ? JSON.parse(workIdParam) : workIdParam;
+          if (workId) {
+            // // URLからパラメータを削除
+            // console.log(`workId: ${workId}`);
+            // const newUrl = <?= deployedUrl ?>;
+            // window.history.replaceState({}, document.title, newUrl);
+            openWorkDetailOverlay(workId);
+          }
+        }
+      } catch (error) {
+        console.error('URLパラメータ処理でエラーが発生しました:', error);
+      }
     }
 
     // 複数の方法で初期化を試みる
