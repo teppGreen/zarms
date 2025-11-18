@@ -562,7 +562,7 @@
     </div>
   </div>
 
-  <script>
+   <script>
     // グローバル変数
     let currentUser = null;
     let worksData = [];
@@ -622,7 +622,7 @@
         // window.history.replaceState({}, document.title, newUrl);
         openWorkDetailOverlay(workId);
       }
-      
+
       // --- 新規作成ボタンのロジック ---
       const newButton = document.getElementById('new-button');
       const dropdown = document.getElementById('new-button-dropdown');
@@ -639,7 +639,6 @@
         if (!newButtonContainer || !newButtonContainer.contains(event.target)) {
           closeAllPopups();
         }
-        
         // ドロップダウンが表示されていて、かつ
         // クリックされた場所がボタンコンテナの外側の場合にドロップダウンを閉じる
         if (dropdown && dropdown.classList.contains('show') && newButtonContainer && !newButtonContainer.contains(event.target)) {
@@ -860,6 +859,8 @@
           data.review_requests.forEach(reviewRequest => {
             const card = document.createElement('div');
             card.className = 'review-card';
+
+
             card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
             card.innerHTML = `
               <h3 class="card-title-text">${escapeHtml(reviewRequest.review_title)}</h3>
@@ -1078,7 +1079,7 @@
         const workflowStatusBar = document.getElementById('workflow-status-bar');
         if (workflowStatusBar && timestamps) {
           workflowStatusBar.style.display = 'flex';
-          
+
           // workflow-status-dropdownに全てのWORK_STATUSを表示
           const workflowStatusDropdown = document.getElementById('workflow-status-dropdown');
           if (workflowStatusDropdown && configData.WORK_STATUS) {
@@ -2322,7 +2323,7 @@
       if (submitButton) {
         submitButton.textContent = '更新';
       }
-      
+
       // フォームの送信ハンドラを一時的に変更
       const originalOnsubmit = form.onsubmit;
       form.onsubmit = (e) => {
@@ -2388,6 +2389,33 @@
             <span>${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
           </div>
         `;
+        
+        // const title = document.createElement('h4');
+        // title.style.margin = '0 0 8px 0';
+        // title.style.fontSize = '14px';
+        // title.style.fontWeight = '600';
+        // title.textContent = escapeHtml(reviewRequest.review_title);
+        
+        // const commentPreview = document.createElement('p');
+        // commentPreview.style.margin = '0 0 8px 0';
+        // commentPreview.style.color = '#6b7280';
+        // commentPreview.style.fontSize = '12px';
+        // const commentText = reviewRequest.review_comment || '';
+        // commentPreview.textContent = commentText.length > 50 ? commentText.substring(0, 50) + '...' : commentText;
+        
+        // const meta = document.createElement('div');
+        // meta.style.display = 'flex';
+        // meta.style.justifyContent = 'space-between';
+        // meta.style.fontSize = '11px';
+        // meta.style.color = '#9ca3af';
+        // meta.innerHTML = `
+        //   <span>${reviewRequest.file_count || 0}個のファイル</span>
+        //   <span>${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
+        // `;
+        
+        // card.appendChild(title);
+        // card.appendChild(commentPreview);
+        // card.appendChild(meta);
         container.appendChild(card);
       });
     }
