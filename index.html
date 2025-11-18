@@ -299,13 +299,44 @@
         </div>
       </div>
       <div class="overlay-body">
-        <!-- 左: ドキュメントの埋め込み -->
-        <div class="overlay-main">
+        <!-- 列1: 案件情報など（1/5幅） -->
+        <div class="overlay-column-project">
+          <div class="project-info-section">
+            <div class="project-info-field">
+              <label>案件タイトル</label>
+              <div id="overlay-project-title" class="project-info-value"></div>
+            </div>
+            <div class="project-info-field">
+              <label>制作タイトル</label>
+              <div id="overlay-work-title" class="project-info-value"></div>
+            </div>
+            <div class="project-info-field">
+              <label>制作物種別</label>
+              <div id="overlay-work-type" class="project-info-value"></div>
+            </div>
+            <div class="project-info-field">
+              <label>依頼受付優先度</label>
+              <div id="overlay-priority" class="project-info-value"></div>
+            </div>
+            <div class="project-info-separator"></div>
+            <div class="project-info-field">
+              <label>依頼者</label>
+              <div id="overlay-client" class="project-info-value"></div>
+            </div>
+            <div class="project-info-field">
+              <label>担当者</label>
+              <button id="overlay-add-assignee-btn" class="project-info-add-btn">+追加</button>
+              <div id="overlay-assignees" class="project-info-assignees"></div>
+            </div>
+          </div>
+        </div>
+        <!-- 列2-3: ドキュメントの埋め込み（2/5幅） -->
+        <div class="overlay-column-document">
           <div id="work-detail-document-container" style="width: 100%; height: 100%;">
           </div>
         </div>
-        <!-- 右: タスクとレビューを縦並び -->
-        <div class="overlay-side">
+        <!-- 列4: タスク（1/5幅） -->
+        <div class="overlay-column-task">
           <div class="detail-section">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
               <h3 style="margin: 0;">タスク</h3>
@@ -314,6 +345,9 @@
             <div id="work-tasks-container"></div>
             <button id="new-task-button" class="btn btn-sm">+追加</button>
           </div>
+        </div>
+        <!-- 列5: レビュー（1/5幅） -->
+        <div class="overlay-column-review">
           <div class="detail-section">
             <h3>レビュー</h3>
             <div id="work-review-requests-container"></div>
@@ -1060,124 +1094,119 @@
           }
         }
         
-        // 左サイドバーのプロジェクト詳細セクションを表示
-        const sidebarProjectDetail = document.getElementById('sidebar-project-detail');
-        if (sidebarProjectDetail) {
-          sidebarProjectDetail.style.display = 'block';
-          
-          // 案件タイトル（編集可能）
-          const sidebarProjectTitle = document.getElementById('sidebar-project-title');
-          if (sidebarProjectTitle) {
-            sidebarProjectTitle.innerHTML = '';
-            const projectTitleInput = document.createElement('input');
-            projectTitleInput.type = 'text';
-            projectTitleInput.className = 'input-field';
-            projectTitleInput.style.width = '100%';
-            projectTitleInput.value = work.project_title || '';
-            projectTitleInput.dataset.projectId = work.project_id || '';
-            projectTitleInput.oninput = (e) => searchProjectsForWorkDetail(e.target.value, work.work_id);
-            sidebarProjectTitle.appendChild(projectTitleInput);
-          }
-          
-          // 制作タイトル（編集可能）
-          const sidebarWorkTitle = document.getElementById('sidebar-work-title');
-          if (sidebarWorkTitle) {
-            sidebarWorkTitle.innerHTML = '';
-            const workTitleInput = document.createElement('input');
-            workTitleInput.type = 'text';
-            workTitleInput.className = 'input-field';
-            workTitleInput.style.width = '100%';
-            workTitleInput.value = work.work_title || '';
-            workTitleInput.onblur = () => {
-              const newValue = workTitleInput.value.trim();
-              if (newValue && newValue !== work.work_title) {
+        // overlay-body内の案件情報列にデータを表示
+        // 案件タイトル（編集可能）
+        const overlayProjectTitle = document.getElementById('overlay-project-title');
+        if (overlayProjectTitle) {
+          overlayProjectTitle.innerHTML = '';
+          const projectTitleInput = document.createElement('input');
+          projectTitleInput.type = 'text';
+          projectTitleInput.className = 'input-field';
+          projectTitleInput.style.width = '100%';
+          projectTitleInput.value = work.project_title || '';
+          projectTitleInput.dataset.projectId = work.project_id || '';
+          projectTitleInput.oninput = (e) => searchProjectsForWorkDetail(e.target.value, work.work_id);
+          overlayProjectTitle.appendChild(projectTitleInput);
+        }
+        
+        // 制作タイトル（編集可能）
+        const overlayWorkTitle = document.getElementById('overlay-work-title');
+        if (overlayWorkTitle) {
+          overlayWorkTitle.innerHTML = '';
+          const workTitleInput = document.createElement('input');
+          workTitleInput.type = 'text';
+          workTitleInput.className = 'input-field';
+          workTitleInput.style.width = '100%';
+          workTitleInput.value = work.work_title || '';
+          workTitleInput.onblur = () => {
+            const newValue = workTitleInput.value.trim();
+            if (newValue && newValue !== work.work_title) {
+              showLoading();
+              callGAS('updateSingleField', 'works', work.work_id, 'work_title', newValue)
+                .then(() => {
+                  hideLoading();
+                })
+                .catch(handleError);
+            }
+          };
+          overlayWorkTitle.appendChild(workTitleInput);
+        }
+        
+        // 制作物種別
+        const overlayWorkType = document.getElementById('overlay-work-type');
+        if (overlayWorkType) {
+          overlayWorkType.textContent = getConfigLabel(work.work_type_key, 'WORK_TYPE') || work.work_type_key || '';
+        }
+        
+        // 依頼受付優先度
+        const overlayPriority = document.getElementById('overlay-priority');
+        if (overlayPriority) {
+          overlayPriority.textContent = getConfigLabel(work.priority_key, 'TASK_PRIORITY') || work.priority_key || '';
+        }
+        
+        // 依頼者
+        const overlayClient = document.getElementById('overlay-client');
+        if (overlayClient) {
+          const clientMember = membersData.find(m => m.member_email === work.work_client_email);
+          overlayClient.textContent = clientMember ? `${clientMember.member_name}/${getConfigLabel(clientMember.member_team_key, 'TEAM')}` : work.work_client_email || '';
+        }
+        
+        // 担当者
+        const overlayAssignees = document.getElementById('overlay-assignees');
+        if (overlayAssignees) {
+          overlayAssignees.innerHTML = '';
+          if (work.assignees && work.assignees.length > 0) {
+            work.assignees.forEach(assignee => {
+              const assigneeDiv = document.createElement('div');
+              assigneeDiv.className = 'project-info-assignee-item';
+              assigneeDiv.style.display = 'flex';
+              assigneeDiv.style.alignItems = 'center';
+              assigneeDiv.style.gap = '8px';
+              assigneeDiv.style.marginBottom = '4px';
+              
+              const icon = document.createElement('img');
+              icon.src = assignee.member_icon || 'https://via.placeholder.com/32';
+              icon.className = 'avatar';
+              icon.style.width = '20px';
+              icon.style.height = '20px';
+              icon.style.borderRadius = '50%';
+              
+              const name = document.createElement('span');
+              name.textContent = `${assignee.member_name}/${assignee.member_team_value}`;
+              name.style.fontSize = '12px';
+              
+              const deleteBtn = document.createElement('button');
+              deleteBtn.textContent = '一削除';
+              deleteBtn.className = 'project-info-delete-btn';
+              deleteBtn.style.fontSize = '12px';
+              deleteBtn.style.padding = '2px 8px';
+              deleteBtn.style.border = 'none';
+              deleteBtn.style.background = 'none';
+              deleteBtn.style.cursor = 'pointer';
+              deleteBtn.style.color = 'var(--md-sys-color-error)';
+              deleteBtn.onclick = () => {
                 showLoading();
-                callGAS('updateSingleField', 'works', work.work_id, 'work_title', newValue)
+                callGAS('removeWorkAssignee', work.work_id, assignee.member_email)
                   .then(() => {
-                    hideLoading();
+                    openWorkDetailOverlay(work.work_id);
                   })
                   .catch(handleError);
-              }
-            };
-            sidebarWorkTitle.appendChild(workTitleInput);
+              };
+              
+              assigneeDiv.appendChild(icon);
+              assigneeDiv.appendChild(name);
+              assigneeDiv.appendChild(deleteBtn);
+              overlayAssignees.appendChild(assigneeDiv);
+            });
           }
-          
-          // 制作物種別
-          const sidebarWorkType = document.getElementById('sidebar-work-type');
-          if (sidebarWorkType) {
-            sidebarWorkType.textContent = getConfigLabel(work.work_type_key, 'WORK_TYPE') || work.work_type_key || '';
-          }
-          
-          // 依頼受付優先度
-          const sidebarPriority = document.getElementById('sidebar-priority');
-          if (sidebarPriority) {
-            sidebarPriority.textContent = getConfigLabel(work.priority_key, 'TASK_PRIORITY') || work.priority_key || '';
-          }
-          
-          // 依頼者
-          const sidebarClient = document.getElementById('sidebar-client');
-          if (sidebarClient) {
-            const clientMember = membersData.find(m => m.member_email === work.work_client_email);
-            sidebarClient.textContent = clientMember ? `${clientMember.member_name}/${getConfigLabel(clientMember.member_team_key, 'TEAM')}` : work.work_client_email || '';
-          }
-          
-          // 担当者
-          const sidebarAssignees = document.getElementById('sidebar-assignees');
-          if (sidebarAssignees) {
-            sidebarAssignees.innerHTML = '';
-            if (work.assignees && work.assignees.length > 0) {
-              work.assignees.forEach(assignee => {
-                const assigneeDiv = document.createElement('div');
-                assigneeDiv.className = 'project-detail-assignee-item';
-                assigneeDiv.style.display = 'flex';
-                assigneeDiv.style.alignItems = 'center';
-                assigneeDiv.style.gap = '8px';
-                assigneeDiv.style.marginBottom = '4px';
-                
-                const icon = document.createElement('img');
-                icon.src = assignee.member_icon || 'https://via.placeholder.com/32';
-                icon.className = 'avatar';
-                icon.style.width = '20px';
-                icon.style.height = '20px';
-                icon.style.borderRadius = '50%';
-                
-                const name = document.createElement('span');
-                name.textContent = `${assignee.member_name}/${assignee.member_team_value}`;
-                name.style.fontSize = '12px';
-                
-                const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = '一削除';
-                deleteBtn.className = 'project-detail-delete-btn';
-                deleteBtn.style.fontSize = '12px';
-                deleteBtn.style.padding = '2px 8px';
-                deleteBtn.style.border = 'none';
-                deleteBtn.style.background = 'none';
-                deleteBtn.style.cursor = 'pointer';
-                deleteBtn.style.color = 'var(--md-sys-color-error)';
-                deleteBtn.onclick = () => {
-                  showLoading();
-                  callGAS('removeWorkAssignee', work.work_id, assignee.member_email)
-                    .then(() => {
-                      openWorkDetailOverlay(work.work_id);
-                    })
-                    .catch(handleError);
-                };
-                
-                assigneeDiv.appendChild(icon);
-                assigneeDiv.appendChild(name);
-                assigneeDiv.appendChild(deleteBtn);
-                sidebarAssignees.appendChild(assigneeDiv);
-              });
-            }
-          }
-          
-          // +追加ボタン
-          const sidebarAddAssigneeBtn = document.getElementById('sidebar-add-assignee-btn');
-          if (sidebarAddAssigneeBtn) {
-            sidebarAddAssigneeBtn.onclick = (e) => {
-              openAddAssigneeDropdown(e.target, work.work_id, work.assignees || []);
-            };
-          }
+        }
+        
+        // +追加ボタン
+        const overlayAddAssigneeBtn = document.getElementById('overlay-add-assignee-btn');
+        if (overlayAddAssigneeBtn) {
+          overlayAddAssigneeBtn.onclick = (e) => {
+            openAddAssigneeDropdown(e.target, work.work_id, work.assignees || []);
+          };
         }
         
         // Googleドキュメントを埋め込む
@@ -1185,10 +1214,9 @@
         if (work.work_document_id) {
           // Googleドキュメントを編集可能な状態で埋め込む（rm=minimalパラメータ追加）
           const embedUrl = `https://docs.google.com/document/d/${work.work_document_id}/edit?rm=minimal&tab=${work.work_document_tab_id}`;
-          docContainer.innerHTML = `<style> iframe { width: 100%; height: 100%; max-width: 100%; border: none; overflow-x: hidden; } </style>
-                                    <iframe src="${embedUrl}" style="width: 100%; height: 100%; max-width: 100%; border: none; overflow-x: hidden;"></iframe>`;
+          docContainer.innerHTML = `<iframe src="${embedUrl}" style="width: 100%; height: 100%; max-width: 100%; border: none; overflow-x: hidden; border-radius: 8px;"></iframe>`;
         } else {
-          docContainer.innerHTML = '<p style="color: #6b7280; padding: 24px;">ドキュメントが作成されていません</p>';
+          docContainer.innerHTML = '';
         }
         
         renderWorkTasks(work.tasks);
@@ -1317,12 +1345,6 @@
       const workflowStatusBar = document.getElementById('workflow-status-bar');
       if (workflowStatusBar) {
         workflowStatusBar.style.display = 'none';
-      }
-      
-      // 左サイドバーのプロジェクト詳細セクションを非表示
-      const sidebarProjectDetail = document.getElementById('sidebar-project-detail');
-      if (sidebarProjectDetail) {
-        sidebarProjectDetail.style.display = 'none';
       }
       
       // ドロップダウンを削除

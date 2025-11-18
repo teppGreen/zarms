@@ -1626,15 +1626,84 @@
       display: flex;
       overflow-y: auto;
       padding: 24px 32px;
+      gap: 16px;
     }
 
-    .overlay-main {
-      flex: 1;
-      padding-right: 16px;
+    /* 5分割レイアウト: 1列、2列、1列、1列 */
+    .overlay-column-project {
+      flex: 0 0 20%;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+
+    .overlay-column-document {
+      flex: 0 0 40%;
       overflow: hidden;
-      overflow-x: hidden;
-      max-width: 100%;
-      min-width: 0;
+      padding: 0 8px;
+    }
+
+    .overlay-column-task {
+      flex: 0 0 20%;
+      overflow-y: auto;
+      padding: 0 8px;
+    }
+
+    .overlay-column-review {
+      flex: 0 0 20%;
+      overflow-y: auto;
+      padding-left: 8px;
+    }
+
+    .project-info-section {
+      padding: 16px;
+      background-color: var(--md-sys-color-surface);
+      border-radius: 8px;
+    }
+
+    .project-info-field {
+      margin-bottom: 16px;
+    }
+
+    .project-info-field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+
+    .project-info-value {
+      font-size: 14px;
+      color: var(--md-sys-color-on-surface);
+      padding: 4px 0;
+      word-break: break-word;
+    }
+
+    .project-info-separator {
+      height: 1px;
+      background-color: var(--md-sys-color-surface-variant);
+      margin: 16px 0;
+    }
+
+    .project-info-add-btn {
+      font-size: 12px;
+      padding: 4px 8px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: var(--md-sys-color-primary);
+      margin-bottom: 8px;
+    }
+
+    .project-info-assignees {
+      margin-top: 8px;
+    }
+
+    .project-info-assignee-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
     }
 
     #work-detail-document-container {
@@ -1649,7 +1718,14 @@
       align-items: center;
       justify-content: center;
       font-size: 24px;
-      color: var(--md-sys-color-on-surface-variant);
+      color: var(--md-sys-color-on-surface);
+      min-height: 400px;
+    }
+
+    #work-detail-document-container:empty::before {
+      content: 'ドキュメント埋め込み';
+      font-size: 24px;
+      color: var(--md-sys-color-on-surface);
     }
 
     #work-detail-document-container iframe {
@@ -1659,15 +1735,6 @@
       border: none;
       overflow-x: hidden;
       border-radius: 8px;
-    }
-
-    .overlay-side {
-      flex: 0 0 400px;
-      padding-left: 16px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
     }
 
     .detail-section {
