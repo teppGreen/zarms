@@ -2025,47 +2025,132 @@
         container.innerHTML = '<p class="text-sm text-gray-500">タスクはありません。</p>';
         return;
       }
-      const table = document.createElement('table');
-      table.className = 'table-fixed w-full text-sm';
-      table.innerHTML = `<thead><tr class="border-b"><th class="w-2/5 text-left py-2">タスク名</th><th class="w-1/5 text-left py-2">ステータス</th><th class="w-1/5 text-left py-2">担当者</th><th class="w-1/5 text-left py-2">終了予定</th><th class="w-1/12"></th></tr></thead><tbody></tbody>`;
-      const tbody = table.querySelector('tbody');
+      
+      // カード形式で表示
       tasks.forEach(task => {
-        const row = tbody.insertRow();
-        row.className = 'border-b';
-        row.dataset.taskId = task.task_id;
+        const card = document.createElement('div');
+        card.className = 'task-card';
+        card.dataset.taskId = task.task_id;
         
-        const titleCell = row.insertCell();
-        titleCell.className = 'py-2';
-        titleCell.textContent = task.task_title;
+        // ステータスに応じた色を取得
+        const statusColor = getTaskStatusColor(task.status_key);
         
-        const statusCell = row.insertCell();
-        statusCell.className = 'py-2';
-        statusCell.innerHTML = `<div class="editable-container" onclick="editTaskField(event, '${task.task_id}', 'status_key', '${task.status_key}', 'TASK_STATUS')"><span class="editable-text">${getConfigLabel(task.status_key, 'TASK_STATUS')}</span><span class="editable-toggle-btn">✎</span></div>`;
+        // 担当者の情報を取得
+        const assignee = task.assign_to ? membersData.find(m => m.member_email === task.assign_to) : null;
+        const assigneeName = assignee ? assignee.member_name : '';
+        const assigneeTeam = assignee ? getConfigLabel(assignee.member_team_key, 'TEAM') : '';
+        const assigneeIcon = assignee ? (assignee.member_icon || 'https://via.placeholder.com/32') : 'https://via.placeholder.com/32';
         
-        const assigneeCell = row.insertCell();
-        assigneeCell.className = 'py-2';
-        assigneeCell.innerHTML = `<div class="editable-container" onclick="editTaskField(event, '${task.task_id}', 'assign_to', '${task.assign_to || ''}', 'MEMBER')"><span class="editable-text">${escapeHtml(getMemberNameById(task.assign_to))}</span><span class="editable-toggle-btn">✎</span></div>`;
+        card.innerHTML = `
+          <div class="task-card-content">
+            <div class="task-card-header">
+              <div class="task-card-id">${escapeHtml(task.task_id)}</div>
+              <div class="task-card-status-indicator" style="border-color: ${statusColor};">
+                <div class="task-card-status-icon" style="background-color: ${statusColor};"></div>
+              </div>
+            </div>
+            <div class="task-card-title">
+              ${escapeHtml(task.task_title)}
+            </div>
+            <div class="task-card-footer">
+              <div class="task-card-assignee">
+                ${task.assign_to ? `
+                  <img src="${assigneeIcon}" class="task-card-avatar" alt="${escapeHtml(assigneeName)}" title="${escapeHtml(assigneeName)}/${escapeHtml(assigneeTeam)}">
+                ` : '<div class="task-card-avatar-placeholder">未設定</div>'}
+              </div>
+              <div class="task-card-date">
+                ${formatDateTimeForDisplay(task.planned_end_datetime)}
+              </div>
+            </div>
+          </div>
+        `;
         
-        const dateCell = row.insertCell();
-        dateCell.className = 'py-2';
-        dateCell.innerHTML = `<div class="editable-container datetime-editable" onclick="openDateTimePicker(event, 'task', '${task.task_id}', 'planned_end_datetime')"><span class="editable-text">${formatDateTimeForDisplay(task.planned_end_datetime)}</span><span class="editable-toggle-btn">✎</span></div>`;
+        // イベントリスナーを追加
+        const titleElement = card.querySelector('.task-card-title');
+        titleElement.addEventListener('click', (e) => {
+          editTaskField(e, task.task_id, 'task_title', task.task_title, 'TEXT');
+        });
         
-        const actionCell = row.insertCell();
-        actionCell.className = 'py-2 text-right';
-        const editBtn = document.createElement('button');
-        editBtn.className = 'btn btn-sm btn-secondary';
-        editBtn.textContent = '編集';
-        editBtn.onclick = () => openEditTaskModal(task);
-        actionCell.appendChild(editBtn);
+        const assigneeElement = card.querySelector('.task-card-assignee');
+        assigneeElement.addEventListener('click', (e) => {
+          editTaskField(e, task.task_id, 'assign_to', task.assign_to || '', 'MEMBER');
+        });
+        
+        const dateElement = card.querySelector('.task-card-date');
+        dateElement.addEventListener('click', (e) => {
+          openDateTimePicker(e, 'task', task.task_id, 'planned_end_datetime');
+        });
+        
+        container.appendChild(card);
       });
-      container.appendChild(table);
+    }
+    
+    function getTaskStatusColor(statusKey) {
+      switch(statusKey) {
+        case 'TODO':
+          return '#BA1A1A'; // 赤色
+        case 'IN_PROGRESS':
+          return '#FFC107'; // 黄色
+        case 'DONE':
+          return '#4CAF50'; // 緑色
+        default:
+          return '#74777F'; // グレー（デフォルト）
+      }
     }
 
     function editTaskField(event, taskId, field, currentValue, configType) {
       event.stopPropagation();
       const container = event.currentTarget;
       
-      if (configType === 'MEMBER') {
+      if (configType === 'TEXT') {
+        // テキスト編集
+        const inputContainer = document.createElement('div');
+        inputContainer.className = 'popup-editor';
+        inputContainer.style.position = 'absolute';
+        inputContainer.style.zIndex = '1000';
+        inputContainer.style.backgroundColor = 'var(--md-sys-color-surface)';
+        inputContainer.style.border = '1px solid var(--md-sys-color-outline)';
+        inputContainer.style.borderRadius = '8px';
+        inputContainer.style.padding = '8px';
+        inputContainer.style.minWidth = '200px';
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'popup-editor-input';
+        input.value = currentValue || '';
+        input.style.width = '100%';
+        input.style.padding = '8px';
+        input.style.border = 'none';
+        input.style.outline = 'none';
+        input.style.fontSize = '14px';
+        input.style.fontFamily = 'inherit';
+        
+        const handleSubmit = () => {
+          const newValue = input.value.trim();
+          if (newValue !== currentValue) {
+            updateTaskField(taskId, field, newValue, currentValue);
+          }
+          closeAllPopups();
+        };
+        
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSubmit();
+          } else if (e.key === 'Escape') {
+            closeAllPopups();
+          }
+        });
+        
+        input.addEventListener('blur', () => {
+          setTimeout(handleSubmit, 200);
+        });
+        
+        inputContainer.appendChild(input);
+        createPopup(container, inputContainer);
+        input.focus();
+        input.select();
+      } else if (configType === 'MEMBER') {
         // メンバー選択
         const optionsContainer = document.createElement('div');
         optionsContainer.className = 'popup-editor';
