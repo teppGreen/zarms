@@ -609,24 +609,17 @@
     ];
 
 
-    // 初期化
-    window.onload = function() {
-      loadInitialData();
-
-      // URLパラメータからwork_idを取得して詳細画面を開く（最優先処理）
-      const workId = JSON.parse(<?= JSON.stringify(urlParam.work_id) ?>);
-      if (workId) {
-        // // URLからパラメータを削除
-        // console.log(`workId: ${workId}`);
-        // const newUrl = <?= deployedUrl ?>;
-        // window.history.replaceState({}, document.title, newUrl);
-        openWorkDetailOverlay(workId);
-      }
-
+    // 新規作成ボタンの初期化関数
+    function initializeNewButton() {
+      console.log('initializeNewButton が呼び出されました');
+      
       // --- 新規作成ボタンのロジック ---
       const newButton = document.getElementById('new-button');
       const dropdown = document.getElementById('new-button-dropdown');
       const newButtonContainer = document.querySelector('.new-button-container');
+
+      console.log('newButton:', newButton);
+      console.log('newButtonContainer:', newButtonContainer);
 
       // 新規作成ボタンのクリック
       if (newButton) {
@@ -647,25 +640,64 @@
         }
       } else {
         console.error('新規作成ボタンが見つかりませんでした！');
+        // リトライ（DOMがまだ読み込まれていない場合）
+        setTimeout(initializeNewButton, 100);
+        return;
       }
 
-      // ドキュメント全体（body）をクリックした時の動作
-      document.addEventListener('click', (event) => {
-        // 新規作成ボタン関連の要素がクリックされた場合は処理をスキップ
-        if (newButtonContainer && newButtonContainer.contains(event.target)) {
-          return; // ボタンのクリックイベントを妨げないように早期リターン
-        }
-        
-        // ポップアップエディタを閉じる
-        closeAllPopups();
-        
-        // ドロップダウンが表示されていて、かつ
-        // クリックされた場所がボタンコンテナの外側の場合にドロップダウンを閉じる
-        if (dropdown && dropdown.classList.contains('show')) {
-          closeNewButtonDropdown();
-        }
-      });
-    };
+      // ドキュメント全体（body）をクリックした時の動作（一度だけ設定）
+      if (!window.newButtonClickHandlerInitialized) {
+        document.addEventListener('click', (event) => {
+          // 新規作成ボタン関連の要素がクリックされた場合は処理をスキップ
+          if (newButtonContainer && newButtonContainer.contains(event.target)) {
+            return; // ボタンのクリックイベントを妨げないように早期リターン
+          }
+          
+          // ポップアップエディタを閉じる
+          closeAllPopups();
+          
+          // ドロップダウンが表示されていて、かつ
+          // クリックされた場所がボタンコンテナの外側の場合にドロップダウンを閉じる
+          if (dropdown && dropdown.classList.contains('show')) {
+            closeNewButtonDropdown();
+          }
+        });
+        window.newButtonClickHandlerInitialized = true;
+      }
+    }
+
+    // 初期化
+    function initializeApp() {
+      console.log('initializeApp が呼び出されました');
+      
+      loadInitialData();
+
+      // URLパラメータからwork_idを取得して詳細画面を開く（最優先処理）
+      const workId = JSON.parse(<?= JSON.stringify(urlParam.work_id) ?>);
+      if (workId) {
+        // // URLからパラメータを削除
+        // console.log(`workId: ${workId}`);
+        // const newUrl = <?= deployedUrl ?>;
+        // window.history.replaceState({}, document.title, newUrl);
+        openWorkDetailOverlay(workId);
+      }
+
+      // 新規作成ボタンを初期化
+      initializeNewButton();
+    }
+
+    // 複数の方法で初期化を試みる
+    if (document.readyState === 'loading') {
+      console.log('DOMContentLoaded を待機します');
+      document.addEventListener('DOMContentLoaded', initializeApp);
+    } else {
+      console.log('DOMContentLoaded は既に発火済み。即座に実行します');
+      // DOMContentLoaded が既に発火している場合
+      initializeApp();
+    }
+    
+    // window.onload も念のため設定
+    window.onload = initializeApp;
 
     function loadInitialData(shouldSwitchTab = true) {
       showLoading();
