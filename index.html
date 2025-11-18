@@ -5657,12 +5657,15 @@
       input.placeholder = 'ID検索（例：P0001, W0001, T0001, R0001）';
     }
     
-    function handleIdSearchClick() {
-      const input = document.getElementById('id-search-input');
-      if (!input) return;
-      
-      const searchValue = input.value.trim();
+    // ID検索の共通処理
+    function executeIdSearch(searchValue) {
       if (!searchValue) return;
+      
+      // 検索ボックスからフォーカスを外す（入力値は保持）
+      const input = document.getElementById('id-search-input');
+      if (input) {
+        input.blur();
+      }
       
       // 複数のIDが連なっている場合、最も小さな単位のIDのみを取り出す
       // project_id > work_id > review_id > task_id の順で優先度が低い
@@ -5736,6 +5739,14 @@
       }
     }
     
+    function handleIdSearchClick() {
+      const input = document.getElementById('id-search-input');
+      if (!input) return;
+      
+      const searchValue = input.value.trim();
+      executeIdSearch(searchValue);
+    }
+    
     function handleIdSearchBlur(event) {
       const input = event.target;
       console.log('[DEBUG] handleIdSearchBlur triggered', {
@@ -5760,78 +5771,7 @@
         event.preventDefault();
         const input = event.target;
         const searchValue = input.value.trim();
-        if (!searchValue) return;
-        
-        // 複数のIDが連なっている場合、最も小さな単位のIDのみを取り出す
-        // project_id > work_id > review_id > task_id の順で優先度が低い
-        let targetId = null;
-        let targetType = null;
-        
-        // task_idを検索 (T + 4桁の数字)
-        const taskIdMatch = searchValue.match(/T\d{4}/);
-        if (taskIdMatch) {
-          targetId = taskIdMatch[0];
-          targetType = 'task';
-        }
-        
-        // review_idを検索 (R + 4桁の数字)
-        const reviewIdMatch = searchValue.match(/R\d{4}/);
-        if (reviewIdMatch && !targetId) {
-          targetId = reviewIdMatch[0];
-          targetType = 'review';
-        }
-        
-        // work_idを検索 (W + 4桁の数字)
-        const workIdMatch = searchValue.match(/W\d{4}/);
-        if (workIdMatch && !targetId) {
-          targetId = workIdMatch[0];
-          targetType = 'work';
-        }
-        
-        // project_idを検索 (P + 4桁の数字)
-        const projectIdMatch = searchValue.match(/P\d{4}/);
-        if (projectIdMatch && !targetId) {
-          targetId = projectIdMatch[0];
-          targetType = 'project';
-        }
-        
-        if (!targetId) {
-          alert('有効なIDが見つかりません。P0001, W0001, T0001, R0001 の形式で入力してください。');
-          return;
-        }
-        
-        // 検索実行
-        if (targetType === 'task') {
-          // task_idの場合は、taskからwork_idを取得してwork詳細画面を開く
-          callGAS('getTaskById', targetId).then(task => {
-            if (!task) {
-              alert('タスクが見つかりません');
-              return;
-            }
-            openWorkDetailOverlay(task.work_id);
-          }).catch(handleError);
-        } else if (targetType === 'review') {
-          // review_idの場合は、reviewからwork_idを取得してwork詳細画面を開く
-          // new-buttonのスピナーをすぐに表示
-          showLoading();
-          callGAS('getReviewRequestById', targetId).then(reviewRequest => {
-            if (!reviewRequest) {
-              alert('レビューリクエストが見つかりません');
-              hideLoading();
-              return;
-            }
-            openWorkDetailOverlay(reviewRequest.work_id);
-          }).catch(error => {
-            handleError(error);
-            hideLoading();
-          });
-        } else if (targetType === 'work') {
-          // work_idの場合はwork詳細画面を開く
-          openWorkDetailOverlay(targetId);
-        } else if (targetType === 'project') {
-          // project_idの場合はproject詳細画面を開く
-          openProjectDetailOverlay(targetId);
-        }
+        executeIdSearch(searchValue);
       }
     }
   </script>
