@@ -630,22 +630,31 @@
 
       // 新規作成ボタンのクリック
       if (newButton) {
+        console.log('新規作成ボタンが見つかりました。イベントリスナーを設定します。');
         newButton.addEventListener('click', handleMainButtonClick);
+        // 子要素（span）からのクリックも確実に処理されるように
+        const newButtonMain = document.getElementById('new-button-main');
+        if (newButtonMain) {
+          newButtonMain.addEventListener('click', handleMainButtonClick);
+        }
+      } else {
+        console.error('新規作成ボタンが見つかりませんでした！');
       }
 
       // ドキュメント全体（body）をクリックした時の動作
       document.addEventListener('click', (event) => {
-        // ポップアップエディタを閉じる（新規作成ボタン関連の要素は除外）
-        if (!newButtonContainer || !newButtonContainer.contains(event.target)) {
-          closeAllPopups();
+        // 新規作成ボタン関連の要素がクリックされた場合は処理をスキップ
+        if (newButtonContainer && newButtonContainer.contains(event.target)) {
+          return; // ボタンのクリックイベントを妨げないように早期リターン
         }
+        
+        // ポップアップエディタを閉じる
+        closeAllPopups();
+        
         // ドロップダウンが表示されていて、かつ
         // クリックされた場所がボタンコンテナの外側の場合にドロップダウンを閉じる
-        if (dropdown && dropdown.classList.contains('show') && newButtonContainer && !newButtonContainer.contains(event.target)) {
-          // 新規作成ボタン自体のクリックは除外
-          if (event.target !== newButton && !newButton.contains(event.target)) {
-            closeNewButtonDropdown();
-          }
+        if (dropdown && dropdown.classList.contains('show')) {
+          closeNewButtonDropdown();
         }
       });
     };
@@ -780,30 +789,39 @@
      * メインの「+ 新規作成」ボタンがクリックされたときの処理
      */
     function handleMainButtonClick(event) {
+      console.log('handleMainButtonClick が呼び出されました', event);
       event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
       event.preventDefault(); // デフォルトの動作を防ぐ
       closeAllPopups();
       
       // アクティブなナビゲーションアイテムを確認してタブを判定
       const activeNavItem = document.querySelector('.nav-item.active');
+      console.log('アクティブなナビゲーションアイテム:', activeNavItem);
       if (!activeNavItem) {
         // アクティブなタブが見つからない場合はドロップダウンを表示
+        console.log('アクティブなタブが見つからないため、ドロップダウンを表示します');
         toggleNewButtonDropdown(event);
         return;
       }
       
       const navItemId = activeNavItem.id;
+      console.log('ナビゲーションアイテムID:', navItemId);
       
       if (navItemId === 'works-nav') {
+        console.log('制作物モーダルを開きます');
         openNewWorkModal();
       } else if (navItemId === 'projects-nav') {
+        console.log('制作物モーダルを開きます（案件タブ）');
         openNewWorkModal();
       } else if (navItemId === 'members-nav') {
+        console.log('メンバーモーダルを開きます');
         openNewMemberModal();
       } else if (navItemId === 'knowledge-nav') {
+        console.log('ナレッジモーダルを開きます');
         openNewKnowledgeModal();
       } else {
         // それ以外のタブ（ホーム、統計など）ではドロップダウンを表示
+        console.log('その他のタブのため、ドロップダウンを表示します');
         toggleNewButtonDropdown(event);
       }
     }
