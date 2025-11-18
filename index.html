@@ -1850,9 +1850,33 @@
           projectTitleInput.type = 'text';
           projectTitleInput.className = 'input-field';
           projectTitleInput.style.width = '100%';
-          projectTitleInput.value = work.project_title || '';
-          projectTitleInput.dataset.projectId = work.project_id || '';
-          projectTitleInput.oninput = (e) => searchProjectsForOverlayProjectTitle(e.target.value, work.work_id, work.project_id);
+          const originalProjectTitle = work.project_title || '';
+          const originalProjectId = work.project_id || '';
+          projectTitleInput.value = originalProjectTitle;
+          projectTitleInput.dataset.projectId = originalProjectId;
+          projectTitleInput.dataset.originalTitle = originalProjectTitle;
+          projectTitleInput.dataset.originalProjectId = originalProjectId;
+          
+          projectTitleInput.oninput = (e) => {
+            // 入力が変更されたらフラグをリセット
+            projectTitleInput.dataset.dropdownSelected = 'false';
+            searchProjectsForOverlayProjectTitle(e.target.value, work.work_id, work.project_id);
+          };
+          
+          // フォーカスが外れたときに元の値に戻す
+          projectTitleInput.onblur = (e) => {
+            // 少し遅延させて、ドロップダウンのクリックイベントが先に処理されるようにする
+            setTimeout(() => {
+              const dropdownContainer = overlayProjectTitle.querySelector('.overlay-project-title-dropdown');
+              // ドロップダウンが選択されていない場合、元の値に戻す
+              if (projectTitleInput.dataset.dropdownSelected !== 'true' && (!dropdownContainer || dropdownContainer.style.display === 'none')) {
+                projectTitleInput.value = originalProjectTitle;
+                projectTitleInput.dataset.projectId = originalProjectId;
+              }
+              // フラグをリセット
+              projectTitleInput.dataset.dropdownSelected = 'false';
+            }, 200);
+          };
           
           // キーボード操作のサポート
           let selectedIndex = -1;
@@ -2547,8 +2571,10 @@
         selectedIndex = 0;
         const updateItem = document.createElement('div');
         updateItem.className = 'popup-editor-option';
-        updateItem.innerHTML = `現在の案件IDの案件タイトルを変更する: <strong>${escapeHtml(query)}</strong>`;
+        updateItem.innerHTML = `案件タイトルを変更: <strong>${escapeHtml(p.project_id)}`;
         updateItem.onclick = () => {
+          // ドロップダウンが選択されたことをマーク
+          projectTitleInput.dataset.dropdownSelected = 'true';
           showLoading();
           callGAS('updateSingleField', 'projects', currentProjectId, 'project_title', query)
             .then(() => {
@@ -2567,41 +2593,14 @@
         };
         dropdownContainer.appendChild(updateItem);
       }
-      
-      // 2. 部分一致するプロジェクト（該当する場合のみ）
-      filteredProjects.forEach((p, idx) => {
-        const item = document.createElement('div');
-        item.className = 'popup-editor-option';
-        item.innerHTML = `${escapeHtml(p.project_id)} ${escapeHtml(p.project_title)}`;
-        item.onclick = () => {
-          projectTitleInput.value = p.project_title;
-          projectTitleInput.dataset.projectId = p.project_id;
-          dropdownContainer.style.display = 'none';
-          // 案件IDを更新
-          if (p.project_id !== currentProjectId) {
-            showLoading();
-            callGAS('updateSingleField', 'works', workId, 'project_id', p.project_id)
-              .then(() => {
-                // 画面を再読み込み
-                openWorkDetailOverlay(workId);
-              })
-              .catch(handleError);
-          }
-        };
-        item.onmouseenter = () => {
-          // マウスホバー時に選択状態を更新
-          dropdownContainer.querySelectorAll('.popup-editor-option').forEach((opt) => {
-            opt.classList.toggle('selected', opt === item);
-          });
-        };
-        dropdownContainer.appendChild(item);
-      });
-      
-      // 3. 案件を新規作成
+
+      // 2. 案件を新規作成
       const newItem = document.createElement('div');
       newItem.className = 'popup-editor-option';
       newItem.innerHTML = `案件を新規作成: <strong>${escapeHtml(query)}</strong>`;
       newItem.onclick = () => {
+        // ドロップダウンが選択されたことをマーク
+        projectTitleInput.dataset.dropdownSelected = 'true';
         showLoading();
         callGAS('createProject', query).then(projectId => {
           projectTitleInput.value = query;
@@ -2627,6 +2626,37 @@
         });
       };
       dropdownContainer.appendChild(newItem);
+      
+      // 3. 部分一致するプロジェクト（該当する場合のみ）
+      filteredProjects.forEach((p, idx) => {
+        const item = document.createElement('div');
+        item.className = 'popup-editor-option';
+        item.innerHTML = `別案件に変更: <strong>${escapeHtml(p.project_id)} ${escapeHtml(p.project_title)}</strong>`;
+        item.onclick = () => {
+          // ドロップダウンが選択されたことをマーク
+          projectTitleInput.dataset.dropdownSelected = 'true';
+          projectTitleInput.value = p.project_title;
+          projectTitleInput.dataset.projectId = p.project_id;
+          dropdownContainer.style.display = 'none';
+          // 案件IDを更新
+          if (p.project_id !== currentProjectId) {
+            showLoading();
+            callGAS('updateSingleField', 'works', workId, 'project_id', p.project_id)
+              .then(() => {
+                // 画面を再読み込み
+                openWorkDetailOverlay(workId);
+              })
+              .catch(handleError);
+          }
+        };
+        item.onmouseenter = () => {
+          // マウスホバー時に選択状態を更新
+          dropdownContainer.querySelectorAll('.popup-editor-option').forEach((opt) => {
+            opt.classList.toggle('selected', opt === item);
+          });
+        };
+        dropdownContainer.appendChild(item);
+      });
       
       // 最初の項目を選択状態にする
       const firstOption = dropdownContainer.querySelector('.popup-editor-option');
