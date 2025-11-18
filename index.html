@@ -2667,7 +2667,7 @@
       if (currentProjectId) {
         const updateItem = document.createElement('div');
         updateItem.className = 'popup-editor-option';
-        updateItem.innerHTML = `案件タイトルを変更: <strong>${escapeHtml(currentProjectId)}</strong> → <strong>${escapeHtml(query)}</strong>`;
+        updateItem.innerHTML = `案件タイトルを変更: <strong>${escapeHtml(currentProjectId)}</strong>`;
         updateItem.onclick = () => {
           // ドロップダウンが選択されたことをマーク
           projectTitleInput.dataset.dropdownSelected = 'true';
@@ -5702,7 +5702,10 @@
     function handleIdSearchBlur(event) {
       const input = event.target;
       // フォーカスが外れたら、詳細画面が表示中の場合はIDを再設定
-      updateIdSearchInput();
+      // setTimeoutを使って、document.activeElementが更新された後に実行
+      setTimeout(() => {
+        updateIdSearchInput();
+      }, 0);
     }
     
     function handleIdSearchInput(event) {
