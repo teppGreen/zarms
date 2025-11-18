@@ -787,14 +787,7 @@
           worksContainer.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
         } else {
           data.works.forEach(work => {
-            const card = document.createElement('md-filled-card');
-            card.style.cursor = 'pointer';
-            card.style.padding = '20px';
-            card.style.marginBottom = '24px';
-            card.onclick = () => openWorkDetailOverlay(work.work_id);
-            card.innerHTML = `<h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div>`;
-            worksContainer.appendChild(card);
-            container.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
+            worksContainer.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
           });
         }
         
@@ -1185,7 +1178,7 @@
         
         renderWorkTasks(work.tasks);
         renderWorkAssignees(work.assignees);
-        renderWorkApps(work.apps);
+        // renderWorkApps(work.apps);
         renderWorkReviewRequests(work.review_requests || []);
         document.getElementById('new-task-button').onclick = () => openNewTaskModal(work.work_id);
         document.getElementById('new-review-request-button').onclick = () => openNewReviewRequestModal(work.work_id);
