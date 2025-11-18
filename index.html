@@ -21,8 +21,8 @@
       <h1 class="header-title" id="header-title-default">CTMS v3.0</h1>
       <h1 class="header-title" id="header-title-work-detail-header" style="display: none;"></h1>
       <div id="id-search-container" style="position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 0;">
-        <input type="text" id="id-search-input" placeholder="ID検索（例：P0001, W0001, T0001, R0001）" style="padding: 8px 12px; border: 1px solid #6b7280; border-right: none; border-radius: 50px 0 0 50px; font-size: 1.5rem; width: 600px; text-transform: uppercase; height: 48px; box-sizing: border-box;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)" onfocus="handleIdSearchFocus(event)" onblur="handleIdSearchBlur(event)">
-        <button id="id-search-button" type="button" onclick="handleIdSearchClick()" style="padding: 8px 16px; border: 1px solid #6b7280; border-left: none; border-radius: 0 50px 50px 0; background-color: #f9fafb; cursor: pointer; height: 48px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; position: relative;">
+        <input type="text" id="id-search-input" placeholder="ID検索（例：P0001, W0001, T0001, R0001）" style="padding: 8px 24px; border: 1px solid #6b7280; border-right: none; border-radius: 50px 0 0 50px; font-size: 1.5rem; width: 600px; text-transform: uppercase; height: 48px; box-sizing: border-box;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)" onfocus="handleIdSearchFocus(event)" onblur="handleIdSearchBlur(event)">
+        <button id="id-search-button" type="button" onclick="handleIdSearchClick()" style="padding: 8px 16px; border: 1px solid #6b7280; border-radius: 0 50px 50px 0; background-color: #f9fafb; cursor: pointer; height: 48px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; position: relative;">
           <span class="material-icons" style="font-size: 24px; color: #6b7280;">search</span>
         </button>
       </div>
@@ -30,10 +30,6 @@
     <div class="new-button-container">
       <div id="new-button" class="new-button">
         <span id="new-button-main">+</span>
-      </div>
-      <div id="new-button-loading" class="new-button-loading" style="display: none;">
-        <div class="loading-spinner" style="display: none;"></div>
-        <div class="loading-checkmark" style="display: none;">✓</div>
       </div>
       <div id="new-button-dropdown" class="new-button-dropdown">
         <a onclick="openNewWorkModal(); closeNewButtonDropdown();">制作物</a>
@@ -365,9 +361,11 @@
         <!-- 列5: レビュー（1/5幅） -->
         <div class="overlay-column-review">
           <div class="detail-section">
-            <h3>レビュー</h3>
-            <div id="work-review-requests-container"></div>
-            <button id="new-review-request-button" class="btn btn-sm">+追加</button>
+              <div style="margin-bottom: 12px;">  
+              <h3 style="margin: 0;">レビュー</h3>
+              <div id="work-review-requests-container"></div>
+              <button id="new-review-request-button" class="btn btn-sm">+追加</button>
+            </div>
           </div>
         </div>
       </div>
@@ -774,37 +772,26 @@
       
       // 新規作成ボタンのローディング
       const newButton = document.getElementById('new-button');
-      const newButtonLoading = document.getElementById('new-button-loading');
       if (newButton) {
-        newButton.style.display = 'none';
-      }
-      if (newButtonLoading) {
-        const spinner = newButtonLoading.querySelector('.loading-spinner');
-        const checkmark = newButtonLoading.querySelector('.loading-checkmark');
-        newButtonLoading.style.display = 'flex';
-        if (spinner) spinner.style.display = 'flex';
-        if (checkmark) checkmark.style.display = 'none';
+        // シマーエフェクトをON（スパイラルアニメーションの代わり）
+        newButton.classList.add('shimmer-loading');
+        // 新規作成ボタンと重ねて表示するボタンを切り替える（既存のロジックを維持）
+        // シマーエフェクトを表示するため、ボタンは表示したままにする
       }
     }
 
     function hideLoading() {
       // 新規作成ボタンのローディング
       const newButton = document.getElementById('new-button');
-      const newButtonLoading = document.getElementById('new-button-loading');
-      if (newButtonLoading) {
-        const spinner = newButtonLoading.querySelector('.loading-spinner');
-        const checkmark = newButtonLoading.querySelector('.loading-checkmark');
+      if (newButton) {
+        // シマーエフェクトをOFF（チェックマーク表示の代わり）
+        newButton.classList.remove('shimmer-loading');
         
-        // スピナーを非表示にしてチェックマークを表示
-        if (spinner) spinner.style.display = 'none';
-        if (checkmark) checkmark.style.display = 'flex';
-        
-        // チェックマークを表示してからボタンを表示
+        // 新規作成ボタンと重ねて表示するボタンを切り替える（既存のロジックを維持）
+        // ボタンは既に表示されているので、バウンドアニメーションのみ追加
         if (loadingTimeout) clearTimeout(loadingTimeout);
         loadingTimeout = setTimeout(() => {
-          newButtonLoading.style.display = 'none';
           if (newButton) {
-            newButton.style.display = 'flex';
             // バウンドアニメーションを追加
             newButton.classList.add('animate-bounce-in');
             // アニメーション終了後にクラスを削除（次回のアニメーションのため）
@@ -813,17 +800,6 @@
             }, 600);
           }
         }, 1500);
-      } else {
-        // ローディング要素がない場合は直接ボタンを表示
-        if (newButton) {
-          newButton.style.display = 'flex';
-          // バウンドアニメーションを追加
-          newButton.classList.add('animate-bounce-in');
-          // アニメーション終了後にクラスを削除（次回のアニメーションのため）
-          setTimeout(() => {
-            newButton.classList.remove('animate-bounce-in');
-          }, 600);
-        }
       }
     }
     
@@ -3749,7 +3725,6 @@
         removeBtn.style.fontSize = '18px';
         removeBtn.textContent = '×';
         removeBtn.onclick = () => removeReviewRequestFile(index);
-        
         fileDiv.appendChild(fileNameSpan);
         fileDiv.appendChild(removeBtn);
         container.appendChild(fileDiv);

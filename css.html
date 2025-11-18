@@ -1970,4 +1970,39 @@ td.editable:hover::after {
   gap: 8px;
   margin-top: auto;
 }
+
+/* Shimmer Loading Effect */
+.shimmer-loading {
+  background: linear-gradient(
+    90deg,
+    var(--md-sys-color-surface-variant) 25%,
+    var(--md-sys-color-surface) 50%,
+    var(--md-sys-color-surface-variant) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmerMove 1.5s infinite linear;
+  cursor: wait;
+}
+
+@keyframes shimmerMove {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ダークモード対応 */
+@media (prefers-color-scheme: dark) {
+  .shimmer-loading {
+    background: linear-gradient(
+      90deg,
+      #333333 25%,
+      #444444 50%,
+      #333333 75%
+    );
+    background-size: 200% 100%;
+  }
+}
 </style>
