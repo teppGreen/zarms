@@ -770,36 +770,18 @@
     function showLoading() {
       if (loadingTimeout) clearTimeout(loadingTimeout);
       
-      // 新規作成ボタンのローディング
-      const newButton = document.getElementById('new-button');
-      if (newButton) {
-        // シマーエフェクトをON（スパイラルアニメーションの代わり）
-        newButton.classList.add('shimmer-loading');
-        // 新規作成ボタンと重ねて表示するボタンを切り替える（既存のロジックを維持）
-        // シマーエフェクトを表示するため、ボタンは表示したままにする
+      // app-headerにシマーエフェクトをON（スパイラルアニメーションの代わり）
+      const appHeader = document.querySelector('.app-header');
+      if (appHeader) {
+        appHeader.classList.add('shimmer-loading');
       }
     }
 
     function hideLoading() {
-      // 新規作成ボタンのローディング
-      const newButton = document.getElementById('new-button');
-      if (newButton) {
-        // シマーエフェクトをOFF（チェックマーク表示の代わり）
-        newButton.classList.remove('shimmer-loading');
-        
-        // 新規作成ボタンと重ねて表示するボタンを切り替える（既存のロジックを維持）
-        // ボタンは既に表示されているので、バウンドアニメーションのみ追加
-        if (loadingTimeout) clearTimeout(loadingTimeout);
-        loadingTimeout = setTimeout(() => {
-          if (newButton) {
-            // バウンドアニメーションを追加
-            newButton.classList.add('animate-bounce-in');
-            // アニメーション終了後にクラスを削除（次回のアニメーションのため）
-            setTimeout(() => {
-              newButton.classList.remove('animate-bounce-in');
-            }, 600);
-          }
-        }, 1500);
+      // app-headerからシマーエフェクトをOFF（チェックマーク表示の代わり）
+      const appHeader = document.querySelector('.app-header');
+      if (appHeader) {
+        appHeader.classList.remove('shimmer-loading');
       }
     }
     
