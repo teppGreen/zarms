@@ -609,8 +609,64 @@
     ];
 
 
+    // 新規作成ボタンの初期化関数
+    function initializeNewButton() {
+      console.log('initializeNewButton が呼び出されました');
+      
+      // --- 新規作成ボタンのロジック ---
+      const newButton = document.getElementById('new-button');
+      const dropdown = document.getElementById('new-button-dropdown');
+      const newButtonContainer = document.querySelector('.new-button-container');
+
+      console.log('newButton:', newButton);
+      console.log('newButtonContainer:', newButtonContainer);
+
+      // 新規作成ボタンのクリック
+      if (newButton) {
+        console.log('新規作成ボタンが見つかりました。イベントリスナーを設定します。');
+        // 既存のイベントリスナーを削除してから追加（重複を防ぐ）
+        const newHandler = function(event) {
+          console.log('新規作成ボタンがクリックされました（直接イベント）', event);
+          handleMainButtonClick(event);
+        };
+        newButton.onclick = newHandler; // onclickを使用して確実に設定
+        
+        // 子要素（span）からのクリックも確実に処理されるように
+        const newButtonMain = document.getElementById('new-button-main');
+        if (newButtonMain) {
+          newButtonMain.onclick = newHandler;
+        }
+      } else {
+        console.error('新規作成ボタンが見つかりませんでした！');
+        // リトライ（DOMがまだ読み込まれていない場合）
+        setTimeout(initializeNewButton, 100);
+        return;
+      }
+
+      // ドキュメント全体（body）をクリックした時の動作
+      if (!window.newButtonClickHandlerInitialized) {
+        document.addEventListener('click', (event) => {
+          // 新規作成ボタン関連の要素がクリックされた場合は処理をスキップ
+          if (newButtonContainer && newButtonContainer.contains(event.target)) {
+            return; // ボタンのクリックイベントを妨げないように早期リターン
+          }
+          
+          // ポップアップエディタを閉じる
+          closeAllPopups();
+          
+          // ドロップダウンが表示されていて、かつ
+          // クリックされた場所がボタンコンテナの外側の場合にドロップダウンを閉じる
+          if (dropdown && dropdown.classList.contains('show')) {
+            closeNewButtonDropdown();
+          }
+        });
+        window.newButtonClickHandlerInitialized = true;
+      }
+    }
+
     // 初期化
-    window.onload = function() {
+    function initializeApp() {
+      console.log('initializeApp が呼び出されました');
       loadInitialData();
 
       // URLパラメータからwork_idを取得して詳細画面を開く（最優先処理）
@@ -623,41 +679,20 @@
         openWorkDetailOverlay(workId);
       }
 
-      // --- 新規作成ボタンのロジック ---
-      const newButton = document.getElementById('new-button');
-      const dropdown = document.getElementById('new-button-dropdown');
-      const newButtonContainer = document.querySelector('.new-button-container');
+      // 新規作成ボタンを初期化
+      initializeNewButton();
+    }
 
-      // 新規作成ボタンのクリック
-      if (newButton) {
-        console.log('新規作成ボタンが見つかりました。イベントリスナーを設定します。');
-        newButton.addEventListener('click', handleMainButtonClick);
-        // 子要素（span）からのクリックも確実に処理されるように
-        const newButtonMain = document.getElementById('new-button-main');
-        if (newButtonMain) {
-          newButtonMain.addEventListener('click', handleMainButtonClick);
-        }
-      } else {
-        console.error('新規作成ボタンが見つかりませんでした！');
-      }
-
-      // ドキュメント全体（body）をクリックした時の動作
-      document.addEventListener('click', (event) => {
-        // 新規作成ボタン関連の要素がクリックされた場合は処理をスキップ
-        if (newButtonContainer && newButtonContainer.contains(event.target)) {
-          return; // ボタンのクリックイベントを妨げないように早期リターン
-        }
-        
-        // ポップアップエディタを閉じる
-        closeAllPopups();
-        
-        // ドロップダウンが表示されていて、かつ
-        // クリックされた場所がボタンコンテナの外側の場合にドロップダウンを閉じる
-        if (dropdown && dropdown.classList.contains('show')) {
-          closeNewButtonDropdown();
-        }
-      });
-    };
+    // 複数の方法で初期化を試みる
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeApp);
+    } else {
+      // DOMContentLoaded が既に発火している場合
+      initializeApp();
+    }
+    
+    // window.onload も念のため設定
+    window.onload = initializeApp;
 
     function loadInitialData(shouldSwitchTab = true) {
       showLoading();
