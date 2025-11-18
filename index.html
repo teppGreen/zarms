@@ -5562,34 +5562,14 @@
     }
     
     function updateIdSearchInput(idValue) {
-      console.log('[DEBUG] updateIdSearchInput called', {
-        idValue: idValue,
-        currentWorkId: currentWorkId,
-        currentProjectId: currentProjectId,
-        hasCurrentWork: !!currentWork
-      });
-      
       const input = document.getElementById('id-search-input');
-      if (!input) {
-        console.log('[DEBUG] updateIdSearchInput: input not found');
-        return;
-      }
-      
-      console.log('[DEBUG] updateIdSearchInput: checking activeElement', {
-        activeElement: document.activeElement,
-        input: input,
-        isInputFocused: document.activeElement === input
-      });
+      if (!input) return;
       
       // フォーカス中は何もしない
-      if (document.activeElement === input) {
-        console.log('[DEBUG] updateIdSearchInput: input is focused, returning');
-        return;
-      }
+      if (document.activeElement === input) return;
       
       // idValueが直接指定された場合
       if (idValue) {
-        console.log('[DEBUG] updateIdSearchInput: setting idValue directly', idValue);
         input.value = idValue;
         input.removeAttribute('placeholder');
         return;
@@ -5598,39 +5578,22 @@
       // work詳細画面が表示中の場合
       if (currentWorkId && currentWork) {
         const workDetailOverlay = document.getElementById('work-detail-overlay');
-        const isOverlayVisible = workDetailOverlay && workDetailOverlay.classList.contains('show');
-        const headerTitle = document.getElementById('header-title-work-detail-header');
-        const headerTitleText = headerTitle ? headerTitle.textContent : null;
-        
-        console.log('[DEBUG] updateIdSearchInput: checking work detail', {
-          isOverlayVisible: isOverlayVisible,
-          headerTitleText: headerTitleText,
-          shouldSetWorkId: isOverlayVisible && headerTitleText === 'CTMS v3.0'
-        });
-        
-        if (isOverlayVisible) {
+        if (workDetailOverlay && workDetailOverlay.classList.contains('show')) {
+          const headerTitle = document.getElementById('header-title-work-detail-header');
           if (headerTitle && headerTitle.textContent === 'CTMS v3.0') {
             // 保持しているworkデータからIDを構築（APIリクエスト不要）
             const workIdForSearch = `${currentWork.project_id || ''}-${currentWork.work_id || ''}`;
-            console.log('[DEBUG] updateIdSearchInput: setting workIdForSearch', workIdForSearch);
             input.value = workIdForSearch;
             input.removeAttribute('placeholder');
             return;
           }
+        }
       }
       
       // project詳細画面が表示中の場合
       if (currentProjectId) {
         const projectDetailOverlay = document.getElementById('project-detail-overlay');
-        const isOverlayVisible = projectDetailOverlay && projectDetailOverlay.classList.contains('show');
-        
-        console.log('[DEBUG] updateIdSearchInput: checking project detail', {
-          isOverlayVisible: isOverlayVisible,
-          shouldSetProjectId: isOverlayVisible
-        });
-        
-        if (isOverlayVisible) {
-          console.log('[DEBUG] updateIdSearchInput: setting projectId', currentProjectId);
+        if (projectDetailOverlay && projectDetailOverlay.classList.contains('show')) {
           input.value = currentProjectId;
           input.removeAttribute('placeholder');
           return;
@@ -5638,7 +5601,6 @@
       }
       
       // どちらも表示されていない場合はクリア
-      console.log('[DEBUG] updateIdSearchInput: clearing input');
       clearIdSearchInput();
     }
     
@@ -5738,12 +5700,6 @@
     
     function handleIdSearchBlur(event) {
       const input = event.target;
-      console.log('[DEBUG] handleIdSearchBlur triggered', {
-        value: input.value,
-        activeElement: document.activeElement,
-        isInputFocused: document.activeElement === input
-      });
-      
       // フォーカスが外れたら、詳細画面が表示中の場合はIDを再設定
       updateIdSearchInput();
     }
