@@ -623,8 +623,6 @@
         openWorkDetailOverlay(workId);
       }
       
-      document.body.addEventListener('click', closeAllPopups);
-
       // --- 新規作成ボタンのロジック ---
       const newButton = document.getElementById('new-button');
       const dropdown = document.getElementById('new-button-dropdown');
@@ -637,6 +635,11 @@
 
       // ドキュメント全体（body）をクリックした時の動作
       document.addEventListener('click', (event) => {
+        // ポップアップエディタを閉じる（新規作成ボタン関連の要素は除外）
+        if (!newButtonContainer || !newButtonContainer.contains(event.target)) {
+          closeAllPopups();
+        }
+        
         // ドロップダウンが表示されていて、かつ
         // クリックされた場所がボタンコンテナの外側の場合にドロップダウンを閉じる
         if (dropdown && dropdown.classList.contains('show') && newButtonContainer && !newButtonContainer.contains(event.target)) {
@@ -834,7 +837,17 @@
           worksContainer.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
         } else {
           data.works.forEach(work => {
-            worksContainer.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
+            const workCard = document.createElement('div');
+            workCard.className = 'work-card';
+            workCard.onclick = () => openWorkDetailOverlay(work.work_id);
+            workCard.innerHTML = `
+              <h3 class="card-title-text">${escapeHtml(work.work_title)}</h3>
+              <p class="card-subtitle">${escapeHtml(work.project_title)}</p>
+              <div class="card-meta">
+                <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span>
+              </div>
+            `;
+            worksContainer.appendChild(workCard);
           });
         }
         
@@ -845,17 +858,15 @@
           reviewRequestsContainer.innerHTML = '<p style="color: #6b7280;">レビュー依頼はありません</p>';
         } else {
           data.review_requests.forEach(reviewRequest => {
-            const card = document.createElement('md-filled-card');
-            card.style.cursor = 'pointer';
-            card.style.padding = '20px';
-            card.style.marginBottom = '24px';
+            const card = document.createElement('div');
+            card.className = 'review-card';
             card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
             card.innerHTML = `
-              <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(reviewRequest.review_title)}</h3>
-              <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml((reviewRequest.review_comment || '').substring(0, 100))}${(reviewRequest.review_comment || '').length > 100 ? '...' : ''}</p>
-              <div style="font-size: 12px; color: #6b7280;">
+              <h3 class="card-title-text">${escapeHtml(reviewRequest.review_title)}</h3>
+              <p class="card-subtitle">${escapeHtml((reviewRequest.review_comment || '').substring(0, 100))}${(reviewRequest.review_comment || '').length > 100 ? '...' : ''}</p>
+              <div class="card-meta">
                 <span>${reviewRequest.file_count || 0}個のファイル</span>
-                <span style="margin-left: 16px;">${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
+                <span>${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
               </div>
             `;
             reviewRequestsContainer.appendChild(card);
@@ -1068,6 +1079,22 @@
         if (workflowStatusBar && timestamps) {
           workflowStatusBar.style.display = 'flex';
           
+          // workflow-status-dropdownに全てのWORK_STATUSを表示
+          const workflowStatusDropdown = document.getElementById('workflow-status-dropdown');
+          if (workflowStatusDropdown && configData.WORK_STATUS) {
+            workflowStatusDropdown.innerHTML = '';
+            const activeStatuses = configData.WORK_STATUS.filter(status => status.is_active !== false);
+            activeStatuses.forEach(status => {
+              const option = document.createElement('option');
+              option.value = status.config_key;
+              option.textContent = status.config_value;
+              if (status.config_key === work.work_status_key) {
+                option.selected = true;
+              }
+              workflowStatusDropdown.appendChild(option);
+            });
+          }
+          
           // 日時をフォーマットする関数
           const formatWorkflowDate = (dateStr) => {
             if (!dateStr) return '';
@@ -1081,10 +1108,13 @@
             return `${month}/${day}(${dayOfWeek}) ${hours}:${minutes}`;
           };
           
-          // 依頼
+          // 依頼（work.created_atを使用）
           const requestDate = document.getElementById('workflow-date-request');
-          if (requestDate && timestamps.request) {
-            requestDate.textContent = formatWorkflowDate(timestamps.request);
+          if (requestDate) {
+            const requestDateValue = timestamps.request || work.created_at;
+            if (requestDateValue) {
+              requestDate.textContent = formatWorkflowDate(requestDateValue);
+            }
           }
           
           // 制作
@@ -2065,20 +2095,9 @@
           </div>
         `;
         
-        // イベントリスナーを追加
-        const titleElement = card.querySelector('.task-card-title');
-        titleElement.addEventListener('click', (e) => {
-          editTaskField(e, task.task_id, 'task_title', task.task_title, 'TEXT');
-        });
-        
-        const assigneeElement = card.querySelector('.task-card-assignee');
-        assigneeElement.addEventListener('click', (e) => {
-          editTaskField(e, task.task_id, 'assign_to', task.assign_to || '', 'MEMBER');
-        });
-        
-        const dateElement = card.querySelector('.task-card-date');
-        dateElement.addEventListener('click', (e) => {
-          openDateTimePicker(e, 'task', task.task_id, 'planned_end_datetime');
+        // カード全体をクリックでモーダルを開く
+        card.addEventListener('click', () => {
+          openEditTaskModal(task);
         });
         
         container.appendChild(card);
@@ -2231,9 +2250,22 @@
     function openEditTaskModal(task) {
       // タスク編集モーダルを開く（簡易版：新規作成モーダルを再利用）
       const form = document.getElementById('new-task-form');
+      const modalTitle = form.closest('.modal-content').querySelector('.modal-title');
+      
+      // モーダルタイトルを変更
+      if (modalTitle) {
+        modalTitle.textContent = 'タスク編集';
+      }
+      
+      // フォームをリセット
+      form.reset();
+      
+      // タスクデータを設定
       form.elements.work_id.value = task.work_id;
-      form.elements.task_title.value = task.task_title;
-      form.elements.task_detail.value = task.task_detail || '';
+      form.elements.task_title.value = task.task_title || '';
+      if (form.elements.task_detail) {
+        form.elements.task_detail.value = task.task_detail || '';
+      }
       
       // メンバー選択肢を設定
       const assignToSelect = form.elements.assign_to;
@@ -2266,24 +2298,33 @@
       
       // 優先度選択肢を設定
       const prioritySelect = form.elements.priority_key;
-      prioritySelect.innerHTML = '<option value="">選択してください</option>';
-      const priorities = configData['TASK_PRIORITY'] || [];
-      priorities.forEach(priority => {
-        const option = document.createElement('option');
-        option.value = priority.config_key;
-        option.textContent = priority.config_value;
-        if (priority.config_key === task.priority_key) {
-          option.selected = true;
-        }
-        prioritySelect.appendChild(option);
-      });
+      if (prioritySelect) {
+        prioritySelect.innerHTML = '<option value="">選択してください</option>';
+        const priorities = configData['TASK_PRIORITY'] || [];
+        priorities.forEach(priority => {
+          const option = document.createElement('option');
+          option.value = priority.config_key;
+          option.textContent = priority.config_value;
+          if (priority.config_key === task.priority_key) {
+            option.selected = true;
+          }
+          prioritySelect.appendChild(option);
+        });
+      }
       
       // 日時を設定
-      if (task.planned_end_datetime) {
+      if (task.planned_end_datetime && form.elements.planned_end_datetime) {
         form.elements.planned_end_datetime.value = formatDateTimeForInput(task.planned_end_datetime);
       }
       
+      // 送信ボタンのテキストを変更
+      const submitButton = form.querySelector('button[type="submit"]');
+      if (submitButton) {
+        submitButton.textContent = '更新';
+      }
+      
       // フォームの送信ハンドラを一時的に変更
+      const originalOnsubmit = form.onsubmit;
       form.onsubmit = (e) => {
         e.preventDefault();
         const formData = new FormData(form);
@@ -2298,6 +2339,14 @@
                 openWorkDetailOverlay(currentWorkId);
               }
             });
+            // 元のハンドラに戻す
+            form.onsubmit = originalOnsubmit;
+            if (modalTitle) {
+              modalTitle.textContent = '新規タスク作成';
+            }
+            if (submitButton) {
+              submitButton.textContent = '作成';
+            }
           })
           .catch(error => {
             handleError(error);
@@ -2328,38 +2377,17 @@
       }
       
       reviewRequests.forEach(reviewRequest => {
-        const card = document.createElement('md-filled-card');
-        card.style.cursor = 'pointer';
-        card.style.padding = '16px';
-        card.style.marginBottom = '12px';
+        const card = document.createElement('div');
+        card.className = 'review-card';
         card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
-        
-        const title = document.createElement('h4');
-        title.style.margin = '0 0 8px 0';
-        title.style.fontSize = '14px';
-        title.style.fontWeight = '600';
-        title.textContent = escapeHtml(reviewRequest.review_title);
-        
-        const commentPreview = document.createElement('p');
-        commentPreview.style.margin = '0 0 8px 0';
-        commentPreview.style.color = '#6b7280';
-        commentPreview.style.fontSize = '12px';
-        const commentText = reviewRequest.review_comment || '';
-        commentPreview.textContent = commentText.length > 50 ? commentText.substring(0, 50) + '...' : commentText;
-        
-        const meta = document.createElement('div');
-        meta.style.display = 'flex';
-        meta.style.justifyContent = 'space-between';
-        meta.style.fontSize = '11px';
-        meta.style.color = '#9ca3af';
-        meta.innerHTML = `
-          <span>${reviewRequest.file_count || 0}個のファイル</span>
-          <span>${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
+        card.innerHTML = `
+          <h3 class="card-title-text">${escapeHtml(reviewRequest.review_title)}</h3>
+          <p class="card-subtitle">${escapeHtml((reviewRequest.review_comment || '').substring(0, 100))}${(reviewRequest.review_comment || '').length > 100 ? '...' : ''}</p>
+          <div class="card-meta">
+            <span>${reviewRequest.file_count || 0}個のファイル</span>
+            <span>${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
+          </div>
         `;
-        
-        card.appendChild(title);
-        card.appendChild(commentPreview);
-        card.appendChild(meta);
         container.appendChild(card);
       });
     }
