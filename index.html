@@ -1863,6 +1863,14 @@
             searchProjectsForOverlayProjectTitle(e.target.value, work.work_id, work.project_id);
           };
           
+          // フォーカスが当たったときにドロップダウンを表示
+          projectTitleInput.onfocus = (e) => {
+            const currentValue = e.target.value.trim();
+            if (currentValue) {
+              searchProjectsForOverlayProjectTitle(currentValue, work.work_id, work.project_id);
+            }
+          };
+          
           // フォーカスが外れたときに元の値に戻す
           projectTitleInput.onblur = (e) => {
             // 少し遅延させて、ドロップダウンのクリックイベントが先に処理されるようにする
@@ -2538,37 +2546,28 @@
       
       const trimmedQuery = query.trim();
       
-      // projectsDataが取得されていない場合は取得
+      // 即座にドロップダウンを表示（検索結果を待たずに）
+      performOverlayProjectTitleSearchImmediate(trimmedQuery, workId, currentProjectId, dropdownContainer, projectTitleInput);
+      
+      // projectsDataが取得されていない場合は取得してから検索結果を更新
       if (!projectsData || projectsData.length === 0) {
         callGAS('getProjects').then(data => {
           projectsData = data;
-          performOverlayProjectTitleSearch(trimmedQuery, workId, currentProjectId, dropdownContainer, projectTitleInput);
+          performOverlayProjectTitleSearchUpdate(trimmedQuery, workId, currentProjectId, dropdownContainer, projectTitleInput);
         }).catch(handleError);
       } else {
-        performOverlayProjectTitleSearch(trimmedQuery, workId, currentProjectId, dropdownContainer, projectTitleInput);
+        performOverlayProjectTitleSearchUpdate(trimmedQuery, workId, currentProjectId, dropdownContainer, projectTitleInput);
       }
     }
     
-    function performOverlayProjectTitleSearch(query, workId, currentProjectId, dropdownContainer, projectTitleInput) {
+    function performOverlayProjectTitleSearchImmediate(query, workId, currentProjectId, dropdownContainer, projectTitleInput) {
       if (!dropdownContainer || !projectTitleInput) return;
-      
-      const lowerCaseQuery = query.toLowerCase();
-      
-      // 部分一致するプロジェクトを検索（project_idまたはproject_titleで検索）
-      const filteredProjects = (projectsData || []).filter(p => 
-        p.project_id.toLowerCase().includes(lowerCaseQuery) ||
-        p.project_title.toLowerCase().includes(lowerCaseQuery)
-      );
       
       dropdownContainer.innerHTML = '';
       dropdownContainer.className = 'overlay-project-title-dropdown popup-editor';
       
-      // 選択インデックスをリセット
-      let selectedIndex = -1;
-      
       // 1. 現在の案件IDの案件タイトルを変更する
       if (currentProjectId) {
-        selectedIndex = 0;
         const updateItem = document.createElement('div');
         updateItem.className = 'popup-editor-option';
         updateItem.innerHTML = `案件タイトルを変更: <strong>${escapeHtml(currentProjectId)}</strong> → <strong>${escapeHtml(query)}</strong>`;
@@ -2587,7 +2586,7 @@
         };
         updateItem.onmouseenter = () => {
           // マウスホバー時に選択状態を更新
-          dropdownContainer.querySelectorAll('.popup-editor-option').forEach((opt, idx) => {
+          dropdownContainer.querySelectorAll('.popup-editor-option').forEach((opt) => {
             opt.classList.toggle('selected', opt === updateItem);
           });
         };
@@ -2627,42 +2626,44 @@
       };
       dropdownContainer.appendChild(newItem);
       
-      // 3. 部分一致するプロジェクト（該当する場合のみ）
-      filteredProjects.forEach((p, idx) => {
-        const item = document.createElement('div');
-        item.className = 'popup-editor-option';
-        item.innerHTML = `別案件に変更: <strong>${escapeHtml(p.project_id)} ${escapeHtml(p.project_title)}</strong>`;
-        item.onclick = () => {
-          // ドロップダウンが選択されたことをマーク
-          projectTitleInput.dataset.dropdownSelected = 'true';
-          projectTitleInput.value = p.project_title;
-          projectTitleInput.dataset.projectId = p.project_id;
-          dropdownContainer.style.display = 'none';
-          // 案件IDを更新
-          if (p.project_id !== currentProjectId) {
-            showLoading();
-            callGAS('updateSingleField', 'works', workId, 'project_id', p.project_id)
+      // 3. 別案件に変更（検索結果を待たずに表示）
+      const changeProjectItem = document.createElement('div');
+      changeProjectItem.className = 'popup-editor-option';
+      changeProjectItem.id = 'change-project-item';
+      changeProjectItem.innerHTML = '別案件に変更';
+      changeProjectItem.onclick = () => {
+        // ドロップダウンが選択されたことをマーク
+        projectTitleInput.dataset.dropdownSelected = 'true';
+        dropdownContainer.style.display = 'none';
+        
+        // work_idを入力するモーダルを表示
+        const inputProjectId = prompt('案件IDを入力してください（例：P0001）:');
+        if (inputProjectId && inputProjectId.trim()) {
+          const trimmedProjectId = inputProjectId.trim().toUpperCase();
+          showLoading();
+          callGAS('getProjectById', trimmedProjectId).then(project => {
+            if (!project) {
+              alert('案件が見つかりません');
+              hideLoading();
+              return;
+            }
+            // 案件IDを更新
+            callGAS('updateSingleField', 'works', workId, 'project_id', trimmedProjectId)
               .then(() => {
                 // 画面を再読み込み
                 openWorkDetailOverlay(workId);
               })
               .catch(handleError);
-          }
-        };
-        item.onmouseenter = () => {
-          // マウスホバー時に選択状態を更新
-          dropdownContainer.querySelectorAll('.popup-editor-option').forEach((opt) => {
-            opt.classList.toggle('selected', opt === item);
-          });
-        };
-        dropdownContainer.appendChild(item);
-      });
-      
-      // 最初の項目を選択状態にする
-      const firstOption = dropdownContainer.querySelector('.popup-editor-option');
-      if (firstOption) {
-        firstOption.classList.add('selected');
-      }
+          }).catch(handleError);
+        }
+      };
+      changeProjectItem.onmouseenter = () => {
+        // マウスホバー時に選択状態を更新
+        dropdownContainer.querySelectorAll('.popup-editor-option').forEach((opt) => {
+          opt.classList.toggle('selected', opt === changeProjectItem);
+        });
+      };
+      dropdownContainer.appendChild(changeProjectItem);
       
       // 位置を設定
       const inputRect = projectTitleInput.getBoundingClientRect();
@@ -2673,16 +2674,52 @@
       dropdownContainer.style.zIndex = '1000';
       dropdownContainer.style.display = 'block';
       
-      // 外側をクリックしたら閉じる
-      const closeOnOutsideClick = (e) => {
-        if (!dropdownContainer.contains(e.target) && e.target !== projectTitleInput) {
+      // 最初の項目を選択状態にする
+      const firstOption = dropdownContainer.querySelector('.popup-editor-option');
+      if (firstOption) {
+        firstOption.classList.add('selected');
+      }
+    }
+    
+    function performOverlayProjectTitleSearchUpdate(query, workId, currentProjectId, dropdownContainer, projectTitleInput) {
+      if (!dropdownContainer || !projectTitleInput) return;
+      
+      const lowerCaseQuery = query.toLowerCase();
+      
+      // 部分一致するプロジェクトを検索（project_idまたはproject_titleで検索）
+      const filteredProjects = (projectsData || []).filter(p => 
+        p.project_id.toLowerCase().includes(lowerCaseQuery) ||
+        p.project_title.toLowerCase().includes(lowerCaseQuery)
+      );
+      
+      // 「別案件に変更」の項目を取得
+      const changeProjectItem = dropdownContainer.querySelector('#change-project-item');
+      
+      // マッチしたプロジェクトがある場合、詳細を表示
+      if (filteredProjects.length > 0 && changeProjectItem) {
+        const firstProject = filteredProjects[0];
+        changeProjectItem.innerHTML = `別案件に変更: <strong>${escapeHtml(firstProject.project_id)} ${escapeHtml(firstProject.project_title)}</strong>`;
+        
+        // クリック時の動作を更新（最初のマッチしたプロジェクトを選択）
+        changeProjectItem.onclick = () => {
+          // ドロップダウンが選択されたことをマーク
+          projectTitleInput.dataset.dropdownSelected = 'true';
+          projectTitleInput.value = firstProject.project_title;
+          projectTitleInput.dataset.projectId = firstProject.project_id;
           dropdownContainer.style.display = 'none';
-          document.removeEventListener('click', closeOnOutsideClick);
-        }
-      };
-      setTimeout(() => {
-        document.addEventListener('click', closeOnOutsideClick);
-      }, 0);
+          // 案件IDを更新
+          if (firstProject.project_id !== currentProjectId) {
+            showLoading();
+            callGAS('updateSingleField', 'works', workId, 'project_id', firstProject.project_id)
+              .then(() => {
+                // 画面を再読み込み
+                openWorkDetailOverlay(workId);
+              })
+              .catch(handleError);
+          }
+        };
+      }
+      // マッチしない場合でも「別案件に変更」は表示し続ける（既に表示されている）
     }
     
     function showSelectEditorForWorkDetail(event, workId, field, currentValue, configType) {
