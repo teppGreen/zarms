@@ -609,108 +609,63 @@
     ];
 
 
-    // 新規作成ボタンの初期化関数
-    function initializeNewButton() {
-      console.log('initializeNewButton が呼び出されました');
-      
+    // 初期化
+    window.onload = function() {
+      loadInitialData();
+
+      // URLパラメータからwork_idを取得して詳細画面を開く（最優先処理）
+      const workId = JSON.parse(<?= JSON.stringify(urlParam.work_id) ?>);
+      if (workId) {
+        // // URLからパラメータを削除
+        // console.log(`workId: ${workId}`);
+        // const newUrl = <?= deployedUrl ?>;
+        // window.history.replaceState({}, document.title, newUrl);
+        openWorkDetailOverlay(workId);
+      }
+
       // --- 新規作成ボタンのロジック ---
       const newButton = document.getElementById('new-button');
       const dropdown = document.getElementById('new-button-dropdown');
       const newButtonContainer = document.querySelector('.new-button-container');
 
-      console.log('newButton:', newButton);
-      console.log('newButtonContainer:', newButtonContainer);
-
       // 新規作成ボタンのクリック
       if (newButton) {
         console.log('新規作成ボタンが見つかりました。イベントリスナーを設定します。');
-        // 既存のイベントリスナーを削除してから追加（重複を防ぐ）
-        const newHandler = function(event) {
-          console.log('新規作成ボタンがクリックされました（直接イベント）', event);
+        // onclickを使用して確実に設定
+        newButton.onclick = function(event) {
+          console.log('新規作成ボタンがクリックされました', event);
           handleMainButtonClick(event);
         };
-        newButton.onclick = newHandler; // onclickを使用して確実に設定
         
         // 子要素（span）からのクリックも確実に処理されるように
         const newButtonMain = document.getElementById('new-button-main');
         if (newButtonMain) {
-          newButtonMain.onclick = newHandler;
+          newButtonMain.onclick = function(event) {
+            console.log('新規作成ボタン（span）がクリックされました', event);
+            handleMainButtonClick(event);
+          };
         }
       } else {
         console.error('新規作成ボタンが見つかりませんでした！');
-        // リトライ（DOMがまだ読み込まれていない場合）
-        setTimeout(initializeNewButton, 100);
-        return;
       }
 
       // ドキュメント全体（body）をクリックした時の動作
-      if (!window.newButtonClickHandlerInitialized) {
-        document.addEventListener('click', (event) => {
-          // 新規作成ボタン関連の要素がクリックされた場合は処理をスキップ
-          if (newButtonContainer && newButtonContainer.contains(event.target)) {
-            return; // ボタンのクリックイベントを妨げないように早期リターン
-          }
-          
-          // ポップアップエディタを閉じる
-          closeAllPopups();
-          
-          // ドロップダウンが表示されていて、かつ
-          // クリックされた場所がボタンコンテナの外側の場合にドロップダウンを閉じる
-          if (dropdown && dropdown.classList.contains('show')) {
-            closeNewButtonDropdown();
-          }
-        });
-        window.newButtonClickHandlerInitialized = true;
-      }
-    }
-
-    // 初期化
-    function initializeApp() {
-      console.log('initializeApp が呼び出されました');
-      
-      try {
-        // 新規作成ボタンを最初に初期化（DOMが利用可能な状態で確実に実行）
-        console.log('initializeNewButton を呼び出します');
-        initializeNewButton();
-      } catch (error) {
-        console.error('initializeNewButton でエラーが発生しました:', error);
-      }
-
-      try {
-        loadInitialData();
-      } catch (error) {
-        console.error('loadInitialData でエラーが発生しました:', error);
-      }
-
-      try {
-        // URLパラメータからwork_idを取得して詳細画面を開く（最優先処理）
-        const workIdParam = <?= JSON.stringify(urlParam.work_id) ?>;
-        console.log('workIdParam:', workIdParam);
-        if (workIdParam) {
-          const workId = typeof workIdParam === 'string' ? JSON.parse(workIdParam) : workIdParam;
-          if (workId) {
-            // // URLからパラメータを削除
-            // console.log(`workId: ${workId}`);
-            // const newUrl = <?= deployedUrl ?>;
-            // window.history.replaceState({}, document.title, newUrl);
-            openWorkDetailOverlay(workId);
-          }
+      document.addEventListener('click', (event) => {
+        // 新規作成ボタン関連の要素がクリックされた場合は処理をスキップ
+        if (newButtonContainer && newButtonContainer.contains(event.target)) {
+          return; // ボタンのクリックイベントを妨げないように早期リターン
         }
-      } catch (error) {
-        console.error('URLパラメータ処理でエラーが発生しました:', error);
-      }
-    }
-
-    // 複数の方法で初期化を試みる
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initializeApp);
-    } else {
-      // DOMContentLoaded が既に発火している場合
-      initializeApp();
-    }
-    
-    // window.onload も念のため設定
-    window.onload = initializeApp;
+        
+        // ポップアップエディタを閉じる
+        closeAllPopups();
+        
+        // ドロップダウンが表示されていて、かつ
+        // クリックされた場所がボタンコンテナの外側の場合にドロップダウンを閉じる
+        if (dropdown && dropdown.classList.contains('show')) {
+          closeNewButtonDropdown();
+        }
+      });
+    };
 
     function loadInitialData(shouldSwitchTab = true) {
       showLoading();
