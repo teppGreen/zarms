@@ -1109,6 +1109,9 @@
         // 現在のworkデータを保持
         currentWork = work;
         
+        // 別のオーバーレイ画面が開かれていたら一旦閉じる
+        handleHeaderCloseClick();
+        
         // メインヘッダーを更新
         const headerTitleDefault = document.getElementById('header-title-default');
         const headerTitleWorkDetailHeader = document.getElementById('header-title-work-detail-header');
@@ -1947,6 +1950,9 @@
           hideLoading();
           return;
         }
+        
+        // 別のオーバーレイ画面が開かれていたら一旦閉じる
+        handleHeaderCloseClick();
         
         // ヘッダータイトルを変更
         const headerTitleDefault = document.getElementById('header-title-default');
@@ -5037,7 +5043,6 @@
         // project_idの場合はproject詳細画面を開く
         openProjectDetailOverlay(targetId);
       }
-      handleHeaderCloseClick();
     }
     
     function handleIdSearchBlur(event) {
