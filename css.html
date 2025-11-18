@@ -1057,7 +1057,7 @@
     .workflow-status-bar {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 0;
       padding: 16px 32px;
       border-bottom: 1px solid var(--md-sys-color-surface-variant);
       background-color: var(--md-sys-color-surface);
@@ -1078,17 +1078,35 @@
       padding-right: 24px; /* 16px + 8px */
     }
 
-    /* 制作・承認: 左右両方に切り欠き、左右に8pxのパディング */
+    /* 制作・承認: 左右両方に切り欠き、左側に切り欠き分のパディングを追加、左右に8pxのパディング */
     #workflow-status-production,
     #workflow-status-approval {
-      padding-left: 24px; /* 16px + 8px */
+      padding-left: 40px; /* 16px(切り欠き) + 8px(パディング) + 16px(基本パディング) */
       padding-right: 24px; /* 16px + 8px */
     }
 
-    /* 納品: 左側のみ切り欠き、左側に8pxのパディング */
+    /* 納品: 左側のみ切り欠き、左側に切り欠き分のパディングを追加 */
     #workflow-status-delivery {
-      padding-left: 24px; /* 16px + 8px */
+      padding-left: 40px; /* 16px(切り欠き) + 8px(パディング) + 16px(基本パディング) */
       padding-right: 16px;
+    }
+
+    /* 納品が期限超過の場合のスタイル */
+    #workflow-status-delivery.overdue {
+      color: #FFFFFF;
+    }
+
+    #workflow-status-delivery.overdue .workflow-status-label,
+    #workflow-status-delivery.overdue .workflow-status-date {
+      color: #FFFFFF;
+    }
+
+    #workflow-status-delivery.overdue::before {
+      opacity: 1;
+    }
+
+    #workflow-status-delivery.overdue .workflow-status-icon-wrapper {
+      opacity: 1;
     }
 
     /* ブレード型の背景図形 - 依頼（右側のみ切り欠き） */

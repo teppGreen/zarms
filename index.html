@@ -1254,7 +1254,7 @@
               }
             }
             
-            // 制作: work_status_key が TODO の場合は赤、CREATEの場合はオレンジ、それ以外の場合は緑
+            // 制作: work_status_key が TO-DO の場合は赤、CREATEの場合はオレンジ、それ以外の場合は緑
             // 形式: yyyy/mm/dd(曜日) hh:mm ~
             const productionItem = document.getElementById('workflow-status-production');
             const productionIconWrapper = productionItem ? productionItem.querySelector('.workflow-status-icon-wrapper') : null;
@@ -1262,11 +1262,15 @@
             const productionDate = document.getElementById('workflow-date-production');
             if (productionItem && productionIconWrapper && productionIcon) {
               let productionColor = '#4CAF50'; // デフォルト: 緑
+              // work_status_key が TO-DO の場合は赤
               if (currentStatus === 'TO-DO') {
                 productionColor = '#F44336'; // 赤
-              } else if (currentStatus === 'CREATE') {
+              } 
+              // work_status_key が CREATE の場合はオレンジ
+              else if (currentStatus === 'CREATE') {
                 productionColor = '#FF9800'; // オレンジ
               }
+              // それ以外の場合は緑
               productionIconWrapper.style.backgroundColor = productionColor;
               updateIcon(productionIcon, productionColor);
               // ブレード型の背景色も設定
@@ -1312,10 +1316,25 @@
             
             // 納品: work_status_key が DELIVERED の場合は緑、APPROVED の場合はオレンジ、それ以外の場合は赤
             // 形式: 色が緑の場合は yyyy/mm/dd(曜日) hh:mm, 色が赤またはオレンジの場合は ~ yyyy/mm/dd(曜日) hh:mm
+            // 日時の後ろに、due_datetimeまでの残り日数を表示
             const deliveryItem = document.getElementById('workflow-status-delivery');
             const deliveryIconWrapper = deliveryItem ? deliveryItem.querySelector('.workflow-status-icon-wrapper') : null;
             const deliveryIcon = deliveryItem ? deliveryItem.querySelector('.workflow-status-icon') : null;
             const deliveryDate = document.getElementById('workflow-date-delivery');
+            
+            // 残り日数を計算する関数
+            function calculateDaysRemaining(dueDatetime) {
+              if (!dueDatetime) return null;
+              const now = new Date();
+              const due = new Date(dueDatetime);
+              // 日付のみを比較（時刻を無視）
+              const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+              const dueDate = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+              const diffTime = dueDate - nowDate;
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              return diffDays;
+            }
+            
             if (deliveryItem && deliveryIconWrapper && deliveryIcon) {
               let deliveryColor = '#F44336'; // デフォルト: 赤
               if (currentStatus === 'DELIVERED') {
@@ -1323,6 +1342,20 @@
               } else if (currentStatus === 'APPROVED') {
                 deliveryColor = '#FF9800'; // オレンジ
               }
+              
+              // 期限超過のチェック
+              const daysRemaining = calculateDaysRemaining(work.due_datetime);
+              const isOverdue = daysRemaining !== null && daysRemaining < 0;
+              
+              if (isOverdue) {
+                // 期限超過の場合: 透明度を反転＆文字色をwhiteに変更
+                deliveryItem.classList.add('overdue');
+                deliveryIconWrapper.style.opacity = '1';
+              } else {
+                deliveryItem.classList.remove('overdue');
+                deliveryIconWrapper.style.opacity = '1';
+              }
+              
               deliveryIconWrapper.style.backgroundColor = deliveryColor;
               updateIcon(deliveryIcon, deliveryColor);
               // ブレード型の背景色も設定
@@ -1335,13 +1368,31 @@
               } else if (currentStatus === 'APPROVED') {
                 deliveryColor = '#FF9800';
               }
+              
+              let dateText = '';
               if (deliveryColor === '#4CAF50') {
                 // 緑の場合
-                deliveryDate.textContent = formatWorkflowDate(timestamps.delivery);
+                dateText = formatWorkflowDate(timestamps.delivery);
               } else {
                 // 赤またはオレンジの場合
-                deliveryDate.textContent = '~ ' + formatWorkflowDate(timestamps.delivery);
+                dateText = '~ ' + formatWorkflowDate(timestamps.delivery);
               }
+              
+              // 残り日数を追加
+              const daysRemaining = calculateDaysRemaining(work.due_datetime);
+              if (daysRemaining !== null) {
+                let daysText = '';
+                if (daysRemaining === 0) {
+                  daysText = '本日';
+                } else if (daysRemaining < 0) {
+                  daysText = Math.abs(daysRemaining) + '日前(超過)';
+                } else {
+                  daysText = daysRemaining + '日後';
+                }
+                dateText += ' ' + daysText;
+              }
+              
+              deliveryDate.textContent = dateText;
             }
           }
           
