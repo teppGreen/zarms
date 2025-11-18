@@ -745,6 +745,16 @@
 
     // 直前のcallGAS呼び出しを記録（HTTP 429エラー時の再試行用）
     let lastCallGASInvocation = null;
+    // 直前のJavaScript関数呼び出しを記録（HTTP 429エラー時の再試行用）
+    let lastJSInvocation = null;
+
+    // JavaScript関数呼び出しを記録するヘルパー関数
+    function recordJSInvocation(functionName, ...args) {
+      lastJSInvocation = {
+        functionName: functionName,
+        args: args
+      };
+    }
 
     function callGAS(functionName, ...args) {
       // 呼び出し履歴を記録
@@ -847,11 +857,46 @@
         }
 
         console.log('lastCallGASInvocation:', lastCallGASInvocation);
+        console.log('lastJSInvocation:', lastJSInvocation);
         
-        // 直前の操作を再試行
+        // 直前のGAS操作を再試行
         const { functionName, args } = lastCallGASInvocation;
         callGAS(functionName, ...args)
           .then(() => {
+            // GASの再試行が成功したら、記録されたJavaScript関数も実行
+            if (lastJSInvocation && lastJSInvocation.functionName && lastJSInvocation.args) {
+              const jsFunctionName = lastJSInvocation.functionName;
+              const jsArgs = lastJSInvocation.args;
+              
+              // 関数を取得して実行
+              let jsFunction = null;
+              if (typeof window[jsFunctionName] === 'function') {
+                jsFunction = window[jsFunctionName];
+              } else if (typeof this[jsFunctionName] === 'function') {
+                jsFunction = this[jsFunctionName];
+              } else {
+                // 関数名から直接関数を取得を試みる
+                try {
+                  jsFunction = eval(jsFunctionName);
+                  if (typeof jsFunction !== 'function') {
+                    jsFunction = null;
+                  }
+                } catch (e) {
+                  console.warn(`Failed to get function ${jsFunctionName}:`, e);
+                }
+              }
+              
+              if (jsFunction && typeof jsFunction === 'function') {
+                try {
+                  jsFunction(...jsArgs);
+                } catch (e) {
+                  console.error(`Failed to execute ${jsFunctionName}:`, e);
+                }
+              } else {
+                console.warn(`Function ${jsFunctionName} not found`);
+              }
+            }
+            
             // 成功時はポップアップを閉じる
             hideRetryPopup();
           })
@@ -883,7 +928,7 @@
       retryPopup.className = 'retry-popup';
       retryPopup.innerHTML = `
         <div class="retry-popup-content">
-          <div class="retry-popup-text">ネットワークエラーが発生したため再試行します<br>少々お待ちください</div>
+          <div class="retry-popup-text">ネットワークエラーが発生したため復旧します<br>再度操作を行ってください</div>
           <div class="retry-progress-container">
             <div class="retry-progress-bar">
               <div class="retry-progress-fill" style="width: 0%"></div>
@@ -1214,6 +1259,9 @@
     let currentProjectId = null;
 
     function openWorkDetailOverlay(workId) {
+      // JavaScript関数呼び出しを記録（HTTP 429エラー時の再試行用）
+      recordJSInvocation('openWorkDetailOverlay', workId);
+      
       showLoading();
       currentWorkId = workId;
       const promises = [ 
@@ -2066,6 +2114,9 @@
     }
 
     function openProjectDetailOverlay(projectId) {
+      // JavaScript関数呼び出しを記録（HTTP 429エラー時の再試行用）
+      recordJSInvocation('openProjectDetailOverlay', projectId);
+      
       showLoading();
       currentProjectId = projectId;
       callGAS('getProjectById', projectId).then(project => {
@@ -3526,6 +3577,9 @@
     }
 
     function openMemberDetail(memberEmail) {
+      // JavaScript関数呼び出しを記録（HTTP 429エラー時の再試行用）
+      recordJSInvocation('openMemberDetail', memberEmail);
+      
       showLoading();
       callGAS('getMemberByEmail', memberEmail).then(member => {
         if (!member) {
