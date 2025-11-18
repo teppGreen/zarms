@@ -1177,6 +1177,57 @@
               }
               workflowStatusDropdown.appendChild(option);
             });
+            
+            // ドロップダウン変更イベントを追加
+            workflowStatusDropdown.onchange = function() {
+              const newStatusKey = this.value;
+              if (newStatusKey && newStatusKey !== work.work_status_key) {
+                showLoading();
+                callGAS('updateSingleField', 'works', work.work_id, 'work_status_key', newStatusKey)
+                  .then(() => {
+                    hideLoading();
+                    // workオブジェクトを更新
+                    work.work_status_key = newStatusKey;
+                    // ステータス表示を更新
+                    updateWorkflowStatusDisplay(work, timestamps, configData);
+                  })
+                  .catch(handleError);
+              }
+            };
+          }
+          
+          // ステータス表示を更新する関数
+          function updateWorkflowStatusDisplay(work, timestamps, configData) {
+            // 現在のステータスに応じたクラスを追加
+            const statusItems = [
+              document.getElementById('workflow-status-request'),
+              document.getElementById('workflow-status-production'),
+              document.getElementById('workflow-status-approval'),
+              document.getElementById('workflow-status-delivery')
+            ];
+            
+            // 全てのcurrent-statusクラスを削除
+            statusItems.forEach(item => {
+              if (item) {
+                item.classList.remove('current-status');
+              }
+            });
+            
+            // 現在のステータスに応じてクラスを追加
+            const currentStatus = work.work_status_key;
+            if (currentStatus === 'TO-DO') {
+              const requestItem = document.getElementById('workflow-status-request');
+              if (requestItem) requestItem.classList.add('current-status');
+            } else if (currentStatus === 'CREATE') {
+              const productionItem = document.getElementById('workflow-status-production');
+              if (productionItem) productionItem.classList.add('current-status');
+            } else if (currentStatus === 'REVIEW' || currentStatus === 'APPROVED') {
+              const approvalItem = document.getElementById('workflow-status-approval');
+              if (approvalItem) approvalItem.classList.add('current-status');
+            } else if (currentStatus === 'DELIVERED') {
+              const deliveryItem = document.getElementById('workflow-status-delivery');
+              if (deliveryItem) deliveryItem.classList.add('current-status');
+            }
           }
           
           // 日時をフォーマットする関数
@@ -1218,6 +1269,9 @@
           if (deliveryDate && timestamps.delivery) {
             deliveryDate.textContent = '~' + formatWorkflowDate(timestamps.delivery);
           }
+          
+          // 現在のステータスに応じたクラスを設定
+          updateWorkflowStatusDisplay(work, timestamps, configData);
         }
         
         // overlay-body内の案件情報列にデータを表示
