@@ -2606,13 +2606,22 @@
         return;
       }
       
-      const dropdownContainer = overlayProjectTitle.querySelector('.overlay-project-title-dropdown');
+      let dropdownContainer = overlayProjectTitle.querySelector('.overlay-project-title-dropdown');
       const projectTitleInput = overlayProjectTitle.querySelector('input');
       
       console.log('[DEBUG] Elements found', {
         dropdownContainer: !!dropdownContainer,
         projectTitleInput: !!projectTitleInput
       });
+      
+      // ドロップダウンコンテナが存在しない場合は作成
+      if (!dropdownContainer) {
+        console.log('[DEBUG] Creating dropdown container');
+        dropdownContainer = document.createElement('div');
+        dropdownContainer.className = 'overlay-project-title-dropdown';
+        dropdownContainer.style.display = 'none';
+        overlayProjectTitle.appendChild(dropdownContainer);
+      }
       
       if (!query || !query.trim()) {
         console.log('[DEBUG] Query is empty, hiding dropdown');
