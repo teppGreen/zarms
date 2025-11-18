@@ -1073,8 +1073,26 @@
       border-radius: 4px;
     }
 
-    /* ブレード型の背景図形 */
-    .workflow-status-item::before {
+    /* 依頼: 右側のみ切り欠き、右側に8pxのパディング */
+    #workflow-status-request {
+      padding-right: 24px; /* 16px + 8px */
+    }
+
+    /* 制作・承認: 左右両方に切り欠き、左右に8pxのパディング */
+    #workflow-status-production,
+    #workflow-status-approval {
+      padding-left: 24px; /* 16px + 8px */
+      padding-right: 24px; /* 16px + 8px */
+    }
+
+    /* 納品: 左側のみ切り欠き、左側に8pxのパディング */
+    #workflow-status-delivery {
+      padding-left: 24px; /* 16px + 8px */
+      padding-right: 16px;
+    }
+
+    /* ブレード型の背景図形 - 依頼（右側のみ切り欠き） */
+    #workflow-status-request::before {
       content: '';
       position: absolute;
       top: 0;
@@ -1083,6 +1101,37 @@
       bottom: 0;
       z-index: 0;
       clip-path: polygon(0 0, calc(100% - 16px) 0, calc(100% - 8px) 50%, calc(100% - 16px) 100%, 0 100%);
+      border-radius: 4px;
+      opacity: 0.15;
+      background-color: var(--blade-color, #E1E2EC);
+    }
+
+    /* ブレード型の背景図形 - 制作・承認（左右両方に切り欠き） */
+    #workflow-status-production::before,
+    #workflow-status-approval::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 0;
+      clip-path: polygon(16px 0, calc(100% - 16px) 0, calc(100% - 8px) 50%, calc(100% - 16px) 100%, 16px 100%, 8px 50%);
+      border-radius: 4px;
+      opacity: 0.15;
+      background-color: var(--blade-color, #E1E2EC);
+    }
+
+    /* ブレード型の背景図形 - 納品（左側のみ切り欠き） */
+    #workflow-status-delivery::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 0;
+      clip-path: polygon(16px 0, 100% 0, 100% 100%, 16px 100%, 8px 50%);
       border-radius: 4px;
       opacity: 0.15;
       background-color: var(--blade-color, #E1E2EC);
