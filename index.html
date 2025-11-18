@@ -20,8 +20,9 @@
       <h1 class="header-title" id="header-title-work-detail-header" style="display: none;"></h1>
       <div id="id-search-container" style="position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 0;">
         <input type="text" id="id-search-input" placeholder="ID検索（例：P0001, W0001, T0001, R0001）" style="padding: 8px 12px; border: 1px solid #6b7280; border-right: none; border-radius: 50px 0 0 50px; font-size: 1.5rem; width: 600px; text-transform: uppercase; height: 48px; box-sizing: border-box;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)" onfocus="handleIdSearchFocus(event)" onblur="handleIdSearchBlur(event)">
-        <button id="id-search-button" type="button" onclick="handleIdSearchClick()" style="padding: 8px 16px; border: 1px solid #6b7280; border-left: none; border-radius: 0 50px 50px 0; background-color: #f9fafb; cursor: pointer; height: 48px; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
-          <span class="material-icons" style="font-size: 24px; color: #6b7280;">search</span>
+        <button id="id-search-button" type="button" onclick="handleIdSearchClick()" style="padding: 8px 16px; border: 1px solid #6b7280; border-left: none; border-radius: 0 50px 50px 0; background-color: #f9fafb; cursor: pointer; height: 48px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; position: relative;">
+          <span id="id-search-icon" class="material-icons" style="font-size: 24px; color: #6b7280;">search</span>
+          <div id="id-search-loading" class="loading-spinner" style="display: none; width: 20px; height: 20px; border: 2px solid rgba(107, 114, 128, 0.2); border-top-color: #6b7280; border-radius: 50%; animation: spin 0.8s linear infinite; position: absolute;"></div>
         </button>
       </div>
     </div>
@@ -4345,6 +4346,20 @@
     // ============================================
     // ID検索バー
     // ============================================
+    function showIdSearchLoading() {
+      const icon = document.getElementById('id-search-icon');
+      const loading = document.getElementById('id-search-loading');
+      if (icon) icon.style.display = 'none';
+      if (loading) loading.style.display = 'block';
+    }
+    
+    function hideIdSearchLoading() {
+      const icon = document.getElementById('id-search-icon');
+      const loading = document.getElementById('id-search-loading');
+      if (icon) icon.style.display = 'block';
+      if (loading) loading.style.display = 'none';
+    }
+    
     function updateIdSearchInput(idValue) {
       const input = document.getElementById('id-search-input');
       if (!input) return;
@@ -4448,31 +4463,46 @@
         return;
       }
       
+      // ローディングアニメーションを表示
+      showIdSearchLoading();
+      
       // 検索実行
       if (targetType === 'task') {
         // task_idの場合は、taskからwork_idを取得してwork詳細画面を開く
         callGAS('getTaskById', targetId).then(task => {
           if (!task) {
             alert('タスクが見つかりません');
+            hideIdSearchLoading();
             return;
           }
           openWorkDetailOverlay(task.work_id);
-        }).catch(handleError);
+          hideIdSearchLoading();
+        }).catch(error => {
+          handleError(error);
+          hideIdSearchLoading();
+        });
       } else if (targetType === 'review') {
         // review_idの場合は、reviewからwork_idを取得してwork詳細画面を開く
         callGAS('getReviewRequestById', targetId).then(reviewRequest => {
           if (!reviewRequest) {
             alert('レビューリクエストが見つかりません');
+            hideIdSearchLoading();
             return;
           }
           openWorkDetailOverlay(reviewRequest.work_id);
-        }).catch(handleError);
+          hideIdSearchLoading();
+        }).catch(error => {
+          handleError(error);
+          hideIdSearchLoading();
+        });
       } else if (targetType === 'work') {
         // work_idの場合はwork詳細画面を開く
         openWorkDetailOverlay(targetId);
+        hideIdSearchLoading();
       } else if (targetType === 'project') {
         // project_idの場合はproject詳細画面を開く
         openProjectDetailOverlay(targetId);
+        hideIdSearchLoading();
       }
     }
     
@@ -4534,35 +4564,47 @@
           return;
         }
         
+        // ローディングアニメーションを表示
+        showIdSearchLoading();
+        
         // 検索実行
         if (targetType === 'task') {
           // task_idの場合は、taskからwork_idを取得してwork詳細画面を開く
           callGAS('getTaskById', targetId).then(task => {
             if (!task) {
               alert('タスクが見つかりません');
+              hideIdSearchLoading();
               return;
             }
             openWorkDetailOverlay(task.work_id);
-          }).catch(handleError);
+            hideIdSearchLoading();
+          }).catch(error => {
+            handleError(error);
+            hideIdSearchLoading();
+          });
         } else if (targetType === 'review') {
           // review_idの場合は、reviewからwork_idを取得してwork詳細画面を開く
           callGAS('getReviewRequestById', targetId).then(reviewRequest => {
             if (!reviewRequest) {
               alert('レビューリクエストが見つかりません');
+              hideIdSearchLoading();
               return;
             }
             openWorkDetailOverlay(reviewRequest.work_id);
-          }).catch(handleError);
+            hideIdSearchLoading();
+          }).catch(error => {
+            handleError(error);
+            hideIdSearchLoading();
+          });
         } else if (targetType === 'work') {
           // work_idの場合はwork詳細画面を開く
           openWorkDetailOverlay(targetId);
+          hideIdSearchLoading();
         } else if (targetType === 'project') {
           // project_idの場合はproject詳細画面を開く
           openProjectDetailOverlay(targetId);
+          hideIdSearchLoading();
         }
-        
-        // 検索バーをクリア
-        input.value = '';
       }
     }
   </script>
