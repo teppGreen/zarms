@@ -1013,6 +1013,16 @@ function getReviewRequestFiles(reviewRequestId) {
   return sanitizeForClient(enrichedFiles);
 }
 
+function getOAuthToken() {
+  try {
+    const token = ScriptApp.getOAuthToken();
+    return sanitizeForClient(token);
+  } catch (e) {
+    Logger.log('OAuthトークン取得エラー: ' + e.message);
+    throw new Error('OAuthトークンの取得に失敗しました: ' + e.message);
+  }
+}
+
 function getDriveFileInfo(fileId) {
   try {
     const driveFile = DriveApp.getFileById(fileId);
