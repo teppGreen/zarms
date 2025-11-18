@@ -5704,8 +5704,43 @@
       // フォーカスが外れたら、詳細画面が表示中の場合はIDを再設定
       // setTimeoutを使って、document.activeElementが更新された後に実行
       setTimeout(() => {
-        updateIdSearchInput();
-      }, 0);
+        // updateIdSearchInput内のdocument.activeElementチェックを回避するため、
+        // 直接値を設定する処理を実行
+        const idSearchInput = document.getElementById('id-search-input');
+        if (!idSearchInput) return;
+        
+        // フォーカス中でないことを確認
+        if (document.activeElement === idSearchInput) return;
+        
+        // work詳細画面が表示中の場合
+        if (currentWorkId && currentWork) {
+          const workDetailOverlay = document.getElementById('work-detail-overlay');
+          if (workDetailOverlay && workDetailOverlay.classList.contains('show')) {
+            const headerTitle = document.getElementById('header-title-work-detail-header');
+            if (headerTitle && headerTitle.textContent === 'CTMS v3.0') {
+              // 保持しているworkデータからIDを構築（APIリクエスト不要）
+              const workIdForSearch = `${currentWork.project_id || ''}-${currentWork.work_id || ''}`;
+              idSearchInput.value = workIdForSearch;
+              idSearchInput.removeAttribute('placeholder');
+              return;
+            }
+          }
+        }
+        
+        // project詳細画面が表示中の場合
+        if (currentProjectId) {
+          const projectDetailOverlay = document.getElementById('project-detail-overlay');
+          if (projectDetailOverlay && projectDetailOverlay.classList.contains('show')) {
+            idSearchInput.value = currentProjectId;
+            idSearchInput.removeAttribute('placeholder');
+            return;
+          }
+        }
+        
+        // どちらも表示されていない場合はクリア
+        idSearchInput.value = '';
+        idSearchInput.placeholder = 'ID検索（例：P0001, W0001, T0001, R0001）';
+      }, 50);
     }
     
     function handleIdSearchInput(event) {
