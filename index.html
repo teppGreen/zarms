@@ -799,13 +799,7 @@
       console.error('GAS Error:', error);
       
       // HTTP 429エラーを検出（エラーメッセージに"429"が含まれているか、エラーコードが429か）
-      const is429Error = error.message && (
-        error.message.includes('429') || 
-        error.message.includes('rate limit') ||
-        error.message.includes('Rate limit') ||
-        error.code === 429 ||
-        (error.toString && error.toString().includes('429'))
-      );
+      const is429Error = error.toString().includes('HTTP 429');
       
       if (is429Error && lastCallGASInvocation) {
         // HTTP 429エラーの場合、アラートを表示せずに再試行
@@ -861,13 +855,7 @@
           })
           .catch((error) => {
             // 再試行時もHTTP 429エラーの場合は再度再試行
-            const is429Error = error.message && (
-              error.message.includes('429') || 
-              error.message.includes('rate limit') ||
-              error.message.includes('Rate limit') ||
-              error.code === 429 ||
-              (error.toString && error.toString().includes('429'))
-            );
+            const is429Error = error.toString().includes('429');
             
             if (is429Error) {
               // 再度再試行
