@@ -1852,8 +1852,55 @@
           projectTitleInput.style.width = '100%';
           projectTitleInput.value = work.project_title || '';
           projectTitleInput.dataset.projectId = work.project_id || '';
-          projectTitleInput.oninput = (e) => searchProjectsForWorkDetail(e.target.value, work.work_id);
+          projectTitleInput.oninput = (e) => searchProjectsForOverlayProjectTitle(e.target.value, work.work_id, work.project_id);
+          
+          // キーボード操作のサポート
+          let selectedIndex = -1;
+          projectTitleInput.onkeydown = (e) => {
+            const dropdownContainer = overlayProjectTitle.querySelector('.overlay-project-title-dropdown');
+            if (!dropdownContainer || dropdownContainer.style.display === 'none') {
+              return;
+            }
+            
+            const options = dropdownContainer.querySelectorAll('.popup-editor-option');
+            if (options.length === 0) return;
+            
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              selectedIndex = Math.min(selectedIndex + 1, options.length - 1);
+              options[selectedIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+              options.forEach((opt, idx) => {
+                opt.classList.toggle('selected', idx === selectedIndex);
+              });
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              selectedIndex = Math.max(selectedIndex - 1, -1);
+              options.forEach((opt, idx) => {
+                opt.classList.toggle('selected', idx === selectedIndex);
+              });
+              if (selectedIndex >= 0) {
+                options[selectedIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+              }
+            } else if (e.key === 'Enter' && selectedIndex >= 0) {
+              e.preventDefault();
+              options[selectedIndex].click();
+            } else if (e.key === 'Escape') {
+              dropdownContainer.style.display = 'none';
+              selectedIndex = -1;
+            }
+          };
+          
           overlayProjectTitle.appendChild(projectTitleInput);
+          
+          // ドロップダウンコンテナを作成（既存のものを削除してから作成）
+          let dropdownContainer = overlayProjectTitle.querySelector('.overlay-project-title-dropdown');
+          if (dropdownContainer) {
+            dropdownContainer.remove();
+          }
+          dropdownContainer = document.createElement('div');
+          dropdownContainer.className = 'overlay-project-title-dropdown';
+          dropdownContainer.style.display = 'none';
+          overlayProjectTitle.appendChild(dropdownContainer);
         }
         
         // 制作タイトル（編集可能）
@@ -2449,6 +2496,164 @@
       suggestionsContainer.style.top = `${inputRect.bottom + window.scrollY}px`;
       suggestionsContainer.style.width = `${inputRect.width}px`;
       suggestionsContainer.style.display = 'block';
+    }
+    
+    function searchProjectsForOverlayProjectTitle(query, workId, currentProjectId) {
+      const overlayProjectTitle = document.getElementById('overlay-project-title');
+      if (!overlayProjectTitle) return;
+      
+      const dropdownContainer = overlayProjectTitle.querySelector('.overlay-project-title-dropdown');
+      const projectTitleInput = overlayProjectTitle.querySelector('input');
+      
+      if (!query || !query.trim()) {
+        if (dropdownContainer) {
+          dropdownContainer.style.display = 'none';
+        }
+        return;
+      }
+      
+      const trimmedQuery = query.trim();
+      
+      // projectsDataが取得されていない場合は取得
+      if (!projectsData || projectsData.length === 0) {
+        callGAS('getProjects').then(data => {
+          projectsData = data;
+          performOverlayProjectTitleSearch(trimmedQuery, workId, currentProjectId, dropdownContainer, projectTitleInput);
+        }).catch(handleError);
+      } else {
+        performOverlayProjectTitleSearch(trimmedQuery, workId, currentProjectId, dropdownContainer, projectTitleInput);
+      }
+    }
+    
+    function performOverlayProjectTitleSearch(query, workId, currentProjectId, dropdownContainer, projectTitleInput) {
+      if (!dropdownContainer || !projectTitleInput) return;
+      
+      const lowerCaseQuery = query.toLowerCase();
+      
+      // 部分一致するプロジェクトを検索（project_idまたはproject_titleで検索）
+      const filteredProjects = (projectsData || []).filter(p => 
+        p.project_id.toLowerCase().includes(lowerCaseQuery) ||
+        p.project_title.toLowerCase().includes(lowerCaseQuery)
+      );
+      
+      dropdownContainer.innerHTML = '';
+      dropdownContainer.className = 'overlay-project-title-dropdown popup-editor';
+      
+      // 選択インデックスをリセット
+      let selectedIndex = -1;
+      
+      // 1. 現在の案件IDの案件タイトルを変更する
+      if (currentProjectId) {
+        selectedIndex = 0;
+        const updateItem = document.createElement('div');
+        updateItem.className = 'popup-editor-option';
+        updateItem.innerHTML = `現在の案件IDの案件タイトルを変更する: <strong>${escapeHtml(query)}</strong>`;
+        updateItem.onclick = () => {
+          showLoading();
+          callGAS('updateSingleField', 'projects', currentProjectId, 'project_title', query)
+            .then(() => {
+              projectTitleInput.value = query;
+              dropdownContainer.style.display = 'none';
+              // 画面を再読み込み
+              openWorkDetailOverlay(workId);
+            })
+            .catch(handleError);
+        };
+        updateItem.onmouseenter = () => {
+          // マウスホバー時に選択状態を更新
+          dropdownContainer.querySelectorAll('.popup-editor-option').forEach((opt, idx) => {
+            opt.classList.toggle('selected', opt === updateItem);
+          });
+        };
+        dropdownContainer.appendChild(updateItem);
+      }
+      
+      // 2. 部分一致するプロジェクト（該当する場合のみ）
+      filteredProjects.forEach((p, idx) => {
+        const item = document.createElement('div');
+        item.className = 'popup-editor-option';
+        item.innerHTML = `${escapeHtml(p.project_id)} ${escapeHtml(p.project_title)}`;
+        item.onclick = () => {
+          projectTitleInput.value = p.project_title;
+          projectTitleInput.dataset.projectId = p.project_id;
+          dropdownContainer.style.display = 'none';
+          // 案件IDを更新
+          if (p.project_id !== currentProjectId) {
+            showLoading();
+            callGAS('updateSingleField', 'works', workId, 'project_id', p.project_id)
+              .then(() => {
+                // 画面を再読み込み
+                openWorkDetailOverlay(workId);
+              })
+              .catch(handleError);
+          }
+        };
+        item.onmouseenter = () => {
+          // マウスホバー時に選択状態を更新
+          dropdownContainer.querySelectorAll('.popup-editor-option').forEach((opt) => {
+            opt.classList.toggle('selected', opt === item);
+          });
+        };
+        dropdownContainer.appendChild(item);
+      });
+      
+      // 3. 案件を新規作成
+      const newItem = document.createElement('div');
+      newItem.className = 'popup-editor-option';
+      newItem.innerHTML = `案件を新規作成: <strong>${escapeHtml(query)}</strong>`;
+      newItem.onclick = () => {
+        showLoading();
+        callGAS('createProject', query).then(projectId => {
+          projectTitleInput.value = query;
+          projectTitleInput.dataset.projectId = projectId;
+          dropdownContainer.style.display = 'none';
+          // 案件IDを更新
+          callGAS('updateSingleField', 'works', workId, 'project_id', projectId)
+            .then(() => {
+              // projectsDataを更新
+              if (projectsData) {
+                projectsData.push({ project_id: projectId, project_title: query });
+              }
+              // 画面を再読み込み
+              openWorkDetailOverlay(workId);
+            })
+            .catch(handleError);
+        }).catch(handleError);
+      };
+      newItem.onmouseenter = () => {
+        // マウスホバー時に選択状態を更新
+        dropdownContainer.querySelectorAll('.popup-editor-option').forEach((opt) => {
+          opt.classList.toggle('selected', opt === newItem);
+        });
+      };
+      dropdownContainer.appendChild(newItem);
+      
+      // 最初の項目を選択状態にする
+      const firstOption = dropdownContainer.querySelector('.popup-editor-option');
+      if (firstOption) {
+        firstOption.classList.add('selected');
+      }
+      
+      // 位置を設定
+      const inputRect = projectTitleInput.getBoundingClientRect();
+      const containerRect = overlayProjectTitle.getBoundingClientRect();
+      dropdownContainer.style.position = 'absolute';
+      dropdownContainer.style.top = `${inputRect.height + 4}px`;
+      dropdownContainer.style.left = '0';
+      dropdownContainer.style.width = `${inputRect.width}px`;
+      dropdownContainer.style.zIndex = '1000';
+      dropdownContainer.style.display = 'block';
+      
+      // 外側をクリックしたら閉じる
+      const closeOnOutsideClick = (e) => {
+        if (!dropdownContainer.contains(e.target) && e.target !== projectTitleInput) {
+          dropdownContainer.style.display = 'none';
+          document.removeEventListener('click', closeOnOutsideClick);
+        }
+      };
+      setTimeout(() => {
+        document.addEventListener('click', closeOnOutsideClick);
+      }, 0);
     }
     
     function showSelectEditorForWorkDetail(event, workId, field, currentValue, configType) {
