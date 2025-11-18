@@ -17,7 +17,7 @@
 <body>
   <div class="app-header">
     <div class="header-content">
-      <button id="header-close-btn" class="header-close-btn" onclick="closeWorkDetailOverlay()" style="display: none;">✕</button>
+      <button id="header-close-btn" class="header-close-btn" onclick="handleHeaderCloseClick()" style="display: none;"></button>
       <h1 class="header-title" id="header-title-default">CTMS v3.0</h1>
       <h1 class="header-title" id="header-title-work-detail-header" style="display: none;"></h1>
       <div id="id-search-container" style="position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 0;">
@@ -1120,7 +1120,7 @@
           headerTitleWorkDetailHeader.style.display = 'flex';
           headerTitleWorkDetailHeader.textContent = 'CTMS v3.0';
         }
-        if (headerCloseBtn) headerCloseBtn.style.display = 'block';
+        if (headerCloseBtn) headerCloseBtn.style.display = 'flex';
         if (newButton) newButton.style.display = 'none';
         
         // ID検索バーにIDを表示
@@ -1895,6 +1895,17 @@
         });
     }
 
+    function handleHeaderCloseClick() {
+      const workDetailOverlay = document.getElementById('work-detail-overlay');
+      const projectDetailOverlay = document.getElementById('project-detail-overlay');
+      
+      if (workDetailOverlay && workDetailOverlay.classList.contains('show')) {
+        closeWorkDetailOverlay();
+      } else if (projectDetailOverlay && projectDetailOverlay.classList.contains('show')) {
+        closeProjectDetailOverlay();
+      }
+    }
+
     function closeWorkDetailOverlay() {
       document.getElementById('work-detail-overlay').classList.remove('show');
       
@@ -1940,6 +1951,9 @@
         // ヘッダータイトルを変更
         const headerTitleDefault = document.getElementById('header-title-default');
         const headerTitleWorkDetail = document.getElementById('header-title-work-detail');
+        const headerCloseBtn = document.getElementById('header-close-btn');
+        const newButton = document.getElementById('new-button');
+        
         if (headerTitleDefault) {
           headerTitleDefault.style.display = 'none';
         }
@@ -1947,6 +1961,8 @@
           headerTitleWorkDetail.style.display = 'flex';
           headerTitleWorkDetail.textContent = project.project_id || '';
         }
+        if (headerCloseBtn) headerCloseBtn.style.display = 'flex';
+        if (newButton) newButton.style.display = 'none';
         
         // ヘッダー情報を非表示
         const headerInfoDiv = document.getElementById('work-detail-header-info');
@@ -2042,12 +2058,17 @@
       // ヘッダータイトルを元に戻す
       const headerTitleDefault = document.getElementById('header-title-default');
       const headerTitleWorkDetail = document.getElementById('header-title-work-detail');
+      const headerCloseBtn = document.getElementById('header-close-btn');
+      const newButton = document.getElementById('new-button');
+      
       if (headerTitleDefault) {
         headerTitleDefault.style.display = 'flex';
       }
       if (headerTitleWorkDetail) {
         headerTitleWorkDetail.style.display = 'none';
       }
+      if (headerCloseBtn) headerCloseBtn.style.display = 'none';
+      if (newButton) newButton.style.display = 'flex';
       
       // ID検索バーをクリア
       currentProjectId = null;
