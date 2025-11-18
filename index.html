@@ -18,8 +18,8 @@
       <button id="header-close-btn" class="header-close-btn" onclick="closeWorkDetailOverlay()" style="display: none;">✕</button>
       <h1 class="header-title" id="header-title-default">CTMS v3.0</h1>
       <h1 class="header-title" id="header-title-work-detail-header" style="display: none;"></h1>
-      <div id="id-search-container" style="margin-left: auto; display: flex; align-items: center;">
-        <input type="text" id="id-search-input" placeholder="(例:P0001-W0001-T0001)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; width: 300px; text-transform: uppercase;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)">
+      <div id="id-search-container" style="position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center;">
+        <input type="text" id="id-search-input" placeholder="(例:P0001-W0001-T0001)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 1.5rem; width: 300px; text-transform: uppercase;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)" onfocus="handleIdSearchFocus(event)" onblur="handleIdSearchBlur(event)">
       </div>
     </div>
     <div class="new-button-container">
@@ -1019,6 +1019,7 @@
     }
 
     let currentWorkId = null;
+    let currentProjectId = null;
 
     function openWorkDetailOverlay(workId) {
       showLoading();
@@ -1050,6 +1051,9 @@
         }
         if (headerCloseBtn) headerCloseBtn.style.display = 'block';
         if (newButton) newButton.style.display = 'none';
+        
+        // ID検索バーにIDを表示
+        updateIdSearchInput();
         
         // ワークフローステータスバーを表示
         const workflowStatusBar = document.getElementById('workflow-status-bar');
@@ -1352,10 +1356,15 @@
       if (suggestions) {
         suggestions.remove();
       }
+      
+      // ID検索バーをクリア
+      currentWorkId = null;
+      clearIdSearchInput();
     }
 
     function openProjectDetailOverlay(projectId) {
       showLoading();
+      currentProjectId = projectId;
       callGAS('getProjectById', projectId).then(project => {
         if (!project) {
           alert('プロジェクトが見つかりません');
@@ -1454,6 +1463,10 @@
         }
         
         document.getElementById('project-detail-overlay').classList.add('show');
+        
+        // ID検索バーにIDを表示
+        updateIdSearchInput();
+        
         hideLoading();
       }).catch(handleError);
     }
@@ -1470,6 +1483,10 @@
       if (headerTitleWorkDetail) {
         headerTitleWorkDetail.style.display = 'none';
       }
+      
+      // ID検索バーをクリア
+      currentProjectId = null;
+      clearIdSearchInput();
     }
     
     function copyWorkDetailUrl() {
@@ -4097,6 +4114,61 @@
     // ============================================
     // ID検索バー
     // ============================================
+    function updateIdSearchInput() {
+      const input = document.getElementById('id-search-input');
+      if (!input) return;
+      
+      // フォーカス中は何もしない
+      if (document.activeElement === input) return;
+      
+      // work詳細画面が表示中の場合
+      if (currentWorkId) {
+        const workDetailOverlay = document.getElementById('work-detail-overlay');
+        if (workDetailOverlay && workDetailOverlay.classList.contains('show')) {
+          const headerTitle = document.getElementById('header-title-work-detail-header');
+          if (headerTitle && headerTitle.textContent) {
+            input.value = headerTitle.textContent;
+            input.removeAttribute('placeholder');
+            return;
+          }
+        }
+      }
+      
+      // project詳細画面が表示中の場合
+      if (currentProjectId) {
+        const projectDetailOverlay = document.getElementById('project-detail-overlay');
+        if (projectDetailOverlay && projectDetailOverlay.classList.contains('show')) {
+          input.value = currentProjectId;
+          input.removeAttribute('placeholder');
+          return;
+        }
+      }
+      
+      // どちらも表示されていない場合はクリア
+      clearIdSearchInput();
+    }
+    
+    function clearIdSearchInput() {
+      const input = document.getElementById('id-search-input');
+      if (!input) return;
+      
+      input.value = '';
+      input.placeholder = '案件・制作物・タスク・レビュー依頼をID検索（例：P0001, W0001, T0001, R0001）';
+    }
+    
+    function handleIdSearchFocus(event) {
+      const input = event.target;
+      // valueをクリアしてplaceholderを設定
+      input.value = '';
+      input.placeholder = '案件・制作物・タスク・レビュー依頼をID検索（例：P0001, W0001, T0001, R0001）';
+    }
+    
+    function handleIdSearchBlur(event) {
+      const input = event.target;
+      // フォーカスが外れたら、詳細画面が表示中の場合はIDを再設定
+      updateIdSearchInput();
+    }
+    
     function handleIdSearchInput(event) {
       const input = event.target;
       // 半角英数とハイフンに変換し、大文字にする
