@@ -80,6 +80,41 @@
       }
     }
 
+    @keyframes shimmer {
+      0% {
+        background-position: -1000px 0;
+      }
+      100% {
+        background-position: 1000px 0;
+      }
+    }
+
+    #id-search-container.loading {
+      position: relative;
+      overflow: hidden;
+    }
+
+    #id-search-container.loading::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(107, 114, 128, 0.1) 45%,
+        rgba(107, 114, 128, 0.2) 50%,
+        rgba(107, 114, 128, 0.1) 55%,
+        transparent 100%
+      );
+      background-size: 1000px 100%;
+      animation: shimmer 2s infinite;
+      pointer-events: none;
+      z-index: 1;
+    }
+
     body {
       margin: 0;
       font-family: 'Noto Sans JP', sans-serif;
