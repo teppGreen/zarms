@@ -16,22 +16,22 @@
   <div class="app-header">
     <div class="header-content">
       <h1 class="header-title" id="header-title-default">CTMS v3.0</h1>
-      <div id="id-search-container">
-        <input type="text" id="id-search-input" placeholder="ID検索 (例: P0001, W0001, T0001)" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)">
+      <div id="id-search-container" style="margin-left: 24px; display: flex; align-items: center;">
+        <input type="text" id="id-search-input" placeholder="ID検索 (例: P0001, W0001, T0001)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; width: 300px; text-transform: uppercase;" onkeydown="handleIdSearchKeydown(event)" oninput="handleIdSearchInput(event)">
       </div>
     </div>
     <div class="new-button-container">
       <div id="new-button" class="new-button">
         <span id="new-button-main">+</span>
       </div>
-      <div id="new-button-loading" class="new-button-loading hidden">
-        <div class="loading-spinner hidden"></div>
-        <div class="loading-checkmark hidden">✓</div>
+      <div id="new-button-loading" class="new-button-loading" style="display: none;">
+        <div class="loading-spinner" style="display: none;"></div>
+        <div class="loading-checkmark" style="display: none;">✓</div>
       </div>
       <div id="new-button-dropdown" class="new-button-dropdown">
         <a onclick="openNewWorkModal(); closeNewButtonDropdown();">制作物</a>
         <a onclick="openNewProjectModal(); closeNewButtonDropdown();">案件</a>
-        <a id="new-member-dropdown-item" class="hidden" onclick="openNewMemberModal(); closeNewButtonDropdown();">メンバー</a>
+        <a id="new-member-dropdown-item" style="display: none;" onclick="openNewMemberModal(); closeNewButtonDropdown();">メンバー</a>
         <a onclick="openNewKnowledgeModal(); closeNewButtonDropdown();">ナレッジ</a>
       </div>
     </div>
@@ -68,19 +68,19 @@
 
   <div class="main-content">
     
-    <div id="tab-home" class="tab-content active">
+    <div id="tab-home" class="tab-content">
       <div class="card">
         <h1 id="home-greeting" class="main-title">こんにちは</h1>
         <p class="main-subtitle">今日も良い一日を！</p>
       </div>
       
-      <div class="home-layout">
-        <div>
+      <div style="display: flex; gap: 24px;">
+        <div style="flex: 1;">
           <h2 class="section-title">あなたが担当者の制作物</h2>
           <div id="home-works-container" class="grid-container">
           </div>
         </div>
-        <div>
+        <div style="flex: 1;">
           <h2 class="section-title">レビュー依頼</h2>
           <div id="home-review-requests-container" class="grid-container">
           </div>
@@ -88,7 +88,7 @@
       </div>
     </div>
 
-    <div id="tab-works" class="tab-content">
+    <div id="tab-works" class="tab-content" style="display: none;">
       
       <div class="card">
         <div class="table-container">
@@ -111,7 +111,7 @@
       </div>
     </div>
 
-    <div id="tab-projects" class="tab-content">
+    <div id="tab-projects" class="tab-content" style="display: none;">
       
       <div class="card">
         <div class="table-container">
@@ -132,7 +132,7 @@
       </div>
     </div>
 
-    <div id="tab-members" class="tab-content">
+    <div id="tab-members" class="tab-content" style="display: none;">
       
       <div class="card">
         <div class="table-container">
@@ -155,13 +155,13 @@
       </div>
     </div>
 
-    <div id="tab-knowledge" class="tab-content">
+    <div id="tab-knowledge" class="tab-content" style="display: none;">
       
       <div id="knowledge-container" class="grid-container">
       </div>
     </div>
 
-    <div id="tab-summary" class="tab-content">
+    <div id="tab-summary" class="tab-content" style="display: none;">
       
       <div class="grid-container summary-grid">
         <div class="card">
@@ -203,7 +203,7 @@
         <h2 class="modal-title">新規制作物作成</h2>
         <div id="new-work-form"></div>
       </div>
-      <div class="modal-result-content hidden">
+      <div class="modal-result-content" style="display: none;">
       </div>
     </div>
   </div>
@@ -234,64 +234,64 @@
           </div>
         </form>
       </div>
-      <div class="modal-result-content hidden">
+      <div class="modal-result-content" style="display: none;">
       </div>
     </div>
   </div>
 
   <div id="work-detail-overlay" class="overlay">
     <div class="overlay-content">
-      <div class="overlay-header-info">
-        <div class="flex-1 flex-col gap-8">
-          <h1 class="header-title hidden" id="header-title-work-detail"></h1>
-          <div id="work-detail-header-info" class="hidden flex-col gap-8">
-            <div id="work-detail-header-row1" class="work-detail-header-row">
-              <div class="work-detail-header-item">
+      <div class="overlay-header-info" style="display: flex; align-items: center; gap: 16px; width: 100%;">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+          <h1 class="header-title" id="header-title-work-detail" style="display: none;"></h1>
+          <div id="work-detail-header-info" style="display: none; flex-direction: column; gap: 8px; font-size: 14px;">
+            <div id="work-detail-header-row1" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 8px;">
                 <strong>案件:</strong>
                 <span id="work-detail-project-title-header"></span>
               </div>
-              <div class="work-detail-header-item">
+              <div style="display: flex; align-items: center; gap: 8px;">
                 <strong>制作:</strong>
                 <span id="work-detail-work-title-header"></span>
               </div>
-              <div class="work-detail-header-item">
+              <div style="display: flex; align-items: center; gap: 8px;">
                 <strong>担当者:</strong>
-                <span id="work-detail-assignees-header-info" class="work-detail-assignees-header"></span>
+                <span id="work-detail-assignees-header-info" style="display: inline-flex; align-items: center;"></span>
               </div>
             </div>
-            <div id="work-detail-header-row2" class="work-detail-header-row">
-              <div class="work-detail-status-container work-detail-header-item">
+            <div id="work-detail-header-row2" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+              <div class="work-detail-status-container" style="display: flex; align-items: center; gap: 8px;">
                 <strong>ステータス:</strong>
-                <div class="editable-container work-detail-status-editable-header" id="work-detail-status-editable-header">
+                <div class="editable-container" id="work-detail-status-editable-header" style="display: inline-flex; min-width: 120px;">
                   <span class="editable-text" id="work-detail-status-text-header"></span>
                   <span class="editable-toggle-btn">✎</span>
                 </div>
               </div>
-              <div class="work-detail-header-item">
+              <div style="display: flex; align-items: center; gap: 8px;">
                 <strong>作成日:</strong>
                 <span id="work-detail-created-at-header"></span>
               </div>
-              <div class="work-detail-due-container work-detail-header-item">
+              <div class="work-detail-due-container" style="display: flex; align-items: center; gap: 8px;">
                 <strong>納品期限:</strong>
-                <div class="editable-container datetime-editable work-detail-due-editable-header" id="work-detail-due-editable-header">
+                <div class="editable-container datetime-editable" id="work-detail-due-editable-header" style="display: inline-flex; min-width: 180px;">
                   <span class="editable-text" id="work-detail-due-text-header"></span>
                   <span class="editable-toggle-btn">✎</span>
                 </div>
               </div>
-              <div class="work-detail-header-item">
+              <div style="display: flex; align-items: center; gap: 8px;">
                 <strong>残り日数:</strong>
                 <span id="work-detail-days-remaining-header"></span>
               </div>
             </div>
           </div>
         </div>
-        <button id="work-detail-url-copy-button" class="url-copy-button-header hidden" onclick="copyWorkDetailUrl()">🔗</button>
+        <button id="work-detail-url-copy-button" class="url-copy-button-header" style="display: none; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--md-sys-color-on-surface); padding: 0 16px;" onclick="copyWorkDetailUrl()">🔗</button>
         <button class="close-btn" onclick="closeWorkDetailOverlay()">&times;</button>
       </div>
       <div class="overlay-body">
         <!-- 左1/3: ドキュメントの埋め込み -->
         <div class="overlay-main">
-          <div id="work-detail-document-container">
+          <div id="work-detail-document-container" style="width: 100%; height: 100%;">
           </div>
         </div>
         <!-- 中央1/3: タスク -->
@@ -322,7 +322,7 @@
       <div class="overlay-body">
         <!-- 左半分: プロジェクト詳細情報 -->
         <div class="overlay-main">
-          <div id="project-detail-content-container">
+          <div id="project-detail-content-container" style="width: 100%; height: 100%; min-height: 600px; padding: 24px;">
           </div>
         </div>
         <!-- 右半分: 関連制作物 -->
@@ -368,7 +368,7 @@
           </div>
         </form>
       </div>
-      <div class="modal-result-content hidden">
+      <div class="modal-result-content" style="display: none;">
       </div>
     </div>
   </div>
@@ -380,25 +380,25 @@
         <form id="new-review-request-form" onsubmit="submitNewReviewRequest(event)">
           <input type="hidden" name="work_id">
           <div class="form-group">
-            <label class="form-label">タイトル <span class="required">*</span></label>
+            <label class="form-label">タイトル <span style="color: red;">*</span></label>
             <input type="text" name="review_title" class="input-field" required>
           </div>
           <div class="form-group">
-            <label class="form-label">コメント <span class="required">*</span></label>
+            <label class="form-label">コメント <span style="color: red;">*</span></label>
             <textarea name="review_comment" class="input-field" rows="4" required></textarea>
           </div>
           <div class="form-group">
             <label class="form-label">ファイル（1つ以上）</label>
-            <div id="review-request-files-container" class="review-request-files-container">
-              <div id="review-request-files-list" class="review-request-files-list"></div>
-              <div class="review-request-files-actions">
+            <div id="review-request-files-container" style="margin-bottom: 12px;">
+              <div id="review-request-files-list" style="margin-bottom: 12px;"></div>
+              <div style="display: flex; gap: 8px;">
                 <button type="button" class="btn btn-secondary" onclick="openGoogleDrivePicker()">Googleドライブから選択</button>
                 <button type="button" class="btn btn-secondary" onclick="document.getElementById('review-request-file-input').click()">ファイルをアップロード</button>
               </div>
-              <input type="file" id="review-request-file-input" multiple class="hidden" onchange="handleFileUpload(event)">
+              <input type="file" id="review-request-file-input" multiple style="display: none;" onchange="handleFileUpload(event)">
             </div>
-            <div id="review-request-file-dropzone" class="file-dropzone" ondrop="handleFileDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
-              <p>ファイルをドラッグアンドドロップ</p>
+            <div id="review-request-file-dropzone" style="border: 2px dashed #ccc; border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; margin-top: 12px;" ondrop="handleFileDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+              <p style="margin: 0; color: #6b7280;">ファイルをドラッグアンドドロップ</p>
             </div>
           </div>
           <div class="modal-footer">
@@ -407,7 +407,7 @@
           </div>
         </form>
       </div>
-      <div class="modal-result-content hidden">
+      <div class="modal-result-content" style="display: none;">
       </div>
     </div>
   </div>
@@ -428,11 +428,11 @@
         <h2 class="modal-title">新規メンバー登録</h2>
         <form id="new-member-form" onsubmit="submitNewMember(event)">
           <div class="form-group">
-            <label class="form-label">メールアドレス <span class="required">*</span></label>
+            <label class="form-label">メールアドレス <span style="color: red;">*</span></label>
             <input type="email" name="member_email" class="input-field" required>
           </div>
           <div class="form-group">
-            <label class="form-label">名前 <span class="required">*</span></label>
+            <label class="form-label">名前 <span style="color: red;">*</span></label>
             <input type="text" name="member_name" class="input-field" required>
           </div>
           <div class="form-group">
@@ -444,11 +444,11 @@
             <input type="url" name="member_icon" class="input-field">
           </div>
           <div class="form-group">
-            <label class="form-label">チーム <span class="required">*</span></label>
+            <label class="form-label">チーム <span style="color: red;">*</span></label>
             <select name="member_team_key" class="input-field" required></select>
           </div>
           <div class="form-group">
-            <label class="form-label">権限 <span class="required">*</span></label>
+            <label class="form-label">権限 <span style="color: red;">*</span></label>
             <select name="role_key" class="input-field" required></select>
           </div>
           <div class="form-group">
@@ -461,7 +461,7 @@
           </div>
         </form>
       </div>
-      <div class="modal-result-content hidden">
+      <div class="modal-result-content" style="display: none;">
       </div>
     </div>
   </div>
@@ -472,11 +472,11 @@
         <h2 class="modal-title">新規ナレッジ作成</h2>
         <form id="new-knowledge-form" onsubmit="submitNewKnowledge(event)">
           <div class="form-group">
-            <label class="form-label">ナレッジタイプ <span class="required">*</span></label>
+            <label class="form-label">ナレッジタイプ <span style="color: red;">*</span></label>
             <select name="knowledge_type_key" class="input-field" required></select>
           </div>
           <div class="form-group">
-            <label class="form-label">紐づける制作物 <span class="required">*</span></label>
+            <label class="form-label">紐づける制作物 <span style="color: red;">*</span></label>
             <div class="combobox-container">
               <input type="text" name="work_search" class="input-field" placeholder="制作物を検索..." oninput="searchWorksForKnowledge(this.value)" autocomplete="off">
               <input type="hidden" name="work_id">
@@ -484,7 +484,7 @@
             </div>
           </div>
           <div class="form-group">
-            <label class="form-label">内容 <span class="required">*</span></label>
+            <label class="form-label">内容 <span style="color: red;">*</span></label>
             <div class="rich-text-editor-wrapper">
               <div class="rich-text-toolbar" data-editor="knowledge-content-editor">
                 <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h1" title="見出し1">H1</button>
@@ -496,10 +496,10 @@
                 <button type="button" class="toolbar-btn" data-command="strikeThrough" title="打ち消し線"><s>S</s></button>
                 <button type="button" class="toolbar-btn" data-command="underline" title="下線"><u>U</u></button>
                 <span class="toolbar-separator"></span>
-                <button type="button" class="toolbar-btn color-btn" data-color="#000000" title="黒"></button>
-                <button type="button" class="toolbar-btn color-btn" data-color="#FF0000" title="赤"></button>
-                <button type="button" class="toolbar-btn color-btn" data-color="#0000FF" title="青"></button>
-                <button type="button" class="toolbar-btn color-btn" data-color="#008000" title="緑"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#000000" title="黒" style="background: #000000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#FF0000" title="赤" style="background: #FF0000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#0000FF" title="青" style="background: #0000FF;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#008000" title="緑" style="background: #008000;"></button>
               </div>
               <div id="knowledge-content-editor" class="rich-text-editor" contenteditable="true"></div>
             </div>
@@ -510,7 +510,7 @@
           </div>
         </form>
       </div>
-      <div class="modal-result-content hidden">
+      <div class="modal-result-content" style="display: none;">
       </div>
     </div>
   </div>
@@ -652,18 +652,14 @@
       const newButton = document.getElementById('new-button');
       const newButtonLoading = document.getElementById('new-button-loading');
       if (newButton) {
-        newButton.classList.add('hidden');
+        newButton.style.display = 'none';
       }
       if (newButtonLoading) {
         const spinner = newButtonLoading.querySelector('.loading-spinner');
         const checkmark = newButtonLoading.querySelector('.loading-checkmark');
-        newButtonLoading.classList.remove('hidden');
-        if (spinner) {
-          spinner.classList.remove('hidden');
-        }
-        if (checkmark) {
-          checkmark.classList.add('hidden');
-        }
+        newButtonLoading.style.display = 'flex';
+        if (spinner) spinner.style.display = 'flex';
+        if (checkmark) checkmark.style.display = 'none';
       }
     }
 
@@ -676,15 +672,15 @@
         const checkmark = newButtonLoading.querySelector('.loading-checkmark');
         
         // スピナーを非表示にしてチェックマークを表示
-        if (spinner) spinner.classList.add('hidden');
-        if (checkmark) checkmark.classList.remove('hidden');
+        if (spinner) spinner.style.display = 'none';
+        if (checkmark) checkmark.style.display = 'flex';
         
         // チェックマークを表示してからボタンを表示
         if (loadingTimeout) clearTimeout(loadingTimeout);
         loadingTimeout = setTimeout(() => {
-          newButtonLoading.classList.add('hidden');
+          newButtonLoading.style.display = 'none';
           if (newButton) {
-            newButton.classList.remove('hidden');
+            newButton.style.display = 'flex';
             // バウンドアニメーションを追加
             newButton.classList.add('animate-bounce-in');
             // アニメーション終了後にクラスを削除（次回のアニメーションのため）
@@ -696,7 +692,7 @@
       } else {
         // ローディング要素がない場合は直接ボタンを表示
         if (newButton) {
-          newButton.classList.remove('hidden');
+          newButton.style.display = 'flex';
           // バウンドアニメーションを追加
           newButton.classList.add('animate-bounce-in');
           // アニメーション終了後にクラスを削除（次回のアニメーションのため）
@@ -739,13 +735,13 @@
       closeAllPopups();
       
       // 表示中のタブを判定
-      if (document.getElementById('tab-works').classList.contains('active')) {
+      if (document.getElementById('tab-works').style.display === 'block') {
         openNewWorkModal();
-      } else if (document.getElementById('tab-projects').classList.contains('active')) {
+      } else if (document.getElementById('tab-projects').style.display === 'block') {
         openNewWorkModal();
-      } else if (document.getElementById('tab-members').classList.contains('active')) {
+      } else if (document.getElementById('tab-members').style.display === 'block') {
         openNewMemberModal();
-      } else if (document.getElementById('tab-knowledge').classList.contains('active')) {
+      } else if (document.getElementById('tab-knowledge').style.display === 'block') {
         openNewKnowledgeModal();
       } else {
         // それ以外のタブ（ホーム、統計など）ではドロップダウンを表示
@@ -761,8 +757,8 @@
       closeWorkDetailOverlay();
       document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
       document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`).classList.add('active');
-      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-      document.getElementById('tab-' + tabName).classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+      document.getElementById('tab-' + tabName).style.display = 'block';
       loadTabData(tabName);
     }
 
@@ -788,10 +784,10 @@
         const worksContainer = document.getElementById('home-works-container');
         worksContainer.innerHTML = '';
         if (!data.works || data.works.length === 0) {
-          worksContainer.innerHTML = '<p class="empty-message">担当中の制作はありません</p>';
+          worksContainer.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
         } else {
           data.works.forEach(work => {
-            worksContainer.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 class="card-title-inline">${escapeHtml(work.work_title)}</h3> <p class="card-text">${escapeHtml(work.project_title)}</p> <div class="card-text-small"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
+            worksContainer.innerHTML += `<div class="card card-clickable" onclick="openWorkDetailOverlay('${work.work_id}')"> <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(work.work_title)}</h3> <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml(work.project_title)}</p> <div style="font-size: 12px; color: #6b7280;"> <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span> </div> </div>`;
           });
         }
         
@@ -799,7 +795,7 @@
         const reviewRequestsContainer = document.getElementById('home-review-requests-container');
         reviewRequestsContainer.innerHTML = '';
         if (!data.review_requests || data.review_requests.length === 0) {
-          reviewRequestsContainer.innerHTML = '<p class="empty-message">レビュー依頼はありません</p>';
+          reviewRequestsContainer.innerHTML = '<p style="color: #6b7280;">レビュー依頼はありません</p>';
         } else {
           data.review_requests.forEach(reviewRequest => {
             const card = document.createElement('md-filled-card');
@@ -808,11 +804,11 @@
             card.style.marginBottom = '24px';
             card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
             card.innerHTML = `
-              <h3 class="card-title-inline">${escapeHtml(reviewRequest.review_title)}</h3>
-              <p class="card-text">${escapeHtml((reviewRequest.review_comment || '').substring(0, 100))}${(reviewRequest.review_comment || '').length > 100 ? '...' : ''}</p>
-              <div class="card-text-small">
+              <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${escapeHtml(reviewRequest.review_title)}</h3>
+              <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">${escapeHtml((reviewRequest.review_comment || '').substring(0, 100))}${(reviewRequest.review_comment || '').length > 100 ? '...' : ''}</p>
+              <div style="font-size: 12px; color: #6b7280;">
                 <span>${reviewRequest.file_count || 0}個のファイル</span>
-                <span class="ml-16">${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
+                <span style="margin-left: 16px;">${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
               </div>
             `;
             reviewRequestsContainer.appendChild(card);
@@ -839,10 +835,10 @@
         const container = document.getElementById('knowledge-container');
         container.innerHTML = '';
         if (!knowledgeData || knowledgeData.length === 0) {
-          container.innerHTML = '<p class="empty-message-grid">データがありません</p>';
+          container.innerHTML = '<p style="color: #6b7280; grid-column: 1 / -1;">データがありません</p>';
         } else {
           knowledgeData.forEach(item => {
-            container.innerHTML += `<div class="card"> <div class="knowledge-card-badge"> <span class="badge" style="background: #fef3c7; color: #92400e;">${getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE')}</span> </div> <div class="knowledge-card-work"> ${escapeHtml(item.work_title)} </div> <div class="knowledge-card-content"> ${escapeHtml(item.knowledge_content.substring(0, 150))}... </div> <div class="knowledge-card-meta"> ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)} </div> </div>`;
+            container.innerHTML += `<div class="card"> <div style="margin-bottom: 8px;"> <span class="badge" style="background: #fef3c7; color: #92400e;">${getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE')}</span> </div> <div style="margin-bottom: 12px; font-size: 14px; color: #6b7280;"> ${escapeHtml(item.work_title)} </div> <div style="margin-bottom: 12px;"> ${escapeHtml(item.knowledge_content.substring(0, 150))}... </div> <div style="font-size: 12px; color: #9ca3af;"> ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)} </div> </div>`;
           });
         }
         hideLoading();
@@ -904,7 +900,7 @@
       // ボディの生成
       tbody.innerHTML = '';
       if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${headers.length}" class="table-cell-center">データがありません</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align: center; color: #6b7280;">データがありません</td></tr>`;
         return;
       }
 
@@ -965,7 +961,7 @@
     function drawChart(elementId, chartType, data, hAxis, vAxis, options = {}) {
       const container = document.getElementById(elementId);
       if (!data || Object.keys(data).length === 0) {
-        container.innerHTML = '<p class="empty-message-center">データがありません</p>';
+        container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 40px;">データがありません</p>';
         return;
       }
       const chartData = [[hAxis, vAxis]];
@@ -1080,7 +1076,7 @@
               }
             };
             input.onkeydown = (e) => {
-              if (e.key === 'Enter') {
+              if (e.key === 'Enter' && !e.isComposing) {
                 input.blur();
               } else if (e.key === 'Escape') {
                 workTitleHeader.textContent = originalValue;
@@ -1174,9 +1170,10 @@
         if (work.work_document_id) {
           // Googleドキュメントを編集可能な状態で埋め込む（rm=minimalパラメータ追加）
           const embedUrl = `https://docs.google.com/document/d/${work.work_document_id}/edit?rm=minimal&tab=${work.work_document_tab_id}`;
-          docContainer.innerHTML = `<iframe src="${embedUrl}"></iframe>`;
+          docContainer.innerHTML = `<style> iframe { width: 100%; height: 100%; max-width: 100%; border: none; overflow-x: hidden; } </style>
+                                    <iframe src="${embedUrl}" style="width: 100%; height: 100%; max-width: 100%; border: none; overflow-x: hidden;"></iframe>`;
         } else {
-          docContainer.innerHTML = '<p class="empty-message" style="padding: 24px;">ドキュメントが作成されていません</p>';
+          docContainer.innerHTML = '<p style="color: #6b7280; padding: 24px;">ドキュメントが作成されていません</p>';
         }
         
         renderWorkTasks(work.tasks);
@@ -1343,11 +1340,11 @@
         
         // プロジェクト詳細情報を表示
         const contentContainer = document.getElementById('project-detail-content-container');
-        let html = '<div class="flex-col gap-24">';
+        let html = '<div style="display: flex; flex-direction: column; gap: 24px;">';
         
         // プロジェクトの全プロパティを表示
-        html += '<div class="project-detail-section"><h2>プロジェクト情報</h2>';
-        html += '<table class="table-full project-detail-table">';
+        html += '<div><h2 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 600;">プロジェクト情報</h2>';
+        html += '<table class="table-full" style="margin-top: 12px;">';
         html += '<tbody>';
         
         // 各プロパティを表示
@@ -1376,11 +1373,11 @@
             default: label = key;
           }
           
-          html += `<tr><th class="table-cell-label">${escapeHtml(label)}</th>`;
+          html += `<tr><th style="width: 200px; text-align: left; padding: 12px; background: #f9fafb;">${escapeHtml(label)}</th>`;
           if (key === 'project_detail') {
-            html += `<td class="table-cell-content"><div class="pre-wrap">${value || '-'}</div></td>`;
+            html += `<td style="padding: 12px;"><div style="white-space: pre-wrap;">${value || '-'}</div></td>`;
           } else {
-            html += `<td class="table-cell-content">${displayValue}</td>`;
+            html += `<td style="padding: 12px;">${displayValue}</td>`;
           }
           html += '</tr>';
         });
@@ -1393,7 +1390,7 @@
         // 関連制作物を表示
         const worksContainer = document.getElementById('project-works-container');
         if (project.works && project.works.length > 0) {
-          let worksHtml = '<table class="table-full project-detail-table">';
+          let worksHtml = '<table class="table-full" style="margin-top: 12px;">';
           worksHtml += '<thead><tr><th>制作ID</th><th>制作タイトル</th><th>ステータス</th><th>納品期限</th></tr></thead>';
           worksHtml += '<tbody>';
           project.works.forEach(work => {
@@ -1407,7 +1404,7 @@
           worksHtml += '</tbody></table>';
           worksContainer.innerHTML = worksHtml;
         } else {
-          worksContainer.innerHTML = '<p class="empty-message">関連制作物はありません</p>';
+          worksContainer.innerHTML = '<p style="color: #6b7280;">関連制作物はありません</p>';
         }
         
         document.getElementById('project-detail-overlay').classList.add('show');
@@ -1692,7 +1689,7 @@
         });
         
         input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') {
+          if (e.key === 'Enter' && !e.isComposing) {
             e.preventDefault();
             saveWorkDetailDateTime(editorDiv, container, workId, field, originalValue, inputs);
           } else if (e.key === 'Escape') {
@@ -1781,7 +1778,7 @@
         });
         
         input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') {
+          if (e.key === 'Enter' && !e.isComposing) {
             e.preventDefault();
             saveWorkDetailDateTimeHeader(editorDiv, container, workId, field, originalValue, inputs);
           } else if (e.key === 'Escape') {
@@ -2139,7 +2136,7 @@
       const container = document.getElementById('work-review-requests-container');
       container.innerHTML = '';
       if (!reviewRequests || reviewRequests.length === 0) {
-        container.innerHTML = '<p class="empty-message mb-8">レビュー依頼はありません。</p>';
+        container.innerHTML = '<p style="color: #6b7280; margin-bottom: 8px;">レビュー依頼はありません。</p>';
         return;
       }
       
@@ -2184,7 +2181,7 @@
       const container = document.getElementById('work-apps-container');
       container.innerHTML = '';
       if (!apps || apps.length === 0) {
-        container.innerHTML = '<p class="empty-message mb-8">使用アプリはありません。</p>';
+        container.innerHTML = '<p style="color: #6b7280; margin-bottom: 8px;">使用アプリはありません。</p>';
       } else {
         apps.forEach(app => {
           const div = document.createElement('div');
@@ -2584,13 +2581,13 @@
         
         const content = document.getElementById('member-detail-content');
         content.innerHTML = `
-          <div class="mb-24">
-            <img src="${member.member_icon || 'https://via.placeholder.com/64'}" class="avatar member-detail-avatar" alt="">
-            <h3 class="member-detail-name">${escapeHtml(member.member_name)}</h3>
-            <p class="member-detail-info"><strong>メール:</strong> ${escapeHtml(member.member_email)}</p>
-            <p class="member-detail-info"><strong>チーム:</strong> ${getConfigLabel(member.member_team_key, 'TEAM')}</p>
-            <p class="member-detail-info"><strong>権限:</strong> ${getConfigLabel(member.role_key, 'ROLE')}</p>
-            ${member.slack_member_id ? `<p class="member-detail-info"><strong>Slack ID:</strong> ${escapeHtml(member.slack_member_id)}</p>` : ''}
+          <div style="margin-bottom: 24px;">
+            <img src="${member.member_icon || 'https://via.placeholder.com/64'}" class="avatar" style="width: 64px; height: 64px; margin-bottom: 16px;" alt="">
+            <h3 style="margin: 0 0 8px 0;">${escapeHtml(member.member_name)}</h3>
+            <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>メール:</strong> ${escapeHtml(member.member_email)}</p>
+            <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>チーム:</strong> ${getConfigLabel(member.member_team_key, 'TEAM')}</p>
+            <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>権限:</strong> ${getConfigLabel(member.role_key, 'ROLE')}</p>
+            ${member.slack_member_id ? `<p style="margin: 0 0 4px 0; color: #6b7280;"><strong>Slack ID:</strong> ${escapeHtml(member.slack_member_id)}</p>` : ''}
           </div>
           <div class="detail-section">
             <h3>備考</h3>
@@ -2605,18 +2602,18 @@
                 <button type="button" class="toolbar-btn" data-command="strikeThrough" title="打ち消し線"><s>S</s></button>
                 <button type="button" class="toolbar-btn" data-command="underline" title="下線"><u>U</u></button>
                 <span class="toolbar-separator"></span>
-                <button type="button" class="toolbar-btn color-btn" data-color="#000000" title="黒"></button>
-                <button type="button" class="toolbar-btn color-btn" data-color="#FF0000" title="赤"></button>
-                <button type="button" class="toolbar-btn color-btn" data-color="#0000FF" title="青"></button>
-                <button type="button" class="toolbar-btn color-btn" data-color="#008000" title="緑"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#000000" title="黒" style="background: #000000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#FF0000" title="赤" style="background: #FF0000;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#0000FF" title="青" style="background: #0000FF;"></button>
+                <button type="button" class="toolbar-btn color-btn" data-color="#008000" title="緑" style="background: #008000;"></button>
               </div>
               <div id="member-notes-editor" class="rich-text-editor" contenteditable="true" data-field="member_notes" data-member-email="${memberEmail}"></div>
             </div>
           </div>
           <div class="detail-section">
             <h3>担当している制作物</h3>
-            ${assignedWorks.length === 0 ? '<p class="empty-message">担当している制作物はありません</p>' : `
-              <table class="table-full project-detail-table">
+            ${assignedWorks.length === 0 ? '<p style="color: #6b7280;">担当している制作物はありません</p>' : `
+              <table class="table-full" style="margin-top: 12px;">
                 <thead>
                   <tr>
                     <th>案件</th>
@@ -2692,6 +2689,19 @@
       const workTypes = configData['WORK_TYPE'] || [];
       const workTypeOptions = workTypes.map(wt => `<option value="${wt.config_key}">${wt.config_value}</option>`).join('');
       formContainer.innerHTML = `<form id="new-work-form-element" onsubmit="submitNewWork(event)"> <div class="form-group"> <label class="form-label">案件タイトル</label> <div id="project-combobox" class="combobox-container"> <input type="text" name="project_title" class="input-field" required placeholder="既存の案件タイトルで検索、または新規作成" oninput="searchProjects(this.value)" autocomplete="off"> <input type="hidden" name="project_id"> <div id="project-suggestions" class="combobox-suggestions"></div> </div> </div> <div class="form-group"> <label class="form-label">制作タイトル</label> <input type="text" name="work_title" class="input-field" required> </div> <div class="form-group"> <label class="form-label">制作種別</label> <select name="work_type_key" class="input-field" onchange="updateRegulationPreset(this.value)"> <option value="">選択してください</option> ${workTypeOptions} </select> </div> <div class="form-group"> <label class="form-label">納品期限</label> <input type="datetime-local" name="due_datetime" class="input-field"> </div> <div class="form-group"> <label class="form-label">制作物の概要</label> <textarea name="work_detail_content" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">デザイン要項</label> <textarea name="work_detail_design" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">入稿規定</label> <textarea name="work_detail_regulation" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">依頼者からの備考</label> <textarea name="work_detail_note" class="input-field" rows="4"></textarea> </div> <div class="modal-footer"> <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-work')">キャンセル</button> <button type="submit" class="btn btn-primary">作成</button> </div> </form>`;
+      
+      // IME変換確定時のEnterキーを無視する処理を追加
+      const form = document.getElementById('new-work-form-element');
+      if (form) {
+        const textInputs = form.querySelectorAll('input[type="text"], textarea');
+        textInputs.forEach(input => {
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.isComposing) {
+              e.stopPropagation();
+            }
+          });
+        });
+      }
     }
 
     function updateRegulationPreset(workTypeKey) {
@@ -2766,12 +2776,32 @@
     }
 
     function openNewProjectModal() {
-      document.getElementById('new-project-form').reset();
+      const form = document.getElementById('new-project-form');
+      form.reset();
+      // IME変換確定時のEnterキーを無視する処理を追加
+      const textInputs = form.querySelectorAll('input[type="text"], textarea');
+      textInputs.forEach(input => {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && e.isComposing) {
+            e.stopPropagation();
+          }
+        });
+      });
       openModal('modal-new-project');
     }
     function openNewTaskModal(workId) {
       const form = document.getElementById('new-task-form');
       form.elements.work_id.value = workId;
+      
+      // IME変換確定時のEnterキーを無視する処理を追加
+      const textInputs = form.querySelectorAll('input[type="text"], textarea');
+      textInputs.forEach(input => {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && e.isComposing) {
+            e.stopPropagation();
+          }
+        });
+      });
       
       // メンバー選択肢を設定
       const assignToSelect = form.elements.assign_to;
@@ -2825,6 +2855,17 @@
       const form = document.getElementById('new-review-request-form');
       form.reset();
       form.elements.work_id.value = workId;
+      
+      // IME変換確定時のEnterキーを無視する処理を追加
+      const textInputs = form.querySelectorAll('input[type="text"], textarea');
+      textInputs.forEach(input => {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && e.isComposing) {
+            e.stopPropagation();
+          }
+        });
+      });
+      
       updateReviewRequestFilesList();
       openModal('modal-new-review-request');
     }
@@ -3005,20 +3046,20 @@
       callGAS('getReviewRequestById', reviewRequestId).then(reviewRequest => {
         const container = document.getElementById('review-request-detail-content');
         container.innerHTML = `
-          <div class="mb-24">
+          <div style="margin-bottom: 24px;">
             <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">${escapeHtml(reviewRequest.review_title)}</h3>
-            <p class="card-text">${escapeHtml(reviewRequest.review_comment)}</p>
+            <p style="margin: 0; color: #6b7280; font-size: 14px;">${escapeHtml(reviewRequest.review_comment)}</p>
           </div>
-          <div class="mb-24">
+          <div style="margin-bottom: 24px;">
             <h4 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">ファイル</h4>
             <div>
               ${reviewRequest.files && reviewRequest.files.length > 0 
                 ? reviewRequest.files.map(file => 
-                    `<div class="review-request-file-item">
-                      <a href="${file.file_url}" target="_blank" class="review-request-file-link">${escapeHtml(file.file_name)}</a>
+                    `<div style="margin-bottom: 8px;">
+                      <a href="${file.file_url}" target="_blank" style="color: #3b82f6; text-decoration: underline;">${escapeHtml(file.file_name)}</a>
                     </div>`
                   ).join('')
-                : '<p class="empty-message">ファイルはありません</p>'
+                : '<p style="color: #6b7280;">ファイルはありません</p>'
               }
             </div>
           </div>
@@ -3540,7 +3581,7 @@
       };
       input.addEventListener('blur', onSave);
       input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') input.blur();
+        if (e.key === 'Enter' && !e.isComposing) input.blur();
         if (e.key === 'Escape') {
           cell.innerHTML = escapeHtml(originalValue);
           cell.classList.remove('editing');
@@ -3700,7 +3741,7 @@
         
         // キーボード操作
         input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') {
+          if (e.key === 'Enter' && !e.isComposing) {
             e.preventDefault();
             saveDateTimePicker(cell, tableName, id, field, originalValue, inputs);
           } else if (e.key === 'Escape') {
@@ -3890,7 +3931,7 @@
         });
         
         input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') {
+          if (e.key === 'Enter' && !e.isComposing) {
             e.preventDefault();
             saveTaskDateTimePicker(cell, taskId, field, originalValue, inputs);
           } else if (e.key === 'Escape') {
@@ -3988,7 +4029,7 @@
     }
 
     function handleIdSearchKeydown(event) {
-      if (event.key === 'Enter') {
+      if (event.key === 'Enter' && !event.isComposing) {
         event.preventDefault();
         const input = event.target;
         const searchValue = input.value.trim();
