@@ -545,10 +545,10 @@
       const infoText = infoParts.length > 0 ? infoParts.join('|') : '';
       
       card.innerHTML = `
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Courier New', monospace;">
+        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${work.project_id ? `${escapeHtml(work.project_id)} ` : ''}${escapeHtml(work.project_title || '')}
         </div>
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Courier New', monospace;">
+        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${escapeHtml(work.work_id)} ${escapeHtml(work.work_title || '')}
         </div>
         ${infoText ? `<div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px;">${escapeHtml(infoText)}</div>` : ''}
@@ -623,10 +623,10 @@
       
       card.innerHTML = `
         <div class="work-status-badge ${statusColor}">${escapeHtml(statusLabel)}</div>
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Courier New', monospace;">
+        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${work.project_id ? `${escapeHtml(work.project_id)} ` : ''}${escapeHtml(work.project_title || '')}
         </div>
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Courier New', monospace;">
+        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${escapeHtml(work.work_id)} ${escapeHtml(work.work_title || '')}
         </div>
         <div class="card-meta" style="margin-bottom: 8px;">
@@ -663,7 +663,7 @@
       const creatorName = reviewRequest.creator_name || '';
       
       card.innerHTML = `
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Courier New', monospace;">
+        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${escapeHtml(reviewRequest.review_request_id || '')} ${escapeHtml(reviewRequest.review_title || '')}
         </div>
         ${dueDateHtml ? `<div class="card-meta" style="margin-bottom: 12px;">${dueDateHtml}</div>` : ''}
@@ -812,13 +812,14 @@
     if (!dueDatetime) return '';
     try {
       const date = new Date(dueDatetime);
-      const month = date.getMonth() + 1;
-      const day = date.getDate();
+      const year = String(date.getFullYear()).padStart(4, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
       const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
       const weekday = weekdays[date.getDay()];
       const hours = String(date.getHours()).padStart(2, '0');
       const minutes = String(date.getMinutes()).padStart(2, '0');
-      return `~${month}/${day}(${weekday}) ${hours}:${minutes}`;
+      return `~${year}/${month}/${day}(${weekday}) ${hours}:${minutes}`;
     } catch (e) {
       return '';
     }
@@ -4758,21 +4759,23 @@
     } catch (e) { return dateString; }
   }
   function formatDateTimeForDisplay(dateString, includeSeconds = false) {
-    if (!dateString) return includeSeconds ? 'yyyy/mm/dd hh:mm:ss' : 'yyyy/mm/dd hh:mm';
+    if (!dateString) return includeSeconds ? 'yyyy/mm/dd(曜日) hh:mm:ss' : 'yyyy/mm/dd(曜日) hh:mm';
     try {
       const dt = new Date(dateString);
-      const year = dt.getFullYear();
-      const month = ('0' + (dt.getMonth() + 1)).slice(-2);
-      const day = ('0' + dt.getDate()).slice(-2);
-      const hours = ('0' + dt.getHours()).slice(-2);
-      const minutes = ('0' + dt.getMinutes()).slice(-2);
-      const seconds = ('0' + dt.getSeconds()).slice(-2);
+      const year = String(dt.getFullYear()).padStart(4, '0');
+      const month = String(dt.getMonth() + 1).padStart(2, '0');
+      const day = String(dt.getDate()).padStart(2, '0');
+      const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+      const weekday = weekdays[dt.getDay()];
+      const hours = String(dt.getHours()).padStart(2, '0');
+      const minutes = String(dt.getMinutes()).padStart(2, '0');
+      const seconds = String(dt.getSeconds()).padStart(2, '0');
       if (includeSeconds) {
-        return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+        return `${year}/${month}/${day}(${weekday}) ${hours}:${minutes}:${seconds}`;
       }
-      return `${year}/${month}/${day} ${hours}:${minutes}`;
+      return `${year}/${month}/${day}(${weekday}) ${hours}:${minutes}`;
     } catch (e) {
-      return includeSeconds ? 'yyyy/mm/dd hh:mm:ss' : 'yyyy/mm/dd hh:mm';
+      return includeSeconds ? 'yyyy/mm/dd(曜日) hh:mm:ss' : 'yyyy/mm/dd(曜日) hh:mm';
     }
   }
   
