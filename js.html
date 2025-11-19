@@ -1020,6 +1020,7 @@
       const contentDiv = document.createElement('div');
       contentDiv.className = 'header-content';
       const labelSpan = document.createElement('span');
+      labelSpan.className = 'header-label';
       labelSpan.textContent = header.label;
       contentDiv.appendChild(labelSpan);
       if (header.sortable || header.filterable) {
@@ -1066,13 +1067,36 @@
         if (header.editable) {
           switch(header.editType) {
             case 'select':
-              cell.innerHTML = `<div class="editable-container" onclick="showSelectEditor(event, ${JSON.stringify(name)}, ${JSON.stringify(item[idKey])}, ${JSON.stringify(header.key)})"> <span class="editable-text">${escapeHtml(getConfigLabel(currentValue, header.configType))}</span> <span class="editable-toggle-btn">✎</span> </div>`;
+              const selectContainer = document.createElement('div');
+              selectContainer.className = 'editable-container';
+              const selectText = document.createElement('span');
+              selectText.className = 'editable-text';
+              selectText.textContent = getConfigLabel(currentValue, header.configType);
+              const selectToggle = document.createElement('span');
+              selectToggle.className = 'editable-toggle-btn';
+              selectToggle.textContent = '✎';
+              selectContainer.appendChild(selectText);
+              selectContainer.appendChild(selectToggle);
+              selectContainer.addEventListener('click', (e) => {
+                showSelectEditor(e, name, item[idKey], header.key);
+              });
+              cell.appendChild(selectContainer);
               break;
             case 'datetime':
-              cell.innerHTML = `<div class="editable-container datetime-editable" onclick="openDateTimePicker(event, ${JSON.stringify(name)}, ${JSON.stringify(item[idKey])}, ${JSON.stringify(header.key)})">
-                <span class="editable-text">${escapeHtml(formatDateTimeForDisplay(currentValue))}</span>
-                <span class="editable-toggle-btn">✎</span>
-              </div>`;
+              const datetimeContainer = document.createElement('div');
+              datetimeContainer.className = 'editable-container datetime-editable';
+              const datetimeText = document.createElement('span');
+              datetimeText.className = 'editable-text';
+              datetimeText.textContent = formatDateTimeForDisplay(currentValue);
+              const datetimeToggle = document.createElement('span');
+              datetimeToggle.className = 'editable-toggle-btn';
+              datetimeToggle.textContent = '✎';
+              datetimeContainer.appendChild(datetimeText);
+              datetimeContainer.appendChild(datetimeToggle);
+              datetimeContainer.addEventListener('click', (e) => {
+                openDateTimePicker(e, name, item[idKey], header.key);
+              });
+              cell.appendChild(datetimeContainer);
               break;
             default: // text
               cell.textContent = currentValue;
