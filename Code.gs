@@ -1311,3 +1311,12 @@ function sanitizeForClient(data) {
   // それ以外（文字列、数値、ブール値）はそのまま返す
   return data;
 }
+
+/**
+ * 別のHTMLファイルをテンプレートとして評価し、コンテンツを文字列として返します。
+ * @param {string} filename - HTMLファイル名 (例: 'css')
+ * @returns {string} ファイルの内容
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
