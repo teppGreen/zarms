@@ -404,7 +404,9 @@ function getKnowledgeForHome() {
   const knowledge = getAllData(SHEET_NAMES.KNOWLEDGE);
   
   const enrichedKnowledge = knowledge.map(item => {
-    item.creator_name = getMemberName(item.created_by);
+    const creator = getMemberByEmail(item.created_by);
+    item.creator_name = creator ? creator.member_name : '';
+    item.creator_icon = creator ? creator.member_icon : '';
     item.work_title = getWorkTitle(item.work_id);
     return item;
   });
