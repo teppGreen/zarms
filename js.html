@@ -993,9 +993,9 @@
           }
         } else {
           switch(header.key) {
-            case 'work_id': content = `<button class="btn-link" onclick="openWorkDetailOverlay(${item.work_id})">${escapeHtml(item.work_id)}</button>`; break;
-            case 'project_id': content = `<button class="btn-link" onclick="openProjectDetailOverlay(${item.project_id})">${escapeHtml(item.project_id)}</button>`; break;
-            case 'detail': content = `<button class="btn-link" onclick="openMemberDetail(${item.member_email})">詳細</button>`; break;
+            case 'work_id': content = `<button class="btn-link" onclick="openWorkDetailOverlay('${item.work_id}')">${escapeHtml(item.work_id)}</button>`; break;
+            case 'project_id': content = `<button class="btn-link" onclick="openProjectDetailOverlay('${item.project_id}')">${escapeHtml(item.project_id)}</button>`; break;
+            case 'detail': content = `<button class="btn-link" onclick="openMemberDetail('${item.member_email}')">詳細</button>`; break;
             case 'assignees': content = renderAssignees(item.assignees); break;
             case 'avatar': content = `<img src="${escapeHtml(item.member_icon || 'https://via.placeholder.com/32')}" class="avatar" alt="">`; break;
             case 'due_datetime': content = escapeHtml(formatDateTimeForDisplay(currentValue, true)); break;
@@ -2211,7 +2211,7 @@
         worksHtml += '<tbody>';
         project.works.forEach(work => {
           worksHtml += `<tr>`;
-          worksHtml += `<td><button class="btn-link" onclick="openWorkDetailOverlay(${work.work_id}); closeProjectDetailOverlay();">${escapeHtml(work.work_id)}</button></td>`;
+          worksHtml += `<td><button class="btn-link" onclick="openWorkDetailOverlay('${work.work_id}'); closeProjectDetailOverlay();">${escapeHtml(work.work_id)}</button></td>`;
           worksHtml += `<td>${escapeHtml(work.work_title || '-')}</td>`;
           worksHtml += `<td>${escapeHtml(getConfigLabel(work.work_status_key, 'WORK_STATUS') || work.work_status_key || '-')}</td>`;
           worksHtml += `<td>${escapeHtml(formatDateTimeForDisplay(work.due_datetime) || '-')}</td>`;
@@ -3882,7 +3882,7 @@
                 ${assignedWorks.map(work => `
                   <tr>
                     <td>${escapeHtml(work.project_title)}</td>
-                    <td><button class="btn-link" onclick="openWorkDetailOverlay(${work.work_id}); closeModal('modal-member-detail');">${escapeHtml(work.work_title)}</button></td>
+                    <td><button class="btn-link" onclick="openWorkDetailOverlay('${work.work_id}'); closeModal('modal-member-detail');">${escapeHtml(work.work_title)}</button></td>
                     <td>${escapeHtml(getConfigLabel(work.work_status_key, 'WORK_STATUS'))}</td>
                   </tr>
                 `).join('')}
