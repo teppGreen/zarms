@@ -1032,8 +1032,9 @@ function getReviewRequestsByWorkId(workId) {
   const reviewRequests = findData(SHEET_NAMES.REVIEW_REQUESTS, { work_id: workId });
   
   const enrichedReviewRequests = reviewRequests.map(reviewRequest => {
-    reviewRequest.creator_name = getMemberName(reviewRequest.created_by);
-    reviewRequest.creator_icon = getMemberIcon(reviewRequest.created_by);
+    const creator = getMemberByEmail(reviewRequest.created_by);
+    reviewRequest.creator_name = creator ? creator.member_name : '';
+    reviewRequest.creator_icon = creator ? creator.member_icon : '';
     reviewRequest.files = getReviewRequestFiles(reviewRequest.review_request_id);
     reviewRequest.file_count = reviewRequest.files.length;
     return reviewRequest;
