@@ -103,8 +103,12 @@
   }
 
   // 初期化
-  function initializeApp() {
+  async function initializeApp() {
     console.log('initializeApp が呼び出されました');
+    
+    // 全画面タイトルの最小表示時間を確保（アニメーションが適切に表示されるように）
+    const titleStartTime = Date.now();
+    const minDisplayTime = 1000; // 最小表示時間（ミリ秒）
     
     // 新規作成ボタンを最初に初期化（エラーが発生しても確実に実行されるように）
     try {
@@ -115,7 +119,8 @@
     }
 
     try {
-      loadInitialData();
+      // データ読み込みを待つ
+      await loadInitialData();
     } catch (error) {
       console.error('loadInitialData でエラーが発生しました:', error);
     }
@@ -130,9 +135,14 @@
       console.error('URLパラメータ処理でエラーが発生しました:', error);
     }
 
-    // 全画面タイトルを非表示にする処理
+    // 最小表示時間を確保してから全画面タイトルを非表示にする
     try {
-      hideFullscreenTitle();
+      const elapsedTime = Date.now() - titleStartTime;
+      const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
+      
+      setTimeout(() => {
+        hideFullscreenTitle();
+      }, remainingTime);
     } catch (error) {
       console.error('全画面タイトル非表示処理でエラーが発生しました:', error);
     }
@@ -170,7 +180,7 @@
   function loadInitialData(shouldSwitchTab = true) {
     showLoading();
     
-    Promise.all([
+    return Promise.all([
       callGAS('getCurrentUser'),
       callGAS('getConfig', null),
       callGAS('getUserRole')
@@ -183,7 +193,10 @@
       }
       
       hideLoading();
-      switchTab('home');
+      if (shouldSwitchTab) {
+        switchTab('home');
+      }
+      return { user, config, role };
     }).catch(handleError);
   }
 
