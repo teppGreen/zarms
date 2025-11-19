@@ -479,7 +479,19 @@
   let hiddenWorkIds = new Set();
 
   function loadHomeData() {
-    callGAS('getHomeData').then(data => {
+    // membersDataが取得されていない場合は取得
+    const promises = [callGAS('getHomeData')];
+    if (!membersData || membersData.length === 0) {
+      promises.push(callGAS('getMembers'));
+    } else {
+      promises.push(Promise.resolve(membersData));
+    }
+    
+    Promise.all(promises).then(([data, members]) => {
+      if (!membersData || membersData.length === 0) {
+        membersData = members;
+      }
+      
       document.getElementById('home-greeting').textContent = `${data.greeting}、${data.memberName}さん。`;
       
       // 最新の制作依頼を表示
@@ -521,19 +533,34 @@
       // 残り時間を計算（hh:mm形式）
       const remainingTime = calculateRemainingTime(work.remaining_time_ms);
       
+      // 優先度、制作物種別、依頼者の所属チームを取得
+      const priorityLabel = work.priority_key ? getConfigLabel(work.priority_key, 'PRIORITY') : '';
+      const workTypeLabel = work.work_type_key ? getConfigLabel(work.work_type_key, 'WORK_TYPE') : '';
+      const clientTeamLabel = work.work_client_email ? (() => {
+        const client = membersData?.find(m => m.member_email === work.work_client_email);
+        return client ? getConfigLabel(client.member_team_key, 'TEAM') : '';
+      })() : '';
+      
+      const infoParts = [priorityLabel, workTypeLabel, clientTeamLabel].filter(Boolean);
+      const infoText = infoParts.length > 0 ? infoParts.join('|') : '';
+      
       card.innerHTML = `
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Courier New', monospace;">${escapeHtml(work.work_id)}</div>
-        <h3 class="card-title-text">${escapeHtml(work.work_title)}</h3>
-        <p class="card-subtitle">${escapeHtml(work.project_title)}</p>
-        <div class="card-meta">
-          <span>${formatDateTimeForHome(work.created_at)}</span>
+        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Courier New', monospace;">
+          ${work.project_id ? `${escapeHtml(work.project_id)} ` : ''}${escapeHtml(work.project_title || '')}
+        </div>
+        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Courier New', monospace;">
+          ${escapeHtml(work.work_id)} ${escapeHtml(work.work_title || '')}
+        </div>
+        ${infoText ? `<div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px;">${escapeHtml(infoText)}</div>` : ''}
+        <div class="card-meta" style="margin-bottom: 12px;">
+          <span>納期: ${formatDateTimeForHome(work.due_datetime)}</span>
         </div>
         <div class="work-accept-decline-buttons">
           <button class="btn-accept" data-work-id="${escapeHtml(work.work_id)}" data-remaining-ms="${work.remaining_time_ms || 0}">
             承諾
-            ${remainingTime ? `<div class="remaining-time" data-remaining-ms="${work.remaining_time_ms || 0}">残り ${remainingTime}</div>` : ''}
+            ${remainingTime ? `<div class="remaining-time" data-remaining-ms="${work.remaining_time_ms || 0}">${remainingTime}後に一旦締切</div>` : ''}
           </button>
-          <button class="btn-decline" data-work-id="${escapeHtml(work.work_id)}">辞退</button>
+          <button class="btn-decline" data-work-id="${escapeHtml(work.work_id)}">保留・辞退</button>
         </div>
       `;
       
@@ -596,10 +623,13 @@
       
       card.innerHTML = `
         <div class="work-status-badge ${statusColor}">${escapeHtml(statusLabel)}</div>
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Courier New', monospace;">${escapeHtml(work.work_id)}</div>
-        <h3 class="card-title-text">${escapeHtml(work.work_title)}</h3>
-        <p class="card-subtitle">${escapeHtml(work.project_title)}</p>
-        <div class="card-meta">
+        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Courier New', monospace;">
+          ${work.project_id ? `${escapeHtml(work.project_id)} ` : ''}${escapeHtml(work.project_title || '')}
+        </div>
+        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Courier New', monospace;">
+          ${escapeHtml(work.work_id)} ${escapeHtml(work.work_title || '')}
+        </div>
+        <div class="card-meta" style="margin-bottom: 8px;">
           <span>納期: ${formatDateTimeForHome(work.due_datetime)}</span>
         </div>
         ${incompleteTasksHtml}
@@ -625,7 +655,7 @@
       
       // due_datetimeを「~10/24(水) 15:00」形式で表示
       const dueDateHtml = reviewRequest.due_datetime 
-        ? `<div class="card-meta">${formatDateTimeForHome(reviewRequest.due_datetime)}</div>`
+        ? formatDateForReview(reviewRequest.due_datetime)
         : '';
       
       // 作成者情報
@@ -633,9 +663,10 @@
       const creatorName = reviewRequest.creator_name || '';
       
       card.innerHTML = `
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Courier New', monospace;">${escapeHtml(reviewRequest.review_request_id || '')}</div>
-        <h3 class="card-title-text">${escapeHtml(reviewRequest.review_title)}</h3>
-        ${dueDateHtml}
+        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Courier New', monospace;">
+          ${escapeHtml(reviewRequest.review_request_id || '')} ${escapeHtml(reviewRequest.review_title || '')}
+        </div>
+        ${dueDateHtml ? `<div class="card-meta" style="margin-bottom: 12px;">${dueDateHtml}</div>` : ''}
         <div class="review-creator">
           <img src="${escapeHtml(creatorIcon)}" class="review-creator-icon" alt="${escapeHtml(creatorName)}">
           <span>${escapeHtml(creatorName)}</span>
@@ -779,14 +810,18 @@
 
   function formatDateForReview(dueDatetime) {
     if (!dueDatetime) return '';
-    const date = new Date(dueDatetime);
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-    const weekday = weekdays[date.getDay()];
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `~${month}/${day}(${weekday}) ${hours}:${minutes}`;
+    try {
+      const date = new Date(dueDatetime);
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+      const weekday = weekdays[date.getDay()];
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `~${month}/${day}(${weekday}) ${hours}:${minutes}`;
+    } catch (e) {
+      return '';
+    }
   }
 
   function handleAcceptWork(workId) {
