@@ -659,8 +659,29 @@
       const creatorIcon = reviewRequest.creator_icon || 'https:\/\/via.placeholder.com/24';
       const creatorName = reviewRequest.creator_name || '';
       
+      // 最初に登録されたファイルを取得（created_atでソート）
+      let firstFile = null;
+      if (reviewRequest.files && reviewRequest.files.length > 0) {
+        const sortedFiles = [...reviewRequest.files].sort((a, b) => {
+          const dateA = new Date(a.created_at || 0);
+          const dateB = new Date(b.created_at || 0);
+          return dateA - dateB;
+        });
+        firstFile = sortedFiles[0];
+      }
+      
+      // サムネイル用のプレースホルダー
+      const thumbnailHtml = firstFile && firstFile.file_id
+        ? `<div class="review-thumbnail-container" data-file-id="${escapeHtml(firstFile.file_id)}">
+             <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: var(--md-sys-color-surface-variant);">
+               <span style="color: var(--md-sys-color-on-surface-variant); font-size: 12px;">読み込み中...</span>
+             </div>
+           </div>`
+        : '';
+      
       card.innerHTML = `
-        <div style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); font-family: 'Roboto Mono', monospace; font-weight: 500;">
+        ${thumbnailHtml}
+        <div style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); font-family: 'Roboto Mono', monospace; font-weight: 500; word-wrap: break-word;">
           ${escapeHtml(reviewRequest.review_request_id || '')} ${escapeHtml(reviewRequest.review_title || '')}
         </div>
         ${dueDateHtml ? `<div class="card-meta"><span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${dueDateHtml}</span></div>` : ''}
@@ -672,7 +693,36 @@
       
       card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
       container.appendChild(card);
+      
+      // サムネイルを非同期で読み込む（タブの読み込み完了後）
+      if (firstFile && firstFile.file_id) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            loadReviewThumbnail(card.querySelector('.review-thumbnail-container'), firstFile.file_id);
+          });
+        });
+      }
     });
+  }
+  
+  function loadReviewThumbnail(container, fileId) {
+    if (!container) return;
+    
+    // Google DriveのサムネイルURLを生成
+    const thumbnailUrl = `https:\/\/drive.google.com\/thumbnail?id=${fileId}&sz=w800-h450`;
+    
+    const img = document.createElement('img');
+    img.className = 'review-thumbnail';
+    img.src = thumbnailUrl;
+    img.alt = 'サムネイル';
+    img.onerror = () => {
+      // サムネイルの読み込みに失敗した場合はプレースホルダーを表示
+      container.innerHTML = '<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: var(--md-sys-color-surface-variant);"><span style="color: var(--md-sys-color-on-surface-variant); font-size: 12px;">サムネイルなし</span></div>';
+    };
+    img.onload = () => {
+      container.innerHTML = '';
+      container.appendChild(img);
+    };
   }
 
   function renderKnowledge(knowledgeList) {
@@ -818,7 +868,7 @@
       const weekday = weekdays[date.getDay()];
       const hours = String(date.getHours()).padStart(2, '0');
       const minutes = String(date.getMinutes()).padStart(2, '0');
-      return `~${year}/${month}/${day}(${weekday}) ${hours}:${minutes}`;
+      return `~ ${year}/${month}/${day}(${weekday}) ${hours}:${minutes}`;
     } catch (e) {
       return '';
     }
@@ -3351,8 +3401,30 @@
       const card = document.createElement('div');
       card.className = 'review-card';
       card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
+      
+      // 最初に登録されたファイルを取得（created_atでソート）
+      let firstFile = null;
+      if (reviewRequest.files && reviewRequest.files.length > 0) {
+        const sortedFiles = [...reviewRequest.files].sort((a, b) => {
+          const dateA = new Date(a.created_at || 0);
+          const dateB = new Date(b.created_at || 0);
+          return dateA - dateB;
+        });
+        firstFile = sortedFiles[0];
+      }
+      
+      // サムネイル用のプレースホルダー
+      const thumbnailHtml = firstFile && firstFile.file_id
+        ? `<div class="review-thumbnail-container" data-file-id="${escapeHtml(firstFile.file_id)}">
+             <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: var(--md-sys-color-surface-variant);">
+               <span style="color: var(--md-sys-color-on-surface-variant); font-size: 12px;">読み込み中...</span>
+             </div>
+           </div>`
+        : '';
+      
       card.innerHTML = `
-        <h3 class="card-title-text">${escapeHtml(reviewRequest.review_title)}</h3>
+        ${thumbnailHtml}
+        <h3 class="card-title-text" style="word-wrap: break-word;">${escapeHtml(reviewRequest.review_title)}</h3>
         <p class="card-subtitle">${escapeHtml((reviewRequest.review_comment || '').substring(0, 100))}${(reviewRequest.review_comment || '').length > 100 ? '...' : ''}</p>
         <div class="card-meta">
           <span>${reviewRequest.file_count || 0}個のファイル</span>
@@ -3360,33 +3432,16 @@
         </div>
       `;
       
-      // const title = document.createElement('h4');
-      // title.style.margin = '0 0 8px 0';
-      // title.style.fontSize = '14px';
-      // title.style.fontWeight = '600';
-      // title.textContent = escapeHtml(reviewRequest.review_title);
-      
-      // const commentPreview = document.createElement('p');
-      // commentPreview.style.margin = '0 0 8px 0';
-      // commentPreview.style.color = '#6b7280';
-      // commentPreview.style.fontSize = '12px';
-      // const commentText = reviewRequest.review_comment || '';
-      // commentPreview.textContent = commentText.length > 50 ? commentText.substring(0, 50) + '...' : commentText;
-      
-      // const meta = document.createElement('div');
-      // meta.style.display = 'flex';
-      // meta.style.justifyContent = 'space-between';
-      // meta.style.fontSize = '11px';
-      // meta.style.color = '#9ca3af';
-      // meta.innerHTML = `
-      //   <span>${reviewRequest.file_count || 0}個のファイル</span>
-      //   <span>${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
-      // `;
-      
-      // card.appendChild(title);
-      // card.appendChild(commentPreview);
-      // card.appendChild(meta);
       container.appendChild(card);
+      
+      // サムネイルを非同期で読み込む（タブの読み込み完了後）
+      if (firstFile && firstFile.file_id) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            loadReviewThumbnail(card.querySelector('.review-thumbnail-container'), firstFile.file_id);
+          });
+        });
+      }
     });
   }
 
