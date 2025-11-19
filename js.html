@@ -530,9 +530,6 @@
       card.className = 'home-card';
       card.dataset.workId = work.work_id;
       
-      // 残り時間を計算（hh:mm形式）
-      const remainingTime = calculateRemainingTime(work.remaining_time_ms);
-      
       // 優先度、制作物種別、依頼者の所属チームを取得
       const priorityLabel = work.priority_key ? getConfigLabel(work.priority_key, 'PRIORITY') : '';
       const workTypeLabel = work.work_type_key ? getConfigLabel(work.work_type_key, 'WORK_TYPE') : '';
@@ -545,10 +542,10 @@
       const infoText = infoParts.length > 0 ? infoParts.join('|') : '';
       
       card.innerHTML = `
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
+        <div style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${work.project_id ? `${escapeHtml(work.project_id)} ` : ''}${escapeHtml(work.project_title || '')}
         </div>
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
+        <div style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${escapeHtml(work.work_id)} ${escapeHtml(work.work_title || '')}
         </div>
         ${infoText ? `<div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px;">${escapeHtml(infoText)}</div>` : ''}
@@ -558,7 +555,7 @@
         <div class="work-accept-decline-buttons">
           <button class="btn-accept" data-work-id="${escapeHtml(work.work_id)}" data-remaining-ms="${work.remaining_time_ms || 0}">
             承諾
-            ${remainingTime ? `<div class="remaining-time" data-remaining-ms="${work.remaining_time_ms || 0}">${remainingTime}後に一旦締切</div>` : ''}
+            <div class="remaining-time" data-remaining-ms="${work.remaining_time_ms || 0}"></div>
           </button>
           <button class="btn-decline" data-work-id="${escapeHtml(work.work_id)}">保留・辞退</button>
         </div>
@@ -623,16 +620,16 @@
       
       card.innerHTML = `
         <div class="work-status-badge ${statusColor}">${escapeHtml(statusLabel)}</div>
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
+        <div style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${work.project_id ? `${escapeHtml(work.project_id)} ` : ''}${escapeHtml(work.project_title || '')}
         </div>
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
+        <div style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${escapeHtml(work.work_id)} ${escapeHtml(work.work_title || '')}
         </div>
-        <div class="card-meta" style="margin-bottom: 8px;">
+        <div class="card-meta">
           <span>納期: ${formatDateTimeForHome(work.due_datetime)}</span>
+          ${incompleteTasksHtml}
         </div>
-        ${incompleteTasksHtml}
       `;
       
       card.onclick = () => openWorkDetailOverlay(work.work_id);
@@ -663,7 +660,7 @@
       const creatorName = reviewRequest.creator_name || '';
       
       card.innerHTML = `
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
+        <div style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${escapeHtml(reviewRequest.review_request_id || '')} ${escapeHtml(reviewRequest.review_title || '')}
         </div>
         ${dueDateHtml ? `<div class="card-meta" style="margin-bottom: 12px;">${dueDateHtml}</div>` : ''}
@@ -736,11 +733,15 @@
     }
   }
 
-  function calculateRemainingTime(remainingMs) {
-    if (!remainingMs || remainingMs <= 0) return '';
-    const hours = Math.floor(remainingMs / (1000 * 60 * 60));
-    const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  function calculateRemainingTime(ms) {
+    if (!ms || ms <= 0) return '';
+    
+    const totalSeconds = ms / 1000; // ミリ秒を秒に変換（小数点以下も保持）
+    const hours = Math.floor(totalSeconds / 3600); // 時間部分の取得（小数切り捨て）
+    const minutes = Math.floor((totalSeconds % 3600) / 60); // 分部分の取得（小数切り捨て）
+    const seconds = Math.floor(totalSeconds % 60); // ミリ秒部分は切り捨て（整数部分のみ）
+
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   }
   
   // 残り時間をリアルタイムで更新するためのinterval ID
@@ -768,11 +769,9 @@
       
       const remainingTimeElement = button.querySelector('.remaining-time');
       if (remainingTimeElement) {
-        if (remainingMs <= 0) {
-          remainingTimeElement.textContent = '残り 00:00';
-        } else {
+        if (remainingMs > 0) {
           const remainingTime = calculateRemainingTime(remainingMs);
-          remainingTimeElement.textContent = `残り ${remainingTime}`;
+          remainingTimeElement.textContent = `${remainingTime}`;
         }
       }
     });
