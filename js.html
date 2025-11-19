@@ -542,13 +542,13 @@
       const infoText = infoParts.length > 0 ? infoParts.join('|') : '';
       
       card.innerHTML = `
-        <div style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
+        <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${work.project_id ? `${escapeHtml(work.project_id)} ` : ''}${escapeHtml(work.project_title || '')}
         </div>
-        <div style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
+        <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${escapeHtml(work.work_id)} ${escapeHtml(work.work_title || '')}
         </div>
-        ${infoText ? `<div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px;">${escapeHtml(infoText)}</div>` : ''}
+        ${infoText ? `<div style="font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px;">${escapeHtml(infoText)}</div>` : ''}
         <div class="card-meta" style="margin-bottom: 12px;">
           <span>納期: <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${formatDateTimeForHome(work.due_datetime)}</span></span>
         </div>
@@ -620,10 +620,10 @@
       
       card.innerHTML = `
         <div class="work-status-badge ${statusColor}">${escapeHtml(statusLabel)}</div>
-        <div style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
+        <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${work.project_id ? `${escapeHtml(work.project_id)} ` : ''}${escapeHtml(work.project_title || '')}
         </div>
-        <div style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
+        <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${escapeHtml(work.work_id)} ${escapeHtml(work.work_title || '')}
         </div>
         <div class="card-meta">
@@ -674,14 +674,14 @@
       const thumbnailHtml = firstFile && firstFile.file_id
         ? `<div class="review-thumbnail-container" data-file-id="${escapeHtml(firstFile.file_id)}">
              <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: var(--md-sys-color-surface-variant);">
-               <span style="color: var(--md-sys-color-on-surface-variant); font-size: 12px;">読み込み中...</span>
+               <span style="color: var(--md-sys-color-on-surface-variant); font-size: 0.75rem;">読み込み中...</span>
              </div>
            </div>`
         : '';
       
       card.innerHTML = `
         ${thumbnailHtml}
-        <div style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); font-family: 'Roboto Mono', monospace; font-weight: 500; word-wrap: break-word;">
+        <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); font-family: 'Roboto Mono', monospace; font-weight: 500; word-wrap: break-word;">
           ${escapeHtml(reviewRequest.review_request_id || '')} ${escapeHtml(reviewRequest.review_title || '')}
         </div>
         ${dueDateHtml ? `<div class="card-meta"><span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${dueDateHtml}</span></div>` : ''}
@@ -717,7 +717,7 @@
     img.alt = 'サムネイル';
     img.onerror = () => {
       // サムネイルの読み込みに失敗した場合はプレースホルダーを表示
-      container.innerHTML = '<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: var(--md-sys-color-surface-variant);"><span style="color: var(--md-sys-color-on-surface-variant); font-size: 12px;">サムネイルなし</span></div>';
+      container.innerHTML = '<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: var(--md-sys-color-surface-variant);"><span style="color: var(--md-sys-color-on-surface-variant); font-size: 0.75rem;">サムネイルなし</span></div>';
     };
     img.onload = () => {
       container.innerHTML = '';
@@ -753,11 +753,11 @@
       
       card.innerHTML = `
         <div class="knowledge-content">${contentHtml}</div>
-        <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--md-sys-color-on-surface-variant);">
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant);">
           <img src="${escapeHtml(creatorIcon)}" class="review-creator-icon" alt="${escapeHtml(creatorName)}">
           <span>${escapeHtml(creatorName)}</span>
         </div>
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-top: 8px;">
+        <div style="font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant); margin-top: 8px;">
           <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${formatDateTimeForHome(item.created_at)}</span>
         </div>
       `;
@@ -912,11 +912,11 @@
           <div style="margin-bottom: 12px;">
             <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(knowledge.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span>
           </div>
-          <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">${escapeHtml(knowledge.work_title)}</h3>
-          <p style="margin: 0; color: #6b7280; font-size: 14px;">${formatDate(knowledge.created_at)} - ${escapeHtml(knowledge.creator_name)}</p>
+          <h3 style="margin: 0 0 8px 0; font-size: 1.125rem; font-weight: 600;">${escapeHtml(knowledge.work_title)}</h3>
+          <p style="margin: 0; color: #6b7280; font-size: 0.875rem;">${formatDate(knowledge.created_at)} - ${escapeHtml(knowledge.creator_name)}</p>
         </div>
         <div style="margin-bottom: 24px;">
-          <h4 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">内容</h4>
+          <h4 style="margin: 0 0 12px 0; font-size: 1rem; font-weight: 600;">内容</h4>
           <div style="line-height: 1.6; color: var(--md-sys-color-on-surface);">${knowledge.knowledge_content || ''}</div>
         </div>
       `;
@@ -944,7 +944,7 @@
         container.innerHTML = '<p style="color: #6b7280; grid-column: 1 / -1;">データがありません</p>';
       } else {
         knowledgeData.forEach(item => {
-          container.innerHTML += `<div class="card"> <div style="margin-bottom: 8px;"> <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span> </div> <div style="margin-bottom: 12px; font-size: 14px; color: #6b7280;"> ${escapeHtml(item.work_title)} </div> <div style="margin-bottom: 12px;"> ${escapeHtml(item.knowledge_content.substring(0, 150))}... </div> <div style="font-size: 12px; color: #9ca3af;"> ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)} </div> </div>`;
+          container.innerHTML += `<div class="card"> <div style="margin-bottom: 8px;"> <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span> </div> <div style="margin-bottom: 12px; font-size: 0.875rem; color: #6b7280;"> ${escapeHtml(item.work_title)} </div> <div style="margin-bottom: 12px;"> ${escapeHtml(item.knowledge_content.substring(0, 150))}... </div> <div style="font-size: 0.75rem; color: #9ca3af;"> ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)} </div> </div>`;
         });
       }
       hideLoading();
@@ -1881,12 +1881,12 @@
             
             const name = document.createElement('span');
             name.textContent = `${assignee.member_name}/${assignee.member_team_value}`;
-            name.style.fontSize = '12px';
+            name.style.fontSize = '0.75rem';
             
             const deleteBtn = document.createElement('button');
             deleteBtn.textContent = '一削除';
             deleteBtn.className = 'project-info-delete-btn';
-            deleteBtn.style.fontSize = '12px';
+            deleteBtn.style.fontSize = '0.75rem';
             deleteBtn.style.padding = '2px 8px';
             deleteBtn.style.border = 'none';
             deleteBtn.style.background = 'none';
@@ -2209,7 +2209,7 @@
       let html = '<div style="display: flex; flex-direction: column; gap: 24px;">';
       
       // プロジェクトの全プロパティを表示
-      html += '<div><h2 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 600;">プロジェクト情報</h2>';
+      html += '<div><h2 style="margin: 0 0 16px 0; font-size: 1.5rem; font-weight: 600;">プロジェクト情報</h2>';
       html += '<table class="table-full" style="margin-top: 12px;">';
       html += '<tbody>';
       
@@ -3162,7 +3162,7 @@
       input.style.padding = '8px';
       input.style.border = 'none';
       input.style.outline = 'none';
-      input.style.fontSize = '14px';
+      input.style.fontSize = '0.875rem';
       input.style.fontFamily = 'inherit';
       
       const handleSubmit = () => {
@@ -3417,7 +3417,7 @@
       const thumbnailHtml = firstFile && firstFile.file_id
         ? `<div class="review-thumbnail-container" data-file-id="${escapeHtml(firstFile.file_id)}">
              <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: var(--md-sys-color-surface-variant);">
-               <span style="color: var(--md-sys-color-on-surface-variant); font-size: 12px;">読み込み中...</span>
+               <span style="color: var(--md-sys-color-on-surface-variant); font-size: 0.75rem;">読み込み中...</span>
              </div>
            </div>`
         : '';
@@ -3606,7 +3606,7 @@
         
         const teamDiv = document.createElement('div');
         teamDiv.textContent = getConfigLabel(member.member_team_key, 'TEAM');
-        teamDiv.style.fontSize = '12px';
+        teamDiv.style.fontSize = '0.75rem';
         teamDiv.style.color = 'var(--md-sys-color-on-surface-variant)';
         
         const infoDiv = document.createElement('div');
@@ -3810,7 +3810,7 @@
               addIcon.style.display = 'inline-flex';
               addIcon.style.alignItems = 'center';
               addIcon.style.justifyContent = 'center';
-              addIcon.style.fontSize = '16px';
+              addIcon.style.fontSize = '1rem';
               addIcon.style.fontWeight = 'bold';
               addIcon.style.verticalAlign = 'middle';
               addIcon.onclick = (e) => {
@@ -4198,7 +4198,7 @@
       fileDiv.style.backgroundColor = '#f3f4f6';
       fileDiv.style.borderRadius = '4px';
       const fileNameSpan = document.createElement('span');
-      fileNameSpan.style.fontSize = '12px';
+      fileNameSpan.style.fontSize = '0.75rem';
       fileNameSpan.textContent = file.name || file.file_name || 'ファイル';
       
       const removeBtn = document.createElement('button');
@@ -4207,7 +4207,7 @@
       removeBtn.style.border = 'none';
       removeBtn.style.color = '#ef4444';
       removeBtn.style.cursor = 'pointer';
-      removeBtn.style.fontSize = '18px';
+      removeBtn.style.fontSize = '1.125rem';
       removeBtn.textContent = '×';
       removeBtn.onclick = () => removeReviewRequestFile(index);
       fileDiv.appendChild(fileNameSpan);
@@ -4417,11 +4417,11 @@
       
       container.innerHTML = `
         <div style="margin-bottom: 24px;">
-          <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">${escapeHtml(reviewRequest.review_title)}</h3>
-          <p style="margin: 0; color: #6b7280; font-size: 14px;">${escapeHtml(reviewRequest.review_comment)}</p>
+          <h3 style="margin: 0 0 8px 0; font-size: 1.125rem; font-weight: 600;">${escapeHtml(reviewRequest.review_title)}</h3>
+          <p style="margin: 0; color: #6b7280; font-size: 0.875rem;">${escapeHtml(reviewRequest.review_comment)}</p>
         </div>
         <div style="margin-bottom: 24px;">
-          <h4 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">ファイル</h4>
+          <h4 style="margin: 0 0 12px 0; font-size: 1rem; font-weight: 600;">ファイル</h4>
           <div id="review-request-files-list">
             ${filesHtml}
           </div>
