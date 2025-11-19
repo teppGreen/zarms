@@ -1749,14 +1749,17 @@
       flex-direction: column;
       overflow: hidden;
     }
-
+    
     .home-scroll-container {
       flex: 1;
       min-height: 0;
       overflow-y: auto;
       overflow-x: visible;
       padding-right: 8px;
-      margin-top: 12px;
+      /* margin-top: 12px; を削除し、paddingに変更 */
+      margin-top: 0;
+      padding-top: 12px;    /* 余白を描画可能領域(padding)として確保 */
+      padding-bottom: 12px; /* 下側の影切れ防止のため、ついでに追加推奨 */
     }
 
     /* ホームタブ用セクションタイトル */
@@ -1817,7 +1820,7 @@
     .home-card:hover {
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       top: -2px;
-      z-index: 200;
+      z-index: 300;  /* ← 隣り合う要素(200)より大きくする */
       position: relative;
       overflow: visible;
     }
@@ -2131,6 +2134,9 @@ td.editable:hover::after {
   margin-bottom: 12px;
   transition: all 0.2s var(--ease-standard);
   cursor: pointer;
+  /* ▼ 以下2行を追加（ベースで位置と重なり順を確定させておく） */
+  position: relative;
+  z-index: 1;
 }
 
 .task-card:hover,
@@ -2138,8 +2144,8 @@ td.editable:hover::after {
 .work-card:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transform: translateY(-2px);
-  z-index: 1000;
-  position: relative;
+  z-index: 1000; /* これで確実に手前に来ます */
+  /* position: relative; ← ベースに記述したので削除可能です */
 }
 
 .task-card-content {
