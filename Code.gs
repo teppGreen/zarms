@@ -390,20 +390,6 @@ function getKnowledge() {
   const knowledge = getAllData(SHEET_NAMES.KNOWLEDGE);
   
   const enrichedKnowledge = knowledge.map(item => {
-    item.creator_name = getMemberName(item.created_by);
-    item.work_title = getWorkTitle(item.work_id);
-    return item;
-  });
-  
-  enrichedKnowledge.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  
-  return sanitizeForClient(enrichedKnowledge);
-}
-
-function getKnowledgeForHome() {
-  const knowledge = getAllData(SHEET_NAMES.KNOWLEDGE);
-  
-  const enrichedKnowledge = knowledge.map(item => {
     const creator = getMemberByEmail(item.created_by);
     item.creator_name = creator ? creator.member_name : '';
     item.creator_icon = creator ? creator.member_icon : '';
@@ -524,7 +510,7 @@ function getHomeData() {
   const newRequests = getAvailableWorks(userEmail);
   const assignedWorks = getAssignedWorksWithTasks(userEmail);
   const reviewRequests = getReviewRequestsForUser(userEmail);
-  const knowledge = getKnowledgeForHome();
+  const knowledge = getKnowledge();
   
   const hour = new Date().getHours();
   let greeting = 'こんにちは';
@@ -952,14 +938,14 @@ function sendNewWorkNotification(workId) {
     
     const subject = `【新規依頼】${work.project_title} - ${work.work_title}`;
     const body = `
-新規の制作依頼が登録されました。
+      新規の制作依頼が登録されました。
 
-案件: ${work.project_title}
-制作: ${work.work_title}
-依頼者: ${work.client_name}
-納期: ${work.due_datetime}
+      案件: ${work.project_title}
+      制作: ${work.work_title}
+      依頼者: ${work.client_name}
+      納期: ${work.due_datetime}
 
-詳細はCTMSでご確認ください。
+      詳細はCTMSでご確認ください。
     `.trim();
     
     notificationEmails.forEach(config => {
@@ -1047,6 +1033,7 @@ function getReviewRequestsByWorkId(workId) {
   
   const enrichedReviewRequests = reviewRequests.map(reviewRequest => {
     reviewRequest.creator_name = getMemberName(reviewRequest.created_by);
+    reviewRequest.creator_icon = getMemberIcon(reviewRequest.created_by);
     reviewRequest.files = getReviewRequestFiles(reviewRequest.review_request_id);
     reviewRequest.file_count = reviewRequest.files.length;
     return reviewRequest;
