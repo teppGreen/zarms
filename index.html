@@ -1124,11 +1124,11 @@
             <span>${formatDateTimeForDisplay(work.created_at)}</span>
           </div>
           <div class="work-accept-decline-buttons">
-            <button class="btn-accept" onclick="event.stopPropagation(); handleAcceptWork('${work.work_id}')">
+            <button class="btn-accept" onclick="event.stopPropagation(); handleAcceptWork(${JSON.stringify(work.work_id)})">
               承諾
               ${remainingTime ? `<div class="remaining-time">残り ${remainingTime}</div>` : ''}
             </button>
-            <button class="btn-decline" onclick="event.stopPropagation(); handleDeclineWork('${work.work_id}')">辞退</button>
+            <button class="btn-decline" onclick="event.stopPropagation(); handleDeclineWork(${JSON.stringify(work.work_id)})">辞退</button>
           </div>
         `;
         
@@ -1372,7 +1372,7 @@
           container.innerHTML = '<p style="color: #6b7280; grid-column: 1 / -1;">データがありません</p>';
         } else {
           knowledgeData.forEach(item => {
-            container.innerHTML += `<div class="card"> <div style="margin-bottom: 8px;"> <span class="badge" style="background: #fef3c7; color: #92400e;">${getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE')}</span> </div> <div style="margin-bottom: 12px; font-size: 14px; color: #6b7280;"> ${escapeHtml(item.work_title)} </div> <div style="margin-bottom: 12px;"> ${escapeHtml(item.knowledge_content.substring(0, 150))}... </div> <div style="font-size: 12px; color: #9ca3af;"> ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)} </div> </div>`;
+            container.innerHTML += `<div class="card"> <div style="margin-bottom: 8px;"> <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span> </div> <div style="margin-bottom: 12px; font-size: 14px; color: #6b7280;"> ${escapeHtml(item.work_title)} </div> <div style="margin-bottom: 12px;"> ${escapeHtml(item.knowledge_content.substring(0, 150))}... </div> <div style="font-size: 12px; color: #9ca3af;"> ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)} </div> </div>`;
           });
         }
         hideLoading();
@@ -1452,11 +1452,11 @@
           if (header.editable) {
             switch(header.editType) {
               case 'select':
-                cell.innerHTML = `<div class="editable-container" onclick="showSelectEditor(event, '${name}', '${item[idKey]}', '${header.key}')"> <span class="editable-text">${getConfigLabel(currentValue, header.configType)}</span> <span class="editable-toggle-btn">✎</span> </div>`;
+                cell.innerHTML = `<div class="editable-container" onclick="showSelectEditor(event, ${JSON.stringify(name)}, ${JSON.stringify(item[idKey])}, ${JSON.stringify(header.key)})"> <span class="editable-text">${escapeHtml(getConfigLabel(currentValue, header.configType))}</span> <span class="editable-toggle-btn">✎</span> </div>`;
                 break;
               case 'datetime':
-                cell.innerHTML = `<div class="editable-container datetime-editable" onclick="openDateTimePicker(event, '${name}', '${item[idKey]}', '${header.key}')">
-                  <span class="editable-text">${formatDateTimeForDisplay(currentValue)}</span>
+                cell.innerHTML = `<div class="editable-container datetime-editable" onclick="openDateTimePicker(event, ${JSON.stringify(name)}, ${JSON.stringify(item[idKey])}, ${JSON.stringify(header.key)})">
+                  <span class="editable-text">${escapeHtml(formatDateTimeForDisplay(currentValue))}</span>
                   <span class="editable-toggle-btn">✎</span>
                 </div>`;
                 break;
@@ -1471,13 +1471,13 @@
             }
           } else {
             switch(header.key) {
-              case 'work_id': content = `<button class="btn-link" onclick="openWorkDetailOverlay('${item.work_id}')">${item.work_id}</button>`; break;
-              case 'project_id': content = `<button class="btn-link" onclick="openProjectDetailOverlay('${item.project_id}')">${item.project_id}</button>`; break;
-              case 'detail': content = `<button class="btn-link" onclick="openMemberDetail('${item.member_email}')">詳細</button>`; break;
+              case 'work_id': content = `<button class="btn-link" onclick="openWorkDetailOverlay(${JSON.stringify(item.work_id)})">${escapeHtml(item.work_id)}</button>`; break;
+              case 'project_id': content = `<button class="btn-link" onclick="openProjectDetailOverlay(${JSON.stringify(item.project_id)})">${escapeHtml(item.project_id)}</button>`; break;
+              case 'detail': content = `<button class="btn-link" onclick="openMemberDetail(${JSON.stringify(item.member_email)})">詳細</button>`; break;
               case 'assignees': content = renderAssignees(item.assignees); break;
-              case 'avatar': content = `<img src="${item.member_icon || 'https://via.placeholder.com/32'}" class="avatar" alt="">`; break;
-              case 'due_datetime': content = formatDateTimeForDisplay(currentValue, true); break;
-              case 'created_at': content = formatDate(currentValue); break;
+              case 'avatar': content = `<img src="${escapeHtml(item.member_icon || 'https://via.placeholder.com/32')}" class="avatar" alt="">`; break;
+              case 'due_datetime': content = escapeHtml(formatDateTimeForDisplay(currentValue, true)); break;
+              case 'created_at': content = escapeHtml(formatDate(currentValue)); break;
               default: 
                 if (typeof currentValue === 'string' && currentValue.length > 10) {
                   content = escapeHtml(currentValue.substring(0, 10)) + '...';
@@ -2689,10 +2689,10 @@
           worksHtml += '<tbody>';
           project.works.forEach(work => {
             worksHtml += `<tr>`;
-            worksHtml += `<td><button class="btn-link" onclick="openWorkDetailOverlay('${work.work_id}'); closeProjectDetailOverlay();">${escapeHtml(work.work_id)}</button></td>`;
+            worksHtml += `<td><button class="btn-link" onclick="openWorkDetailOverlay(${JSON.stringify(work.work_id)}); closeProjectDetailOverlay();">${escapeHtml(work.work_id)}</button></td>`;
             worksHtml += `<td>${escapeHtml(work.work_title || '-')}</td>`;
-            worksHtml += `<td>${getConfigLabel(work.work_status_key, 'WORK_STATUS') || work.work_status_key || '-'}</td>`;
-            worksHtml += `<td>${formatDateTimeForDisplay(work.due_datetime) || '-'}</td>`;
+            worksHtml += `<td>${escapeHtml(getConfigLabel(work.work_status_key, 'WORK_STATUS') || work.work_status_key || '-')}</td>`;
+            worksHtml += `<td>${escapeHtml(formatDateTimeForDisplay(work.due_datetime) || '-')}</td>`;
             worksHtml += `</tr>`;
           });
           worksHtml += '</tbody></table>';
@@ -4317,11 +4317,11 @@
         const content = document.getElementById('member-detail-content');
         content.innerHTML = `
           <div style="margin-bottom: 24px;">
-            <img src="${member.member_icon || 'https://via.placeholder.com/64'}" class="avatar" style="width: 64px; height: 64px; margin-bottom: 16px;" alt="">
+            <img src="${escapeHtml(member.member_icon || 'https://via.placeholder.com/64')}" class="avatar" style="width: 64px; height: 64px; margin-bottom: 16px;" alt="">
             <h3 style="margin: 0 0 8px 0;">${escapeHtml(member.member_name)}</h3>
             <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>メール:</strong> ${escapeHtml(member.member_email)}</p>
-            <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>チーム:</strong> ${getConfigLabel(member.member_team_key, 'TEAM')}</p>
-            <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>権限:</strong> ${getConfigLabel(member.role_key, 'ROLE')}</p>
+            <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>チーム:</strong> ${escapeHtml(getConfigLabel(member.member_team_key, 'TEAM'))}</p>
+            <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>権限:</strong> ${escapeHtml(getConfigLabel(member.role_key, 'ROLE'))}</p>
             ${member.slack_member_id ? `<p style="margin: 0 0 4px 0; color: #6b7280;"><strong>Slack ID:</strong> ${escapeHtml(member.slack_member_id)}</p>` : ''}
           </div>
           <div class="detail-section">
@@ -4360,8 +4360,8 @@
                   ${assignedWorks.map(work => `
                     <tr>
                       <td>${escapeHtml(work.project_title)}</td>
-                      <td><button class="btn-link" onclick="openWorkDetailOverlay('${work.work_id}'); closeModal('modal-member-detail');">${escapeHtml(work.work_title)}</button></td>
-                      <td>${getConfigLabel(work.work_status_key, 'WORK_STATUS')}</td>
+                      <td><button class="btn-link" onclick="openWorkDetailOverlay(${JSON.stringify(work.work_id)}); closeModal('modal-member-detail');">${escapeHtml(work.work_title)}</button></td>
+                      <td>${escapeHtml(getConfigLabel(work.work_status_key, 'WORK_STATUS'))}</td>
                     </tr>
                   `).join('')}
                 </tbody>
