@@ -19,8 +19,11 @@ function doGet(e) {
   
   // メインUIを返す
   const template = HtmlService.createTemplateFromFile("index");
-    template.urlParam = urlParam;
-    template.deployedUrl = ScriptApp.getService().getUrl();
+    const array = new Array(template.variables);
+    array.push({
+      urlParam: urlParam,
+      deployedUrl: ScriptApp.getService().getUrl()
+    });
 
   return template.evaluate()
     .setTitle('CTMS v3.0')
