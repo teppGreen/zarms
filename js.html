@@ -450,6 +450,10 @@
 
     function switchTab(tabName) {
       closeWorkDetailOverlay();
+      // ホームタブ以外に切り替える場合は残り時間の更新を停止
+      if (tabName !== 'home') {
+        stopRemainingTimeUpdates();
+      }
       document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
       document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`).classList.add('active');
       document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
@@ -490,6 +494,9 @@
         // 最近のナレッジを表示
         renderKnowledge(data.knowledge || []);
         
+        // 残り時間のリアルタイム更新を開始
+        startRemainingTimeUpdates();
+        
         hideLoading();
       }).catch(handleError);
     }
@@ -515,15 +522,16 @@
         const remainingTime = calculateRemainingTime(work.remaining_time_ms);
         
         card.innerHTML = `
+          <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Courier New', monospace;">${escapeHtml(work.work_id)}</div>
           <h3 class="card-title-text">${escapeHtml(work.work_title)}</h3>
           <p class="card-subtitle">${escapeHtml(work.project_title)}</p>
           <div class="card-meta">
-            <span>${formatDateTimeForDisplay(work.created_at)}</span>
+            <span>${formatDateTimeForHome(work.created_at)}</span>
           </div>
           <div class="work-accept-decline-buttons">
-            <button class="btn-accept" onclick="event.stopPropagation(); handleAcceptWork(${JSON.stringify(work.work_id)})">
+            <button class="btn-accept" data-work-id="${escapeHtml(work.work_id)}" data-remaining-ms="${work.remaining_time_ms || 0}" onclick="event.stopPropagation(); handleAcceptWork(${JSON.stringify(work.work_id)})">
               承諾
-              ${remainingTime ? `<div class="remaining-time">残り ${remainingTime}</div>` : ''}
+              <div class="remaining-time" data-remaining-ms="${work.remaining_time_ms || 0}">${remainingTime ? `残り ${remainingTime}` : ''}</div>
             </button>
             <button class="btn-decline" onclick="event.stopPropagation(); handleDeclineWork(${JSON.stringify(work.work_id)})">辞退</button>
           </div>
@@ -564,10 +572,11 @@
         
         card.innerHTML = `
           <div class="work-status-badge ${statusColor}">${escapeHtml(statusLabel)}</div>
+          <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Courier New', monospace;">${escapeHtml(work.work_id)}</div>
           <h3 class="card-title-text">${escapeHtml(work.work_title)}</h3>
           <p class="card-subtitle">${escapeHtml(work.project_title)}</p>
           <div class="card-meta">
-            <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span>
+            <span>納期: ${formatDateTimeForHome(work.due_datetime)}</span>
           </div>
           ${incompleteTasksHtml}
         `;
@@ -592,7 +601,7 @@
         
         // due_datetimeを「~10/24(水) 15:00」形式で表示
         const dueDateHtml = reviewRequest.due_datetime 
-          ? `<div class="card-meta">${formatDateForReview(reviewRequest.due_datetime)}</div>`
+          ? `<div class="card-meta">${formatDateTimeForHome(reviewRequest.due_datetime)}</div>`
           : '';
         
         // 作成者情報
@@ -600,6 +609,7 @@
         const creatorName = reviewRequest.creator_name || '';
         
         card.innerHTML = `
+          <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Courier New', monospace;">${escapeHtml(reviewRequest.review_request_id || '')}</div>
           <h3 class="card-title-text">${escapeHtml(reviewRequest.review_title)}</h3>
           ${dueDateHtml}
           <div class="review-creator">
@@ -635,16 +645,18 @@
         // knowledge_contentを原則全文表示
         const contentHtml = item.knowledge_content || '';
         
+        // 作成者情報
+        const creatorIcon = item.creator_icon || 'https://via.placeholder.com/24';
+        const creatorName = item.creator_name || '';
+        
         card.innerHTML = `
-          <div style="margin-bottom: 8px;">
-            <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span>
-          </div>
-          <div style="margin-bottom: 12px; font-size: 14px; color: #6b7280;">
-            ${escapeHtml(item.work_title)}
-          </div>
           <div class="knowledge-content">${contentHtml}</div>
-          <div style="font-size: 12px; color: #9ca3af; margin-top: 12px;">
-            ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)}
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--md-sys-color-on-surface-variant);">
+            <img src="${escapeHtml(creatorIcon)}" class="review-creator-icon" alt="${escapeHtml(creatorName)}">
+            <span>${escapeHtml(creatorName)}</span>
+          </div>
+          <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-top: 8px;">
+            ${formatDateTimeForHome(item.created_at)}
           </div>
         `;
         
@@ -674,6 +686,60 @@
       const hours = Math.floor(remainingMs / (1000 * 60 * 60));
       const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
       return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    }
+    
+    // 残り時間をリアルタイムで更新するためのinterval ID
+    let remainingTimeIntervalId = null;
+    
+    function updateRemainingTimes() {
+      const acceptButtons = document.querySelectorAll('.btn-accept[data-remaining-ms]');
+      const now = new Date().getTime();
+      
+      acceptButtons.forEach(button => {
+        const initialRemainingMs = parseInt(button.dataset.remainingMs) || 0;
+        if (initialRemainingMs <= 0) return;
+        
+        // 初期時刻を取得（データ属性から）
+        const initialTimeAttr = button.dataset.initialTime;
+        if (!initialTimeAttr) {
+          // 初回のみ、現在時刻を記録
+          button.dataset.initialTime = now.toString();
+          return;
+        }
+        
+        const initialTime = parseInt(initialTimeAttr);
+        const elapsed = now - initialTime;
+        const remainingMs = initialRemainingMs - elapsed;
+        
+        const remainingTimeElement = button.querySelector('.remaining-time');
+        if (remainingTimeElement) {
+          if (remainingMs <= 0) {
+            remainingTimeElement.textContent = '残り 00:00';
+          } else {
+            const remainingTime = calculateRemainingTime(remainingMs);
+            remainingTimeElement.textContent = `残り ${remainingTime}`;
+          }
+        }
+      });
+    }
+    
+    function startRemainingTimeUpdates() {
+      // 既存のintervalをクリア
+      if (remainingTimeIntervalId) {
+        clearInterval(remainingTimeIntervalId);
+      }
+      
+      // 1秒ごとに更新
+      remainingTimeIntervalId = setInterval(updateRemainingTimes, 1000);
+      // 即座に1回実行
+      updateRemainingTimes();
+    }
+    
+    function stopRemainingTimeUpdates() {
+      if (remainingTimeIntervalId) {
+        clearInterval(remainingTimeIntervalId);
+        remainingTimeIntervalId = null;
+      }
     }
 
     function getWorkStatusColor(statusKey) {
@@ -4648,6 +4714,23 @@
         return `${year}/${month}/${day} ${hours}:${minutes}`;
       } catch (e) {
         return includeSeconds ? 'yyyy/mm/dd hh:mm:ss' : 'yyyy/mm/dd hh:mm';
+      }
+    }
+    
+    function formatDateTimeForHome(dateString) {
+      if (!dateString) return 'yyyy/mm/dd(曜日) hh:mm';
+      try {
+        const dt = new Date(dateString);
+        const year = dt.getFullYear();
+        const month = String(dt.getMonth() + 1).padStart(2, '0');
+        const day = String(dt.getDate()).padStart(2, '0');
+        const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+        const weekday = weekdays[dt.getDay()];
+        const hours = String(dt.getHours()).padStart(2, '0');
+        const minutes = String(dt.getMinutes()).padStart(2, '0');
+        return `${year}/${month}/${day}(${weekday}) ${hours}:${minutes}`;
+      } catch (e) {
+        return 'yyyy/mm/dd(曜日) hh:mm';
       }
     }
     function formatDateTimeForInput(dateString) {
