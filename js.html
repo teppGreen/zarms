@@ -4916,6 +4916,37 @@
         resetModalState('modal-new-knowledge');
       });
   }
+
+  function openGithubIssueModal() {
+    const form = document.getElementById('github-issue-form');
+    form.reset();
+    openModal('modal-github-issue');
+  }
+
+  function submitGithubIssue(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const issueData = {
+      title: formData.get('issue_title'),
+      body: formData.get('issue_body'),
+      labels: Array.from(form.elements.issue_labels.selectedOptions).map(opt => opt.value)
+    };
+    
+    showModalLoading('modal-github-issue', 'GitHubイシューを登録しています');
+    callGAS('createGithubIssue', issueData)
+      .then((result) => {
+        showModalSuccess('modal-github-issue', `GitHubイシューを登録しました\nイシュー番号: #${result.number}`, () => {
+          // Success callback - nothing to do for now
+        });
+      })
+      .catch(error => {
+        handleError(error);
+        resetModalState('modal-github-issue');
+      });
+  }
+
   function openModal(modalId) { document.getElementById(modalId).classList.add('active'); }
   function showModalLoading(modalId, message) {
     const modal = document.getElementById(modalId);
