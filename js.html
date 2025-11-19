@@ -129,6 +129,29 @@
     } catch (error) {
       console.error('URLパラメータ処理でエラーが発生しました:', error);
     }
+
+    // 全画面タイトルを非表示にする処理
+    try {
+      hideFullscreenTitle();
+    } catch (error) {
+      console.error('全画面タイトル非表示処理でエラーが発生しました:', error);
+    }
+  }
+
+  // 全画面タイトルを非表示にする関数
+  function hideFullscreenTitle() {
+    const fullscreenTitle = document.getElementById('fullscreen-title');
+    if (!fullscreenTitle) {
+      return;
+    }
+
+    // アニメーションアウトクラスを追加
+    fullscreenTitle.classList.add('fade-out');
+
+    // アニメーション完了後にdisplay=noneにする
+    setTimeout(() => {
+      fullscreenTitle.style.display = 'none';
+    }, 500); // アニメーション時間（0.5s）に合わせる
   }
 
   // 複数の方法で初期化を試みる
