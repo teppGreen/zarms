@@ -4013,6 +4013,24 @@
           }
         });
       });
+      
+      // datetime-localの年の部分を4桁に制限
+      const datetimeInput = form.querySelector('input[name="due_datetime"]');
+      if (datetimeInput) {
+        datetimeInput.addEventListener('input', function(e) {
+          const value = e.target.value;
+          if (value && value.length > 0) {
+            // 年の部分を抽出（最初のハイフンまたはTまでの数字、または最初の4桁以上の数字）
+            const match = value.match(/^(\d+)([-T]|$)/);
+            if (match && match[1].length > 4) {
+              // 年の部分が4桁を超える場合は、最初の4桁のみを使用
+              const year = match[1].substring(0, 4);
+              const rest = value.substring(match[1].length);
+              e.target.value = year + rest;
+            }
+          }
+        });
+      }
     }
   }
 
@@ -4114,6 +4132,24 @@
         }
       });
     });
+    
+    // datetime-localの年の部分を4桁に制限
+    const datetimeInput = form.querySelector('input[name="planned_end_datetime"]');
+    if (datetimeInput) {
+      datetimeInput.addEventListener('input', function(e) {
+        const value = e.target.value;
+        if (value && value.length > 0) {
+          // 年の部分を抽出（最初のハイフンまたはTまでの数字、または最初の4桁以上の数字）
+          const match = value.match(/^(\d+)([-T]|$)/);
+          if (match && match[1].length > 4) {
+            // 年の部分が4桁を超える場合は、最初の4桁のみを使用
+            const year = match[1].substring(0, 4);
+            const rest = value.substring(match[1].length);
+            e.target.value = year + rest;
+          }
+        }
+      });
+    }
     
     // メンバー選択肢を設定
     const assignToSelect = form.elements.assign_to;
