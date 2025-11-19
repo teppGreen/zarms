@@ -105,15 +105,29 @@
         <p class="main-subtitle">今日も良い一日を！</p>
       </div>
       
-      <div style="display: flex; gap: 24px;">
-        <div style="flex: 1;">
-          <h2 class="section-title">あなたが担当者の制作物</h2>
-          <div id="home-works-container" class="grid-container">
+      <div class="home-body">
+        <!-- 列1: 最新の制作依頼（1/5幅） -->
+        <div class="home-column-new-requests">
+          <h2 class="section-title">最新の制作依頼</h2>
+          <div id="home-new-requests-container" class="home-scroll-container">
           </div>
         </div>
-        <div style="flex: 1;">
-          <h2 class="section-title">レビュー依頼</h2>
-          <div id="home-review-requests-container" class="grid-container">
+        <!-- 列2-3: 担当中の制作物（2/5幅） -->
+        <div class="home-column-assigned-works">
+          <h2 class="section-title">担当中の制作物</h2>
+          <div id="home-works-container" class="home-scroll-container">
+          </div>
+        </div>
+        <!-- 列4: 受付中のレビュー（1/5幅） -->
+        <div class="home-column-review-requests">
+          <h2 class="section-title">受付中のレビュー</h2>
+          <div id="home-review-requests-container" class="home-scroll-container">
+          </div>
+        </div>
+        <!-- 列5: 最近のナレッジ（1/5幅） -->
+        <div class="home-column-knowledge">
+          <h2 class="section-title">最近のナレッジ</h2>
+          <div id="home-knowledge-container" class="home-scroll-container">
           </div>
         </div>
       </div>
@@ -476,6 +490,16 @@
       <div id="review-request-detail-content"></div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-review-request-detail')">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-knowledge-detail" class="modal">
+    <div class="modal-content">
+      <h2 class="modal-title">ナレッジ詳細</h2>
+      <div id="knowledge-detail-content"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-knowledge-detail')">閉じる</button>
       </div>
     </div>
   </div>
@@ -1050,56 +1074,282 @@
     // データ読み込み & 描画
     // ============================================
 
+    // セッション中に非表示にするwork_idを管理
+    let hiddenWorkIds = new Set();
+
     function loadHomeData() {
       callGAS('getHomeData').then(data => {
         document.getElementById('home-greeting').textContent = `${data.greeting}、${data.memberName}さん。`;
         
-        // 制作物を表示
-        const worksContainer = document.getElementById('home-works-container');
-        worksContainer.innerHTML = '';
-        if (!data.works || data.works.length === 0) {
-          worksContainer.innerHTML = '<p style="color: #6b7280;">担当中の制作はありません</p>';
-        } else {
-          data.works.forEach(work => {
-            const workCard = document.createElement('div');
-            workCard.className = 'work-card';
-            workCard.onclick = () => openWorkDetailOverlay(work.work_id);
-            workCard.innerHTML = `
-              <h3 class="card-title-text">${escapeHtml(work.work_title)}</h3>
-              <p class="card-subtitle">${escapeHtml(work.project_title)}</p>
-              <div class="card-meta">
-                <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span>
-              </div>
-            `;
-            worksContainer.appendChild(workCard);
-          });
-        }
+        // 最新の制作依頼を表示
+        renderNewRequests(data.new_requests || []);
         
-        // レビュー依頼を表示
-        const reviewRequestsContainer = document.getElementById('home-review-requests-container');
-        reviewRequestsContainer.innerHTML = '';
-        if (!data.review_requests || data.review_requests.length === 0) {
-          reviewRequestsContainer.innerHTML = '<p style="color: #6b7280;">レビュー依頼はありません</p>';
-        } else {
-          data.review_requests.forEach(reviewRequest => {
-            const card = document.createElement('div');
-            card.className = 'review-card';
-
-
-            card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
-            card.innerHTML = `
-              <h3 class="card-title-text">${escapeHtml(reviewRequest.review_title)}</h3>
-              <p class="card-subtitle">${escapeHtml((reviewRequest.review_comment || '').substring(0, 100))}${(reviewRequest.review_comment || '').length > 100 ? '...' : ''}</p>
-              <div class="card-meta">
-                <span>${reviewRequest.file_count || 0}個のファイル</span>
-                <span>${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
-              </div>
-            `;
-            reviewRequestsContainer.appendChild(card);
-          });
-        }
+        // 担当中の制作物を表示
+        renderAssignedWorks(data.works || []);
+        
+        // 受付中のレビューを表示
+        renderReviewRequests(data.review_requests || []);
+        
+        // 最近のナレッジを表示
+        renderKnowledge(data.knowledge || []);
         
         hideLoading();
+      }).catch(handleError);
+    }
+
+    function renderNewRequests(newRequests) {
+      const container = document.getElementById('home-new-requests-container');
+      container.innerHTML = '';
+      
+      // 非表示にするwork_idをフィルタ
+      const visibleRequests = newRequests.filter(work => !hiddenWorkIds.has(work.work_id));
+      
+      if (visibleRequests.length === 0) {
+        container.innerHTML = '<p style="color: #6b7280;">最新の制作依頼はありません</p>';
+        return;
+      }
+      
+      visibleRequests.forEach(work => {
+        const card = document.createElement('div');
+        card.className = 'home-card';
+        card.dataset.workId = work.work_id;
+        
+        // 残り時間を計算（hh:mm形式）
+        const remainingTime = calculateRemainingTime(work.remaining_time_ms);
+        
+        card.innerHTML = `
+          <h3 class="card-title-text">${escapeHtml(work.work_title)}</h3>
+          <p class="card-subtitle">${escapeHtml(work.project_title)}</p>
+          <div class="card-meta">
+            <span>${formatDateTimeForDisplay(work.created_at)}</span>
+          </div>
+          <div class="work-accept-decline-buttons">
+            <button class="btn-accept" onclick="event.stopPropagation(); handleAcceptWork('${work.work_id}')">
+              承諾
+              ${remainingTime ? `<div class="remaining-time">残り ${remainingTime}</div>` : ''}
+            </button>
+            <button class="btn-decline" onclick="event.stopPropagation(); handleDeclineWork('${work.work_id}')">辞退</button>
+          </div>
+        `;
+        
+        // カードクリックでwork_detail_overlayを開く（ボタン以外の領域）
+        card.addEventListener('click', (e) => {
+          if (!e.target.closest('.work-accept-decline-buttons')) {
+            openWorkDetailOverlay(work.work_id);
+          }
+        });
+        
+        container.appendChild(card);
+      });
+    }
+
+    function renderAssignedWorks(works) {
+      const container = document.getElementById('home-works-container');
+      container.innerHTML = '';
+      
+      if (works.length === 0) {
+        container.innerHTML = '<p style="color: #6b7280;">担当中の制作物はありません</p>';
+        return;
+      }
+      
+      works.forEach(work => {
+        const card = document.createElement('div');
+        card.className = 'home-card';
+        
+        // ステータス色を取得
+        const statusColor = getWorkStatusColor(work.work_status_key);
+        const statusLabel = getConfigLabel(work.work_status_key, 'WORK_STATUS');
+        
+        // 未完了タスク数の表示
+        const incompleteTasksHtml = work.incomplete_task_count > 0 
+          ? `<div class="incomplete-tasks-count">未完了のタスク: ${work.incomplete_task_count}件</div>`
+          : '';
+        
+        card.innerHTML = `
+          <div class="work-status-badge ${statusColor}">${escapeHtml(statusLabel)}</div>
+          <h3 class="card-title-text">${escapeHtml(work.work_title)}</h3>
+          <p class="card-subtitle">${escapeHtml(work.project_title)}</p>
+          <div class="card-meta">
+            <span>納期: ${formatDateTimeForDisplay(work.due_datetime)}</span>
+          </div>
+          ${incompleteTasksHtml}
+        `;
+        
+        card.onclick = () => openWorkDetailOverlay(work.work_id);
+        container.appendChild(card);
+      });
+    }
+
+    function renderReviewRequests(reviewRequests) {
+      const container = document.getElementById('home-review-requests-container');
+      container.innerHTML = '';
+      
+      if (reviewRequests.length === 0) {
+        container.innerHTML = '<p style="color: #6b7280;">受付中のレビューはありません</p>';
+        return;
+      }
+      
+      reviewRequests.forEach(reviewRequest => {
+        const card = document.createElement('div');
+        card.className = 'home-card';
+        
+        // due_datetimeを「~10/24(水) 15:00」形式で表示
+        const dueDateHtml = reviewRequest.due_datetime 
+          ? `<div class="card-meta">${formatDateForReview(reviewRequest.due_datetime)}</div>`
+          : '';
+        
+        // 作成者情報
+        const creatorIcon = reviewRequest.creator_icon || 'https://via.placeholder.com/24';
+        const creatorName = reviewRequest.creator_name || '';
+        
+        card.innerHTML = `
+          <h3 class="card-title-text">${escapeHtml(reviewRequest.review_title)}</h3>
+          ${dueDateHtml}
+          <div class="review-creator">
+            <img src="${escapeHtml(creatorIcon)}" class="review-creator-icon" alt="${escapeHtml(creatorName)}">
+            <span>${escapeHtml(creatorName)}</span>
+          </div>
+        `;
+        
+        card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
+        container.appendChild(card);
+      });
+    }
+
+    function renderKnowledge(knowledgeList) {
+      const container = document.getElementById('home-knowledge-container');
+      container.innerHTML = '';
+      
+      if (knowledgeList.length === 0) {
+        container.innerHTML = '<p style="color: #6b7280;">最近のナレッジはありません</p>';
+        return;
+      }
+      
+      // 縦スクロールが必要ない数だけ表示するため、まず全て表示してから調整
+      const cards = [];
+      let totalHeight = 0;
+      const containerHeight = container.clientHeight || 600; // デフォルト高さ
+      
+      knowledgeList.forEach((item, index) => {
+        const card = document.createElement('div');
+        card.className = 'knowledge-card';
+        card.dataset.knowledgeId = item.knowledge_id;
+        
+        // knowledge_contentを原則全文表示
+        const contentHtml = item.knowledge_content || '';
+        
+        card.innerHTML = `
+          <div style="margin-bottom: 8px;">
+            <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span>
+          </div>
+          <div style="margin-bottom: 12px; font-size: 14px; color: #6b7280;">
+            ${escapeHtml(item.work_title)}
+          </div>
+          <div class="knowledge-content">${contentHtml}</div>
+          <div style="font-size: 12px; color: #9ca3af; margin-top: 12px;">
+            ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)}
+          </div>
+        `;
+        
+        card.onclick = () => openKnowledgeDetailModal(item.knowledge_id);
+        cards.push(card);
+      });
+      
+      // 全てのカードを追加
+      cards.forEach(card => container.appendChild(card));
+      
+      // 1つのナレッジだけで縦スクロールが必要な場合は省略
+      if (cards.length > 0) {
+        const firstCard = cards[0];
+        const firstCardHeight = firstCard.scrollHeight;
+        if (firstCardHeight > containerHeight * 0.8) {
+          // はみ出た部分を...で省略
+          const contentDiv = firstCard.querySelector('.knowledge-content');
+          if (contentDiv) {
+            contentDiv.classList.add('knowledge-content-truncated');
+          }
+        }
+      }
+    }
+
+    function calculateRemainingTime(remainingMs) {
+      if (!remainingMs || remainingMs <= 0) return '';
+      const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+      const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    }
+
+    function getWorkStatusColor(statusKey) {
+      if (statusKey === 'TODO' || statusKey === 'APPROVED') {
+        return 'status-red';
+      } else if (statusKey === 'CREATE' || statusKey === 'REVIEW' || statusKey === 'REVISION') {
+        return 'status-orange';
+      } else if (statusKey === 'DELIVERED') {
+        return 'status-green';
+      }
+      return 'status-red';
+    }
+
+    function formatDateForReview(dueDatetime) {
+      if (!dueDatetime) return '';
+      const date = new Date(dueDatetime);
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+      const weekday = weekdays[date.getDay()];
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `~${month}/${day}(${weekday}) ${hours}:${minutes}`;
+    }
+
+    function handleAcceptWork(workId) {
+      showLoading();
+      callGAS('acceptWork', workId).then(result => {
+        hideLoading();
+        // セッション中は非表示にする
+        hiddenWorkIds.add(workId);
+        // 最新の制作依頼セクションを再描画
+        callGAS('getHomeData').then(data => {
+          renderNewRequests(data.new_requests || []);
+        }).catch(handleError);
+      }).catch(handleError);
+    }
+
+    function handleDeclineWork(workId) {
+      // セッション中は非表示にする（フロントエンドで管理）
+      hiddenWorkIds.add(workId);
+      // 最新の制作依頼セクションを再描画
+      callGAS('getHomeData').then(data => {
+        renderNewRequests(data.new_requests || []);
+      }).catch(handleError);
+    }
+
+    function openKnowledgeDetailModal(knowledgeId) {
+      showLoading();
+      callGAS('getKnowledge').then(knowledgeList => {
+        const knowledge = knowledgeList.find(k => k.knowledge_id === knowledgeId);
+        if (!knowledge) {
+          alert('ナレッジが見つかりません');
+          hideLoading();
+          return;
+        }
+        
+        const container = document.getElementById('knowledge-detail-content');
+        container.innerHTML = `
+          <div style="margin-bottom: 24px;">
+            <div style="margin-bottom: 12px;">
+              <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(knowledge.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span>
+            </div>
+            <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">${escapeHtml(knowledge.work_title)}</h3>
+            <p style="margin: 0; color: #6b7280; font-size: 14px;">${formatDate(knowledge.created_at)} - ${escapeHtml(knowledge.creator_name)}</p>
+          </div>
+          <div style="margin-bottom: 24px;">
+            <h4 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">内容</h4>
+            <div style="line-height: 1.6; color: var(--md-sys-color-on-surface);">${knowledge.knowledge_content || ''}</div>
+          </div>
+        `;
+        hideLoading();
+        openModal('modal-knowledge-detail');
       }).catch(handleError);
     }
 
@@ -2305,7 +2555,8 @@
       
       if (workDetailOverlay && workDetailOverlay.classList.contains('show')) {
         closeWorkDetailOverlay();
-      } else if (projectDetailOverlay && projectDetailOverlay.classList.contains('show')) {
+      }
+      if (projectDetailOverlay && projectDetailOverlay.classList.contains('show')) {
         closeProjectDetailOverlay();
       }
     }
@@ -4566,6 +4817,27 @@
       showLoading();
       callGAS('getReviewRequestById', reviewRequestId).then(reviewRequest => {
         const container = document.getElementById('review-request-detail-content');
+        
+        // ファイル名取得完了まではファイルURLを表示
+        let filesHtml = '';
+        if (reviewRequest.files && reviewRequest.files.length > 0) {
+          filesHtml = reviewRequest.files.map(file => {
+            if (file.file_name && file.file_name !== 'ファイルが見つかりません') {
+              // ファイル名が取得済み
+              return `<div style="margin-bottom: 8px;">
+                <a href="${file.file_url}" target="_blank" style="color: #3b82f6; text-decoration: underline;">${escapeHtml(file.file_name)}</a>
+              </div>`;
+            } else {
+              // ファイル名が未取得の場合はURLを表示
+              return `<div style="margin-bottom: 8px;">
+                <a href="${file.file_url}" target="_blank" style="color: #3b82f6; text-decoration: underline;">${escapeHtml(file.file_url || 'ファイルURL')}</a>
+              </div>`;
+            }
+          }).join('');
+        } else {
+          filesHtml = '<p style="color: #6b7280;">ファイルはありません</p>';
+        }
+        
         container.innerHTML = `
           <div style="margin-bottom: 24px;">
             <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">${escapeHtml(reviewRequest.review_title)}</h3>
@@ -4573,20 +4845,33 @@
           </div>
           <div style="margin-bottom: 24px;">
             <h4 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">ファイル</h4>
-            <div>
-              ${reviewRequest.files && reviewRequest.files.length > 0 
-                ? reviewRequest.files.map(file => 
-                    `<div style="margin-bottom: 8px;">
-                      <a href="${file.file_url}" target="_blank" style="color: #3b82f6; text-decoration: underline;">${escapeHtml(file.file_name)}</a>
-                    </div>`
-                  ).join('')
-                : '<p style="color: #6b7280;">ファイルはありません</p>'
-              }
+            <div id="review-request-files-list">
+              ${filesHtml}
             </div>
           </div>
         `;
         hideLoading();
         openModal('modal-review-request-detail');
+        
+        // ファイル名を取得（非同期）
+        if (reviewRequest.files && reviewRequest.files.length > 0) {
+          Promise.all(reviewRequest.files.map(file => 
+            callGAS('getDriveFileInfo', file.file_id).then(fileInfo => {
+              return { file_id: file.file_id, file_name: fileInfo.file_name, file_url: file.file_url };
+            }).catch(() => {
+              return { file_id: file.file_id, file_name: 'ファイルが見つかりません', file_url: file.file_url };
+            })
+          )).then(filesWithNames => {
+            const filesListContainer = document.getElementById('review-request-files-list');
+            if (filesListContainer) {
+              filesListContainer.innerHTML = filesWithNames.map(file => 
+                `<div style="margin-bottom: 8px;">
+                  <a href="${file.file_url}" target="_blank" style="color: #3b82f6; text-decoration: underline;">${escapeHtml(file.file_name)}</a>
+                </div>`
+              ).join('');
+            }
+          });
+        }
       }).catch(handleError);
     }
 
@@ -5657,12 +5942,6 @@
     function executeIdSearch(searchValue) {
       if (!searchValue) return;
       
-      // 検索ボックスからフォーカスを外す（入力値は保持）
-      const input = document.getElementById('id-search-input');
-      if (input) {
-        input.blur();
-      }
-      
       // 複数のIDが連なっている場合、最も小さな単位のIDのみを取り出す
       // project_id > work_id > review_id > task_id の順で優先度が低い
       let targetId = null;
@@ -5699,6 +5978,14 @@
       if (!targetId) {
         alert('有効なIDが見つかりません。P0001, W0001, T0001, R0001 の形式で入力してください。');
         return;
+      }
+
+      handleHeaderCloseClick();
+      // 検索ボックスからフォーカスを外す（入力値は保持）
+      const input = document.getElementById('id-search-input');
+      if (input) {
+        input.blur();
+        input.value = searchValue;
       }
       
       // 検索実行
