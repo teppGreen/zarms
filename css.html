@@ -1675,6 +1675,221 @@
       .overlay-content {
         overflow: visible;
       }
+      .home-body {
+        overflow-x: auto;
+      }
+    }
+
+    /* ホームタブ用5分割レイアウト */
+    .home-body {
+      display: flex;
+      gap: 16px;
+      padding: 24px;
+      width: 100%;
+      box-sizing: border-box;
+      min-width: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    /* 5分割レイアウト: 1列、2列、1列、1列 */
+    .home-column-new-requests {
+      flex: 0 1 20%;
+      min-width: 0;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .home-column-assigned-works {
+      flex: 0 1 40%;
+      min-width: 0;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .home-column-review-requests {
+      flex: 0 1 20%;
+      min-width: 0;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .home-column-knowledge {
+      flex: 0 1 20%;
+      min-width: 0;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .home-scroll-container {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 8px;
+      margin-top: 12px;
+    }
+
+    /* ホームタブ用セクションタイトル */
+    .home-column-new-requests .section-title,
+    .home-column-assigned-works .section-title,
+    .home-column-review-requests .section-title,
+    .home-column-knowledge .section-title {
+      margin-top: 0;
+      margin-bottom: 12px;
+      font-size: 1.125rem;
+    }
+
+    /* ステータス色分け */
+    .work-status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      position: absolute;
+      top: 8px;
+      right: 8px;
+    }
+
+    .work-status-badge.status-red {
+      background-color: #FEE2E2;
+      color: #991B1B;
+    }
+
+    .work-status-badge.status-orange {
+      background-color: #FED7AA;
+      color: #9A3412;
+    }
+
+    .work-status-badge.status-green {
+      background-color: #D1FAE5;
+      color: #065F46;
+    }
+
+    /* ホームタブ用カードスタイル */
+    .home-card {
+      background-color: var(--md-sys-color-surface);
+      border: 1px solid var(--md-sys-color-surface-variant);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.2s var(--ease-standard);
+      position: relative;
+    }
+
+    .home-card:hover {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transform: translateY(-2px);
+    }
+
+    /* 承諾/辞退ボタン */
+    .work-accept-decline-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .btn-accept,
+    .btn-decline {
+      flex: 1;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+    }
+
+    .btn-accept {
+      background-color: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+    }
+
+    .btn-accept:hover {
+      background-color: #004A9E;
+    }
+
+    .btn-decline {
+      background-color: var(--md-sys-color-surface-variant);
+      color: var(--md-sys-color-on-surface);
+    }
+
+    .btn-decline:hover {
+      background-color: #C5C6D0;
+    }
+
+    /* 残り時間表示 */
+    .remaining-time {
+      font-size: 12px;
+      color: var(--md-sys-color-error);
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    /* 未完了タスク数表示 */
+    .incomplete-tasks-count {
+      font-size: 12px;
+      color: var(--md-sys-color-error);
+      margin-top: 8px;
+    }
+
+    /* レビュー作成者情報 */
+    .review-creator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+
+    .review-creator-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    /* ナレッジカード */
+    .knowledge-card {
+      background-color: var(--md-sys-color-surface);
+      border: 1px solid var(--md-sys-color-surface-variant);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.2s var(--ease-standard);
+    }
+
+    .knowledge-card:hover {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .knowledge-content {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--md-sys-color-on-surface);
+      word-wrap: break-word;
+    }
+
+    .knowledge-content-truncated {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+      -webkit-box-orient: vertical;
     }
 
     .summary-grid.grid-container {

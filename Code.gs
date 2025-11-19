@@ -400,6 +400,21 @@ function getKnowledge() {
   return sanitizeForClient(enrichedKnowledge);
 }
 
+function getKnowledgeForHome() {
+  const knowledge = getAllData(SHEET_NAMES.KNOWLEDGE);
+  
+  const enrichedKnowledge = knowledge.map(item => {
+    item.creator_name = getMemberName(item.created_by);
+    item.work_title = getWorkTitle(item.work_id);
+    return item;
+  });
+  
+  // created_at降順でソート
+  enrichedKnowledge.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  
+  return sanitizeForClient(enrichedKnowledge);
+}
+
 function createKnowledge(knowledgeData) {
   const userEmail = Session.getActiveUser().getEmail();
   const knowledgeId = Utilities.getUuid();
@@ -497,13 +512,17 @@ function getHomeData() {
     return sanitizeForClient({
       greeting: 'こんにちは',
       memberName: 'ゲスト',
+      new_requests: [],
       works: [],
-      review_requests: []
+      review_requests: [],
+      knowledge: []
     });
   }
   
-  const assignedWorks = getAssignedWorks(userEmail);
+  const newRequests = getAvailableWorks(userEmail);
+  const assignedWorks = getAssignedWorksWithTasks(userEmail);
   const reviewRequests = getReviewRequestsForUser(userEmail);
+  const knowledge = getKnowledgeForHome();
   
   const hour = new Date().getHours();
   let greeting = 'こんにちは';
@@ -513,8 +532,10 @@ function getHomeData() {
   return sanitizeForClient({
     greeting: greeting,
     memberName: member.member_name,
+    new_requests: newRequests || [],
     works: assignedWorks || [],
-    review_requests: reviewRequests || []
+    review_requests: reviewRequests || [],
+    knowledge: knowledge || []
   });
 }
 
@@ -686,6 +707,18 @@ function addWorkAssignee(workId, memberEmail) {
   return createData(SHEET_NAMES.WORK_ASSIGNMENTS, newAssignment);
 }
 
+function acceptWork(workId) {
+  const userEmail = Session.getActiveUser().getEmail();
+  // 既に割り当てられているかチェック
+  const existingAssignments = findData(SHEET_NAMES.WORK_ASSIGNMENTS, { work_id: workId, member_email: userEmail });
+  if (existingAssignments.length > 0) {
+    return { success: true, message: '既に承諾済みです' };
+  }
+  
+  addWorkAssignee(workId, userEmail);
+  return { success: true, message: '承諾しました' };
+}
+
 function removeWorkAssignee(workId, memberEmail) {
   return deleteData(SHEET_NAMES.WORK_ASSIGNMENTS, { work_id: workId, member_email: memberEmail });
 }
@@ -797,7 +830,7 @@ function getAssignedWorks(memberEmail) {
   const allWorks = getAllData(SHEET_NAMES.WORKS);
   
   const works = allWorks.filter(work => 
-    workIds.includes(work.work_id) && ![`DELIVERED`,`CANCELED`].includes(work.work_status_key)
+    workIds.includes(work.work_id) && work.work_status_key !== 'DELIVERED' && work.work_status_key !== 'CANCEL'
   );
 
   const enrichedWorks = works.map(work => {
@@ -806,6 +839,85 @@ function getAssignedWorks(memberEmail) {
   });
 
   return enrichedWorks;
+}
+
+function getAssignedWorksWithTasks(memberEmail) {
+  const assignments = findData(SHEET_NAMES.WORK_ASSIGNMENTS, { member_email: memberEmail });
+  const workIds = assignments.map(a => a.work_id);
+  if (workIds.length === 0) return [];
+
+  const allWorks = getAllData(SHEET_NAMES.WORKS);
+  
+  const works = allWorks.filter(work => 
+    workIds.includes(work.work_id) && work.work_status_key !== 'DELIVERED' && work.work_status_key !== 'CANCEL'
+  );
+
+  const enrichedWorks = works.map(work => {
+    work.project_title = getProjectTitle(work.project_id);
+    // 未完了タスク数を計算
+    const incompleteTasks = getTasksByWorkIdAndAssignee(work.work_id, memberEmail);
+    work.incomplete_task_count = incompleteTasks.length;
+    return work;
+  });
+
+  // ソート: due_datetime降順、次にwork_status_keyのsort_order昇順
+  const statusConfigs = getAllData(SHEET_NAMES.CONFIG).filter(c => c.config_type === 'WORK_STATUS');
+  const getStatusSortOrder = (statusKey) => {
+    const config = statusConfigs.find(c => c.config_key === statusKey);
+    return config ? (config.sort_order || 999) : 999;
+  };
+
+  enrichedWorks.sort((a, b) => {
+    // due_datetime降順
+    const dateA = a.due_datetime ? new Date(a.due_datetime) : new Date(0);
+    const dateB = b.due_datetime ? new Date(b.due_datetime) : new Date(0);
+    if (dateB.getTime() !== dateA.getTime()) {
+      return dateB - dateA;
+    }
+    // work_status_keyのsort_order昇順
+    const orderA = getStatusSortOrder(a.work_status_key);
+    const orderB = getStatusSortOrder(b.work_status_key);
+    return orderA - orderB;
+  });
+
+  return enrichedWorks;
+}
+
+function getAvailableWorks(userEmail) {
+  // work_status_keyがTODOかつwork_assignmentsでユーザーと紐付けられていないworksを取得
+  const allWorks = getAllData(SHEET_NAMES.WORKS);
+  const assignments = findData(SHEET_NAMES.WORK_ASSIGNMENTS, { member_email: userEmail });
+  const assignedWorkIds = new Set(assignments.map(a => a.work_id));
+  
+  const availableWorks = allWorks.filter(work => 
+    work.work_status_key === 'TODO' && !assignedWorkIds.has(work.work_id)
+  );
+
+  const now = new Date();
+  const enrichedWorks = availableWorks.map(work => {
+    work.project_title = getProjectTitle(work.project_id);
+    // 残り時間を計算 (created_at + 24時間 - 現在日時)
+    const createdAt = new Date(work.created_at);
+    const deadline = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
+    const remainingMs = deadline.getTime() - now.getTime();
+    work.remaining_time_ms = remainingMs > 0 ? remainingMs : 0;
+    return work;
+  }).filter(work => work.remaining_time_ms > 0); // 残り時間が正の数のみ
+
+  // created_at降順でソート
+  enrichedWorks.sort((a, b) => {
+    const dateA = new Date(a.created_at);
+    const dateB = new Date(b.created_at);
+    return dateB - dateA;
+  });
+
+  return enrichedWorks;
+}
+
+function getTasksByWorkIdAndAssignee(workId, userEmail) {
+  const tasks = findData(SHEET_NAMES.TASKS, { work_id: workId, assign_to: userEmail });
+  // status_keyがDONEではないタスクをフィルタ
+  return tasks.filter(task => task.status_key !== 'DONE');
 }
 
 // ============================================
@@ -1079,14 +1191,22 @@ function getReviewRequestsForUser(userEmail) {
     allReviewRequests.push(...reviewRequests);
   });
   
+  // レビュー作成者の情報を追加
+  const enrichedReviewRequests = allReviewRequests.map(reviewRequest => {
+    const creator = getMemberByEmail(reviewRequest.created_by);
+    reviewRequest.creator_name = creator ? creator.member_name : '';
+    reviewRequest.creator_icon = creator ? creator.member_icon : '';
+    return reviewRequest;
+  });
+  
   // created_atの降順でソート
-  allReviewRequests.sort((a, b) => {
+  enrichedReviewRequests.sort((a, b) => {
     const dateA = new Date(a.created_at);
     const dateB = new Date(b.created_at);
     return dateB - dateA;
   });
   
-  return sanitizeForClient(allReviewRequests);
+  return sanitizeForClient(enrichedReviewRequests);
 }
 
 // ============================================

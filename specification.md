@@ -51,17 +51,18 @@ Creative Team Management System (CTMS) (v3)
 * due\_datetime (納品期限日時)  
 * work\_client\_email (リレーション: membersシートのmember\_email)  
 * work\_folder\_id (制作フォルダID)  
-* work\_detail\_content (内容, リッチテキスト: 制作物の概要と、制作物にどんな情報を入れてほしいか)  
-* work\_detail\_design (デザイン要項, リッチテキスト: フォント・色味・出したいイメージ・等身など)  
-* work\_detail\_regulation (入稿規定, リッチテキスト)  
-* work\_detail\_note (依頼者からの備考)  
+* work\_document\_id (GoogleドキュメントID, **【実装】** 新規Work作成時に自動生成されるGoogleドキュメントのID)  
+* work\_document\_tab\_id (GoogleドキュメントタブID, **【実装】** work\_document\_idと同じ値が設定される)  
+* work\_detail (プレーンテキストの備考)  
+  * **【実装】** work\_detail\_content, work\_detail\_design, work\_detail\_regulation, work\_detail\_note は新規Work作成時にGoogleドキュメントに保存されるが、worksシートにはwork\_detail（プレーンテキストの備考）のみが保存される。  
 * work\_delivery\_count (成果物数: 納品したファイルの総数, 数値型, デフォルト0)  
 * created\_by (レコード作成者, リレーション: membersシートのmember\_email)  
 * created\_at (依頼受付日時)
 
 ### **2.3. tasksシート (タスクDB)**
 
-* task\_id (主キー, UUID)  
+* task\_id (主キー, プレフィックス + 連番形式, 例: T0001, T0002)  
+  * **【実装】** バックエンドで `generateNextId` 関数により自動生成される。プレフィックス 'T' + 4桁のゼロパディングされた連番。同時実行による重複を防ぐため、LockServiceを使用してロックを取得する。  
 * work\_id (リレーション: worksシートのwork\_id)  
 * task\_title (タスクタイトル)  
 * task\_detail (タスクの内容, リッチテキスト)  
@@ -139,13 +140,27 @@ Creative Team Management System (CTMS) (v3)
 * created\_by (リレーション: membersシートのmember\_email)  
 * created\_at (作成日時)
 
+### **2.11. logsシート (操作ログDB) - 【実装追加】**
+
+* log\_id (主キー, UUID)  
+* user\_email (操作を行ったユーザーのメールアドレス)  
+* operation\_type (操作種別: 'add', 'modified', 'delete')  
+* table\_name (対象テーブル名（シート名）)  
+* record\_id (対象レコードID（主キー値）)  
+* column\_id (変更されたカラム名（更新時のみ）)  
+* old\_value (変更前の値（JSON形式）)  
+* new\_value (変更後の値（JSON形式）)  
+* created\_at (操作日時)  
+* **【ロジック】** すべてのデータ操作（追加・更新・削除）が自動的に記録される。ログシートへの操作はログを記録しない（循環記録回避）。
+
 ## **3\. 機能要件 (GAS Webアプリ)**
 
 ### **3.1. 共通UI**
 
 * PC画面幅を前提としたモダンなデザインを採用する (tailwindcssを使用)。  
 * 画面左側に固定サイドバーを配置し、Home, Works, Projects, Members, Knowledge, Summary のナビゲーションタブを設置する。  
-* 各タブのメインコンテンツは、基本的に表形式（テーブル）とし、各カラムに対してソート・フィルタリング機能をつける。
+* 各タブのメインコンテンツは、基本的に表形式（テーブル）とし、各カラムに対してソート・フィルタリング機能をつける。  
+* **【実装追加】** ヘッダーにID検索機能を配置。P0001, W0001, T0001, R0001などのIDを入力して直接該当レコードを表示できる。
 
 ### **3.2. Home**
 
@@ -169,18 +184,20 @@ Creative Team Management System (CTMS) (v3)
 * **一覧表示:**  
   * 表示項目: work\_id (プレフィックス + 連番形式, 例: W0001), project\_title, work\_title, work\_status\_key (のconfig\_value), due\_datetime, work\_client\_email (のmember\_name), work\_folder\_id (リンク), created\_at, 担当者 (work\_assignmentsからアイコン一覧表示)  
 * **詳細表示:** 一覧の行クリック（または「詳細」ボタン）で画面内オーバーレイを表示。  
-  * work\_overlay-content領域の横幅を1/3ずつ分割して表示:  
-    * **左側:** ドキュメント埋め込み領域（Googleドライブのファイル表示）  
-    * **中央:** タスク管理（このwork\_idに紐づくtasksを一覧表示）  
-      * task\_title, status\_key, priority\_key, assign\_to (担当者の名前), planned\_end\_datetime を表示。  
-      * 表示項目の編集が可能
-      * 「+ 新規」ボタン（タスク追加, モーダル表示）  
-    * **右側:** レビュー依頼（カード表示領域）  
-      * このwork\_idに紐づくreview\_requestsをカード形式で一覧表示（created\_atの降順）。  
-      * 各カードにはreview\_title、review\_commentの一部（プレビュー）、ファイル数が表示される。  
-      * カードをクリックすると詳細表示（review\_title、review\_comment全文、Googleドライブのファイルリンク一覧）が表示される。  
-      * 「+ 新規」ボタン（レビュー依頼作成, モーダル表示）  
-  * work\_detail\_... のリッチテキスト群を表示・編集。  
+  * **【実装追加】** ワークフローステータスバー: 依頼・制作・承認・納品の各ステージの日時を表示。  
+  * work\_overlay-content領域の横幅を分割して表示:  
+    * **左側（1/5幅）:** 案件情報（project\_title, work\_title, work\_type, priority, 依頼者, 担当者）  
+    * **中央（2/5幅）:** ドキュメント埋め込み領域（Googleドキュメントの表示。work\_document\_idを使用）  
+    * **右側（2/5幅）:** タスク管理とレビュー依頼を縦に分割  
+      * **タスク管理:** このwork\_idに紐づくtasksを一覧表示  
+        * task\_title, status\_key, priority\_key, assign\_to (担当者の名前), planned\_end\_datetime を表示。  
+        * 表示項目の編集が可能  
+        * 「+ 新規」ボタン（タスク追加, モーダル表示）  
+      * **レビュー依頼:** カード表示領域  
+        * このwork\_idに紐づくreview\_requestsをカード形式で一覧表示（created\_atの降順）。  
+        * 各カードにはreview\_title、review\_commentの一部（プレビュー）、ファイル数が表示される。  
+        * カードをクリックすると詳細表示（review\_title、review\_comment全文、Googleドライブのファイルリンク一覧）が表示される。  
+        * 「+ 新規」ボタン（レビュー依頼作成, モーダル表示）  
   * 担当者管理: このwork\_idのwork\_assignmentsを管理。membersから検索して追加/削除が可能。  
 
 ### **3.4. Projects (案件管理)**
@@ -238,9 +255,14 @@ Creative Team Management System (CTMS) (v3)
   * **【ロジック】** 送信時、バックエンドで以下の処理を実行する:  
     1. work\_id（プレフィックス + 連番形式, 例: W0001）を自動生成する。  
     2. worksシートにデータを書き込む。  
-    3. Google Drive の親フォルダ配下に、{project\_title}\_{work\_title} の名称で新しいフォルダを作成し、そのIDを work\_folder\_id に保存する。  
+    3. Google Drive の親フォルダ配下に、{work\_id}\_{work\_title} の名称で新しいフォルダを作成し、そのIDを work\_folder\_id に保存する。  
       * **【ロジック】** 親フォルダIDは、configシート (2.8) で config\_type = 'FOLDER', config\_key = 'WORK\_FOLDER\_PARENT' に設定された config\_value から取得する。設定されていない場合は空文字列を返す。  
-    4. configシート (2.8) で config\_type \= 'NOTIFICATION\_EMAIL' に設定されたメールアドレス宛に、GmailApp.sendEmail() を使用して新規依頼の通知メールを送信する。  
+    4. **【実装追加】** Googleドキュメントを自動作成する。  
+      * ドキュメント名: {work\_id} {work\_title} ドキュメント  
+      * work\_detail\_content, work\_detail\_design, work\_detail\_regulation, work\_detail\_note を各セクション（H2見出し）として保存  
+      * 作成したドキュメントをwork\_folder\_idのフォルダに移動  
+      * work\_document\_idとwork\_document\_tab\_idにドキュメントIDを保存  
+    5. configシート (2.8) で config\_type \= 'NOTIFICATION\_EMAIL' に設定されたメールアドレス宛に、GmailApp.sendEmail() を使用して新規依頼の通知メールを送信する。  
 * **(b) 新規「Project」作成:**  
   * Projectsタブ(3.2)の「+ New」ボタンから作成する  
   * 新規Work作成時に同時にProjectを作成することもできる  
@@ -256,9 +278,9 @@ Creative Team Management System (CTMS) (v3)
     2. ドラッグアンドドロップで添付されたファイルは、バックエンドで該当workのwork\_folder\_idにアップロードし、Googleドライブ経由で再読み込みする。  
     3. ユーザーがreview\_title（タイトル）とreview\_comment（コメント）を入力。  
     4. 投稿ボタンを押すと、バックエンドで以下の処理を実行:  
-      * review\_request\_id（UUID）を自動生成する。  
+      * review\_request\_id（プレフィックス + 連番形式, 例: R0001）を自動生成する。  
       * review\_requestsシートにデータを書き込む。  
-      * 添付されたファイルごとにreview\_request\_filesシートにレコードを作成（drive\_file\_id、file\_nameを保存）。  
+      * 添付されたファイルごとにreview\_request\_filesシートにレコードを作成（file\_id、review\_request\_idを保存）。  
     5. 投稿後、work詳細画面とHomeタブにレビュー依頼が表示される。
 
 ### **4.2. 認証・認可（権限管理）**
