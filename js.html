@@ -3399,14 +3399,30 @@
     const container = document.getElementById('work-review-requests-container');
     container.innerHTML = '';
     if (!reviewRequests || reviewRequests.length === 0) {
-      container.innerHTML = '<p style="color: #6b7280; margin-bottom: 8px;">レビュー依頼はありません。</p>';
+      container.innerHTML = '<p style="color: #6b7280;">レビュー依頼はありません。</p>';
       return;
     }
     
-    reviewRequests.forEach(reviewRequest => {
+    // created_atを参照して降順で並び替え
+    const sortedReviewRequests = [...reviewRequests].sort((a, b) => {
+      const dateA = new Date(a.created_at || 0);
+      const dateB = new Date(b.created_at || 0);
+      return dateB - dateA; // 降順
+    });
+    
+    sortedReviewRequests.forEach(reviewRequest => {
       const card = document.createElement('div');
-      card.className = 'review-card';
+      card.className = 'home-card';
       card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
+      
+      // due_datetimeを「~10/24(水) 15:00」形式で表示
+      const dueDateHtml = reviewRequest.due_datetime 
+        ? formatDateForReview(reviewRequest.due_datetime)
+        : '';
+      
+      // 作成者情報
+      const creatorIcon = reviewRequest.creator_icon || 'https:\/\/via.placeholder.com/24';
+      const creatorName = reviewRequest.creator_name || '';
       
       // 最初に登録されたファイルを取得（created_atでソート）
       let firstFile = null;
@@ -3430,11 +3446,13 @@
       
       card.innerHTML = `
         ${thumbnailHtml}
-        <h3 class="card-title-text" style="word-wrap: break-word;">${escapeHtml(reviewRequest.review_title)}</h3>
-        <p class="card-subtitle">${escapeHtml((reviewRequest.review_comment || '').substring(0, 100))}${(reviewRequest.review_comment || '').length > 100 ? '...' : ''}</p>
-        <div class="card-meta">
-          <span>${reviewRequest.file_count || 0}個のファイル</span>
-          <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
+        <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); font-family: 'Roboto Mono', monospace; font-weight: 500; word-wrap: break-word;">
+          ${escapeHtml(reviewRequest.review_request_id || '')} ${escapeHtml(reviewRequest.review_title || '')}
+        </div>
+        ${dueDateHtml ? `<div class="card-meta"><span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${dueDateHtml}</span></div>` : ''}
+        <div class="review-creator">
+          <img src="${escapeHtml(creatorIcon)}" class="review-creator-icon" alt="${escapeHtml(creatorName)}">
+          <span>${escapeHtml(creatorName)}</span>
         </div>
       `;
       
