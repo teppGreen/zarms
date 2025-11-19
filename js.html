@@ -550,7 +550,7 @@
         </div>
         ${infoText ? `<div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px;">${escapeHtml(infoText)}</div>` : ''}
         <div class="card-meta" style="margin-bottom: 12px;">
-          <span>納期: ${formatDateTimeForHome(work.due_datetime)}</span>
+          <span>納期: <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${formatDateTimeForHome(work.due_datetime)}</span></span>
         </div>
         <div class="work-accept-decline-buttons">
           <button class="btn-accept" data-work-id="${escapeHtml(work.work_id)}" data-remaining-ms="${work.remaining_time_ms || 0}">
@@ -627,7 +627,7 @@
           ${escapeHtml(work.work_id)} ${escapeHtml(work.work_title || '')}
         </div>
         <div class="card-meta">
-          <span>納期: ${formatDateTimeForHome(work.due_datetime)}</span>
+          <span>納期: <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${formatDateTimeForHome(work.due_datetime)}</span></span>
           ${incompleteTasksHtml}
         </div>
       `;
@@ -663,7 +663,7 @@
         <div style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${escapeHtml(reviewRequest.review_request_id || '')} ${escapeHtml(reviewRequest.review_title || '')}
         </div>
-        ${dueDateHtml ? `<div class="card-meta" style="margin-bottom: 12px;">${dueDateHtml}</div>` : ''}
+        ${dueDateHtml ? `<div class="card-meta" style="margin-bottom: 12px;"><span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${dueDateHtml}</span></div>` : ''}
         <div class="review-creator">
           <img src="${escapeHtml(creatorIcon)}" class="review-creator-icon" alt="${escapeHtml(creatorName)}">
           <span>${escapeHtml(creatorName)}</span>
@@ -708,7 +708,7 @@
           <span>${escapeHtml(creatorName)}</span>
         </div>
         <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-top: 8px;">
-          ${formatDateTimeForHome(item.created_at)}
+          <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${formatDateTimeForHome(item.created_at)}</span>
         </div>
       `;
       
@@ -993,12 +993,12 @@
           }
         } else {
           switch(header.key) {
-            case 'work_id': content = `<button class="btn-link" onclick="openWorkDetailOverlay('${item.work_id}')">${escapeHtml(item.work_id)}</button>`; break;
-            case 'project_id': content = `<button class="btn-link" onclick="openProjectDetailOverlay('${item.project_id}')">${escapeHtml(item.project_id)}</button>`; break;
+            case 'work_id': content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openWorkDetailOverlay('${item.work_id}')">${escapeHtml(item.work_id)}</button>`; break;
+            case 'project_id': content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openProjectDetailOverlay('${item.project_id}')">${escapeHtml(item.project_id)}</button>`; break;
             case 'detail': content = `<button class="btn-link" onclick="openMemberDetail('${item.member_email}')">詳細</button>`; break;
             case 'assignees': content = renderAssignees(item.assignees); break;
             case 'avatar': content = `<img src="${escapeHtml(item.member_icon || 'https://via.placeholder.com/32')}" class="avatar" alt="">`; break;
-            case 'due_datetime': content = escapeHtml(formatDateTimeForDisplay(currentValue, true)); break;
+            case 'due_datetime': content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDateTimeForDisplay(currentValue, true))}</span>`; break;
             case 'created_at': content = escapeHtml(formatDate(currentValue)); break;
             default: 
               if (typeof currentValue === 'string' && currentValue.length > 10) {
@@ -2211,10 +2211,10 @@
         worksHtml += '<tbody>';
         project.works.forEach(work => {
           worksHtml += `<tr>`;
-          worksHtml += `<td><button class="btn-link" onclick="openWorkDetailOverlay('${work.work_id}'); closeProjectDetailOverlay();">${escapeHtml(work.work_id)}</button></td>`;
+          worksHtml += `<td><button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openWorkDetailOverlay('${work.work_id}'); closeProjectDetailOverlay();">${escapeHtml(work.work_id)}</button></td>`;
           worksHtml += `<td>${escapeHtml(work.work_title || '-')}</td>`;
           worksHtml += `<td>${escapeHtml(getConfigLabel(work.work_status_key, 'WORK_STATUS') || work.work_status_key || '-')}</td>`;
-          worksHtml += `<td>${escapeHtml(formatDateTimeForDisplay(work.due_datetime) || '-')}</td>`;
+          worksHtml += `<td><span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDateTimeForDisplay(work.due_datetime) || '-')}</span></td>`;
           worksHtml += `</tr>`;
         });
         worksHtml += '</tbody></table>';
@@ -3356,7 +3356,7 @@
         <p class="card-subtitle">${escapeHtml((reviewRequest.review_comment || '').substring(0, 100))}${(reviewRequest.review_comment || '').length > 100 ? '...' : ''}</p>
         <div class="card-meta">
           <span>${reviewRequest.file_count || 0}個のファイル</span>
-          <span>${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
+          <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${formatDateTimeForDisplay(reviewRequest.created_at)}</span>
         </div>
       `;
       
