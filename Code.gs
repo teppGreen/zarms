@@ -5,7 +5,7 @@
 // Webアプリのエントリーポイント
 function doGet(e) {
   const userEmail = Session.getActiveUser().getEmail();
-  
+
   // 認証チェック
   if (!isAuthorizedUser(userEmail)) {
     const template = HtmlService.createTemplate(
@@ -16,14 +16,13 @@ function doGet(e) {
   }
 
   const urlParam = e.parameter;
-  
+
   // メインUIを返す
   const template = HtmlService.createTemplateFromFile("index");
-    const array = new Array(template.variables);
-    array.push({
-      urlParam: urlParam,
-      deployedUrl: ScriptApp.getService().getUrl()
-    });
+  template.templateVariables = {
+    urlParam: urlParam,
+    deployedUrl: ScriptApp.getService().getUrl()
+  };
 
   return template.evaluate()
     .setTitle('CTMS v3.0')
@@ -40,7 +39,7 @@ function getCurrentUser() {
   if (!member) {
     throw new Error('ユーザー情報が見つかりません');
   }
-  
+
   return sanitizeForClient(member);
 }
 
@@ -50,7 +49,7 @@ function getCurrentUser() {
 
 function getWorks() {
   const works = getAllData(SHEET_NAMES.WORKS);
-  
+
   const enrichedWorks = works.map(work => {
     work.project_title = getProjectTitle(work.project_id);
     work.client_name = getMemberName(work.work_client_email);
@@ -72,7 +71,7 @@ function getWorkById(workId) {
   work.tasks = getTasksByWorkId(work.work_id);
   work.apps = getWorkApps(work.work_id);
   work.review_requests = getReviewRequestsByWorkId(work.work_id);
-  
+
   // 担当者の詳細情報を追加（member_name, member_team_value）
   if (work.assignees && work.assignees.length > 0) {
     work.assignees = work.assignees.map(assignee => {
@@ -86,31 +85,31 @@ function getWorkById(workId) {
       };
     });
   }
-  
+
   return sanitizeForClient(work);
 }
 
 function getWorkflowTimestamps(workId) {
   const work = getDataById(SHEET_NAMES.WORKS, workId);
   if (!work) return null;
-  
+
   // logsテーブルから該当するレコードを取得
   const logs = getAllData(SHEET_NAMES.LOGS);
-  
+
   // record_id = work_id かつ column_id = 'work_status_key' のレコードをフィルタ
-  const statusLogs = logs.filter(log => 
-    log.record_id === workId && 
+  const statusLogs = logs.filter(log =>
+    log.record_id === workId &&
     log.column_id === 'work_status_key' &&
     log.new_value
   );
-  
+
   // created_atを降順でソート
   statusLogs.sort((a, b) => {
     const dateA = new Date(a.created_at);
     const dateB = new Date(b.created_at);
     return dateB - dateA;
   });
-  
+
   // new_valueをパース（JSON文字列の場合）
   const parseValue = (value) => {
     if (!value) return null;
@@ -121,26 +120,26 @@ function getWorkflowTimestamps(workId) {
       return value;
     }
   };
-  
+
   const timestamps = {
     request: null,      // TO-DO
     production: null,   // CREATE
     approval: null,     // APPROVED or REVIEW
     delivery: null      // DELIVERED or due_datetime
   };
-  
+
   // 依頼: TO-DO
   const requestLog = statusLogs.find(log => parseValue(log.new_value) === 'TO-DO');
   if (requestLog) {
     timestamps.request = requestLog.created_at;
   }
-  
+
   // 制作: CREATE
   const productionLog = statusLogs.find(log => parseValue(log.new_value) === 'CREATE');
   if (productionLog) {
     timestamps.production = productionLog.created_at;
   }
-  
+
   // 承認: APPROVED（なければREVIEW）
   const approvalLog = statusLogs.find(log => {
     const value = parseValue(log.new_value);
@@ -151,7 +150,7 @@ function getWorkflowTimestamps(workId) {
     const approvedLog = statusLogs.find(log => parseValue(log.new_value) === 'APPROVED');
     timestamps.approval = approvedLog ? approvedLog.created_at : approvalLog.created_at;
   }
-  
+
   // 納品: DELIVERED（なければdue_datetime）
   const deliveryLog = statusLogs.find(log => parseValue(log.new_value) === 'DELIVERED');
   if (deliveryLog) {
@@ -159,7 +158,7 @@ function getWorkflowTimestamps(workId) {
   } else if (work.due_datetime) {
     timestamps.delivery = work.due_datetime;
   }
-  
+
   return sanitizeForClient(timestamps);
 }
 
@@ -200,10 +199,10 @@ function createWork(workData) {
   };
 
   createData(SHEET_NAMES.WORKS, newWork);
-  
+
   // 通知メールを送信
   sendNewWorkNotification(workId);
-  
+
   return workId;
 }
 
@@ -215,7 +214,7 @@ function updateWorkField(workId, field, value) {
   if (!canEdit()) {
     throw new Error('この操作には編集権限が必要です。');
   }
-  
+
   const updateObject = { [field]: value };
   return updateData(SHEET_NAMES.WORKS, workId, updateObject);
 }
@@ -226,7 +225,7 @@ function updateWorkField(workId, field, value) {
 
 function getProjects() {
   const projects = getAllData(SHEET_NAMES.PROJECTS);
-  
+
   const enrichedProjects = projects.map(project => {
     project.creator_name = getMemberName(project.created_by);
     const workStats = getProjectWorkStats(project.project_id);
@@ -235,7 +234,7 @@ function getProjects() {
     // project_detailも含めて返す（プレーンテキスト）
     return project;
   });
-  
+
   return sanitizeForClient(enrichedProjects);
 }
 
@@ -245,7 +244,7 @@ function getProjectById(projectId) {
 
   project.creator_name = getMemberName(project.created_by);
   project.works = getWorksByProjectId(project.project_id);
-  
+
   return sanitizeForClient(project);
 }
 
@@ -255,11 +254,11 @@ function createProject(projectTitle) {
   const userEmail = Session.getActiveUser().getEmail();
   const projectId = generateNextId(SHEET_NAMES.PROJECTS, 'P'); // ★★★★★ 変更 ★★★★★
   const now = new Date();
-  
+
   if (isProjectTitleDuplicate(projectTitle)) {
     throw new Error('このプロジェクトタイトルは既に存在します');
   }
-  
+
   const newProject = {
     project_id: projectId,
     project_title: projectTitle,
@@ -282,25 +281,25 @@ function updateProject(projectId, projectData) {
 
 function getMembers() {
   const members = getAllData(SHEET_NAMES.MEMBERS);
-  
+
   const enrichedMembers = members.map(member => {
     member.assigned_works_count = countAssignedWorks(member.member_email);
     return member;
   });
-  
+
   return sanitizeForClient(enrichedMembers);
 }
 
 function getMemberByEmail(memberEmail) {
   const member = getDataById(SHEET_NAMES.MEMBERS, memberEmail);
   if (!member) return null;
-  
+
   // 担当しているWorksを取得
   const assignments = findData(SHEET_NAMES.WORK_ASSIGNMENTS, { member_email: memberEmail });
   const workIds = assignments.map(a => a.work_id);
   const allWorks = getAllData(SHEET_NAMES.WORKS);
   member.assigned_works = allWorks.filter(work => workIds.includes(work.work_id));
-  
+
   return sanitizeForClient(member);
 }
 
@@ -308,10 +307,10 @@ function createMember(memberData) {
   if (!isAdmin()) {
     throw new Error('この操作にはADMIN権限が必要です');
   }
-  
+
   const userEmail = Session.getActiveUser().getEmail();
   const now = new Date();
-  
+
   const newMember = {
     member_email: memberData.member_email,
     slack_member_id: memberData.slack_member_id || '',
@@ -331,7 +330,7 @@ function updateMember(memberEmail, memberData) {
   if (!isAdmin()) {
     throw new Error('この操作にはADMIN権限が必要です');
   }
-  
+
   return updateData(SHEET_NAMES.MEMBERS, memberEmail, memberData);
 }
 
@@ -341,7 +340,7 @@ function updateMember(memberEmail, memberData) {
 
 function getTasksByWorkId(workId) {
   const tasks = findData(SHEET_NAMES.TASKS, { work_id: workId });
-  
+
   const enrichedTasks = tasks.map(task => {
     task.assignee_name = getMemberName(task.assign_to);
     return task;
@@ -360,7 +359,7 @@ function createTask(taskData) {
   const userEmail = Session.getActiveUser().getEmail();
   const taskId = generateNextId(SHEET_NAMES.TASKS, 'T');
   const now = new Date();
-  
+
   const newTask = {
     task_id: taskId,
     work_id: taskData.work_id,
@@ -391,7 +390,7 @@ function updateTask(taskId, taskData) {
 
 function getKnowledge() {
   const knowledge = getAllData(SHEET_NAMES.KNOWLEDGE);
-  
+
   const enrichedKnowledge = knowledge.map(item => {
     const creator = getMemberByEmail(item.created_by);
     item.creator_name = creator ? creator.member_name : '';
@@ -399,10 +398,10 @@ function getKnowledge() {
     item.work_title = getWorkTitle(item.work_id);
     return item;
   });
-  
+
   // created_at降順でソート
   enrichedKnowledge.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  
+
   return sanitizeForClient(enrichedKnowledge);
 }
 
@@ -410,7 +409,7 @@ function createKnowledge(knowledgeData) {
   const userEmail = Session.getActiveUser().getEmail();
   const knowledgeId = Utilities.getUuid();
   const now = new Date();
-  
+
   const newKnowledge = {
     knowledge_id: knowledgeId,
     work_id: knowledgeData.work_id,
@@ -436,9 +435,9 @@ function getConfig(configType) {
   }
 
   configs = configs.filter(config => config.is_active === true || config.is_active === 'TRUE' || config.is_active === 'true');
-  
+
   configs.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-  
+
   return sanitizeForClient(configs);
 }
 
@@ -451,14 +450,14 @@ function getSummaryData() {
   const assigneeStats = getAssigneeStats();
   const workTypeStats = getWorkTypeStats();
   const monthlyStats = getMonthlyStats();
-  
+
   const data = {
     workStatus: workStatusStats,
     assignee: assigneeStats,
     workType: workTypeStats,
     monthly: monthlyStats
   };
-  
+
   return sanitizeForClient(data);
 }
 
@@ -498,7 +497,7 @@ function updateSingleField(tableName, id, field, value) {
 function getHomeData() {
   const userEmail = Session.getActiveUser().getEmail();
   const member = getMemberByEmail(userEmail);
-  
+
   if (!member) {
     return sanitizeForClient({
       greeting: 'こんにちは',
@@ -509,17 +508,17 @@ function getHomeData() {
       knowledge: []
     });
   }
-  
+
   const newRequests = getAvailableWorks(userEmail);
   const assignedWorks = getAssignedWorksWithTasks(userEmail);
   const reviewRequests = getReviewRequestsForUser(userEmail);
   const knowledge = getKnowledge();
-  
+
   const hour = new Date().getHours();
   let greeting = 'こんにちは';
   if (hour < 11) greeting = 'おはようございます';
   else if (hour >= 18) greeting = 'こんばんは';
-  
+
   return sanitizeForClient({
     greeting: greeting,
     memberName: member.member_name,
@@ -542,7 +541,7 @@ function generateNextId(sheetName, prefix) {
   try {
     const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(sheetName);
     const lastRow = sheet.getLastRow();
-    
+
     // ヘッダー行のインデックスを取得 (1行目と仮定)
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const idColumnName = ID_COLUMNS[sheetName];
@@ -565,10 +564,10 @@ function generateNextId(sheetName, prefix) {
         }
       }
     }
-    
+
     // 4桁のゼロパディング
     const nextId = prefix + String(nextIdNumber).padStart(4, '0');
-    
+
     return nextId;
 
   } finally {
@@ -600,12 +599,12 @@ function isProjectTitleDuplicate(projectTitle) {
 function getProjectWorkStats(projectId) {
   const works = findData(SHEET_NAMES.WORKS, { project_id: projectId });
   const statusCounts = {};
-  
+
   works.forEach(work => {
     const status = work.work_status_key;
     statusCounts[status] = (statusCounts[status] || 0) + 1;
   });
-  
+
   return {
     count: works.length,
     status: statusCounts
@@ -686,7 +685,7 @@ function addWorkAssignee(workId, memberEmail) {
   const userEmail = Session.getActiveUser().getEmail();
   const assignmentId = Utilities.getUuid();
   const now = new Date();
-  
+
   const newAssignment = {
     assignment_id: assignmentId,
     work_id: workId,
@@ -705,7 +704,7 @@ function acceptWork(workId) {
   if (existingAssignments.length > 0) {
     return { success: true, message: '既に承諾済みです' };
   }
-  
+
   addWorkAssignee(workId, userEmail);
   return { success: true, message: '承諾しました' };
 }
@@ -730,7 +729,7 @@ function addWorkApp(workId, appKey) {
   const userEmail = Session.getActiveUser().getEmail();
   const assignmentId = Utilities.getUuid();
   const now = new Date();
-  
+
   const newAssignment = {
     assignment_id: assignmentId,
     work_id: workId,
@@ -753,10 +752,10 @@ function createWorkFolder(workId, workTitle) {
       Logger.log('親フォルダIDが設定されていません');
       return '';
     }
-    
+
     const parentFolder = DriveApp.getFolderById(parentFolderId);
     const folderName = `${workId}_${workTitle}`;
-    
+
     const newFolder = parentFolder.createFolder(folderName);
     return newFolder.getId();
   } catch (e) {
@@ -772,34 +771,34 @@ function createWorkDocument(workId, workTitle, content, design, regulation, note
     const doc = DocumentApp.create(docName);
     const docId = doc.getId();
     const body = doc.getBody();
-    
+
     // ページ分けなしモードに設定（Googleドキュメントの設定を変更）
     // 注: DocumentAppでは直接設定できないため、埋め込み時にURLパラメータで制御
-    
+
     // H2見出しとNormal textで内容を追加
     body.appendParagraph('制作物の概要').setHeading(DocumentApp.ParagraphHeading.HEADING2);
     body.appendParagraph(content || '').setHeading(DocumentApp.ParagraphHeading.NORMAL);
-    
+
     body.appendParagraph('デザイン要項').setHeading(DocumentApp.ParagraphHeading.HEADING2);
     body.appendParagraph(design || '').setHeading(DocumentApp.ParagraphHeading.NORMAL);
-    
+
     body.appendParagraph('入稿規定').setHeading(DocumentApp.ParagraphHeading.HEADING2);
     body.appendParagraph(regulation || '').setHeading(DocumentApp.ParagraphHeading.NORMAL);
-    
+
     body.appendParagraph('依頼者からの備考').setHeading(DocumentApp.ParagraphHeading.HEADING2);
     body.appendParagraph(note || '').setHeading(DocumentApp.ParagraphHeading.NORMAL);
-    
+
     // ドキュメントをフォルダに移動
     if (folderId) {
       const file = DriveApp.getFileById(docId);
       const folder = DriveApp.getFolderById(folderId);
       file.moveTo(folder);
     }
-    
+
     // タブIDを取得（スプレッドシートのタブIDを取得する方法はないため、ドキュメントIDをそのまま使用）
     // 実際には、Googleドキュメントにはタブの概念がないため、documentIdをそのまま使用
     const tabId = docId;
-    
+
     return {
       documentId: docId,
       tabId: tabId
@@ -819,8 +818,8 @@ function getAssignedWorks(memberEmail) {
   if (workIds.length === 0) return [];
 
   const allWorks = getAllData(SHEET_NAMES.WORKS);
-  
-  const works = allWorks.filter(work => 
+
+  const works = allWorks.filter(work =>
     workIds.includes(work.work_id) && work.work_status_key !== 'DELIVERED' && work.work_status_key !== 'CANCEL'
   );
 
@@ -838,8 +837,8 @@ function getAssignedWorksWithTasks(memberEmail) {
   if (workIds.length === 0) return [];
 
   const allWorks = getAllData(SHEET_NAMES.WORKS);
-  
-  const works = allWorks.filter(work => 
+
+  const works = allWorks.filter(work =>
     workIds.includes(work.work_id) && work.work_status_key !== 'DELIVERED' && work.work_status_key !== 'CANCEL'
   );
 
@@ -879,8 +878,8 @@ function getAvailableWorks(userEmail) {
   const allWorks = getAllData(SHEET_NAMES.WORKS);
   const assignments = findData(SHEET_NAMES.WORK_ASSIGNMENTS, { member_email: userEmail });
   const assignedWorkIds = new Set(assignments.map(a => a.work_id));
-  
-  const availableWorks = allWorks.filter(work => 
+
+  const availableWorks = allWorks.filter(work =>
     work.work_status_key === 'TODO' && !assignedWorkIds.has(work.work_id)
   );
 
@@ -933,12 +932,12 @@ function sendNewWorkNotification(workId) {
   try {
     const work = getWorkById(workId);
     const notificationEmails = getConfig('NOTIFICATION_EMAIL');
-    
+
     if (notificationEmails.length === 0) {
       Logger.log('通知先メールアドレスが設定されていません');
       return;
     }
-    
+
     const subject = `【新規依頼】${work.project_title} - ${work.work_title}`;
     const body = `
       新規の制作依頼が登録されました。
@@ -950,7 +949,7 @@ function sendNewWorkNotification(workId) {
 
       詳細はCTMSでご確認ください。
     `.trim();
-    
+
     notificationEmails.forEach(config => {
       GmailApp.sendEmail(config.config_value, subject, body);
     });
@@ -966,35 +965,35 @@ function sendNewWorkNotification(workId) {
 function getWorkStatusStats() {
   const works = getAllData(SHEET_NAMES.WORKS);
   const stats = {};
-  
+
   works.forEach(work => {
     const status = work.work_status_key;
     if (status && status !== 'DELIVERED') {
       stats[status] = (stats[status] || 0) + 1;
     }
   });
-  
+
   return stats;
 }
 
 function getAssigneeStats() {
   const assignments = getAllData(SHEET_NAMES.WORK_ASSIGNMENTS);
   const stats = {};
-  
+
   assignments.forEach(assignment => {
     const name = getMemberName(assignment.member_email);
     if (name) {
       stats[name] = (stats[name] || 0) + 1;
     }
   });
-  
+
   return stats;
 }
 
 function getWorkTypeStats() {
   const works = getAllData(SHEET_NAMES.WORKS);
   const stats = {};
-  
+
   works.forEach(work => {
     const typeKey = work.work_type_key;
     const typeValue = getConfigValue(typeKey, 'WORK_TYPE');
@@ -1003,7 +1002,7 @@ function getWorkTypeStats() {
       stats[key] = (stats[key] || 0) + 1;
     }
   });
-  
+
   return stats;
 }
 
@@ -1018,12 +1017,12 @@ function getMonthlyStats() {
       stats[monthKey] = (stats[monthKey] || 0) + 1;
     }
   });
-  
+
   const sortedStats = {};
   Object.keys(stats).sort().forEach(key => {
     sortedStats[key] = stats[key];
   });
-  
+
   return sortedStats;
 }
 
@@ -1033,7 +1032,7 @@ function getMonthlyStats() {
 
 function getReviewRequestsByWorkId(workId) {
   const reviewRequests = findData(SHEET_NAMES.REVIEW_REQUESTS, { work_id: workId });
-  
+
   const enrichedReviewRequests = reviewRequests.map(reviewRequest => {
     const creator = getMemberByEmail(reviewRequest.created_by);
     reviewRequest.creator_name = creator ? creator.member_name : '';
@@ -1042,26 +1041,26 @@ function getReviewRequestsByWorkId(workId) {
     reviewRequest.file_count = reviewRequest.files.length;
     return reviewRequest;
   });
-  
+
   // created_atの降順でソート
   enrichedReviewRequests.sort((a, b) => {
     const dateA = new Date(a.created_at);
     const dateB = new Date(b.created_at);
     return dateB - dateA;
   });
-  
+
   return sanitizeForClient(enrichedReviewRequests);
 }
 
 function getReviewRequestById(reviewRequestId) {
   const reviewRequest = getDataById(SHEET_NAMES.REVIEW_REQUESTS, reviewRequestId);
   if (!reviewRequest) return null;
-  
+
   reviewRequest.creator_name = getMemberName(reviewRequest.created_by);
   reviewRequest.files = getReviewRequestFiles(reviewRequestId);
   reviewRequest.work_title = getWorkTitle(reviewRequest.work_id);
   reviewRequest.project_title = getProjectTitle(getDataById(SHEET_NAMES.WORKS, reviewRequest.work_id)?.project_id);
-  
+
   return sanitizeForClient(reviewRequest);
 }
 
@@ -1069,7 +1068,7 @@ function createReviewRequest(reviewRequestData) {
   const userEmail = Session.getActiveUser().getEmail();
   const reviewRequestId = generateNextId(SHEET_NAMES.REVIEW_REQUESTS, 'R');
   const now = new Date();
-  
+
   const newReviewRequest = {
     review_request_id: reviewRequestId,
     work_id: reviewRequestData.work_id,
@@ -1078,9 +1077,9 @@ function createReviewRequest(reviewRequestData) {
     created_by: userEmail,
     created_at: now,
   };
-  
+
   createData(SHEET_NAMES.REVIEW_REQUESTS, newReviewRequest);
-  
+
   // ファイルを追加
   if (reviewRequestData.file_ids && reviewRequestData.file_ids.length > 0) {
     reviewRequestData.file_ids.forEach(fileId => {
@@ -1093,13 +1092,13 @@ function createReviewRequest(reviewRequestData) {
       createData(SHEET_NAMES.REVIEW_REQUEST_FILES, newFile);
     });
   }
-  
+
   return reviewRequestId;
 }
 
 function getReviewRequestFiles(reviewRequestId) {
   const files = findData(SHEET_NAMES.REVIEW_REQUEST_FILES, { review_request_id: reviewRequestId });
-  
+
   const enrichedFiles = files.map(file => {
     try {
       const driveFile = DriveApp.getFileById(file.file_id);
@@ -1114,7 +1113,7 @@ function getReviewRequestFiles(reviewRequestId) {
     }
     return file;
   });
-  
+
   return sanitizeForClient(enrichedFiles);
 }
 
@@ -1149,16 +1148,16 @@ function uploadFileToWorkFolder(workId, base64Data, fileName, mimeType) {
     if (!work || !work.work_folder_id) {
       throw new Error('制作物フォルダが見つかりません');
     }
-    
+
     const folder = DriveApp.getFolderById(work.work_folder_id);
     const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType || 'application/octet-stream', fileName);
     const uploadedFile = folder.createFile(blob);
-    
+
     // ファイル名を設定
     if (fileName) {
       uploadedFile.setName(fileName);
     }
-    
+
     return {
       file_id: uploadedFile.getId(),
       file_name: uploadedFile.getName(),
@@ -1174,16 +1173,16 @@ function getReviewRequestsForUser(userEmail) {
   // ユーザーが担当者に割り当てられているworksを取得
   const assignments = findData(SHEET_NAMES.WORK_ASSIGNMENTS, { member_email: userEmail });
   const workIds = assignments.map(a => a.work_id);
-  
+
   if (workIds.length === 0) return [];
-  
+
   // 各workに紐づくレビュー依頼を取得
   const allReviewRequests = [];
   workIds.forEach(workId => {
     const reviewRequests = getReviewRequestsByWorkId(workId);
     allReviewRequests.push(...reviewRequests);
   });
-  
+
   // レビュー作成者の情報を追加
   const enrichedReviewRequests = allReviewRequests.map(reviewRequest => {
     const creator = getMemberByEmail(reviewRequest.created_by);
@@ -1191,14 +1190,14 @@ function getReviewRequestsForUser(userEmail) {
     reviewRequest.creator_icon = creator ? creator.member_icon : '';
     return reviewRequest;
   });
-  
+
   // created_atの降順でソート
   enrichedReviewRequests.sort((a, b) => {
     const dateA = new Date(a.created_at);
     const dateB = new Date(b.created_at);
     return dateB - dateA;
   });
-  
+
   return sanitizeForClient(enrichedReviewRequests);
 }
 
@@ -1211,34 +1210,34 @@ function createGithubIssue(issueData) {
     // Get GitHub token and repository from config
     const githubTokenConfig = getConfigValue('GITHUB_TOKEN', 'GITHUB');
     const githubRepoConfig = getConfigValue('GITHUB_REPO', 'GITHUB');
-    
+
     if (!githubTokenConfig || !githubRepoConfig) {
       throw new Error('GitHub設定が見つかりません。管理者にお問い合わせください。');
     }
-    
+
     // Parse repository (format: owner/repo)
     const repoParts = githubRepoConfig.split('/');
     if (repoParts.length !== 2) {
       throw new Error('GitHubリポジトリの形式が正しくありません。');
     }
-    
+
     const owner = repoParts[0];
     const repo = repoParts[1];
-    
+
     // Prepare issue payload
     const payload = {
       title: issueData.title,
       body: issueData.body
     };
-    
+
     // Add labels if provided
     if (issueData.labels && issueData.labels.length > 0) {
       payload.labels = issueData.labels;
     }
-    
+
     // GitHub API endpoint
     const url = `https://api.github.com/repos/${owner}/${repo}/issues`;
-    
+
     // Make API request
     const options = {
       method: 'post',
@@ -1251,24 +1250,24 @@ function createGithubIssue(issueData) {
       payload: JSON.stringify(payload),
       muteHttpExceptions: true
     };
-    
+
     const response = UrlFetchApp.fetch(url, options);
     const responseCode = response.getResponseCode();
     const responseText = response.getContentText();
-    
+
     if (responseCode !== 201) {
       Logger.log('GitHub API Error: ' + responseText);
       throw new Error(`GitHubイシューの作成に失敗しました (HTTP ${responseCode})`);
     }
-    
+
     const result = JSON.parse(responseText);
-    
+
     return sanitizeForClient({
       number: result.number,
       url: result.html_url,
       state: result.state
     });
-    
+
   } catch (e) {
     Logger.log('createGithubIssue Error: ' + e.message);
     throw new Error('GitHubイシューの作成中にエラーが発生しました: ' + e.message);
@@ -1289,7 +1288,7 @@ function isAuthorizedUser(email) {
 function isAdmin() {
   const userEmail = Session.getActiveUser().getEmail();
   const member = getMemberByEmail(userEmail);
-  
+
   if (!member) return false;
   return member.role_key === 'ADMIN';
 }
@@ -1298,9 +1297,9 @@ function isAdmin() {
 function canEdit() {
   const userEmail = Session.getActiveUser().getEmail();
   const member = getMemberByEmail(userEmail);
-  
+
   if (!member) return false;
-  
+
   return member.role_key === 'ADMIN' || member.role_key === 'EDITOR';
 }
 
@@ -1308,9 +1307,9 @@ function canEdit() {
 function getUserRole() {
   const userEmail = Session.getActiveUser().getEmail();
   const member = getMemberByEmail(userEmail);
-  
+
   if (!member) return sanitizeForClient('NONE');
-  
+
   return sanitizeForClient(member.role_key);
 }
 
@@ -1329,16 +1328,16 @@ function getRoleLevel(roleKey) {
 function checkPermission(operation) {
   const userRole = getUserRole();
   const roleLevel = getRoleLevel(userRole);
-  
+
   const permissions = {
     'view': 1,           // VIEWER以上
     'edit': 2,           // EDITOR以上
     'manage_members': 3, // ADMIN
     'delete': 3          // ADMIN
   };
-  
+
   const requiredLevel = permissions[operation] || 0;
-  
+
   return roleLevel >= requiredLevel;
 }
 
@@ -1352,17 +1351,17 @@ function sanitizeForClient(data) {
   if (data === null || data === undefined) {
     return data;
   }
-  
+
   // Dateオブジェクトの場合
   if (data instanceof Date) {
     return data.toISOString();
   }
-  
+
   // 配列の場合は、各要素を再帰的に処理
   if (Array.isArray(data)) {
     return data.map(item => sanitizeForClient(item));
   }
-  
+
   // プレーンなオブジェクトの場合は、各プロパティを再帰的に処理
   if (typeof data === 'object' && data.constructor === Object) {
     const sanitized = {};
@@ -1373,7 +1372,7 @@ function sanitizeForClient(data) {
     }
     return sanitized;
   }
-  
+
   // それ以外（文字列、数値、ブール値）はそのまま返す
   return data;
 }
