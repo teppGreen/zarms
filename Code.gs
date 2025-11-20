@@ -336,6 +336,23 @@ function updateMember(memberEmail, memberData) {
 // Tasks関連
 // ============================================
 
+function getTasks() {
+  const tasks = getAllData(SHEET_NAMES.TASKS);
+
+  const enrichedTasks = tasks.map(task => {
+    task.assignee_name = getMemberName(task.assign_to);
+    task.work_title = getWorkTitle(task.work_id);
+    const work = getDataById(SHEET_NAMES.WORKS, task.work_id);
+    if (work) {
+      task.project_id = work.project_id;
+      task.project_title = getProjectTitle(work.project_id);
+    }
+    return task;
+  });
+
+  return sanitizeForClient(enrichedTasks);
+}
+
 function getTasksByWorkId(workId) {
   const tasks = findData(SHEET_NAMES.TASKS, { work_id: workId });
 
