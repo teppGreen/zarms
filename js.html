@@ -127,9 +127,11 @@
 
     try {
       // URLパラメータからwork_idを取得して詳細画面を開く（最優先処理）
-      if (templateVariables.urlParam.work_id) {
-        const workId = JSON.parse(JSON.stringify(templateVariables.urlParam.work_id || null));
-        openWorkDetailOverlay(workId);
+      const urlParam = JSON.parse(<?= JSON.stringify(templateVariables.urlParam) ?>);
+      console.log(`URLのパラメータ: ${JSON.stringify(urlParam.work_id)}`);
+      if (urlParam.work_id) {
+        const workId = urlParam.work_id;
+        if (workId) openWorkDetailOverlay(workId);
       }
     } catch (error) {
       console.error('URLパラメータ処理でエラーが発生しました:', error);
@@ -2378,7 +2380,7 @@
     const urlCopyButton = document.getElementById('work-detail-url-copy-button');
     if (!urlCopyButton || !urlCopyButton.dataset.workId) return;
     const workId = urlCopyButton.dataset.workId;
-    const url = `${templateVariables.deployedUrl}?work_id=${workId}`;
+    const url = `${JSON.parse(<?= JSON.stringify(templateVariables.deployedUrl) ?>)}?work_id=${workId}`;
     navigator.clipboard.writeText(url).then(() => {
       // alert('URLをクリップボードにコピーしました');
     }).catch(() => {
