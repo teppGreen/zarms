@@ -487,6 +487,7 @@ function updateSingleField(tableName, id, field, value) {
   const sheetNameMap = {
     'works': SHEET_NAMES.WORKS,
     'projects': SHEET_NAMES.PROJECTS,
+    'tasks': SHEET_NAMES.TASKS,
     'members': SHEET_NAMES.MEMBERS,
   };
 
