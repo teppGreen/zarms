@@ -15,12 +15,10 @@ function doGet(e) {
       .setTitle('CTMS - アクセス拒否');
   }
 
-  const urlParam = e.parameter;
-
   // メインUIを返す
   const template = HtmlService.createTemplateFromFile("index");
   template.templateVariables = {
-    urlParam: urlParam,
+    urlParam: e.parameter,
     deployedUrl: ScriptApp.getService().getUrl()
   };
 

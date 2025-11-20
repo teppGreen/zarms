@@ -48,7 +48,7 @@
   // 新規作成ボタンの初期化関数
   function initializeNewButton() {
     console.log('initializeNewButton が呼び出されました');
-    
+
     // --- 新規作成ボタンのロジック ---
     const newButton = document.getElementById('new-button');
     const dropdown = document.getElementById('new-button-dropdown');
@@ -61,15 +61,15 @@
     if (newButton) {
       console.log('新規作成ボタンが見つかりました。イベントリスナーを設定します。');
       // onclickを使用して確実に設定
-      newButton.onclick = function(event) {
+      newButton.onclick = function (event) {
         console.log('新規作成ボタンがクリックされました', event);
         handleMainButtonClick(event);
       };
-      
+
       // 子要素（span）からのクリックも確実に処理されるように
       const newButtonMain = document.getElementById('new-button-main');
       if (newButtonMain) {
-        newButtonMain.onclick = function(event) {
+        newButtonMain.onclick = function (event) {
           console.log('新規作成ボタン（span）がクリックされました', event);
           handleMainButtonClick(event);
         };
@@ -88,10 +88,10 @@
         if (newButtonContainer && newButtonContainer.contains(event.target)) {
           return; // ボタンのクリックイベントを妨げないように早期リターン
         }
-        
+
         // ポップアップエディタを閉じる
         closeAllPopups();
-        
+
         // ドロップダウンが表示されていて、かつ
         // クリックされた場所がボタンコンテナの外側の場合にドロップダウンを閉じる
         if (dropdown && dropdown.classList.contains('show')) {
@@ -105,11 +105,11 @@
   // 初期化
   async function initializeApp() {
     console.log('initializeApp が呼び出されました');
-    
+
     // 全画面タイトルの最小表示時間を確保（アニメーションが適切に表示されるように）
     const titleStartTime = Date.now();
     const minDisplayTime = 1000; // 最小表示時間（ミリ秒）
-    
+
     // 新規作成ボタンを最初に初期化（エラーが発生しても確実に実行されるように）
     try {
       console.log('initializeNewButton を呼び出します');
@@ -127,8 +127,8 @@
 
     try {
       // URLパラメータからwork_idを取得して詳細画面を開く（最優先処理）
-      const workId = templateVariables.urlParam && templateVariables.urlParam.work_id ? templateVariables.urlParam.work_id : null;
-      if (workId) {
+      if (templateVariables.urlParam.work_id) {
+        const workId = JSON.parse(<?= JSON.stringify(templateVariables.urlParam.work_id) ?>);
         openWorkDetailOverlay(workId);
       }
     } catch (error) {
@@ -139,7 +139,7 @@
     try {
       const elapsedTime = Date.now() - titleStartTime;
       const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
-      
+
       setTimeout(() => {
         hideFullscreenTitle();
       }, remainingTime);
@@ -173,13 +173,13 @@
     // DOMContentLoaded が既に発火している場合
     initializeApp();
   }
-  
+
   // window.onload も念のため設定
   window.onload = initializeApp;
 
   function loadInitialData(shouldSwitchTab = true) {
     showLoading();
-    
+
     return Promise.all([
       callGAS('getCurrentUser'),
       callGAS('getConfig', null),
@@ -187,11 +187,11 @@
     ]).then(([user, config, role]) => {
       currentUser = user;
       configData = groupConfigByType(config);
-      
+
       if (role === 'ADMIN') {
         document.getElementById('new-member-dropdown-item').style.display = 'block';
       }
-      
+
       hideLoading();
       if (shouldSwitchTab) {
         switchTab('home');
@@ -219,19 +219,19 @@
       functionName: functionName,
       args: args
     };
-    
+
     return new Promise((resolve, reject) => {
       google.script.run
         .withSuccessHandler(resolve)
         .withFailureHandler(reject)
-        [functionName](...args);
+      [functionName](...args);
     });
   }
 
   function groupConfigByType(configs) {
     const grouped = {};
     if (!configs || !Array.isArray(configs)) return grouped;
-    
+
     configs.forEach(config => {
       if (!grouped[config.config_type]) {
         grouped[config.config_type] = [];
@@ -245,13 +245,13 @@
 
   function showLoading() {
     if (loadingTimeout) clearTimeout(loadingTimeout);
-    
+
     // app-headerにシマーエフェクトをON（スパイラルアニメーションの代わり）
     const appHeader = document.querySelector('.app-header');
     if (appHeader) {
       appHeader.classList.add('shimmer-loading');
     }
-    
+
     // bodyタグにcursor: waitを適用
     document.body.style.cursor = 'wait';
   }
@@ -262,24 +262,24 @@
     if (appHeader) {
       appHeader.classList.remove('shimmer-loading');
     }
-    
+
     // bodyタグからcursor: waitを削除
     document.body.style.cursor = '';
   }
-  
+
   function handleError(error) {
     hideLoading();
     console.error('GAS Error:', error);
-    
+
     // HTTP 429エラーを検出（エラーメッセージに"429"が含まれているか、エラーコードが429か）
     const is429Error = error.toString().includes('HTTP 429');
-    
+
     if (is429Error && lastCallGASInvocation) {
       // HTTP 429エラーの場合、アラートを表示せずに再試行
       retryLastOperation();
       return;
     }
-    
+
     // その他のエラーは通常通りアラートを表示
     alert('エラーが発生しました: ' + error.message);
   }
@@ -321,7 +321,7 @@
 
       console.log('lastCallGASInvocation:', lastCallGASInvocation);
       console.log('lastJSInvocation:', lastJSInvocation);
-      
+
       // 直前のGAS操作を再試行
       const { functionName, args } = lastCallGASInvocation;
       callGAS(functionName, ...args)
@@ -330,7 +330,7 @@
           if (lastJSInvocation && lastJSInvocation.functionName && lastJSInvocation.args) {
             const jsFunctionName = lastJSInvocation.functionName;
             const jsArgs = lastJSInvocation.args;
-            
+
             // 関数を取得して実行
             let jsFunction = null;
             if (typeof window[jsFunctionName] === 'function') {
@@ -348,7 +348,7 @@
                 console.warn(`Failed to get function ${jsFunctionName}:`, e);
               }
             }
-            
+
             if (jsFunction && typeof jsFunction === 'function') {
               try {
                 jsFunction(...jsArgs);
@@ -359,7 +359,7 @@
               console.warn(`Function ${jsFunctionName} not found`);
             }
           }
-          
+
           // 成功時はポップアップを閉じる
           lastCallGASInvocation = null;
           lastJSInvocation = null;
@@ -368,7 +368,7 @@
         .catch((error) => {
           // 再試行時もHTTP 429エラーの場合は再度再試行
           const is429Error = error.toString().includes('429');
-          
+
           if (is429Error) {
             // 再度再試行
             retryLastOperation();
@@ -403,7 +403,7 @@
         </div>
       </div>
     `;
-    
+
     document.body.appendChild(retryPopup);
   }
 
@@ -453,7 +453,7 @@
     event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
     event.preventDefault(); // デフォルトの動作を防ぐ
     closeAllPopups();
-    
+
     // アクティブなナビゲーションアイテムを確認してタブを判定
     const activeNavItem = document.querySelector('.nav-item.active');
     console.log('アクティブなナビゲーションアイテム:', activeNavItem);
@@ -463,10 +463,10 @@
       toggleNewButtonDropdown(event);
       return;
     }
-    
+
     const navItemId = activeNavItem.id;
     console.log('ナビゲーションアイテムID:', navItemId);
-    
+
     if (navItemId === 'works-nav') {
       console.log('制作物モーダルを開きます');
       openNewWorkModal();
@@ -528,29 +528,29 @@
     } else {
       promises.push(Promise.resolve(membersData));
     }
-    
+
     Promise.all(promises).then(([data, members]) => {
       if (!membersData || membersData.length === 0) {
         membersData = members;
       }
-      
+
       document.getElementById('home-greeting').textContent = `${data.greeting}、${data.memberName}さん。`;
-      
+
       // 最新の制作依頼を表示
       renderNewRequests(data.new_requests || []);
-      
+
       // 担当中の制作物を表示
       renderAssignedWorks(data.works || []);
-      
+
       // 受付中のレビューを表示
       renderReviewRequests(data.review_requests || []);
-      
+
       // 最近のナレッジを表示
       renderKnowledge(data.knowledge || []);
-      
+
       // 残り時間のリアルタイム更新を開始
       startRemainingTimeUpdates();
-      
+
       hideLoading();
     }).catch(handleError);
   }
@@ -558,20 +558,20 @@
   function renderNewRequests(newRequests) {
     const container = document.getElementById('home-new-requests-container');
     container.innerHTML = '';
-    
+
     // 非表示にするwork_idをフィルタ
     const visibleRequests = newRequests.filter(work => !hiddenWorkIds.has(work.work_id));
-    
+
     if (visibleRequests.length === 0) {
       container.innerHTML = '<p style="color: #6b7280;">最新の制作依頼はありません</p>';
       return;
     }
-    
+
     visibleRequests.forEach(work => {
       const card = document.createElement('div');
       card.className = 'home-card';
       card.dataset.workId = work.work_id;
-      
+
       // 優先度、制作物種別、依頼者の所属チームを取得
       const priorityLabel = work.priority_key ? getConfigLabel(work.priority_key, 'PRIORITY') : '';
       const workTypeLabel = work.work_type_key ? getConfigLabel(work.work_type_key, 'WORK_TYPE') : '';
@@ -579,10 +579,10 @@
         const client = membersData?.find(m => m.member_email === work.work_client_email);
         return client ? getConfigLabel(client.member_team_key, 'TEAM') : '';
       })() : '';
-      
+
       const infoParts = [priorityLabel, workTypeLabel, clientTeamLabel].filter(Boolean);
       const infoText = infoParts.length > 0 ? infoParts.join('|') : '';
-      
+
       card.innerHTML = `
         <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
           ${work.project_id ? `${escapeHtml(work.project_id)} ` : ''}${escapeHtml(work.project_title || '')}
@@ -602,7 +602,7 @@
           <button class="btn-decline" data-work-id="${escapeHtml(work.work_id)}">保留・辞退</button>
         </div>
       `;
-      
+
       // 承諾ボタンのイベントリスナー
       const acceptButton = card.querySelector('.btn-accept');
       if (acceptButton) {
@@ -614,7 +614,7 @@
           }
         });
       }
-      
+
       // 辞退ボタンのイベントリスナー
       const declineButton = card.querySelector('.btn-decline');
       if (declineButton) {
@@ -626,14 +626,14 @@
           }
         });
       }
-      
+
       // カードクリックでwork_detail_overlayを開く（ボタン以外の領域）
       card.addEventListener('click', (e) => {
         if (!e.target.closest('.work-accept-decline-buttons')) {
           openWorkDetailOverlay(work.work_id);
         }
       });
-      
+
       container.appendChild(card);
     });
   }
@@ -641,25 +641,25 @@
   function renderAssignedWorks(works) {
     const container = document.getElementById('home-works-container');
     container.innerHTML = '';
-    
+
     if (works.length === 0) {
       container.innerHTML = '<p style="color: #6b7280;">担当中の制作物はありません</p>';
       return;
     }
-    
+
     works.forEach(work => {
       const card = document.createElement('div');
       card.className = 'home-card';
-      
+
       // ステータス色を取得
       const statusColor = getWorkStatusColor(work.work_status_key);
       const statusLabel = getConfigLabel(work.work_status_key, 'WORK_STATUS');
-      
+
       // 未完了タスク数の表示
-      const incompleteTasksHtml = work.incomplete_task_count > 0 
+      const incompleteTasksHtml = work.incomplete_task_count > 0
         ? `<div class="incomplete-tasks-count">未完了のタスク: ${work.incomplete_task_count}件</div>`
         : '';
-      
+
       card.innerHTML = `
         <div class="work-status-badge ${statusColor}">${escapeHtml(statusLabel)}</div>
         <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
@@ -673,7 +673,7 @@
           ${incompleteTasksHtml}
         </div>
       `;
-      
+
       card.onclick = () => openWorkDetailOverlay(work.work_id);
       container.appendChild(card);
     });
@@ -682,25 +682,25 @@
   function renderReviewRequests(reviewRequests) {
     const container = document.getElementById('home-review-requests-container');
     container.innerHTML = '';
-    
+
     if (reviewRequests.length === 0) {
       container.innerHTML = '<p style="color: #6b7280;">受付中のレビューはありません</p>';
       return;
     }
-    
+
     reviewRequests.forEach(reviewRequest => {
       const card = document.createElement('div');
       card.className = 'home-card';
-      
+
       // due_datetimeを「~10/24(水) 15:00」形式で表示
-      const dueDateHtml = reviewRequest.due_datetime 
+      const dueDateHtml = reviewRequest.due_datetime
         ? formatDateForReview(reviewRequest.due_datetime)
         : '';
-      
+
       // 作成者情報
       const creatorIcon = reviewRequest.creator_icon || 'https:\/\/via.placeholder.com/24';
       const creatorName = reviewRequest.creator_name || '';
-      
+
       // 最初に登録されたファイルを取得（created_atでソート）
       let firstFile = null;
       if (reviewRequest.files && reviewRequest.files.length > 0) {
@@ -711,7 +711,7 @@
         });
         firstFile = sortedFiles[0];
       }
-      
+
       // サムネイル用のプレースホルダー
       const thumbnailHtml = firstFile && firstFile.file_id
         ? `<div class="review-thumbnail-container" data-file-id="${escapeHtml(firstFile.file_id)}">
@@ -720,7 +720,7 @@
              </div>
            </div>`
         : '';
-      
+
       card.innerHTML = `
         ${thumbnailHtml}
         <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); font-family: 'Roboto Mono', monospace; font-weight: 500; word-wrap: break-word;">
@@ -732,14 +732,14 @@
             <span>${escapeHtml(creatorName)}</span>
           </span>  
           <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">
-            ${dueDateHtml ||  ''}
+            ${dueDateHtml || ''}
           </span>
         </div>
       `;
-      
+
       card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
       container.appendChild(card);
-      
+
       // サムネイルを非同期で読み込む（タブの読み込み完了後）
       if (firstFile && firstFile.file_id) {
         requestAnimationFrame(() => {
@@ -750,13 +750,13 @@
       }
     });
   }
-  
+
   function loadReviewThumbnail(container, fileId) {
     if (!container) return;
-    
+
     // Google DriveのサムネイルURLを生成
     const thumbnailUrl = `https:\/\/drive.google.com\/thumbnail?id=${fileId}&sz=w800-h450`;
-    
+
     const img = document.createElement('img');
     img.className = 'review-thumbnail';
     img.src = thumbnailUrl;
@@ -774,29 +774,29 @@
   function renderKnowledge(knowledgeList) {
     const container = document.getElementById('home-knowledge-container');
     container.innerHTML = '';
-    
+
     if (knowledgeList.length === 0) {
       container.innerHTML = '<p style="color: #6b7280;">最近のナレッジはありません</p>';
       return;
     }
-    
+
     // 縦スクロールが必要ない数だけ表示するため、まず全て表示してから調整
     const cards = [];
     let totalHeight = 0;
     const containerHeight = container.clientHeight || 600; // デフォルト高さ
-    
+
     knowledgeList.forEach((item, index) => {
       const card = document.createElement('div');
       card.className = 'knowledge-card';
       card.dataset.knowledgeId = item.knowledge_id;
-      
+
       // knowledge_contentを原則全文表示
       const contentHtml = item.knowledge_content || '';
-      
+
       // 作成者情報
       const creatorIcon = item.creator_icon || 'https:\/\/via.placeholder.com/24';
       const creatorName = item.creator_name || '';
-      
+
       card.innerHTML = `
         <div class="knowledge-content">${contentHtml}</div>
         <div class="card-meta">
@@ -809,14 +809,14 @@
           </span>
         </div>
       `;
-      
+
       card.onclick = () => openKnowledgeDetailModal(item.knowledge_id);
       cards.push(card);
     });
-    
+
     // 全てのカードを追加
     cards.forEach(card => container.appendChild(card));
-    
+
     // 1つのナレッジだけで縦スクロールが必要な場合は省略
     if (cards.length > 0) {
       const firstCard = cards[0];
@@ -833,7 +833,7 @@
 
   function calculateRemainingTime(ms) {
     if (!ms || ms <= 0) return '';
-    
+
     const totalSeconds = ms / 1000; // ミリ秒を秒に変換（小数点以下も保持）
     const hours = Math.floor(totalSeconds / 3600); // 時間部分の取得（小数切り捨て）
     const minutes = Math.floor((totalSeconds % 3600) / 60); // 分部分の取得（小数切り捨て）
@@ -841,18 +841,18 @@
 
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   }
-  
+
   // 残り時間をリアルタイムで更新するためのinterval ID
   let remainingTimeIntervalId = null;
-  
+
   function updateRemainingTimes() {
     const acceptButtons = document.querySelectorAll('.btn-accept[data-remaining-ms]');
     const now = new Date().getTime();
-    
+
     acceptButtons.forEach(button => {
       const initialRemainingMs = parseInt(button.dataset.remainingMs) || 0;
       if (initialRemainingMs <= 0) return;
-      
+
       // 初期時刻を取得（データ属性から）
       const initialTimeAttr = button.dataset.initialTime;
       if (!initialTimeAttr) {
@@ -860,11 +860,11 @@
         button.dataset.initialTime = now.toString();
         return;
       }
-      
+
       const initialTime = parseInt(initialTimeAttr);
       const elapsed = now - initialTime;
       const remainingMs = initialRemainingMs - elapsed;
-      
+
       const remainingTimeElement = button.querySelector('.remaining-time');
       if (remainingTimeElement) {
         if (remainingMs > 0) {
@@ -874,19 +874,19 @@
       }
     });
   }
-  
+
   function startRemainingTimeUpdates() {
     // 既存のintervalをクリア
     if (remainingTimeIntervalId) {
       clearInterval(remainingTimeIntervalId);
     }
-    
+
     // 1秒ごとに更新
     remainingTimeIntervalId = setInterval(updateRemainingTimes, 1000);
     // 即座に1回実行
     updateRemainingTimes();
   }
-  
+
   function stopRemainingTimeUpdates() {
     if (remainingTimeIntervalId) {
       clearInterval(remainingTimeIntervalId);
@@ -953,7 +953,7 @@
         hideLoading();
         return;
       }
-      
+
       const container = document.getElementById('knowledge-detail-content');
       container.innerHTML = `
         <div style="margin-bottom: 24px;">
@@ -1000,7 +1000,7 @@
   }
 
   function loadSummaryData() {
-    google.charts.load('current', {'packages':['corechart']});
+    google.charts.load('current', { 'packages': ['corechart'] });
     google.charts.setOnLoadCallback(() => {
       callGAS('getSummaryData').then(data => {
         drawChart('chart-work-status', 'pie', data.workStatus, 'Status', 'Count', { pieHole: 0.4 });
@@ -1011,7 +1011,7 @@
       }).catch(handleError);
     });
   }
-  
+
   function renderTable(name, data, headers) {
     const table = document.getElementById(`${name}-table`);
     const thead = table.querySelector('thead');
@@ -1068,7 +1068,7 @@
         let content = '';
 
         if (header.editable) {
-          switch(header.editType) {
+          switch (header.editType) {
             case 'select':
               const selectContainer = document.createElement('div');
               selectContainer.className = 'editable-container';
@@ -1111,7 +1111,7 @@
               break;
           }
         } else {
-          switch(header.key) {
+          switch (header.key) {
             case 'work_id': content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openWorkDetailOverlay('${item.work_id}')">${escapeHtml(item.work_id)}</button>`; break;
             case 'project_id': content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openProjectDetailOverlay('${item.project_id}')">${escapeHtml(item.project_id)}</button>`; break;
             case 'detail': content = `<button class="btn-link" onclick="openMemberDetail('${item.member_email}')">詳細</button>`; break;
@@ -1119,7 +1119,7 @@
             case 'avatar': content = `<img src="${escapeHtml(item.member_icon || 'https://via.placeholder.com/32')}" class="avatar" alt="">`; break;
             case 'due_datetime': content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDateTimeForDisplay(currentValue, true))}</span>`; break;
             case 'created_at': content = escapeHtml(formatDate(currentValue)); break;
-            default: 
+            default:
               if (typeof currentValue === 'string' && currentValue.length > 10) {
                 content = escapeHtml(currentValue.substring(0, 10)) + '...';
               } else {
@@ -1156,10 +1156,10 @@
   function openWorkDetailOverlay(workId) {
     // JavaScript関数呼び出しを記録（HTTP 429エラー時の再試行用）
     recordJSInvocation('openWorkDetailOverlay', workId);
-    
+
     showLoading();
     currentWorkId = workId;
-    const promises = [ 
+    const promises = [
       callGAS('getWorkById', workId),
       callGAS('getWorkflowTimestamps', workId)
     ];
@@ -1172,16 +1172,16 @@
       if (!membersData || membersData.length === 0) {
         membersData = members;
       }
-      
+
       // 現在のworkデータを保持
       currentWork = work;
-      
+
       // メインヘッダーを更新
       const headerTitleDefault = document.getElementById('header-title-default');
       const headerTitleWorkDetailHeader = document.getElementById('header-title-work-detail-header');
       const headerCloseBtn = document.getElementById('header-close-btn');
       const newButton = document.getElementById('new-button');
-      
+
       if (headerTitleDefault) headerTitleDefault.style.display = 'none';
       if (headerTitleWorkDetailHeader) {
         headerTitleWorkDetailHeader.style.display = 'flex';
@@ -1189,11 +1189,11 @@
       }
       if (headerCloseBtn) headerCloseBtn.style.display = 'flex';
       if (newButton) newButton.style.display = 'none';
-      
+
       // ID検索バーにIDを表示
       const workIdForSearch = `${work.project_id || ''}-${work.work_id || ''}`;
       updateIdSearchInput(workIdForSearch);
-      
+
       // ワークフローステータスバーを表示
       const workflowStatusBar = document.getElementById('workflow-status-bar');
       if (workflowStatusBar && timestamps) {
@@ -1213,9 +1213,9 @@
             }
             workflowStatusDropdown.appendChild(option);
           });
-          
+
           // ドロップダウン変更イベントを追加
-          workflowStatusDropdown.onchange = function() {
+          workflowStatusDropdown.onchange = function () {
             const newStatusKey = this.value;
             if (newStatusKey && newStatusKey !== work.work_status_key) {
               showLoading();
@@ -1229,7 +1229,7 @@
             }
           };
         }
-        
+
         // 日時をフォーマットする関数（yyyy/mm/dd(曜日) hh:mm形式）
         const formatWorkflowDate = (dateStr) => {
           if (!dateStr) return '';
@@ -1243,15 +1243,15 @@
           const minutes = String(date.getMinutes()).padStart(2, '0');
           return `${year}/${month}/${day}(${dayOfWeek}) ${hours}:${minutes}`;
         };
-        
+
         // ステータス表示を更新する関数
         function updateWorkflowStatusDisplay(work, timestamps) {
           const currentStatus = work.work_status_key;
-          
+
           // CANCELEDの場合は全ての背景色をgrayに
           const isCanceled = currentStatus === 'CANCELED';
           const canceledColor = '#9E9E9E'; // gray
-          
+
           // アイコンの表示を背景色に応じて変更する関数
           function updateIcon(iconElement, color) {
             if (!iconElement) return;
@@ -1269,7 +1269,7 @@
               iconElement.textContent = '';
             }
           }
-          
+
           // 依頼: 常に緑、形式: yyyy/mm/dd(曜日) hh:mm
           const requestItem = document.getElementById('workflow-status-request');
           const requestIconWrapper = requestItem ? requestItem.querySelector('.workflow-status-icon-wrapper') : null;
@@ -1288,7 +1288,7 @@
               requestDate.textContent = formatWorkflowDate(requestDateValue);
             }
           }
-          
+
           // 制作: work_status_key が TO-DO の場合は赤、CREATEの場合はオレンジ、それ以外の場合は緑
           // 形式: yyyy/mm/dd(曜日) hh:mm ~
           const productionItem = document.getElementById('workflow-status-production');
@@ -1314,7 +1314,7 @@
           if (productionDate && timestamps.production) {
             productionDate.textContent = formatWorkflowDate(timestamps.production) + ' ~';
           }
-          
+
           // 承認: work_status_key が REVIEW または REVISIONの場合はオレンジ、APPROVEDの場合は緑、それ以外の場合は赤
           // 形式: 色がオレンジの場合は yyyy/mm/dd(曜日) hh:mm ~, 色が赤の場合は ~ yyyy/mm/dd(曜日) hh:mm
           const approvalItem = document.getElementById('workflow-status-approval');
@@ -1350,7 +1350,7 @@
               approvalDate.textContent = '~ ' + formatWorkflowDate(timestamps.approval);
             }
           }
-          
+
           // 納品: work_status_key が DELIVERED の場合は緑、APPROVED の場合はオレンジ、それ以外の場合は赤
           // 形式: 色が緑の場合は yyyy/mm/dd(曜日) hh:mm, 色が赤またはオレンジの場合は ~ yyyy/mm/dd(曜日) hh:mm
           // 日時の後ろに、due_datetimeまでの残り日数を表示
@@ -1358,7 +1358,7 @@
           const deliveryIconWrapper = deliveryItem ? deliveryItem.querySelector('.workflow-status-icon-wrapper') : null;
           const deliveryIcon = deliveryItem ? deliveryItem.querySelector('.workflow-status-icon') : null;
           const deliveryDate = document.getElementById('workflow-date-delivery');
-          
+
           // 残り日数を計算する関数
           function calculateDaysRemaining(dueDatetime) {
             if (!dueDatetime) return null;
@@ -1371,7 +1371,7 @@
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             return diffDays;
           }
-          
+
           if (deliveryItem && deliveryIconWrapper && deliveryIcon) {
             let deliveryColor = isCanceled ? canceledColor : '#F44336'; // CANCELEDの場合はgray、デフォルト: 赤
             if (!isCanceled) {
@@ -1381,12 +1381,12 @@
                 deliveryColor = '#FF9800'; // オレンジ
               }
             }
-            
+
             // 期限超過のチェック（CANCELEDの場合は無視）
             if (!isCanceled) {
               const daysRemaining = calculateDaysRemaining(work.due_datetime);
               const isOverdue = daysRemaining !== null && daysRemaining < 0;
-              
+
               if (isOverdue) {
                 // 期限超過の場合: 透明度を反転＆文字色をwhiteに変更
                 deliveryItem.classList.add('overdue');
@@ -1399,7 +1399,7 @@
               deliveryItem.classList.remove('overdue');
               deliveryIconWrapper.style.opacity = '1';
             }
-            
+
             deliveryIconWrapper.style.backgroundColor = deliveryColor;
             updateIcon(deliveryIcon, deliveryColor);
             // ブレード型の背景色も設定
@@ -1412,7 +1412,7 @@
             } else if (currentStatus === 'APPROVED') {
               deliveryColor = '#FF9800';
             }
-            
+
             let dateText = '';
             if (deliveryColor === '#4CAF50') {
               // 緑の場合
@@ -1421,9 +1421,9 @@
               // 赤またはオレンジの場合
               dateText = '~ ' + formatWorkflowDate(timestamps.delivery);
             }
-            
+
             deliveryDate.textContent = dateText;
-            
+
             // DELIVEREDでない場合のみ、日時部分をクリック可能にする
             if (currentStatus !== 'DELIVERED') {
               deliveryDate.style.cursor = 'pointer';
@@ -1438,7 +1438,7 @@
               deliveryDate.onclick = null;
             }
           }
-          
+
           // 残り日数を新しい要素に表示
           const daysRemainingItem = document.getElementById('workflow-status-days-remaining');
           const daysRemainingText = document.getElementById('workflow-days-remaining-text');
@@ -1458,7 +1458,7 @@
                   daysText = daysRemaining + '日後';
                 }
                 daysRemainingText.textContent = daysText;
-                
+
                 // 納品と同じ背景色を設定
                 let deliveryColor = '#F44336';
                 if (currentStatus === 'DELIVERED') {
@@ -1466,7 +1466,7 @@
                 } else if (currentStatus === 'APPROVED') {
                   deliveryColor = '#FF9800';
                 }
-                
+
                 // 期限超過のチェック
                 const isOverdue = daysRemaining < 0;
                 if (isOverdue) {
@@ -1474,7 +1474,7 @@
                 } else {
                   daysRemainingItem.classList.remove('overdue');
                 }
-                
+
                 // ブレード型の背景色も設定
                 daysRemainingItem.style.setProperty('--blade-color', deliveryColor);
                 daysRemainingItem.style.display = 'flex';
@@ -1484,21 +1484,21 @@
             }
           }
         }
-        
+
         // ステータス表示を更新
         updateWorkflowStatusDisplay(work, timestamps);
       }
-      
+
       // 納品日時の日時選択ピッカーを開く関数
       function openDeliveryDateTimePicker(dateElement, workId, originalValue) {
         if (!dateElement || !workId) return;
-        
+
         // 既に編集中なら何もしない
         if (dateElement.classList.contains('editing-delivery-datetime')) return;
-        
+
         // 編集中の状態にする
         dateElement.classList.add('editing-delivery-datetime');
-        
+
         // 現在の日時を取得してパース
         let dateObj;
         if (originalValue) {
@@ -1506,16 +1506,16 @@
         } else {
           dateObj = new Date();
         }
-        
+
         const yyyy = dateObj.getFullYear().toString().padStart(4, '0');
         const mm = (dateObj.getMonth() + 1).toString().padStart(2, '0');
         const dd = dateObj.getDate().toString().padStart(2, '0');
         const hh = dateObj.getHours().toString().padStart(2, '0');
         const min = dateObj.getMinutes().toString().padStart(2, '0');
-        
+
         // 元のテキストを保存
         const originalText = dateElement.textContent;
-        
+
         // カスタム日時入力フィールドを作成
         const editorDiv = document.createElement('div');
         editorDiv.className = 'datetime-custom-editor';
@@ -1537,53 +1537,53 @@
           <span class="datetime-separator">:</span>
           <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="${min}" placeholder="mm" />
         `;
-        
+
         // 位置を計算（dateElementの位置に合わせる）
         const rect = dateElement.getBoundingClientRect();
         const deliveryItem = document.getElementById('workflow-status-delivery');
         if (!deliveryItem) return;
-        
+
         // deliveryItemにposition: relativeを設定
         const originalPosition = deliveryItem.style.position;
         if (!deliveryItem.style.position || deliveryItem.style.position === 'static') {
           deliveryItem.style.position = 'relative';
         }
-        
+
         // 一時的にテキストを非表示（opacityで非表示にしてレイアウトを維持）
         dateElement.style.opacity = '0';
-        
+
         // エディタを追加（deliveryItem内に配置）
         deliveryItem.appendChild(editorDiv);
-        
+
         // 位置を計算（dateElementの相対位置）
         const itemRect = deliveryItem.getBoundingClientRect();
         const dateRect = dateElement.getBoundingClientRect();
         editorDiv.style.position = 'absolute';
         editorDiv.style.top = (dateRect.top - itemRect.top + dateRect.height + 4) + 'px';
         editorDiv.style.left = (dateRect.left - itemRect.left) + 'px';
-        
+
         const inputs = editorDiv.querySelectorAll('.datetime-segment');
-        
+
         // 各inputにイベントリスナーを設定
         inputs.forEach((input, index) => {
           // 数字のみ入力可能
           input.addEventListener('input', (e) => {
             let value = e.target.value.replace(/[^0-9]/g, '');
             const maxLength = parseInt(e.target.getAttribute('maxlength'));
-            
+
             if (value.length > maxLength) {
               value = value.substring(0, maxLength);
             }
-            
+
             e.target.value = value;
-            
+
             // 最大桁数に達したら次のフィールドへ
             if (value.length >= maxLength && index < inputs.length - 1) {
               inputs[index + 1].focus();
               inputs[index + 1].select();
             }
           });
-          
+
           // キーボード操作
           input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.isComposing) {
@@ -1616,7 +1616,7 @@
               }
             }
           });
-          
+
           // フォーカスアウト時の処理
           input.addEventListener('blur', (e) => {
             setTimeout(() => {
@@ -1628,7 +1628,7 @@
             }, 100);
           });
         });
-        
+
         // クリックアウトサイドで閉じる
         const clickOutsideHandler = (e) => {
           if (!editorDiv.contains(e.target) && e.target !== dateElement) {
@@ -1639,68 +1639,68 @@
         setTimeout(() => {
           document.addEventListener('click', clickOutsideHandler);
         }, 100);
-        
+
         // 最初のフィールドにフォーカス
         setTimeout(() => {
           inputs[0].focus();
           inputs[0].select();
         }, 50);
       }
-      
+
       function saveDeliveryDateTime(editorDiv, dateElement, workId, originalValue, inputs) {
         const values = Array.from(inputs).map(input => input.value);
         const [yyyy, mm, dd, hh, min] = values;
-        
+
         // バリデーション
         const yearNum = parseInt(yyyy);
         const monthNum = parseInt(mm);
         const dayNum = parseInt(dd);
         const hourNum = parseInt(hh);
         const minuteNum = parseInt(min);
-        
+
         if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100 ||
-            isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
-            isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
-            isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
-            isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
+          isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
+          isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
+          isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
+          isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
           alert('無効な日時です');
           cancelDeliveryDateTime(editorDiv, dateElement, dateElement.textContent);
           return;
         }
-        
+
         // ISO形式の日時文字列を作成（秒は00固定）
         const paddedYyyy = yyyy.padStart(4, '0');
         const paddedMm = mm.padStart(2, '0');
         const paddedDd = dd.padStart(2, '0');
         const paddedHh = hh.padStart(2, '0');
         const paddedMin = min.padStart(2, '0');
-        
+
         const newDateStr = `${paddedYyyy}-${paddedMm}-${paddedDd}T${paddedHh}:${paddedMin}:00`;
         const newDate = new Date(newDateStr);
-        
+
         if (isNaN(newDate.getTime())) {
           alert('無効な日時です');
           cancelDeliveryDateTime(editorDiv, dateElement, dateElement.textContent);
           return;
         }
-        
+
         const newValueAsISO = newDate.toISOString();
-        
+
         // エディタを削除
         if (editorDiv && editorDiv.parentNode) {
           editorDiv.parentNode.removeChild(editorDiv);
         }
-        
+
         // テキストを再表示
         dateElement.style.opacity = '1';
         dateElement.classList.remove('editing-delivery-datetime');
-        
+
         // deliveryItemのpositionを元に戻す
         const deliveryItem = document.getElementById('workflow-status-delivery');
         if (deliveryItem) {
           deliveryItem.style.position = '';
         }
-        
+
         // データを保存（変更があった場合のみ）
         if (newValueAsISO !== originalValue) {
           showLoading();
@@ -1713,22 +1713,22 @@
             .catch(handleError);
         }
       }
-      
+
       function cancelDeliveryDateTime(editorDiv, dateElement, originalText) {
         if (editorDiv && editorDiv.parentNode) {
           editorDiv.parentNode.removeChild(editorDiv);
         }
-        
+
         dateElement.style.opacity = '1';
         dateElement.classList.remove('editing-delivery-datetime');
-        
+
         // deliveryItemのpositionを元に戻す
         const deliveryItem = document.getElementById('workflow-status-delivery');
         if (deliveryItem) {
           deliveryItem.style.position = '';
         }
       }
-      
+
       // overlay-body内の案件情報列にデータを表示
       // 案件タイトル（編集可能）
       const overlayProjectTitle = document.getElementById('overlay-project-title');
@@ -1744,16 +1744,16 @@
         projectTitleInput.dataset.projectId = originalProjectId;
         projectTitleInput.dataset.originalTitle = originalProjectTitle;
         projectTitleInput.dataset.originalProjectId = originalProjectId;
-        
+
         projectTitleInput.oninput = (e) => {
           // 入力が変更されたらフラグをリセット
           projectTitleInput.dataset.dropdownSelected = 'false';
           searchProjectsForOverlayProjectTitle(e.target.value, work.work_id, work.project_id);
         };
-        
+
         // onblurのsetTimeoutをキャンセルするための変数
         let blurTimeoutId = null;
-        
+
         // フォーカスが当たったときにドロップダウンを表示
         projectTitleInput.onfocus = (e) => {
           console.log('[DEBUG] onfocus triggered', {
@@ -1761,21 +1761,21 @@
             blurTimeoutId: blurTimeoutId,
             activeElement: document.activeElement === projectTitleInput
           });
-          
+
           // 既存のblurタイマーをキャンセル
           if (blurTimeoutId) {
             console.log('[DEBUG] Cancelling blur timeout');
             clearTimeout(blurTimeoutId);
             blurTimeoutId = null;
           }
-          
+
           const currentValue = e.target.value.trim();
           console.log('[DEBUG] onfocus currentValue:', currentValue);
           if (currentValue) {
             searchProjectsForOverlayProjectTitle(currentValue, work.work_id, work.project_id);
           }
         };
-        
+
         // フォーカスが外れたときに元の値に戻す
         projectTitleInput.onblur = (e) => {
           console.log('[DEBUG] onblur triggered', {
@@ -1784,13 +1784,13 @@
             activeElement: document.activeElement,
             relatedTargetIsDropdown: e.relatedTarget && e.relatedTarget.closest('.overlay-project-title-dropdown')
           });
-          
+
           // ドロップダウン内をクリックした場合は処理をスキップ
           if (e.relatedTarget && e.relatedTarget.closest('.overlay-project-title-dropdown')) {
             console.log('[DEBUG] Clicked on dropdown, skipping blur processing');
             return;
           }
-          
+
           // 少し遅延させて、ドロップダウンのクリックイベントが先に処理されるようにする
           blurTimeoutId = setTimeout(() => {
             console.log('[DEBUG] blur timeout executed', {
@@ -1798,34 +1798,34 @@
               isInputFocused: document.activeElement === projectTitleInput,
               dropdownSelected: projectTitleInput.dataset.dropdownSelected
             });
-            
+
             // フォーカスが再度当たっている場合は処理をスキップ
             if (document.activeElement === projectTitleInput) {
               console.log('[DEBUG] Input is focused again, skipping blur processing');
               blurTimeoutId = null;
               return;
             }
-            
+
             const dropdownContainer = overlayProjectTitle.querySelector('.overlay-project-title-dropdown');
             const currentValue = projectTitleInput.value.trim();
             const dropdownDisplay = dropdownContainer ? dropdownContainer.style.display : 'not found';
             const isDropdownVisible = dropdownContainer && dropdownContainer.style.display !== 'none';
-            
+
             console.log('[DEBUG] blur processing', {
               dropdownSelected: projectTitleInput.dataset.dropdownSelected,
               dropdownDisplay: dropdownDisplay,
               isDropdownVisible: isDropdownVisible,
               currentValue: currentValue,
               originalProjectTitle: originalProjectTitle,
-              shouldReset: projectTitleInput.dataset.dropdownSelected !== 'true' && 
-                          !isDropdownVisible &&
-                          currentValue !== originalProjectTitle
-            });
-            
-            // ドロップダウンが選択されていない場合、かつドロップダウンが非表示で、かつ値が変更されている場合は元の値に戻す
-            if (projectTitleInput.dataset.dropdownSelected !== 'true' && 
+              shouldReset: projectTitleInput.dataset.dropdownSelected !== 'true' &&
                 !isDropdownVisible &&
-                currentValue !== originalProjectTitle) {
+                currentValue !== originalProjectTitle
+            });
+
+            // ドロップダウンが選択されていない場合、かつドロップダウンが非表示で、かつ値が変更されている場合は元の値に戻す
+            if (projectTitleInput.dataset.dropdownSelected !== 'true' &&
+              !isDropdownVisible &&
+              currentValue !== originalProjectTitle) {
               // 値が変更されているが、ドロップダウンで選択されなかった場合は元の値に戻す
               console.log('[DEBUG] Resetting value to original');
               projectTitleInput.value = originalProjectTitle;
@@ -1836,7 +1836,7 @@
             blurTimeoutId = null;
           }, 200);
         };
-        
+
         // キーボード操作のサポート
         let selectedIndex = -1;
         projectTitleInput.onkeydown = (e) => {
@@ -1844,10 +1844,10 @@
           if (!dropdownContainer || dropdownContainer.style.display === 'none') {
             return;
           }
-          
+
           const options = dropdownContainer.querySelectorAll('.popup-editor-option');
           if (options.length === 0) return;
-          
+
           if (e.key === 'ArrowDown') {
             e.preventDefault();
             selectedIndex = Math.min(selectedIndex + 1, options.length - 1);
@@ -1872,9 +1872,9 @@
             selectedIndex = -1;
           }
         };
-        
+
         overlayProjectTitle.appendChild(projectTitleInput);
-        
+
         // ドロップダウンコンテナを作成（既存のものを削除してから作成）
         let dropdownContainer = overlayProjectTitle.querySelector('.overlay-project-title-dropdown');
         if (dropdownContainer) {
@@ -1885,7 +1885,7 @@
         dropdownContainer.style.display = 'none';
         overlayProjectTitle.appendChild(dropdownContainer);
       }
-      
+
       // 制作タイトル（編集可能）
       const overlayWorkTitle = document.getElementById('overlay-work-title');
       if (overlayWorkTitle) {
@@ -1908,26 +1908,26 @@
         };
         overlayWorkTitle.appendChild(workTitleInput);
       }
-      
+
       // 制作物種別
       const overlayWorkType = document.getElementById('overlay-work-type');
       if (overlayWorkType) {
         overlayWorkType.textContent = getConfigLabel(work.work_type_key, 'WORK_TYPE') || work.work_type_key || '';
       }
-      
+
       // 依頼受付優先度
       const overlayPriority = document.getElementById('overlay-priority');
       if (overlayPriority) {
         overlayPriority.textContent = getConfigLabel(work.priority_key, 'TASK_PRIORITY') || work.priority_key || '';
       }
-      
+
       // 依頼者
       const overlayClient = document.getElementById('overlay-client');
       if (overlayClient) {
         const clientMember = membersData.find(m => m.member_email === work.work_client_email);
         overlayClient.textContent = clientMember ? `${clientMember.member_name}/${getConfigLabel(clientMember.member_team_key, 'TEAM')}` : work.work_client_email || '';
       }
-      
+
       // 担当者
       const overlayAssignees = document.getElementById('overlay-assignees');
       if (overlayAssignees) {
@@ -1940,18 +1940,18 @@
             assigneeDiv.style.alignItems = 'center';
             assigneeDiv.style.gap = '8px';
             assigneeDiv.style.marginBottom = '4px';
-            
+
             const icon = document.createElement('img');
             icon.src = assignee.member_icon || 'https://via.placeholder.com/32';
             icon.className = 'avatar';
             icon.style.width = '20px';
             icon.style.height = '20px';
             icon.style.borderRadius = '50%';
-            
+
             const name = document.createElement('span');
             name.textContent = `${assignee.member_name}/${assignee.member_team_value}`;
             name.style.fontSize = '0.75rem';
-            
+
             const deleteBtn = document.createElement('button');
             deleteBtn.textContent = '一削除';
             deleteBtn.className = 'project-info-delete-btn';
@@ -1969,7 +1969,7 @@
                 })
                 .catch(handleError);
             };
-            
+
             assigneeDiv.appendChild(icon);
             assigneeDiv.appendChild(name);
             assigneeDiv.appendChild(deleteBtn);
@@ -1977,7 +1977,7 @@
           });
         }
       }
-      
+
       // +追加ボタン
       const overlayAddAssigneeBtn = document.getElementById('overlay-add-assignee-btn');
       if (overlayAddAssigneeBtn) {
@@ -1985,13 +1985,13 @@
           openAddAssigneeDropdown(e.target, work.work_id, work.assignees || []);
         };
       }
-      
+
       // Googleドキュメントを埋め込む
       const docContainer = document.getElementById('work-detail-document-container');
       let currentDocumentClickHandler = null;
       let containerClickHandler = null;
       let observer = null;
-      
+
       // 既存のイベントリスナーをクリーンアップ
       if (docContainer._iframeActive !== undefined) {
         if (docContainer._containerClickHandler) {
@@ -2004,7 +2004,7 @@
           docContainer._observer.disconnect();
         }
       }
-      
+
       if (work.work_document_id) {
         // Googleドキュメントを編集可能な状態で埋め込む（rm=minimalパラメータ追加）
         const embedUrl = `https:\/\/docs.google.com/document/d/${work.work_document_id}/edit?rm=minimal&tab=${work.work_document_tab_id}`;
@@ -2013,9 +2013,9 @@
         iframe.style.cssText = 'width: 100%; height: 100%; max-width: 100%; border: none; overflow-x: hidden; border-radius: 8px; pointer-events: none;';
         docContainer.innerHTML = '';
         docContainer.appendChild(iframe);
-        
+
         // iframeを無効化する関数
-        const deactivateIframe = function() {
+        const deactivateIframe = function () {
           iframe.style.pointerEvents = 'none';
           if (currentDocumentClickHandler) {
             document.removeEventListener('click', currentDocumentClickHandler, true);
@@ -2023,21 +2023,21 @@
           }
           docContainer._iframeActive = false;
         };
-        
+
         // コンテナをクリックしたときにiframeを有効化
         let isIframeActive = false;
-        containerClickHandler = function(e) {
+        containerClickHandler = function (e) {
           // iframe内のクリックは無視（iframe自身が処理）
           if (e.target === iframe) return;
-          
+
           // コンテナをクリックした場合、iframeを有効化
           if (!isIframeActive) {
             iframe.style.pointerEvents = 'auto';
             isIframeActive = true;
             docContainer._iframeActive = true;
-            
+
             // ドキュメント外をクリックしたときにiframeを無効化
-            currentDocumentClickHandler = function(e) {
+            currentDocumentClickHandler = function (e) {
               // オーバーレイ内のクリックをチェック
               const overlay = document.getElementById('work-detail-overlay');
               if (overlay && overlay.contains(e.target)) {
@@ -2052,7 +2052,7 @@
                 deactivateIframe();
               }
             };
-            
+
             // 少し遅延させてからイベントリスナーを追加（iframe内のクリックイベントが先に処理されるように）
             setTimeout(() => {
               document.addEventListener('click', currentDocumentClickHandler, true);
@@ -2060,14 +2060,14 @@
             }, 100);
           }
         };
-        
+
         docContainer.addEventListener('click', containerClickHandler);
         docContainer._containerClickHandler = containerClickHandler;
-        
+
         // オーバーレイが閉じられたときにiframeを無効化
         const overlay = document.getElementById('work-detail-overlay');
-        observer = new MutationObserver(function(mutations) {
-          mutations.forEach(function(mutation) {
+        observer = new MutationObserver(function (mutations) {
+          mutations.forEach(function (mutation) {
             if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
               if (!overlay.classList.contains('show')) {
                 isIframeActive = false;
@@ -2081,7 +2081,7 @@
       } else {
         docContainer.innerHTML = '';
       }
-      
+
       renderWorkTasks(work.tasks);
       renderWorkAssignees(work.assignees);
       // renderWorkApps(work.apps);
@@ -2099,7 +2099,7 @@
       const editorId = toolbar.dataset.editor;
       const editor = document.getElementById(editorId);
       if (!editor) return;
-      
+
       // ツールバーボタンのイベントリスナーを設定
       toolbar.querySelectorAll('.toolbar-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -2107,9 +2107,9 @@
           const command = btn.dataset.command;
           const value = btn.dataset.value;
           const color = btn.dataset.color;
-          
+
           editor.focus();
-          
+
           if (color) {
             // 色選択
             document.execCommand('foreColor', false, color);
@@ -2120,11 +2120,11 @@
             // その他のコマンド（bold, italic, strikeThrough, underline）
             document.execCommand(command, false, null);
           }
-          
+
           updateToolbarState(toolbar, editor);
         });
       });
-      
+
       // エディタの変更を監視して自動保存
       let saveTimeout = null;
       editor.addEventListener('input', () => {
@@ -2133,12 +2133,12 @@
           saveRichTextEditor(editor);
         }, 2000); // 2秒後に自動保存
       });
-      
+
       // エディタのフォーカス時にツールバーの状態を更新
       editor.addEventListener('focus', () => {
         updateToolbarState(toolbar, editor);
       });
-      
+
       editor.addEventListener('keyup', () => {
         updateToolbarState(toolbar, editor);
       });
@@ -2150,9 +2150,9 @@
     toolbar.querySelectorAll('.toolbar-btn').forEach(btn => {
       const command = btn.dataset.command;
       const value = btn.dataset.value;
-      
+
       btn.classList.remove('active');
-      
+
       if (command === 'formatBlock' && value) {
         // 見出しの状態をチェック
         const selection = window.getSelection();
@@ -2177,9 +2177,9 @@
     const workId = editor.dataset.workId;
     const field = editor.dataset.field;
     if (!workId || !field) return;
-    
+
     const content = editor.innerHTML;
-    
+
     // バックエンドに保存
     callGAS('updateWorkField', workId, field, content)
       .then(() => {
@@ -2193,7 +2193,7 @@
   function handleHeaderCloseClick() {
     const workDetailOverlay = document.getElementById('work-detail-overlay');
     const projectDetailOverlay = document.getElementById('project-detail-overlay');
-    
+
     if (workDetailOverlay && workDetailOverlay.classList.contains('show')) {
       closeWorkDetailOverlay();
     }
@@ -2204,30 +2204,30 @@
 
   function closeWorkDetailOverlay() {
     document.getElementById('work-detail-overlay').classList.remove('show');
-    
+
     // メインヘッダーを元に戻す
     const headerTitleDefault = document.getElementById('header-title-default');
     const headerTitleWorkDetailHeader = document.getElementById('header-title-work-detail-header');
     const headerCloseBtn = document.getElementById('header-close-btn');
     const newButton = document.getElementById('new-button');
-    
+
     if (headerTitleDefault) headerTitleDefault.style.display = 'flex';
     if (headerTitleWorkDetailHeader) headerTitleWorkDetailHeader.style.display = 'none';
     if (headerCloseBtn) headerCloseBtn.style.display = 'none';
     if (newButton) newButton.style.display = 'flex';
-    
+
     // ワークフローステータスバーを非表示
     const workflowStatusBar = document.getElementById('workflow-status-bar');
     if (workflowStatusBar) {
       workflowStatusBar.style.display = 'none';
     }
-    
+
     // ドロップダウンを削除
     const suggestions = document.getElementById('work-detail-project-suggestions');
     if (suggestions) {
       suggestions.remove();
     }
-    
+
     // ID検索バーをクリア
     currentWorkId = null;
     currentWork = null;
@@ -2237,7 +2237,7 @@
   function openProjectDetailOverlay(projectId) {
     // JavaScript関数呼び出しを記録（HTTP 429エラー時の再試行用）
     recordJSInvocation('openProjectDetailOverlay', projectId);
-    
+
     showLoading();
     currentProjectId = projectId;
     callGAS('getProjectById', projectId).then(project => {
@@ -2246,13 +2246,13 @@
         hideLoading();
         return;
       }
-      
+
       // ヘッダータイトルを変更
       // const headerTitleDefault = document.getElementById('header-title-default');
       // const headerTitleWorkDetail = document.getElementById('header-title-work-detail');
       const headerCloseBtn = document.getElementById('header-close-btn');
       const newButton = document.getElementById('new-button');
-      
+
       // if (headerTitleDefault) {
       //   headerTitleDefault.style.display = 'none';
       // }
@@ -2262,7 +2262,7 @@
       // }
       if (headerCloseBtn) headerCloseBtn.style.display = 'flex';
       if (newButton) newButton.style.display = 'none';
-      
+
       // ヘッダー情報を非表示
       const headerInfoDiv = document.getElementById('work-detail-header-info');
       if (headerInfoDiv) {
@@ -2272,16 +2272,16 @@
       if (urlCopyButton) {
         urlCopyButton.style.display = 'none';
       }
-      
+
       // プロジェクト詳細情報を表示
       const contentContainer = document.getElementById('project-detail-content-container');
       let html = '<div style="display: flex; flex-direction: column; gap: 24px;">';
-      
+
       // プロジェクトの全プロパティを表示
       html += '<div><h2 style="margin: 0 0 16px 0; font-size: 1.5rem; font-weight: 600;">プロジェクト情報</h2>';
       html += '<table class="table-full" style="margin-top: 12px;">';
       html += '<tbody>';
-      
+
       // 各プロパティを表示
       Object.keys(project).forEach(key => {
         if (key === 'works') return; // worksは別で表示
@@ -2296,9 +2296,9 @@
         } else {
           displayValue = escapeHtml(String(value));
         }
-        
+
         let label = key;
-        switch(key) {
+        switch (key) {
           case 'project_id': label = 'プロジェクトID'; break;
           case 'project_title': label = '案件タイトル'; break;
           case 'project_detail': label = '備考'; break;
@@ -2307,7 +2307,7 @@
           case 'creator_name': label = '作成者名'; break;
           default: label = key;
         }
-        
+
         html += `<tr><th style="width: 200px; text-align: left; padding: 12px; background: #f9fafb;">${escapeHtml(label)}</th>`;
         if (key === 'project_detail') {
           html += `<td style="padding: 12px;"><div style="white-space: pre-wrap;">${escapeHtml(value || '-')}</div></td>`;
@@ -2316,12 +2316,12 @@
         }
         html += '</tr>';
       });
-      
+
       html += '</tbody></table></div>';
       html += '</div>';
-      
+
       contentContainer.innerHTML = html;
-      
+
       // 関連制作物を表示
       const worksContainer = document.getElementById('project-works-container');
       if (project.works && project.works.length > 0) {
@@ -2341,25 +2341,25 @@
       } else {
         worksContainer.innerHTML = '<p style="color: #6b7280;">関連制作物はありません</p>';
       }
-      
+
       document.getElementById('project-detail-overlay').classList.add('show');
-      
+
       // ID検索バーにIDを表示
       updateIdSearchInput(projectId);
-      
+
       hideLoading();
     }).catch(handleError);
   }
 
   function closeProjectDetailOverlay() {
     document.getElementById('project-detail-overlay').classList.remove('show');
-    
+
     // ヘッダータイトルを元に戻す
     const headerTitleDefault = document.getElementById('header-title-default');
     const headerTitleWorkDetail = document.getElementById('header-title-work-detail');
     const headerCloseBtn = document.getElementById('header-close-btn');
     const newButton = document.getElementById('new-button');
-    
+
     if (headerTitleDefault) {
       headerTitleDefault.style.display = 'flex';
     }
@@ -2368,12 +2368,12 @@
     }
     if (headerCloseBtn) headerCloseBtn.style.display = 'none';
     if (newButton) newButton.style.display = 'flex';
-    
+
     // ID検索バーをクリア
     currentProjectId = null;
     clearIdSearchInput();
   }
-  
+
   function copyWorkDetailUrl() {
     const urlCopyButton = document.getElementById('work-detail-url-copy-button');
     if (!urlCopyButton || !urlCopyButton.dataset.workId) return;
@@ -2392,17 +2392,17 @@
       // alert('URLをクリップボードにコピーしました');
     });
   }
-  
+
   function searchProjectsForWorkDetail(query, workId) {
     const projectTitleHeader = document.getElementById('work-detail-project-title-header');
     const suggestionsContainer = document.getElementById('work-detail-project-suggestions');
     const projectTitleInput = projectTitleHeader.querySelector('input');
-    
+
     if (!query) {
       suggestionsContainer.style.display = 'none';
       return;
     }
-    
+
     // projectsDataが取得されていない場合は取得
     if (!projectsData || projectsData.length === 0) {
       callGAS('getProjects').then(data => {
@@ -2413,18 +2413,18 @@
       performProjectSearch(query, workId, suggestionsContainer, projectTitleInput);
     }
   }
-  
+
   function performProjectSearch(query, workId, suggestionsContainer, projectTitleInput) {
     const lowerCaseQuery = query.toLowerCase();
-    const filteredProjects = (projectsData || []).filter(p => 
+    const filteredProjects = (projectsData || []).filter(p =>
       p.project_title.toLowerCase().includes(lowerCaseQuery)
     );
-    
+
     suggestionsContainer.innerHTML = '';
-    
+
     // 入力フィールドの位置を取得
     const inputRect = projectTitleInput.getBoundingClientRect();
-    
+
     filteredProjects.forEach(p => {
       const item = document.createElement('div');
       item.className = 'combobox-item';
@@ -2447,7 +2447,7 @@
       };
       suggestionsContainer.appendChild(item);
     });
-    
+
     const newItem = document.createElement('div');
     newItem.className = 'combobox-item';
     newItem.innerHTML = `+ 新規作成: <strong>${escapeHtml(query)}</strong>`;
@@ -2471,35 +2471,35 @@
       }).catch(handleError);
     };
     suggestionsContainer.appendChild(newItem);
-    
+
     // 位置を設定
     suggestionsContainer.style.left = `${inputRect.left}px`;
     suggestionsContainer.style.top = `${inputRect.bottom + window.scrollY}px`;
     suggestionsContainer.style.width = `${inputRect.width}px`;
     suggestionsContainer.style.display = 'block';
   }
-  
+
   function searchProjectsForOverlayProjectTitle(query, workId, currentProjectId) {
     console.log('[DEBUG] searchProjectsForOverlayProjectTitle called', {
       query: query,
       workId: workId,
       currentProjectId: currentProjectId
     });
-    
+
     const overlayProjectTitle = document.getElementById('overlay-project-title');
     if (!overlayProjectTitle) {
       console.log('[DEBUG] overlayProjectTitle not found');
       return;
     }
-    
+
     let dropdownContainer = overlayProjectTitle.querySelector('.overlay-project-title-dropdown');
     const projectTitleInput = overlayProjectTitle.querySelector('input');
-    
+
     console.log('[DEBUG] Elements found', {
       dropdownContainer: !!dropdownContainer,
       projectTitleInput: !!projectTitleInput
     });
-    
+
     // ドロップダウンコンテナが存在しない場合は作成
     if (!dropdownContainer) {
       console.log('[DEBUG] Creating dropdown container');
@@ -2508,7 +2508,7 @@
       dropdownContainer.style.display = 'none';
       overlayProjectTitle.appendChild(dropdownContainer);
     }
-    
+
     if (!query || !query.trim()) {
       console.log('[DEBUG] Query is empty, hiding dropdown');
       if (dropdownContainer) {
@@ -2516,13 +2516,13 @@
       }
       return;
     }
-    
+
     const trimmedQuery = query.trim();
-    
+
     // 即座にドロップダウンを表示（検索結果を待たずに）
     console.log('[DEBUG] Calling performOverlayProjectTitleSearchImmediate');
     performOverlayProjectTitleSearchImmediate(trimmedQuery, workId, currentProjectId, dropdownContainer, projectTitleInput);
-    
+
     // projectsDataが取得されていない場合は取得してから検索結果を更新
     if (!projectsData || projectsData.length === 0) {
       callGAS('getProjects').then(data => {
@@ -2533,22 +2533,22 @@
       performOverlayProjectTitleSearchUpdate(trimmedQuery, workId, currentProjectId, dropdownContainer, projectTitleInput);
     }
   }
-  
+
   function performOverlayProjectTitleSearchImmediate(query, workId, currentProjectId, dropdownContainer, projectTitleInput) {
     console.log('[DEBUG] performOverlayProjectTitleSearchImmediate called', {
       query: query,
       dropdownContainer: !!dropdownContainer,
       projectTitleInput: !!projectTitleInput
     });
-    
+
     if (!dropdownContainer || !projectTitleInput) {
       console.log('[DEBUG] Missing container or input, returning');
       return;
     }
-    
+
     dropdownContainer.innerHTML = '';
     dropdownContainer.className = 'overlay-project-title-dropdown popup-editor';
-    
+
     // 1. 現在の案件IDの案件タイトルを変更する
     if (currentProjectId) {
       const updateItem = document.createElement('div');
@@ -2608,7 +2608,7 @@
       });
     };
     dropdownContainer.appendChild(newItem);
-    
+
     // 3. 別案件に変更（検索結果を待たずに表示）
     const changeProjectItem = document.createElement('div');
     changeProjectItem.className = 'popup-editor-option';
@@ -2618,7 +2618,7 @@
       // ドロップダウンが選択されたことをマーク
       projectTitleInput.dataset.dropdownSelected = 'true';
       dropdownContainer.style.display = 'none';
-      
+
       // work_idを入力するモーダルを表示
       const inputProjectId = prompt('案件IDを入力してください（例：P0001）:');
       if (inputProjectId && inputProjectId.trim()) {
@@ -2647,7 +2647,7 @@
       });
     };
     dropdownContainer.appendChild(changeProjectItem);
-    
+
     // 位置を設定
     const inputRect = projectTitleInput.getBoundingClientRect();
     dropdownContainer.style.position = 'absolute';
@@ -2656,7 +2656,7 @@
     dropdownContainer.style.width = `${inputRect.width}px`;
     dropdownContainer.style.zIndex = '1000';
     dropdownContainer.style.display = 'block';
-    
+
     console.log('[DEBUG] Dropdown displayed', {
       display: dropdownContainer.style.display,
       position: dropdownContainer.style.position,
@@ -2665,13 +2665,13 @@
       width: dropdownContainer.style.width,
       zIndex: dropdownContainer.style.zIndex
     });
-    
+
     // 最初の項目を選択状態にする
     const firstOption = dropdownContainer.querySelector('.popup-editor-option');
     if (firstOption) {
       firstOption.classList.add('selected');
     }
-    
+
     // ドロップダウンが非表示になっていないか監視
     setTimeout(() => {
       const currentDisplay = dropdownContainer.style.display;
@@ -2681,26 +2681,26 @@
       }
     }, 100);
   }
-  
+
   function performOverlayProjectTitleSearchUpdate(query, workId, currentProjectId, dropdownContainer, projectTitleInput) {
     if (!dropdownContainer || !projectTitleInput) return;
-    
+
     const lowerCaseQuery = query.toLowerCase();
-    
+
     // 部分一致するプロジェクトを検索（project_idまたはproject_titleで検索）
-    const filteredProjects = (projectsData || []).filter(p => 
+    const filteredProjects = (projectsData || []).filter(p =>
       p.project_id.toLowerCase().includes(lowerCaseQuery) ||
       p.project_title.toLowerCase().includes(lowerCaseQuery)
     );
-    
+
     // 「別案件に変更」の項目を取得
     const changeProjectItem = dropdownContainer.querySelector('#change-project-item');
-    
+
     // マッチしたプロジェクトがある場合、詳細を表示
     if (filteredProjects.length > 0 && changeProjectItem) {
       const firstProject = filteredProjects[0];
       changeProjectItem.innerHTML = `別案件に変更: <strong>${escapeHtml(firstProject.project_id)} ${escapeHtml(firstProject.project_title)}</strong>`;
-      
+
       // クリック時の動作を更新（最初のマッチしたプロジェクトを選択）
       changeProjectItem.onclick = () => {
         // ドロップダウンが選択されたことをマーク
@@ -2722,11 +2722,11 @@
     }
     // マッチしない場合でも「別案件に変更」は表示し続ける（既に表示されている）
   }
-  
+
   function showSelectEditorForWorkDetail(event, workId, field, currentValue, configType) {
     event.stopPropagation();
     const container = event.currentTarget;
-    
+
     const optionsContainer = document.createElement('div');
     optionsContainer.className = 'popup-editor';
     optionsContainer.style.position = 'absolute';
@@ -2735,7 +2735,7 @@
     optionsContainer.style.border = '1px solid var(--md-sys-color-outline)';
     optionsContainer.style.borderRadius = '8px';
     optionsContainer.style.padding = '8px';
-    
+
     const options = configData[configType] || [];
     options.forEach(opt => {
       const optionDiv = document.createElement('div');
@@ -2766,14 +2766,14 @@
       });
       optionsContainer.appendChild(optionDiv);
     });
-    
+
     createPopup(container, optionsContainer);
   }
-  
+
   function showSelectEditorForWorkDetailHeader(event, workId, field, currentValue, configType) {
     event.stopPropagation();
     const container = event.currentTarget;
-    
+
     const optionsContainer = document.createElement('div');
     optionsContainer.className = 'popup-editor';
     optionsContainer.style.position = 'absolute';
@@ -2782,7 +2782,7 @@
     optionsContainer.style.border = '1px solid var(--md-sys-color-outline)';
     optionsContainer.style.borderRadius = '8px';
     optionsContainer.style.padding = '8px';
-    
+
     const options = configData[configType] || [];
     options.forEach(opt => {
       const optionDiv = document.createElement('div');
@@ -2813,33 +2813,33 @@
       });
       optionsContainer.appendChild(optionDiv);
     });
-    
+
     createPopup(container, optionsContainer);
   }
-  
+
   function openDateTimePickerForWorkDetail(event, workId, field, originalValue) {
     event.stopPropagation();
     event.preventDefault();
-    
+
     const container = event.currentTarget;
     const textSpan = container.querySelector('.editable-text');
-    
+
     let dateObj;
     if (originalValue) {
       dateObj = new Date(originalValue);
     } else {
       dateObj = new Date();
     }
-    
+
     const yyyy = dateObj.getFullYear().toString().padStart(4, '0');
     const mm = (dateObj.getMonth() + 1).toString().padStart(2, '0');
     const dd = dateObj.getDate().toString().padStart(2, '0');
     const hh = dateObj.getHours().toString().padStart(2, '0');
     const min = dateObj.getMinutes().toString().padStart(2, '0');
-    
+
     // 既存のコンテンツを非表示
     container.style.display = 'none';
-    
+
     // カスタム日時入力フィールドを作成
     const editorDiv = document.createElement('div');
     editorDiv.className = 'datetime-custom-editor';
@@ -2856,15 +2856,15 @@
       <span class="datetime-separator">:</span>
       <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="${min}" placeholder="mm" />
     `;
-    
+
     const rect = container.getBoundingClientRect();
     editorDiv.style.left = `${rect.left + window.scrollX}px`;
     editorDiv.style.top = `${rect.bottom + window.scrollY}px`;
     editorDiv.style.zIndex = '99999';
     document.body.appendChild(editorDiv);
-    
+
     const inputs = editorDiv.querySelectorAll('.datetime-segment');
-    
+
     // 各inputにイベントリスナーを設定
     inputs.forEach((input, index) => {
       input.addEventListener('input', (e) => {
@@ -2879,7 +2879,7 @@
           inputs[index + 1].select();
         }
       });
-      
+
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.isComposing) {
           e.preventDefault();
@@ -2889,7 +2889,7 @@
           cancelWorkDetailDateTime(editorDiv, container);
         }
       });
-      
+
       input.addEventListener('blur', (e) => {
         setTimeout(() => {
           const focusedElement = document.activeElement;
@@ -2899,39 +2899,39 @@
         }, 100);
       });
     });
-    
+
     setTimeout(() => {
       inputs[0].focus();
       inputs[0].select();
     }, 50);
   }
-  
+
   function openDateTimePickerForWorkDetailHeader(event, workId, field, originalValue) {
     event.stopPropagation();
     event.preventDefault();
-    
+
     const container = event.currentTarget;
     const textSpan = container.querySelector('.editable-text');
-    
+
     let dateObj;
     if (originalValue) {
       dateObj = new Date(originalValue);
     } else {
       dateObj = new Date();
     }
-    
+
     const yyyy = dateObj.getFullYear().toString().padStart(4, '0');
     const mm = (dateObj.getMonth() + 1).toString().padStart(2, '0');
     const dd = dateObj.getDate().toString().padStart(2, '0');
     const hh = dateObj.getHours().toString().padStart(2, '0');
     const min = dateObj.getMinutes().toString().padStart(2, '0');
-    
+
     // containerにposition: relativeを設定（まだ設定されていない場合）
     const originalPosition = container.style.position;
     if (!container.style.position || container.style.position === 'static') {
       container.style.position = 'relative';
     }
-    
+
     // 既存のテキストを非表示
     if (textSpan) {
       textSpan.style.display = 'none';
@@ -2940,7 +2940,7 @@
     if (toggleBtn) {
       toggleBtn.style.display = 'none';
     }
-    
+
     // カスタム日時入力フィールドを作成
     const editorDiv = document.createElement('div');
     editorDiv.className = 'datetime-custom-editor';
@@ -2959,12 +2959,12 @@
       <span class="datetime-separator">:</span>
       <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="${min}" placeholder="mm" />
     `;
-    
+
     // container内に直接追加
     container.appendChild(editorDiv);
-    
+
     const inputs = editorDiv.querySelectorAll('.datetime-segment');
-    
+
     // 各inputにイベントリスナーを設定
     inputs.forEach((input, index) => {
       input.addEventListener('input', (e) => {
@@ -2979,7 +2979,7 @@
           inputs[index + 1].select();
         }
       });
-      
+
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.isComposing) {
           e.preventDefault();
@@ -2989,7 +2989,7 @@
           cancelWorkDetailDateTime(editorDiv, container);
         }
       });
-      
+
       input.addEventListener('blur', (e) => {
         setTimeout(() => {
           const focusedElement = document.activeElement;
@@ -2999,47 +2999,47 @@
         }, 100);
       });
     });
-    
+
     setTimeout(() => {
       inputs[0].focus();
       inputs[0].select();
     }, 50);
   }
-  
+
   function saveWorkDetailDateTime(editorDiv, container, workId, field, originalValue, inputs) {
     const values = Array.from(inputs).map(input => input.value);
     const [yyyy, mm, dd, hh, min] = values;
-    
+
     const yearNum = parseInt(yyyy);
     const monthNum = parseInt(mm);
     const dayNum = parseInt(dd);
     const hourNum = parseInt(hh);
     const minuteNum = parseInt(min);
-    
+
     if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100 ||
-        isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
-        isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
-        isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
-        isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
+      isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
+      isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
+      isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
+      isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
       alert('無効な日時です');
       cancelWorkDetailDateTime(editorDiv, container);
       return;
     }
-    
+
     const newDateStr = `${yyyy.padStart(4, '0')}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T${hh.padStart(2, '0')}:${min.padStart(2, '0')}:00`;
     const newDate = new Date(newDateStr);
-    
+
     if (isNaN(newDate.getTime())) {
       alert('無効な日時です');
       cancelWorkDetailDateTime(editorDiv, container);
       return;
     }
-    
+
     const newValueAsISO = newDate.toISOString();
-    
+
     editorDiv.remove();
     container.style.display = 'inline-flex';
-    
+
     if (newValueAsISO !== originalValue) {
       showLoading();
       callGAS('updateSingleField', 'works', workId, field, newValueAsISO)
@@ -3053,38 +3053,38 @@
         .catch(handleError);
     }
   }
-  
+
   function saveWorkDetailDateTimeHeader(editorDiv, container, workId, field, originalValue, inputs) {
     const values = Array.from(inputs).map(input => input.value);
     const [yyyy, mm, dd, hh, min] = values;
-    
+
     const yearNum = parseInt(yyyy);
     const monthNum = parseInt(mm);
     const dayNum = parseInt(dd);
     const hourNum = parseInt(hh);
     const minuteNum = parseInt(min);
-    
+
     if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100 ||
-        isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
-        isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
-        isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
-        isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
+      isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
+      isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
+      isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
+      isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
       alert('無効な日時です');
       cancelWorkDetailDateTime(editorDiv, container);
       return;
     }
-    
+
     const newDateStr = `${yyyy.padStart(4, '0')}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T${hh.padStart(2, '0')}:${min.padStart(2, '0')}:00`;
     const newDate = new Date(newDateStr);
-    
+
     if (isNaN(newDate.getTime())) {
       alert('無効な日時です');
       cancelWorkDetailDateTime(editorDiv, container);
       return;
     }
-    
+
     const newValueAsISO = newDate.toISOString();
-    
+
     // テキストとボタンを再表示（先に表示を戻す）
     const textSpan = container.querySelector('.editable-text');
     if (textSpan) {
@@ -3094,10 +3094,10 @@
     if (toggleBtn) {
       toggleBtn.style.display = '';
     }
-    
+
     // ピッカーを削除
     editorDiv.remove();
-    
+
     if (newValueAsISO !== originalValue) {
       showLoading();
       callGAS('updateSingleField', 'works', workId, field, newValueAsISO)
@@ -3123,10 +3123,10 @@
         .catch(handleError);
     }
   }
-  
+
   function cancelWorkDetailDateTime(editorDiv, container) {
     editorDiv.remove();
-    
+
     // テキストとボタンを再表示
     const textSpan = container.querySelector('.editable-text');
     if (textSpan) {
@@ -3145,22 +3145,22 @@
       container.innerHTML = '<p class="text-sm text-gray-500">タスクはありません。</p>';
       return;
     }
-    
+
     // カード形式で表示
     tasks.forEach(task => {
       const card = document.createElement('div');
       card.className = 'task-card';
       card.dataset.taskId = task.task_id;
-      
+
       // ステータスに応じた色を取得
       const statusColor = getTaskStatusColor(task.status_key);
-      
+
       // 担当者の情報を取得
       const assignee = task.assign_to ? membersData.find(m => m.member_email === task.assign_to) : null;
       const assigneeName = assignee ? assignee.member_name : '';
       const assigneeTeam = assignee ? getConfigLabel(assignee.member_team_key, 'TEAM') : '';
       const assigneeIcon = assignee ? (assignee.member_icon || 'https://via.placeholder.com/32') : 'https://via.placeholder.com/32';
-      
+
       card.innerHTML = `
         <div class="task-card-content">
           <div class="task-card-header">
@@ -3184,18 +3184,18 @@
           </div>
         </div>
       `;
-      
+
       // カード全体をクリックでモーダルを開く
       card.addEventListener('click', () => {
         openEditTaskModal(task);
       });
-      
+
       container.appendChild(card);
     });
   }
-  
+
   function getTaskStatusColor(statusKey) {
-    switch(statusKey) {
+    switch (statusKey) {
       case 'TODO':
         return '#BA1A1A'; // 赤色
       case 'IN_PROGRESS':
@@ -3210,7 +3210,7 @@
   function editTaskField(event, taskId, field, currentValue, configType) {
     event.stopPropagation();
     const container = event.currentTarget;
-    
+
     if (configType === 'TEXT') {
       // テキスト編集
       const inputContainer = document.createElement('div');
@@ -3222,7 +3222,7 @@
       inputContainer.style.borderRadius = '8px';
       inputContainer.style.padding = '8px';
       inputContainer.style.minWidth = '200px';
-      
+
       const input = document.createElement('input');
       input.type = 'text';
       input.className = 'popup-editor-input';
@@ -3233,7 +3233,7 @@
       input.style.outline = 'none';
       input.style.fontSize = '0.875rem';
       input.style.fontFamily = 'inherit';
-      
+
       const handleSubmit = () => {
         const newValue = input.value.trim();
         if (newValue !== currentValue) {
@@ -3241,7 +3241,7 @@
         }
         closeAllPopups();
       };
-      
+
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
@@ -3250,11 +3250,11 @@
           closeAllPopups();
         }
       });
-      
+
       input.addEventListener('blur', () => {
         setTimeout(handleSubmit, 200);
       });
-      
+
       inputContainer.appendChild(input);
       createPopup(container, inputContainer);
       input.focus();
@@ -3271,7 +3271,7 @@
       optionsContainer.style.padding = '8px';
       optionsContainer.style.maxHeight = '200px';
       optionsContainer.style.overflowY = 'auto';
-      
+
       const members = membersData || [];
       members.forEach(member => {
         const optionDiv = document.createElement('div');
@@ -3287,7 +3287,7 @@
         });
         optionsContainer.appendChild(optionDiv);
       });
-      
+
       createPopup(container, optionsContainer);
     } else {
       // ステータス選択
@@ -3299,7 +3299,7 @@
       optionsContainer.style.border = '1px solid var(--md-sys-color-outline)';
       optionsContainer.style.borderRadius = '8px';
       optionsContainer.style.padding = '8px';
-      
+
       const options = configData[configType] || [];
       options.forEach(opt => {
         const optionDiv = document.createElement('div');
@@ -3315,14 +3315,14 @@
         });
         optionsContainer.appendChild(optionDiv);
       });
-      
+
       createPopup(container, optionsContainer);
     }
   }
 
   function updateTaskField(taskId, field, newValue, oldValue) {
     if (String(newValue) === String(oldValue)) return;
-    
+
     showLoading();
     callGAS('updateTask', taskId, { [field]: newValue })
       .then(() => {
@@ -3341,22 +3341,22 @@
     // タスク編集モーダルを開く（簡易版：新規作成モーダルを再利用）
     const form = document.getElementById('new-task-form');
     const modalTitle = form.closest('.modal-content').querySelector('.modal-title');
-    
+
     // モーダルタイトルを変更
     if (modalTitle) {
       modalTitle.textContent = 'タスク編集';
     }
-    
+
     // フォームをリセット
     form.reset();
-    
+
     // タスクデータを設定
     form.elements.work_id.value = task.work_id;
     form.elements.task_title.value = task.task_title || '';
     if (form.elements.task_detail) {
       form.elements.task_detail.value = task.task_detail || '';
     }
-    
+
     // メンバー選択肢を設定
     const assignToSelect = form.elements.assign_to;
     assignToSelect.innerHTML = '<option value="">選択してください</option>';
@@ -3371,7 +3371,7 @@
         assignToSelect.appendChild(option);
       });
     }
-    
+
     // ステータス選択肢を設定
     const statusSelect = form.elements.status_key;
     statusSelect.innerHTML = '<option value="">選択してください</option>';
@@ -3385,7 +3385,7 @@
       }
       statusSelect.appendChild(option);
     });
-    
+
     // 優先度選択肢を設定
     const prioritySelect = form.elements.priority_key;
     if (prioritySelect) {
@@ -3401,12 +3401,12 @@
         prioritySelect.appendChild(option);
       });
     }
-    
+
     // 日時を設定
     if (task.planned_end_datetime && form.elements.planned_end_datetime) {
       form.elements.planned_end_datetime.value = formatDateTimeForInput(task.planned_end_datetime);
     }
-    
+
     // 送信ボタンのテキストを変更
     const submitButton = form.querySelector('button[type="submit"]');
     if (submitButton) {
@@ -3420,7 +3420,7 @@
       const formData = new FormData(form);
       const taskData = Object.fromEntries(formData.entries());
       taskData.task_id = task.task_id;
-      
+
       showModalLoading('modal-new-task', 'タスクを更新しています');
       callGAS('updateTask', task.task_id, taskData)
         .then(() => {
@@ -3443,7 +3443,7 @@
           resetModalState('modal-new-task');
         });
     };
-    
+
     openModal('modal-new-task');
   }
 
@@ -3465,28 +3465,28 @@
       container.innerHTML = '<p style="color: #6b7280;">レビュー依頼はありません。</p>';
       return;
     }
-    
+
     // created_atを参照して降順で並び替え
     const sortedReviewRequests = [...reviewRequests].sort((a, b) => {
       const dateA = new Date(a.created_at || 0);
       const dateB = new Date(b.created_at || 0);
       return dateB - dateA; // 降順
     });
-    
+
     sortedReviewRequests.forEach(reviewRequest => {
       const card = document.createElement('div');
       card.className = 'home-card';
       card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
-      
+
       // due_datetimeを「~10/24(水) 15:00」形式で表示
-      const dueDateHtml = reviewRequest.due_datetime 
+      const dueDateHtml = reviewRequest.due_datetime
         ? formatDateForReview(reviewRequest.due_datetime)
         : '';
-      
+
       // 作成者情報
       const creatorIcon = reviewRequest.creator_icon || 'https:\/\/via.placeholder.com/24';
       const creatorName = reviewRequest.creator_name || '';
-      
+
       // 最初に登録されたファイルを取得（created_atでソート）
       let firstFile = null;
       if (reviewRequest.files && reviewRequest.files.length > 0) {
@@ -3497,7 +3497,7 @@
         });
         firstFile = sortedFiles[0];
       }
-      
+
       // サムネイル用のプレースホルダー
       const thumbnailHtml = firstFile && firstFile.file_id
         ? `<div class="review-thumbnail-container" data-file-id="${escapeHtml(firstFile.file_id)}">
@@ -3506,7 +3506,7 @@
              </div>
            </div>`
         : '';
-      
+
       card.innerHTML = `
         ${thumbnailHtml}
         <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); font-family: 'Roboto Mono', monospace; font-weight: 500; word-wrap: break-word;">
@@ -3518,13 +3518,13 @@
             <span>${escapeHtml(creatorName)}</span>
           </span>  
           <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">
-            ${dueDateHtml ||  ''}
+            ${dueDateHtml || ''}
           </span>
         </div>
       `;
-      
+
       container.appendChild(card);
-      
+
       // サムネイルを非同期で読み込む（タブの読み込み完了後）
       if (firstFile && firstFile.file_id) {
         requestAnimationFrame(() => {
@@ -3551,21 +3551,21 @@
         div.style.padding = '8px';
         div.style.backgroundColor = 'var(--md-sys-color-surface-variant)';
         div.style.borderRadius = '8px';
-        
+
         const nameSpan = document.createElement('span');
         nameSpan.textContent = app.value || app.key;
-        
+
         const removeBtn = document.createElement('button');
         removeBtn.className = 'btn btn-sm btn-secondary';
         removeBtn.textContent = '削除';
         removeBtn.onclick = () => removeWorkApp(currentWorkId, app.key);
-        
+
         div.appendChild(nameSpan);
         div.appendChild(removeBtn);
         container.appendChild(div);
       });
     }
-    
+
     // 追加ボタン
     const addBtn = container.querySelector('button[data-action="add-app"]');
     if (!addBtn) {
@@ -3582,30 +3582,30 @@
     // 既に割り当てられているメンバーを取得
     const assignedEmails = (currentAssignees || []).map(a => a.member_email);
     const availableMembers = (membersData || []).filter(m => !assignedEmails.includes(m.member_email));
-    
+
     if (availableMembers.length === 0) {
       alert('追加できるメンバーがいません');
       return;
     }
-    
+
     // 既存のドロップダウンを閉じる
     const existingDropdown = document.getElementById('assignee-dropdown');
     if (existingDropdown) {
       existingDropdown.remove();
     }
-    
+
     // メンバーをソートする関数
     const sortMembers = (members) => {
       if (!currentUser) return members;
-      
+
       const currentUserEmail = currentUser.member_email;
       const currentUserTeam = currentUser.member_team_key;
-      
+
       // 自分、同じTEAM、その他の順に分類
       const myself = [];
       const sameTeam = [];
       const others = [];
-      
+
       members.forEach(member => {
         if (member.member_email === currentUserEmail) {
           myself.push(member);
@@ -3615,18 +3615,18 @@
           others.push(member);
         }
       });
-      
+
       // その他は名前降順でソート
       others.sort((a, b) => {
         const nameA = (a.member_name || '').toLowerCase();
         const nameB = (b.member_name || '').toLowerCase();
         return nameB.localeCompare(nameA, 'ja');
       });
-      
+
       // 順番に結合
       return [...myself, ...sameTeam, ...others];
     };
-    
+
     // ドロップダウンを作成
     const dropdown = document.createElement('div');
     dropdown.id = 'assignee-dropdown';
@@ -3641,7 +3641,7 @@
     dropdown.style.maxWidth = '400px';
     dropdown.style.display = 'flex';
     dropdown.style.flexDirection = 'column';
-    
+
     // 検索入力欄
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
@@ -3652,7 +3652,7 @@
     searchInput.style.boxSizing = 'border-box';
     searchInput.style.flexShrink = '0';
     dropdown.appendChild(searchInput);
-    
+
     // メンバーリストコンテナ（スクロール可能）
     const membersList = document.createElement('div');
     membersList.id = 'assignee-members-list';
@@ -3660,7 +3660,7 @@
     membersList.style.overflowY = 'auto';
     membersList.style.overflowX = 'hidden';
     dropdown.appendChild(membersList);
-    
+
     // メンバーを表示する関数
     const renderMembers = (members) => {
       membersList.innerHTML = '';
@@ -3673,10 +3673,10 @@
         membersList.appendChild(noResult);
         return;
       }
-      
+
       // ソートを適用
       const sortedMembers = sortMembers(members);
-      
+
       sortedMembers.forEach(member => {
         const optionDiv = document.createElement('div');
         optionDiv.className = 'popup-editor-option';
@@ -3685,60 +3685,60 @@
         optionDiv.style.gap = '8px';
         optionDiv.style.padding = '8px 12px';
         optionDiv.style.cursor = 'pointer';
-        
+
         const icon = document.createElement('img');
         icon.src = member.member_icon || 'https://via.placeholder.com/24';
         icon.className = 'avatar';
         icon.style.width = '24px';
         icon.style.height = '24px';
-        
+
         const nameDiv = document.createElement('div');
         nameDiv.textContent = member.member_name;
-        
+
         const teamDiv = document.createElement('div');
         teamDiv.textContent = getConfigLabel(member.member_team_key, 'TEAM');
         teamDiv.style.fontSize = '0.75rem';
         teamDiv.style.color = 'var(--md-sys-color-on-surface-variant)';
-        
+
         const infoDiv = document.createElement('div');
         infoDiv.style.display = 'flex';
         infoDiv.style.flexDirection = 'column';
         infoDiv.appendChild(nameDiv);
         infoDiv.appendChild(teamDiv);
-        
+
         optionDiv.appendChild(icon);
         optionDiv.appendChild(infoDiv);
-        
+
         optionDiv.addEventListener('click', () => {
           addWorkAssignee(workId, member.member_email);
           dropdown.remove();
         });
-        
+
         membersList.appendChild(optionDiv);
       });
     };
-    
+
     // 初期表示（ソート済み）
     const sortedAvailableMembers = sortMembers(availableMembers);
     renderMembers(sortedAvailableMembers);
-    
+
     // 検索機能
     searchInput.addEventListener('input', (e) => {
       const query = e.target.value.toLowerCase();
-      const filtered = availableMembers.filter(m => 
+      const filtered = availableMembers.filter(m =>
         m.member_name.toLowerCase().includes(query) ||
         (m.member_email && m.member_email.toLowerCase().includes(query))
       );
       renderMembers(filtered);
     });
-    
+
     // 位置を設定
     const rect = buttonElement.getBoundingClientRect();
     dropdown.style.left = `${rect.right}px`;
     dropdown.style.top = `${rect.top}px`;
-    
+
     document.body.appendChild(dropdown);
-    
+
     // 外側をクリックしたら閉じる
     const closeOnOutsideClick = (e) => {
       if (!dropdown.contains(e.target) && e.target !== buttonElement) {
@@ -3749,24 +3749,24 @@
     setTimeout(() => {
       document.addEventListener('click', closeOnOutsideClick);
     }, 0);
-    
+
     // 検索入力にフォーカス
     searchInput.focus();
   }
-  
+
   function openAddAssigneeModal() {
     if (!currentWorkId) return;
-    
+
     // 既に割り当てられているメンバーを取得
     callGAS('getWorkById', currentWorkId).then(work => {
       const assignedEmails = (work.assignees || []).map(a => a.member_email);
       const availableMembers = (membersData || []).filter(m => !assignedEmails.includes(m.member_email));
-      
+
       if (availableMembers.length === 0) {
         alert('追加できるメンバーがいません');
         return;
       }
-      
+
       // 簡易的な選択UI
       const optionsContainer = document.createElement('div');
       optionsContainer.className = 'popup-editor';
@@ -3778,12 +3778,12 @@
       optionsContainer.style.maxHeight = '400px';
       optionsContainer.style.overflowY = 'auto';
       optionsContainer.style.padding = '16px';
-      
+
       const title = document.createElement('h3');
       title.textContent = '担当者を追加';
       title.style.marginTop = '0';
       optionsContainer.appendChild(title);
-      
+
       availableMembers.forEach(member => {
         const optionDiv = document.createElement('div');
         optionDiv.className = 'popup-editor-option';
@@ -3795,31 +3795,31 @@
         });
         optionsContainer.appendChild(optionDiv);
       });
-      
+
       const closeBtn = document.createElement('button');
       closeBtn.className = 'btn btn-secondary';
       closeBtn.textContent = 'キャンセル';
       closeBtn.style.marginTop = '16px';
       closeBtn.onclick = () => optionsContainer.remove();
       optionsContainer.appendChild(closeBtn);
-      
+
       document.body.appendChild(optionsContainer);
     });
   }
 
   function openAddAppModal() {
     if (!currentWorkId) return;
-    
+
     // 既に割り当てられているアプリを取得
     callGAS('getWorkById', currentWorkId).then(work => {
       const assignedAppKeys = (work.apps || []).map(a => a.key);
       const availableApps = (configData['APP'] || []).filter(app => !assignedAppKeys.includes(app.config_key));
-      
+
       if (availableApps.length === 0) {
         alert('追加できるアプリがいません');
         return;
       }
-      
+
       // 簡易的な選択UI
       const optionsContainer = document.createElement('div');
       optionsContainer.className = 'popup-editor';
@@ -3831,12 +3831,12 @@
       optionsContainer.style.maxHeight = '400px';
       optionsContainer.style.overflowY = 'auto';
       optionsContainer.style.padding = '16px';
-      
+
       const title = document.createElement('h3');
       title.textContent = '使用アプリを追加';
       title.style.marginTop = '0';
       optionsContainer.appendChild(title);
-      
+
       availableApps.forEach(app => {
         const optionDiv = document.createElement('div');
         optionDiv.className = 'popup-editor-option';
@@ -3848,14 +3848,14 @@
         });
         optionsContainer.appendChild(optionDiv);
       });
-      
+
       const closeBtn = document.createElement('button');
       closeBtn.className = 'btn btn-secondary';
       closeBtn.textContent = 'キャンセル';
       closeBtn.style.marginTop = '16px';
       closeBtn.onclick = () => optionsContainer.remove();
       optionsContainer.appendChild(closeBtn);
-      
+
       document.body.appendChild(optionsContainer);
     });
   }
@@ -3921,7 +3921,7 @@
 
   function removeWorkAssignee(workId, memberEmail) {
     if (!confirm('この担当者を削除しますか？')) return;
-    
+
     showLoading();
     callGAS('removeWorkAssignee', workId, memberEmail)
       .then(() => {
@@ -3951,7 +3951,7 @@
 
   function removeWorkApp(workId, appKey) {
     if (!confirm('このアプリを削除しますか？')) return;
-    
+
     showLoading();
     callGAS('removeWorkApp', workId, appKey)
       .then(() => {
@@ -3968,7 +3968,7 @@
   function openMemberDetail(memberEmail) {
     // JavaScript関数呼び出しを記録（HTTP 429エラー時の再試行用）
     recordJSInvocation('openMemberDetail', memberEmail);
-    
+
     showLoading();
     callGAS('getMemberByEmail', memberEmail).then(member => {
       if (!member) {
@@ -3976,12 +3976,12 @@
         hideLoading();
         return;
       }
-      
+
       // 担当しているWorksを取得
       const assignedWorks = (worksData || []).filter(work => {
         return work.assignees && work.assignees.some(a => a.member_email === memberEmail);
       });
-      
+
       const content = document.getElementById('member-detail-content');
       content.innerHTML = `
         <div style="margin-bottom: 24px;">
@@ -4037,14 +4037,14 @@
           `}
         </div>
       `;
-      
+
       // リッチテキストエディタにデータを設定
       const notesEditor = document.getElementById('member-notes-editor');
       if (notesEditor) {
         notesEditor.innerHTML = member.member_notes || '';
         // リッチテキストエディタの初期化
         initRichTextEditors();
-        
+
         // エディタの変更を監視して自動保存
         let saveTimeout = null;
         notesEditor.addEventListener('input', () => {
@@ -4054,7 +4054,7 @@
           }, 2000);
         });
       }
-      
+
       hideLoading();
       openModal('modal-member-detail');
     }).catch(handleError);
@@ -4092,7 +4092,7 @@
     const workTypes = configData['WORK_TYPE'] || [];
     const workTypeOptions = workTypes.map(wt => `<option value="${wt.config_key}">${wt.config_value}</option>`).join('');
     formContainer.innerHTML = `<form id="new-work-form-element" onsubmit="submitNewWork(event)"> <div class="form-group"> <label class="form-label">案件タイトル</label> <div id="project-combobox" class="combobox-container"> <input type="text" name="project_title" class="input-field" required placeholder="既存の案件タイトルで検索、または新規作成" oninput="searchProjects(this.value)" autocomplete="off"> <input type="hidden" name="project_id"> <div id="project-suggestions" class="combobox-suggestions"></div> </div> </div> <div class="form-group"> <label class="form-label">制作タイトル</label> <input type="text" name="work_title" class="input-field" required> </div> <div class="form-group"> <label class="form-label">制作種別</label> <select name="work_type_key" class="input-field" onchange="updateRegulationPreset(this.value)"> <option value="">選択してください</option> ${workTypeOptions} </select> </div> <div class="form-group"> <label class="form-label">納品期限</label> <div id="new-work-datetime-container" class="datetime-custom-editor" style="display: flex; align-items: center; gap: 4px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; background-color: white;"> <input type="text" class="datetime-segment" data-segment="yyyy" maxlength="4" value="" placeholder="yyyy" style="width: 60px; text-align: center; border: none; outline: none; background: transparent;"> <span class="datetime-separator">/</span> <input type="text" class="datetime-segment" data-segment="mm" maxlength="2" value="" placeholder="mm" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;"> <span class="datetime-separator">/</span> <input type="text" class="datetime-segment" data-segment="dd" maxlength="2" value="" placeholder="dd" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;"> <span class="datetime-separator"> </span> <input type="text" class="datetime-segment" data-segment="hh" maxlength="2" value="" placeholder="hh" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;"> <span class="datetime-separator">:</span> <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="" placeholder="mm" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;"> </div> <input type="hidden" name="due_datetime" id="new-work-due-datetime"> </div> <div class="form-group"> <label class="form-label">制作物の概要</label> <textarea name="work_detail_content" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">デザイン要項</label> <textarea name="work_detail_design" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">入稿規定</label> <textarea name="work_detail_regulation" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">依頼者からの備考</label> <textarea name="work_detail_note" class="input-field" rows="4"></textarea> </div> <div class="modal-footer"> <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-work')">キャンセル</button> <button type="submit" class="btn btn-primary">作成</button> </div> </form>`;
-    
+
     // IME変換確定時のEnterキーを無視する処理を追加
     const form = document.getElementById('new-work-form-element');
     if (form) {
@@ -4104,35 +4104,35 @@
           }
         });
       });
-      
+
       // カスタム日時入力フィールドの設定
       const datetimeContainer = document.getElementById('new-work-datetime-container');
       const hiddenInput = document.getElementById('new-work-due-datetime');
       if (datetimeContainer && hiddenInput) {
         const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
-        
+
         inputs.forEach((input, index) => {
           // 数字のみ入力可能
           input.addEventListener('input', (e) => {
             let value = e.target.value.replace(/[^0-9]/g, '');
             const maxLength = parseInt(e.target.getAttribute('maxlength'));
-            
+
             if (value.length > maxLength) {
               value = value.substring(0, maxLength);
             }
-            
+
             e.target.value = value;
-            
+
             // 最大桁数に達したら次のフィールドへ
             if (value.length >= maxLength && index < inputs.length - 1) {
               inputs[index + 1].focus();
               inputs[index + 1].select();
             }
-            
+
             // 隠しフィールドに値を更新
             updateNewWorkDateTimeValue(inputs, hiddenInput);
           });
-          
+
           // キーボード操作
           input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.isComposing) {
@@ -4169,11 +4169,11 @@
       }
     }
   }
-  
+
   function updateNewWorkDateTimeValue(inputs, hiddenInput) {
     const values = Array.from(inputs).map(input => input.value);
     const [yyyy, mm, dd, hh, min] = values;
-    
+
     // すべての値が入力されている場合のみ、隠しフィールドに値を設定
     if (yyyy && yyyy.length === 4 && mm && mm.length === 2 && dd && dd.length === 2 && hh && hh.length === 2 && min && min.length === 2) {
       const paddedYyyy = yyyy.padStart(4, '0');
@@ -4228,7 +4228,7 @@
     suggestionsContainer.style.display = 'block';
   }
 
-  document.addEventListener('click', function(event) {
+  document.addEventListener('click', function (event) {
     const container = document.getElementById('project-combobox');
     if (container && !container.contains(event.target)) {
       const suggestions = document.getElementById('project-suggestions');
@@ -4241,7 +4241,7 @@
   function submitNewWork(event) {
     event.preventDefault();
     const form = event.target;
-    
+
     // カスタム日時入力フィールドの値を確実に更新
     const datetimeContainer = document.getElementById('new-work-datetime-container');
     const hiddenInput = document.getElementById('new-work-due-datetime');
@@ -4249,7 +4249,7 @@
       const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
       updateNewWorkDateTimeValue(inputs, hiddenInput);
     }
-    
+
     const formData = new FormData(form);
     const workData = Object.fromEntries(formData.entries());
     showModalLoading('modal-new-work', `新規制作物を作成しています`);
@@ -4284,7 +4284,7 @@
   function openNewTaskModal(workId) {
     const form = document.getElementById('new-task-form');
     form.elements.work_id.value = workId;
-    
+
     // IME変換確定時のEnterキーを無視する処理を追加
     const textInputs = form.querySelectorAll('input[type="text"], textarea');
     textInputs.forEach(input => {
@@ -4294,7 +4294,7 @@
         }
       });
     });
-    
+
     // datetime-localをカスタム日時入力フィールドに置き換え
     const datetimeInput = form.querySelector('input[name="planned_end_datetime"]');
     if (datetimeInput && datetimeInput.type === 'datetime-local') {
@@ -4302,11 +4302,11 @@
       if (formGroup) {
         const label = formGroup.querySelector('label');
         const labelText = label ? label.textContent : '終了予定日';
-        
+
         // 既存のdatetime-localを非表示にして、カスタム日時入力フィールドを作成
         datetimeInput.style.display = 'none';
         datetimeInput.setAttribute('data-original-type', 'datetime-local');
-        
+
         // カスタム日時入力フィールドのコンテナを作成
         let datetimeContainer = formGroup.querySelector('#new-task-datetime-container');
         if (!datetimeContainer) {
@@ -4327,32 +4327,32 @@
           `;
           datetimeInput.parentNode.insertBefore(datetimeContainer, datetimeInput);
         }
-        
+
         // カスタム日時入力フィールドの設定
         const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
-        
+
         inputs.forEach((input, index) => {
           // 数字のみ入力可能
           input.addEventListener('input', (e) => {
             let value = e.target.value.replace(/[^0-9]/g, '');
             const maxLength = parseInt(e.target.getAttribute('maxlength'));
-            
+
             if (value.length > maxLength) {
               value = value.substring(0, maxLength);
             }
-            
+
             e.target.value = value;
-            
+
             // 最大桁数に達したら次のフィールドへ
             if (value.length >= maxLength && index < inputs.length - 1) {
               inputs[index + 1].focus();
               inputs[index + 1].select();
             }
-            
+
             // 隠しフィールドに値を更新
             updateNewTaskDateTimeValue(inputs, datetimeInput);
           });
-          
+
           // キーボード操作
           input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.isComposing) {
@@ -4388,7 +4388,7 @@
         });
       }
     }
-    
+
     // メンバー選択肢を設定
     const assignToSelect = form.elements.assign_to;
     assignToSelect.innerHTML = '<option value="">選択してください</option>';
@@ -4400,7 +4400,7 @@
         assignToSelect.appendChild(option);
       });
     }
-    
+
     // ステータス選択肢を設定
     const statusSelect = form.elements.status_key;
     statusSelect.innerHTML = '<option value="">選択してください</option>';
@@ -4414,7 +4414,7 @@
       }
       statusSelect.appendChild(option);
     });
-    
+
     // 優先度選択肢を設定
     const prioritySelect = form.elements.priority_key;
     prioritySelect.innerHTML = '<option value="">選択してください</option>';
@@ -4428,14 +4428,14 @@
       }
       prioritySelect.appendChild(option);
     });
-    
+
     openModal('modal-new-task');
   }
-  
+
   function updateNewTaskDateTimeValue(inputs, hiddenInput) {
     const values = Array.from(inputs).map(input => input.value);
     const [yyyy, mm, dd, hh, min] = values;
-    
+
     // すべての値が入力されている場合のみ、隠しフィールドに値を設定
     if (yyyy && yyyy.length === 4 && mm && mm.length === 2 && dd && dd.length === 2 && hh && hh.length === 2 && min && min.length === 2) {
       const paddedYyyy = yyyy.padStart(4, '0');
@@ -4458,7 +4458,7 @@
     const form = document.getElementById('new-review-request-form');
     form.reset();
     form.elements.work_id.value = workId;
-    
+
     // IME変換確定時のEnterキーを無視する処理を追加
     const textInputs = form.querySelectorAll('input[type="text"], textarea');
     textInputs.forEach(input => {
@@ -4468,7 +4468,7 @@
         }
       });
     });
-    
+
     updateReviewRequestFilesList();
     openModal('modal-new-review-request');
   }
@@ -4491,7 +4491,7 @@
       const fileNameSpan = document.createElement('span');
       fileNameSpan.style.fontSize = '0.75rem';
       fileNameSpan.textContent = file.name || file.file_name || 'ファイル';
-      
+
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.style.background = 'none';
@@ -4527,7 +4527,7 @@
               .setOrigin('https://script.google.com')
               .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
               .build();
-            
+
             // Pickerを表示
             picker.setVisible(true);
           },
@@ -4546,11 +4546,11 @@
   function pickerCallback(data) {
     if (data[google.picker.Response.ACTION] === google.picker.Action.PICKED) {
       const docs = data[google.picker.Response.DOCUMENTS];
-      
+
       // 選択されたファイルごとに処理
       docs.forEach(doc => {
         const fileId = doc[google.picker.Document.ID];
-        
+
         // ファイル情報を取得
         callGAS('getDriveFileInfo', fileId)
           .then(fileInfo => {
@@ -4639,12 +4639,12 @@
   function submitNewReviewRequest(event) {
     event.preventDefault();
     const form = event.target;
-    
+
     if (reviewRequestFiles.length === 0) {
       alert('ファイルを1つ以上添付してください。');
       return;
     }
-    
+
     const formData = new FormData(form);
     const reviewRequestData = {
       work_id: form.elements.work_id.value,
@@ -4652,17 +4652,17 @@
       review_comment: formData.get('review_comment'),
       file_ids: reviewRequestFiles.map(f => f.file_id)
     };
-    
+
     if (!reviewRequestData.review_title) {
       alert('タイトルを入力してください。');
       return;
     }
-    
+
     if (!reviewRequestData.review_comment) {
       alert('コメントを入力してください。');
       return;
     }
-    
+
     showModalLoading('modal-new-review-request', 'レビュー依頼を投稿しています');
     callGAS('createReviewRequest', reviewRequestData)
       .then(reviewRequestId => {
@@ -4685,7 +4685,7 @@
     showLoading();
     callGAS('getReviewRequestById', reviewRequestId).then(reviewRequest => {
       const container = document.getElementById('review-request-detail-content');
-      
+
       // ファイル名取得完了まではファイルURLを表示
       let filesHtml = '';
       if (reviewRequest.files && reviewRequest.files.length > 0) {
@@ -4705,7 +4705,7 @@
       } else {
         filesHtml = '<p style="color: #6b7280;">ファイルはありません</p>';
       }
-      
+
       container.innerHTML = `
         <div style="margin-bottom: 24px;">
           <h3 style="margin: 0 0 8px 0; font-size: 1.125rem; font-weight: 600;">${escapeHtml(reviewRequest.review_title)}</h3>
@@ -4720,10 +4720,10 @@
       `;
       hideLoading();
       openModal('modal-review-request-detail');
-      
+
       // ファイル名を取得（非同期）
       if (reviewRequest.files && reviewRequest.files.length > 0) {
-        Promise.all(reviewRequest.files.map(file => 
+        Promise.all(reviewRequest.files.map(file =>
           callGAS('getDriveFileInfo', file.file_id).then(fileInfo => {
             return { file_id: file.file_id, file_name: fileInfo.file_name, file_url: file.file_url };
           }).catch(() => {
@@ -4732,7 +4732,7 @@
         )).then(filesWithNames => {
           const filesListContainer = document.getElementById('review-request-files-list');
           if (filesListContainer) {
-            filesListContainer.innerHTML = filesWithNames.map(file => 
+            filesListContainer.innerHTML = filesWithNames.map(file =>
               `<div style="margin-bottom: 8px;">
                 <a href="${file.file_url}" target="_blank" style="color: #3b82f6; text-decoration: underline;">${escapeHtml(file.file_name)}</a>
               </div>`
@@ -4746,7 +4746,7 @@
   function submitNewTask(event) {
     event.preventDefault();
     const form = event.target;
-    
+
     // カスタム日時入力フィールドの値を確実に更新
     const datetimeContainer = document.getElementById('new-task-datetime-container');
     const datetimeInput = form.querySelector('input[name="planned_end_datetime"]');
@@ -4754,10 +4754,10 @@
       const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
       updateNewTaskDateTimeValue(inputs, datetimeInput);
     }
-    
+
     const formData = new FormData(form);
     const taskData = Object.fromEntries(formData.entries());
-    
+
     showModalLoading('modal-new-task', '新規タスクを作成しています');
     callGAS('createTask', taskData)
       .then(taskId => {
@@ -4777,7 +4777,7 @@
   function openNewMemberModal() {
     const form = document.getElementById('new-member-form');
     form.reset();
-    
+
     // チーム選択肢を設定
     const teamSelect = form.elements.member_team_key;
     teamSelect.innerHTML = '<option value="">選択してください</option>';
@@ -4788,7 +4788,7 @@
       option.textContent = team.config_value;
       teamSelect.appendChild(option);
     });
-    
+
     // 権限選択肢を設定
     const roleSelect = form.elements.role_key;
     roleSelect.innerHTML = '<option value="">選択してください</option>';
@@ -4802,7 +4802,7 @@
       }
       roleSelect.appendChild(option);
     });
-    
+
     openModal('modal-new-member');
   }
 
@@ -4811,7 +4811,7 @@
     const form = event.target;
     const formData = new FormData(form);
     const memberData = Object.fromEntries(formData.entries());
-    
+
     showModalLoading('modal-new-member', '新規メンバーを登録しています');
     callGAS('createMember', memberData)
       .then(() => {
@@ -4830,7 +4830,7 @@
     const form = document.getElementById('new-knowledge-form');
     form.reset();
     document.getElementById('knowledge-content-editor').innerHTML = '';
-    
+
     // ナレッジタイプ選択肢を設定
     const typeSelect = form.elements.knowledge_type_key;
     typeSelect.innerHTML = '<option value="">選択してください</option>';
@@ -4841,7 +4841,7 @@
       option.textContent = type.config_value;
       typeSelect.appendChild(option);
     });
-    
+
     // Worksデータを取得（まだ取得していない場合）
     if (!worksData || worksData.length === 0) {
       showLoading();
@@ -4865,7 +4865,7 @@
       return;
     }
     const lowerCaseQuery = query.toLowerCase();
-    const filteredWorks = (worksData || []).filter(w => 
+    const filteredWorks = (worksData || []).filter(w =>
       w.work_title.toLowerCase().includes(lowerCaseQuery) ||
       (w.project_title && w.project_title.toLowerCase().includes(lowerCaseQuery))
     );
@@ -4890,18 +4890,18 @@
     const workId = form.elements.work_id.value;
     const knowledgeTypeKey = form.elements.knowledge_type_key.value;
     const knowledgeContent = document.getElementById('knowledge-content-editor').innerHTML;
-    
+
     if (!workId) {
       alert('制作物を選択してください');
       return;
     }
-    
+
     const knowledgeData = {
       work_id: workId,
       knowledge_type_key: knowledgeTypeKey,
       knowledge_content: knowledgeContent
     };
-    
+
     showModalLoading('modal-new-knowledge', '新規ナレッジを作成しています');
     callGAS('createKnowledge', knowledgeData)
       .then(() => {
@@ -4927,13 +4927,13 @@
     event.preventDefault();
     const form = event.target;
     const formData = new FormData(form);
-    
+
     const issueData = {
       title: formData.get('issue_title'),
       body: formData.get('issue_body'),
       labels: Array.from(form.elements.issue_labels.selectedOptions).map(opt => opt.value)
     };
-    
+
     showModalLoading('modal-github-issue', 'GitHubイシューを登録しています');
     callGAS('createGithubIssue', issueData)
       .then((result) => {
@@ -4967,15 +4967,15 @@
     }, 1500);
   }
   function resetModalState(modalId) {
-      const modal = document.getElementById(modalId);
-      if (!modal) return;
-      const formContent = modal.querySelector('.modal-form-content');
-      if(formContent) formContent.style.display = 'block';
-      const resultContent = modal.querySelector('.modal-result-content');
-      if(resultContent) {
-          resultContent.style.display = 'none';
-          resultContent.innerHTML = '';
-      }
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    const formContent = modal.querySelector('.modal-form-content');
+    if (formContent) formContent.style.display = 'block';
+    const resultContent = modal.querySelector('.modal-result-content');
+    if (resultContent) {
+      resultContent.style.display = 'none';
+      resultContent.innerHTML = '';
+    }
   }
   function closeModal(modalId) {
     document.getElementById(modalId).classList.remove('active');
@@ -5140,7 +5140,7 @@
       const dt = new Date(dateString);
       const offset = dt.getTimezoneOffset() * 60000;
       const localDate = new Date(dt.getTime() - offset);
-      return localDate.toISOString().slice(0,10);
+      return localDate.toISOString().slice(0, 10);
     } catch (e) { return dateString; }
   }
   function formatDateTimeForDisplay(dateString, includeSeconds = false) {
@@ -5163,7 +5163,7 @@
       return includeSeconds ? 'yyyy/mm/dd(曜日) hh:mm:ss' : 'yyyy/mm/dd(曜日) hh:mm';
     }
   }
-  
+
   function formatDateTimeForHome(dateString) {
     if (!dateString) return 'yyyy/mm/dd(曜日) hh:mm';
     try {
@@ -5211,7 +5211,7 @@
   }
   function escapeHtml(text) {
     if (text === null || typeof text === 'undefined') return '';
-    return String(text).replace(/[&<>"']/g, match => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[match]);
+    return String(text).replace(/[&<>"']/g, match => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[match]);
   }
 
   // ============================================
@@ -5243,7 +5243,7 @@
     if (String(newValue) === String(oldValue)) return;
 
     showLoading();
-    
+
     // まずデータ配列を更新する
     const data = tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : membersData;
     const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : 'project_id');
@@ -5331,7 +5331,7 @@
     const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : 'project_id');
     const item = data.find(d => d[idKey] === id);
     const currentValue = item ? item[field] : '';
-    
+
     const optionsContainer = document.createElement('div');
 
     const options = configData[header.configType] || [];
@@ -5351,19 +5351,19 @@
       });
       optionsContainer.appendChild(optionDiv);
     });
-    
+
     createPopup(container, optionsContainer);
   }
 
 
 
 
-  
+
   // ---- 日付ピッカーを開く ----
   function openDateTimePicker(event, tableName, id, field) {
     event.stopPropagation();
     event.preventDefault();
-    
+
     let originalValue = '';
     if (tableName === 'task') {
       // タスクの場合は、現在開いているWork詳細からタスクデータを取得
@@ -5392,26 +5392,26 @@
       }
       return;
     }
-    
+
     const data = (tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : membersData);
     const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : 'project_id');
     const item = data.find(d => String(d[idKey]) === String(id));
     originalValue = item ? item[field] : '';
-    
+
     // セルを取得
     const table = document.getElementById(`${tableName}-table`);
     const row = table.querySelector(`tr[data-id="${id}"]`);
     if (!row) return;
-    
+
     const cell = row.querySelector(`td[data-field="${field}"]`);
     if (!cell) return;
-    
+
     // 既に編集中なら何もしない
     if (cell.classList.contains('editing-datetime-picker')) return;
-    
+
     // 編集中の状態にする
     cell.classList.add('editing-datetime-picker');
-    
+
     // 現在の日時を取得してパース
     let dateObj;
     if (originalValue) {
@@ -5419,20 +5419,20 @@
     } else {
       dateObj = new Date();
     }
-    
+
     const yyyy = dateObj.getFullYear().toString().padStart(4, '0');
     const mm = (dateObj.getMonth() + 1).toString().padStart(2, '0');
     const dd = dateObj.getDate().toString().padStart(2, '0');
     const hh = dateObj.getHours().toString().padStart(2, '0');
     const min = dateObj.getMinutes().toString().padStart(2, '0');
     const ss = dateObj.getSeconds().toString().padStart(2, '0');
-    
+
     // 既存のコンテンツを非表示
     const container = cell.querySelector('.editable-container');
     if (container) {
       container.style.display = 'none';
     }
-    
+
     // カスタム日時入力フィールドを作成
     const editorDiv = document.createElement('div');
     editorDiv.className = 'datetime-custom-editor';
@@ -5447,31 +5447,31 @@
       <span class="datetime-separator">:</span>
       <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="${min}" placeholder="mm" />
     `;
-    
+
     cell.appendChild(editorDiv);
-    
+
     const inputs = editorDiv.querySelectorAll('.datetime-segment');
-    
+
     // 各inputにイベントリスナーを設定
     inputs.forEach((input, index) => {
       // 数字のみ入力可能
       input.addEventListener('input', (e) => {
         let value = e.target.value.replace(/[^0-9]/g, '');
         const maxLength = parseInt(e.target.getAttribute('maxlength'));
-        
+
         if (value.length > maxLength) {
           value = value.substring(0, maxLength);
         }
-        
+
         e.target.value = value;
-        
+
         // 最大桁数に達したら次のフィールドへ
         if (value.length >= maxLength && index < inputs.length - 1) {
           inputs[index + 1].focus();
           inputs[index + 1].select();
         }
       });
-      
+
       // キーボード操作
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.isComposing) {
@@ -5504,7 +5504,7 @@
           }
         }
       });
-      
+
       // フォーカスアウト時の処理
       input.addEventListener('blur', (e) => {
         setTimeout(() => {
@@ -5516,59 +5516,59 @@
         }, 100);
       });
     });
-    
+
     // 最初のフィールドにフォーカス
     setTimeout(() => {
       inputs[0].focus();
       inputs[0].select();
     }, 50);
   }
-  
+
   function saveDateTimePicker(cell, tableName, id, field, originalValue, inputs) {
     const values = Array.from(inputs).map(input => input.value);
     const [yyyy, mm, dd, hh, min] = values;
-    
+
     // バリデーション
     const yearNum = parseInt(yyyy);
     const monthNum = parseInt(mm);
     const dayNum = parseInt(dd);
     const hourNum = parseInt(hh);
     const minuteNum = parseInt(min);
-    
+
     if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100 ||
-        isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
-        isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
-        isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
-        isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
+      isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
+      isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
+      isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
+      isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
       alert('無効な日時です');
       cancelDateTimePicker(cell, cell.querySelector('.editable-container'));
       return;
     }
-    
+
     // ISO形式の日時文字列を作成（秒は00固定）
     const paddedYyyy = yyyy.padStart(4, '0');
     const paddedMm = mm.padStart(2, '0');
     const paddedDd = dd.padStart(2, '0');
     const paddedHh = hh.padStart(2, '0');
     const paddedMin = min.padStart(2, '0');
-    
+
     const newDateStr = `${paddedYyyy}-${paddedMm}-${paddedDd}T${paddedHh}:${paddedMin}:00`;
     const newDate = new Date(newDateStr);
-    
+
     if (isNaN(newDate.getTime())) {
       alert('無効な日時です');
       cancelDateTimePicker(cell, cell.querySelector('.editable-container'));
       return;
     }
-    
+
     const newValueAsISO = newDate.toISOString();
-    
+
     // エディタを削除
     const editor = cell.querySelector('.datetime-custom-editor');
     if (editor) {
       cell.removeChild(editor);
     }
-    
+
     // 元の表示に戻す
     const container = cell.querySelector('.editable-container');
     if (container) {
@@ -5578,26 +5578,26 @@
         displaySpan.textContent = formatDateTimeForDisplay(newValueAsISO);
       }
     }
-    
+
     cell.classList.remove('editing-datetime-picker');
-    
+
     // データを保存（変更があった場合のみ）
     if (newValueAsISO !== originalValue) {
       saveChange(tableName, id, field, newValueAsISO, originalValue);
     }
   }
-  
+
   function cancelDateTimePicker(cell, container) {
     const editor = cell.querySelector('.datetime-custom-editor');
     if (editor) {
       cell.removeChild(editor);
     }
-    
-    
+
+
     if (container) {
       container.style.display = 'flex';
     }
-    
+
     cell.classList.remove('editing-datetime-picker');
   }
 
@@ -5606,31 +5606,31 @@
     const container = document.getElementById('work-tasks-container');
     const row = container.querySelector(`tr[data-task-id="${taskId}"]`);
     if (!row) return;
-    
+
     const cell = row.querySelector(`td:nth-child(4)`); // 日時列
     if (!cell) return;
-    
+
     if (cell.classList.contains('editing-datetime-picker')) return;
     cell.classList.add('editing-datetime-picker');
-    
+
     let dateObj;
     if (originalValue) {
       dateObj = new Date(originalValue);
     } else {
       dateObj = new Date();
     }
-    
+
     const yyyy = dateObj.getFullYear().toString().padStart(4, '0');
     const mm = (dateObj.getMonth() + 1).toString().padStart(2, '0');
     const dd = dateObj.getDate().toString().padStart(2, '0');
     const hh = dateObj.getHours().toString().padStart(2, '0');
     const min = dateObj.getMinutes().toString().padStart(2, '0');
-    
+
     const containerDiv = cell.querySelector('.editable-container');
     if (containerDiv) {
       containerDiv.style.display = 'none';
     }
-    
+
     const editorDiv = document.createElement('div');
     editorDiv.className = 'datetime-custom-editor';
     editorDiv.innerHTML = `
@@ -5644,11 +5644,11 @@
       <span class="datetime-separator">:</span>
       <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="${min}" placeholder="mm" />
     `;
-    
+
     cell.appendChild(editorDiv);
-    
+
     const inputs = editorDiv.querySelectorAll('.datetime-segment');
-    
+
     inputs.forEach((input, index) => {
       input.addEventListener('input', (e) => {
         let value = e.target.value.replace(/[^0-9]/g, '');
@@ -5662,7 +5662,7 @@
           inputs[index + 1].select();
         }
       });
-      
+
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.isComposing) {
           e.preventDefault();
@@ -5672,7 +5672,7 @@
           cancelTaskDateTimePicker(cell, containerDiv);
         }
       });
-      
+
       input.addEventListener('blur', (e) => {
         setTimeout(() => {
           const focusedElement = document.activeElement;
@@ -5682,7 +5682,7 @@
         }, 100);
       });
     });
-    
+
     setTimeout(() => {
       inputs[0].focus();
       inputs[0].select();
@@ -5692,39 +5692,39 @@
   function saveTaskDateTimePicker(cell, taskId, field, originalValue, inputs) {
     const values = Array.from(inputs).map(input => input.value);
     const [yyyy, mm, dd, hh, min] = values;
-    
+
     const yearNum = parseInt(yyyy);
     const monthNum = parseInt(mm);
     const dayNum = parseInt(dd);
     const hourNum = parseInt(hh);
     const minuteNum = parseInt(min);
-    
+
     if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100 ||
-        isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
-        isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
-        isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
-        isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
+      isNaN(monthNum) || monthNum < 1 || monthNum > 12 ||
+      isNaN(dayNum) || dayNum < 1 || dayNum > 31 ||
+      isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
+      isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
       alert('無効な日時です');
       cancelTaskDateTimePicker(cell, cell.querySelector('.editable-container'));
       return;
     }
-    
+
     const newDateStr = `${yyyy.padStart(4, '0')}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T${hh.padStart(2, '0')}:${min.padStart(2, '0')}:00`;
     const newDate = new Date(newDateStr);
-    
+
     if (isNaN(newDate.getTime())) {
       alert('無効な日時です');
       cancelTaskDateTimePicker(cell, cell.querySelector('.editable-container'));
       return;
     }
-    
+
     const newValueAsISO = newDate.toISOString();
-    
+
     const editor = cell.querySelector('.datetime-custom-editor');
     if (editor) {
       cell.removeChild(editor);
     }
-    
+
     const container = cell.querySelector('.editable-container');
     if (container) {
       container.style.display = 'flex';
@@ -5733,14 +5733,14 @@
         displaySpan.textContent = formatDateTimeForDisplay(newValueAsISO);
       }
     }
-    
+
     cell.classList.remove('editing-datetime-picker');
-    
+
     if (newValueAsISO !== originalValue) {
       updateTaskField(taskId, field, newValueAsISO, originalValue);
     }
   }
-  
+
   function cancelTaskDateTimePicker(cell, container) {
     const editor = cell.querySelector('.datetime-custom-editor');
     if (editor) {
@@ -5760,14 +5760,14 @@
       container.classList.add('id-search-loading');
     }
   }
-  
+
   function hideIdSearchLoading() {
     const container = document.getElementById('id-search-container');
     if (container) {
       container.classList.remove('id-search-loading');
     }
   }
-  
+
   function updateIdSearchInput(idValue) {
     console.log('[DEBUG] updateIdSearchInput called', {
       idValue: idValue,
@@ -5775,25 +5775,25 @@
       currentProjectId: currentProjectId,
       hasCurrentWork: !!currentWork
     });
-    
+
     const input = document.getElementById('id-search-input');
     if (!input) {
       console.log('[DEBUG] updateIdSearchInput: input not found');
       return;
     }
-    
+
     console.log('[DEBUG] updateIdSearchInput: checking activeElement', {
       activeElement: document.activeElement,
       input: input,
       isInputFocused: document.activeElement === input
     });
-    
+
     // フォーカス中は何もしない
     if (document.activeElement === input) {
       console.log('[DEBUG] updateIdSearchInput: input is focused, returning');
       return;
     }
-    
+
     // idValueが直接指定された場合
     if (idValue) {
       console.log('[DEBUG] updateIdSearchInput: setting idValue directly', idValue);
@@ -5801,20 +5801,20 @@
       input.removeAttribute('placeholder');
       return;
     }
-    
+
     // work詳細画面が表示中の場合
     if (currentWork) {
       const workDetailOverlay = document.getElementById('work-detail-overlay');
       const isOverlayVisible = workDetailOverlay && workDetailOverlay.classList.contains('show');
       const headerTitle = document.getElementById('header-title-work-detail-header');
       const headerTitleText = headerTitle ? headerTitle.textContent : null;
-      
+
       console.log('[DEBUG] updateIdSearchInput: checking work detail', {
         isOverlayVisible: isOverlayVisible,
         headerTitleText: headerTitleText,
         shouldSetWorkId: isOverlayVisible && headerTitleText === 'CTMS v3.0'
       });
-      
+
       if (isOverlayVisible) {
         if (headerTitle && headerTitle.textContent === 'CTMS v3.0') {
           // 保持しているworkデータからIDを構築（APIリクエスト不要）
@@ -5826,17 +5826,17 @@
         }
       }
     }
-    
+
     // project詳細画面が表示中の場合
     if (currentProjectId) {
       const projectDetailOverlay = document.getElementById('project-detail-overlay');
       const isOverlayVisible = projectDetailOverlay && projectDetailOverlay.classList.contains('show');
-      
+
       console.log('[DEBUG] updateIdSearchInput: checking project detail', {
         isOverlayVisible: isOverlayVisible,
         shouldSetProjectId: isOverlayVisible
       });
-      
+
       if (isOverlayVisible) {
         console.log('[DEBUG] updateIdSearchInput: setting projectId', currentProjectId);
         input.value = currentProjectId;
@@ -5844,64 +5844,64 @@
         return;
       }
     }
-    
+
     // どちらも表示されていない場合はクリア
     console.log('[DEBUG] updateIdSearchInput: clearing input');
     clearIdSearchInput();
   }
-  
+
   function clearIdSearchInput() {
     const input = document.getElementById('id-search-input');
     if (!input) return;
-    
+
     input.value = '';
     input.placeholder = 'ID検索';
   }
-  
+
   function handleIdSearchFocus(event) {
     const input = event.target;
     // valueをクリアしてplaceholderを設定
     input.value = '';
     input.placeholder = 'ID検索（例：P0001, W0001, T0001, R0001）';
   }
-  
+
   // ID検索の共通処理
   function executeIdSearch(searchValue) {
     if (!searchValue) return;
-    
+
     // 複数のIDが連なっている場合、最も小さな単位のIDのみを取り出す
     // project_id > work_id > review_id > task_id の順で優先度が低い
     let targetId = null;
     let targetType = null;
-    
+
     // task_idを検索 (T + 4桁の数字)
     const taskIdMatch = searchValue.match(/T\d{4}/);
     if (taskIdMatch) {
       targetId = taskIdMatch[0];
       targetType = 'task';
     }
-    
+
     // review_idを検索 (R + 4桁の数字)
     const reviewIdMatch = searchValue.match(/R\d{4}/);
     if (reviewIdMatch && !targetId) {
       targetId = reviewIdMatch[0];
       targetType = 'review';
     }
-    
+
     // work_idを検索 (W + 4桁の数字)
     const workIdMatch = searchValue.match(/W\d{4}/);
     if (workIdMatch && !targetId) {
       targetId = workIdMatch[0];
       targetType = 'work';
     }
-    
+
     // project_idを検索 (P + 4桁の数字)
     const projectIdMatch = searchValue.match(/P\d{4}/);
     if (projectIdMatch && !targetId) {
       targetId = projectIdMatch[0];
       targetType = 'project';
     }
-    
+
     if (!targetId) {
       alert('有効なIDが見つかりません。P0001, W0001, T0001, R0001 の形式で入力してください。');
       return;
@@ -5914,7 +5914,7 @@
       input.blur();
       input.value = searchValue;
     }
-    
+
     // 検索実行
     if (targetType === 'task') {
       // task_idの場合は、taskからwork_idを取得してwork詳細画面を開く
@@ -5948,15 +5948,15 @@
       openProjectDetailOverlay(targetId);
     }
   }
-  
+
   function handleIdSearchClick() {
     const input = document.getElementById('id-search-input');
     if (!input) return;
-    
+
     const searchValue = input.value.trim();
     executeIdSearch(searchValue);
   }
-  
+
   function handleIdSearchBlur(event) {
     const input = event.target;
     console.log('[DEBUG] handleIdSearchBlur triggered', {
@@ -5964,11 +5964,11 @@
       activeElement: document.activeElement,
       isInputFocused: document.activeElement === input
     });
-    
+
     // フォーカスが外れたら、詳細画面が表示中の場合はIDを再設定
     updateIdSearchInput();
   }
-  
+
   function handleIdSearchInput(event) {
     const input = event.target;
     // 半角英数とハイフンに変換し、大文字にする
