@@ -1203,6 +1203,79 @@ function getReviewRequestsForUser(userEmail) {
 }
 
 // ============================================
+// GitHub Issue Creation
+// ============================================
+
+function createGithubIssue(issueData) {
+  try {
+    // Get GitHub token and repository from config
+    const githubTokenConfig = getConfigValue('GITHUB_TOKEN', 'GITHUB');
+    const githubRepoConfig = getConfigValue('GITHUB_REPO', 'GITHUB');
+    
+    if (!githubTokenConfig || !githubRepoConfig) {
+      throw new Error('GitHub設定が見つかりません。管理者にお問い合わせください。');
+    }
+    
+    // Parse repository (format: owner/repo)
+    const repoParts = githubRepoConfig.split('/');
+    if (repoParts.length !== 2) {
+      throw new Error('GitHubリポジトリの形式が正しくありません。');
+    }
+    
+    const owner = repoParts[0];
+    const repo = repoParts[1];
+    
+    // Prepare issue payload
+    const payload = {
+      title: issueData.title,
+      body: issueData.body
+    };
+    
+    // Add labels if provided
+    if (issueData.labels && issueData.labels.length > 0) {
+      payload.labels = issueData.labels;
+    }
+    
+    // GitHub API endpoint
+    const url = `https://api.github.com/repos/${owner}/${repo}/issues`;
+    
+    // Make API request
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {
+        'Authorization': `token ${githubTokenConfig}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'CTMS-App'
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+    
+    if (responseCode !== 201) {
+      Logger.log('GitHub API Error: ' + responseText);
+      throw new Error(`GitHubイシューの作成に失敗しました (HTTP ${responseCode})`);
+    }
+    
+    const result = JSON.parse(responseText);
+    
+    return sanitizeForClient({
+      number: result.number,
+      url: result.html_url,
+      state: result.state
+    });
+    
+  } catch (e) {
+    Logger.log('createGithubIssue Error: ' + e.message);
+    throw new Error('GitHubイシューの作成中にエラーが発生しました: ' + e.message);
+  }
+}
+
+// ============================================
 // Auth.gs - 認証・認可処理
 // ============================================
 
