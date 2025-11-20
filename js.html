@@ -128,7 +128,7 @@
     try {
       // URLパラメータからwork_idを取得して詳細画面を開く（最優先処理）
       const urlParam = JSON.parse(<?= JSON.stringify(templateVariables.urlParam) ?>);
-      console.log(`URLのパラメータ: ${JSON.stringify(urlParam.work_id)}`);
+      console.log(`URLのパラメータ: ${JSON.stringify(urlParam)}`);
       if (urlParam.work_id) {
         const workId = urlParam.work_id;
         if (workId) openWorkDetailOverlay(workId);
@@ -2380,7 +2380,8 @@
     const urlCopyButton = document.getElementById('work-detail-url-copy-button');
     if (!urlCopyButton || !urlCopyButton.dataset.workId) return;
     const workId = urlCopyButton.dataset.workId;
-    const url = `${JSON.parse(<?= JSON.stringify(templateVariables.deployedUrl) ?>)}?work_id=${workId}`;
+    const url = `<?= templateVariables.deployedUrl ?>?work_id=${workId}`;
+    console.log(`work-detail-overlayに直接アクセス可能なURL: ${url}`);
     navigator.clipboard.writeText(url).then(() => {
       // alert('URLをクリップボードにコピーしました');
     }).catch(() => {
