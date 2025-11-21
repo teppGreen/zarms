@@ -3,6 +3,7 @@
   let currentUser = null;
   let worksData = [];
   let projectsData = [];
+  let tasksData = [];
   let membersData = [];
   let knowledgeData = [];
   let configData = {};
@@ -11,6 +12,7 @@
   let tableState = {
     works: { sortKey: 'due_datetime', sortOrder: 'asc', filters: {} },
     projects: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
+    tasks: { sortKey: 'planned_end_datetime', sortOrder: 'asc', filters: {} },
     members: { sortKey: 'member_name', sortOrder: 'asc', filters: {} },
   };
 
@@ -32,6 +34,17 @@
     { key: 'created_at', label: '作成日', sortable: true, editable: false },
     { key: 'creator_name', label: '作成者', sortable: true, filterable: true, editable: false },
     { key: 'works_count', label: '関連制作物', sortable: true, editable: false }
+  ];
+
+  const tasksTableHeaders = [
+    { key: 'task_id', label: 'タスクID', sortable: true },
+    { key: 'project_title', label: '案件タイトル', sortable: true, filterable: true, editable: false },
+    { key: 'work_title', label: '制作タイトル', sortable: true, filterable: true, editable: false },
+    { key: 'task_title', label: 'タスクタイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
+    { key: 'status_key', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'TASK_STATUS' },
+    { key: 'priority_key', label: '優先度', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'TASK_PRIORITY' },
+    { key: 'assignee_name', label: '担当者', sortable: true, filterable: true, editable: false },
+    { key: 'planned_end_datetime', label: '予定終了日時', sortable: true, editable: true, editType: 'datetime' }
   ];
 
   const membersTableHeaders = [
@@ -509,7 +522,7 @@
     showLoading();
     const dataLoaders = {
       'home': loadHomeData, 'works': loadWorksData, 'projects': loadProjectsData,
-      'members': loadMembersData, 'knowledge': loadKnowledgeData, 'summary': loadSummaryData,
+      'tasks': loadTasksData, 'members': loadMembersData, 'knowledge': loadKnowledgeData, 'summary': loadSummaryData,
     };
     if (dataLoaders[tabName]) dataLoaders[tabName]();
     else hideLoading();
@@ -981,6 +994,9 @@
   function loadProjectsData() {
     callGAS('getProjects').then(data => { projectsData = data; renderTable('projects', applyFiltersAndSort('projects', projectsData), projectsTableHeaders); hideLoading(); }).catch(handleError);
   }
+  function loadTasksData() {
+    callGAS('getTasks').then(data => { tasksData = data; renderTable('tasks', applyFiltersAndSort('tasks', tasksData), tasksTableHeaders); hideLoading(); }).catch(handleError);
+  }
   function loadMembersData() {
     callGAS('getMembers').then(data => { membersData = data; renderTable('members', applyFiltersAndSort('members', membersData), membersTableHeaders); hideLoading(); }).catch(handleError);
   }
@@ -1058,7 +1074,7 @@
       return;
     }
 
-    const idKey = name === 'members' ? 'member_email' : (name === 'works' ? 'work_id' : 'project_id');
+    const idKey = name === 'members' ? 'member_email' : (name === 'works' ? 'work_id' : (name === 'tasks' ? 'task_id' : 'project_id'));
 
     data.forEach(item => {
       const row = tbody.insertRow();
@@ -1116,10 +1132,12 @@
           switch (header.key) {
             case 'work_id': content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openWorkDetailOverlay('${item.work_id}')">${escapeHtml(item.work_id)}</button>`; break;
             case 'project_id': content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openProjectDetailOverlay('${item.project_id}')">${escapeHtml(item.project_id)}</button>`; break;
+            case 'task_id': content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(item.task_id)}</span>`; break;
             case 'detail': content = `<button class="btn-link" onclick="openMemberDetail('${item.member_email}')">詳細</button>`; break;
             case 'assignees': content = renderAssignees(item.assignees); break;
             case 'avatar': content = `<img src="${escapeHtml(item.member_icon || 'https://via.placeholder.com/32')}" class="avatar" alt="">`; break;
             case 'due_datetime': content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDateTimeForDisplay(currentValue, true))}</span>`; break;
+            case 'planned_end_datetime': content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDateTimeForDisplay(currentValue))}</span>`; break;
             case 'created_at': content = escapeHtml(formatDate(currentValue)); break;
             default:
               if (typeof currentValue === 'string' && currentValue.length > 10) {
@@ -5007,7 +5025,7 @@
       state.sortKey = columnKey;
       state.sortOrder = 'asc';
     }
-    const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'members': loadMembersData };
+    const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'tasks': loadTasksData, 'members': loadMembersData };
     if (dataLoaders[tableName]) {
       showLoading();
       dataLoaders[tableName]();
@@ -5018,7 +5036,7 @@
     event.stopPropagation();
     closeFilterMenu();
     const state = tableState[tableName];
-    const data = tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : membersData;
+    const data = tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : tableName === 'tasks' ? tasksData : membersData;
     const uniqueValues = [...new Set(data.map(item => item[columnKey]))].filter(v => v);
     const popup = document.createElement('div');
     popup.id = 'filter-popup';
@@ -5055,7 +5073,7 @@
         delete state.filters[columnKey];
       }
       closeFilterMenu();
-      const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'members': loadMembersData };
+      const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'tasks': loadTasksData, 'members': loadMembersData };
       if (dataLoaders[tableName]) {
         showLoading();
         dataLoaders[tableName]();
@@ -5067,7 +5085,7 @@
     clearBtn.onclick = () => {
       delete state.filters[columnKey];
       closeFilterMenu();
-      const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'members': loadMembersData };
+      const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'tasks': loadTasksData, 'members': loadMembersData };
       if (dataLoaders[tableName]) {
         showLoading();
         dataLoaders[tableName]();
@@ -5125,7 +5143,7 @@
   // ヘルパー関数
   // ============================================
   function getHeaderDef(tableName, field) {
-    const headers = tableName === 'works' ? worksTableHeaders : tableName === 'projects' ? projectsTableHeaders : membersTableHeaders;
+    const headers = tableName === 'works' ? worksTableHeaders : tableName === 'projects' ? projectsTableHeaders : tableName === 'tasks' ? tasksTableHeaders : membersTableHeaders;
     return headers.find(h => h.key === field);
   }
   function renderAssignees(assignees) {
@@ -5248,8 +5266,8 @@
     showLoading();
 
     // まずデータ配列を更新する
-    const data = tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : membersData;
-    const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : 'project_id');
+    const data = tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : tableName === 'tasks' ? tasksData : membersData;
+    const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : (tableName === 'tasks' ? 'task_id' : 'project_id'));
     const item = data.find(d => String(d[idKey]) === String(id));
     if (item) {
       item[field] = newValue;
@@ -5286,14 +5304,14 @@
         if (!success) {
           handleError({ message: '更新に失敗しました。' });
           // 失敗時はデータを再読み込み
-          const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'members': loadMembersData };
+          const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'tasks': loadTasksData, 'members': loadMembersData };
           if (dataLoaders[tableName]) dataLoaders[tableName]();
         }
       })
       .catch(err => {
         handleError(err);
         // エラー時はデータを再読み込み
-        const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'members': loadMembersData };
+        const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'tasks': loadTasksData, 'members': loadMembersData };
         if (dataLoaders[tableName]) dataLoaders[tableName]();
       });
   }
