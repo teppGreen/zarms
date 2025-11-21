@@ -670,22 +670,21 @@
       const statusColor = getWorkStatusColor(work.work_status_key);
       const statusLabel = getConfigLabel(work.work_status_key, 'WORK_STATUS');
 
-      // 未完了タスク数の表示
-      const incompleteTasksHtml = work.incomplete_task_count > 0
-        ? `<div class="incomplete-tasks-count">未完了のタスク: ${work.incomplete_task_count}件</div>`
-        : '';
+      // 納期表示
+      const dueDate = formatDateTimeForHome(work.due_datetime);
 
       card.innerHTML = `
-        <div class="work-status-badge ${statusColor}">${escapeHtml(statusLabel)}</div>
-        <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
-          ${work.project_id ? `${escapeHtml(work.project_id)} ` : ''}${escapeHtml(work.project_title || '')}
+        <div class="home-card-row">
+          <span class="home-card-id">${work.project_id ? escapeHtml(work.project_id) : ''}</span>
+          <span class="home-card-title" title="${escapeHtml(work.project_title || '')}">${escapeHtml(work.project_title || '')}</span>
         </div>
-        <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
-          ${escapeHtml(work.work_id)} ${escapeHtml(work.work_title || '')}
+        <div class="home-card-row">
+          <span class="home-card-id">${escapeHtml(work.work_id)}</span>
+          <span class="home-card-title" title="${escapeHtml(work.work_title || '')}">${escapeHtml(work.work_title || '')}</span>
         </div>
-        <div class="card-meta">
-          <span>納期: <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${formatDateTimeForHome(work.due_datetime)}</span></span>
-          ${incompleteTasksHtml}
+        <div class="home-card-meta-row">
+          <div class="work-status-badge ${statusColor}">${escapeHtml(statusLabel)}</div>
+          <span class="home-card-due-date">納期: ${dueDate}</span>
         </div>
       `;
 
