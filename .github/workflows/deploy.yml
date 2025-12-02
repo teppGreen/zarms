@@ -41,10 +41,14 @@ jobs:
         # Clasp の状態を確認し、プロジェクトならプッシュ または、強制プッシュ
         # 元のディレクトリに戻る
       run: |
-        for dir in $(ls -d */); do
-          cd $dir
-          if clasp status; then  
-            clasp push -f  
+        # src ディレクトリ内のサブディレクトリを対象にする
+        for dir in src/*/; do
+          if [ -d "$dir" ]; then
+            cd "$dir"
+            if [ -f ".clasp.json" ]; then
+              echo "Pushing in $dir"
+              clasp push -f
+            fi
+            cd - > /dev/null
           fi
-          cd ..
         done
