@@ -1039,10 +1039,10 @@
   }
 
   function loadWorksData() {
-    callGAS('getWorks').then(data => { worksData = data; renderTable(SHEET_NAMES.WORKS, applyFiltersAndSort(SHEET_NAMES.WORKS, worksData), worksTableHeaders); hideLoading(); }).catch(handleError);
+    callGAS('getAllData', SHEET_NAMES.CREATIVES).then(data => { worksData = data; renderTable(SHEET_NAMES.CREATIVES, applyFiltersAndSort(SHEET_NAMES.CREATIVES, worksData), worksTableHeaders); hideLoading(); }).catch(handleError);
   }
   function loadProjectsData() {
-    callGAS('getProjects').then(data => { projectsData = data; renderTable(SHEET_NAMES.PROJECTS, applyFiltersAndSort(SHEET_NAMES.PROJECTS, projectsData), projectsTableHeaders); hideLoading(); }).catch(handleError);
+    callGAS('getAllData', SHEET_NAMES.PLANS).then(data => { projectsData = data; renderTable(SHEET_NAMES.PLANS, applyFiltersAndSort(SHEET_NAMES.PLANS, projectsData), projectsTableHeaders); hideLoading(); }).catch(handleError);
   }
   function loadTasksData() {
     callGAS('getTasks').then(data => { tasksData = data; renderTable(SHEET_NAMES.TASKS, applyFiltersAndSort(SHEET_NAMES.TASKS, tasksData), tasksTableHeaders); hideLoading(); }).catch(handleError);
@@ -1809,7 +1809,7 @@
         // データを保存（変更があった場合のみ）
         if (newValueAsISO !== originalValue) {
           showLoading();
-          callGAS('updateItem', SHEET_NAMES.WORKS, workId, { due_datetime: newValueAsISO })
+          callGAS('updateItem', SHEET_NAMES.CREATIVES, workId, { due_datetime: newValueAsISO })
             .then(() => {
               hideLoading();
               // 画面を再読み込みしてステータスの日時を更新
@@ -2004,7 +2004,7 @@
           const newValue = workTitleInput.value.trim();
           if (newValue && newValue !== work.work_title) {
             showLoading();
-            callGAS('updateItem', SHEET_NAMES.WORKS, work.work_id, { work_title: newValue })
+            callGAS('updateItem', SHEET_NAMES.CREATIVES, work.work_id, { work_title: newValue })
               .then(() => {
                 hideLoading();
               })
@@ -2190,7 +2190,7 @@
       renderWorkTasks(work.tasks);
       renderWorkAssignees(work.assignees);
       // renderWorkApps(work.apps);
-      renderWorkReviewRequests(work.review_requests || []);
+      // renderWorkReviewRequests(work.review_requests || []);
       document.getElementById('new-task-button').onclick = () => openNewTaskModal(work.work_id);
       document.getElementById('new-review-request-button').onclick = () => openNewReviewRequestModal(work.work_id);
       document.getElementById('work-detail-overlay').classList.add('show');
@@ -2854,7 +2854,7 @@
       optionDiv.addEventListener('click', () => {
         if (opt.config_key !== currentValue) {
           showLoading();
-          callGAS('updateItem', SHEET_NAMES.WORKS, workId, { [field]: opt.config_key })
+          callGAS('updateItem', SHEET_NAMES.CREATIVES, workId, { [field]: opt.config_key })
             .then(() => {
               const statusText = document.getElementById('work-detail-status-text');
               if (statusText) {
@@ -2901,7 +2901,7 @@
       optionDiv.addEventListener('click', () => {
         if (opt.config_key !== currentValue) {
           showLoading();
-          callGAS('updateItem', SHEET_NAMES.WORKS, workId, { [field]: opt.config_key })
+          callGAS('updateItem', SHEET_NAMES.CREATIVES, workId, { [field]: opt.config_key })
             .then(() => {
               const statusTextHeader = document.getElementById('work-detail-status-text-header');
               if (statusTextHeader) {
@@ -3148,7 +3148,7 @@
 
     if (newValueAsISO !== originalValue) {
       showLoading();
-      callGAS('updateItem', SHEET_NAMES.WORKS, workId, { [field]: newValueAsISO })
+      callGAS('updateItem', SHEET_NAMES.CREATIVES, workId, { [field]: newValueAsISO })
         .then(() => {
           const textSpan = container.querySelector('.editable-text');
           if (textSpan) {
@@ -3206,7 +3206,7 @@
 
     if (newValueAsISO !== originalValue) {
       showLoading();
-      callGAS('updateItem', SHEET_NAMES.WORKS, workId, { [field]: newValueAsISO })
+      callGAS('updateItem', SHEET_NAMES.CREATIVES, workId, { [field]: newValueAsISO })
         .then(() => {
           const textSpanHeader = document.getElementById('work-detail-due-text-header');
           const textSpan = document.getElementById('work-detail-due-text');
@@ -3564,125 +3564,129 @@
     // ただし、既存のコードとの互換性のために残す
   }
 
-  function renderWorkReviewRequests(reviewRequests) {
-    const container = document.getElementById('work-review-requests-container');
-    container.innerHTML = '';
-    if (!reviewRequests || reviewRequests.length === 0) {
-      container.innerHTML = '<p style="color: #6b7280;">レビュー依頼はありません。</p>';
-      return;
-    }
-
-    // created_atを参照して降順で並び替え
-    const sortedReviewRequests = [...reviewRequests].sort((a, b) => {
-      const dateA = new Date(a.created_at || 0);
-      const dateB = new Date(b.created_at || 0);
-      return dateB - dateA; // 降順
-    });
-
-    sortedReviewRequests.forEach(reviewRequest => {
-      const card = document.createElement('div');
-      card.className = 'home-card';
-      card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
-
-      // due_datetimeを「~10/24(水) 15:00」形式で表示
-      const dueDateHtml = reviewRequest.due_datetime
-        ? formatDateForReview(reviewRequest.due_datetime)
-        : '';
-
-      // 作成者情報
-      const creatorIcon = reviewRequest.creator_icon || 'https:\/\/via.placeholder.com/24';
-      const creatorName = reviewRequest.creator_name || '';
-
-      // 最初に登録されたファイルを取得（created_atでソート）
-      let firstFile = null;
-      if (reviewRequest.files && reviewRequest.files.length > 0) {
-        const sortedFiles = [...reviewRequest.files].sort((a, b) => {
-          const dateA = new Date(a.created_at || 0);
-          const dateB = new Date(b.created_at || 0);
-          return dateA - dateB;
-        });
-        firstFile = sortedFiles[0];
+  /*
+    function renderWorkReviewRequests(reviewRequests) {
+      const container = document.getElementById('work-review-requests-container');
+      container.innerHTML = '';
+      if (!reviewRequests || reviewRequests.length === 0) {
+        container.innerHTML = '<p style="color: #6b7280;">レビュー依頼はありません。</p>';
+        return;
       }
-
-      // サムネイル用のプレースホルダー
-      const thumbnailHtml = firstFile && firstFile.file_id
-        ? `<div class="review-thumbnail-container" data-file-id="${escapeHtml(firstFile.file_id)}">
-             <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: var(--md-sys-color-surface-variant);">
-               <span style="color: var(--md-sys-color-on-surface-variant); font-size: 0.75rem;">読み込み中...</span>
-             </div>
-           </div>`
-        : '';
-
-      card.innerHTML = `
-        ${thumbnailHtml}
-        <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); font-family: 'Roboto Mono', monospace; font-weight: 500; word-wrap: break-word;">
-          ${escapeHtml(reviewRequest.review_request_id || '')} ${escapeHtml(reviewRequest.review_title || '')}
-        </div>
-        <div class="card-meta">
-          <span class="review-creator">
-            <img src="${escapeHtml(creatorIcon)}" class="review-creator-icon" alt="${escapeHtml(creatorName)}">
-            <span>${escapeHtml(creatorName)}</span>
-          </span>  
-          <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">
-            ${dueDateHtml || ''}
-          </span>
-        </div>
-      `;
-
-      container.appendChild(card);
-
-      // サムネイルを非同期で読み込む（タブの読み込み完了後）
-      if (firstFile && firstFile.file_id) {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            loadReviewThumbnail(card.querySelector('.review-thumbnail-container'), firstFile.file_id);
+  
+      // created_atを参照して降順で並び替え
+      const sortedReviewRequests = [...reviewRequests].sort((a, b) => {
+        const dateA = new Date(a.created_at || 0);
+        const dateB = new Date(b.created_at || 0);
+        return dateB - dateA; // 降順
+      });
+  
+      sortedReviewRequests.forEach(reviewRequest => {
+        const card = document.createElement('div');
+        card.className = 'home-card';
+        card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
+  
+        // due_datetimeを「~10/24(水) 15:00」形式で表示
+        const dueDateHtml = reviewRequest.due_datetime
+          ? formatDateForReview(reviewRequest.due_datetime)
+          : '';
+  
+        // 作成者情報
+        const creatorIcon = reviewRequest.creator_icon || 'https:\/\/via.placeholder.com/24';
+        const creatorName = reviewRequest.creator_name || '';
+  
+        // 最初に登録されたファイルを取得（created_atでソート）
+        let firstFile = null;
+        if (reviewRequest.files && reviewRequest.files.length > 0) {
+          const sortedFiles = [...reviewRequest.files].sort((a, b) => {
+            const dateA = new Date(a.created_at || 0);
+            const dateB = new Date(b.created_at || 0);
+            return dateA - dateB;
           });
-        });
-      }
-    });
-  }
-
-  function renderWorkApps(apps) {
-    const container = document.getElementById('work-apps-container');
-    container.innerHTML = '';
-    if (!apps || apps.length === 0) {
-      container.innerHTML = '<p style="color: #6b7280; margin-bottom: 8px;">使用アプリはありません。</p>';
-    } else {
-      apps.forEach(app => {
-        const div = document.createElement('div');
-        div.style.display = 'flex';
-        div.style.alignItems = 'center';
-        div.style.justifyContent = 'space-between';
-        div.style.marginBottom = '8px';
-        div.style.padding = '8px';
-        div.style.backgroundColor = 'var(--md-sys-color-surface-variant)';
-        div.style.borderRadius = '8px';
-
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = app.value || app.key;
-
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'btn btn-sm btn-secondary';
-        removeBtn.textContent = '削除';
-        removeBtn.onclick = () => removeWorkApp(currentWorkId, app.key);
-
-        div.appendChild(nameSpan);
-        div.appendChild(removeBtn);
-        container.appendChild(div);
+          firstFile = sortedFiles[0];
+        }
+  
+        // サムネイル用のプレースホルダー
+        const thumbnailHtml = firstFile && firstFile.file_id
+          ? `<div class="review-thumbnail-container" data-file-id="${escapeHtml(firstFile.file_id)}">
+               <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: var(--md-sys-color-surface-variant);">
+                 <span style="color: var(--md-sys-color-on-surface-variant); font-size: 0.75rem;">読み込み中...</span>
+               </div>
+             </div>`
+          : '';
+  
+        card.innerHTML = `
+          ${thumbnailHtml}
+          <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); font-family: 'Roboto Mono', monospace; font-weight: 500; word-wrap: break-word;">
+            ${escapeHtml(reviewRequest.review_request_id || '')} ${escapeHtml(reviewRequest.review_title || '')}
+          </div>
+          <div class="card-meta">
+            <span class="review-creator">
+              <img src="${escapeHtml(creatorIcon)}" class="review-creator-icon" alt="${escapeHtml(creatorName)}">
+              <span>${escapeHtml(creatorName)}</span>
+            </span>  
+            <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">
+              ${dueDateHtml || ''}
+            </span>
+          </div>
+        `;
+  
+        container.appendChild(card);
+  
+        // サムネイルを非同期で読み込む（タブの読み込み完了後）
+        if (firstFile && firstFile.file_id) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              loadReviewThumbnail(card.querySelector('.review-thumbnail-container'), firstFile.file_id);
+            });
+          });
+        }
       });
     }
+  */
 
-    // 追加ボタン
-    const addBtn = container.querySelector('button[data-action="add-app"]');
-    if (!addBtn) {
-      const newAddBtn = document.createElement('button');
-      newAddBtn.className = 'btn btn-sm';
-      newAddBtn.textContent = '+ Add App';
-      newAddBtn.dataset.action = 'add-app';
-      newAddBtn.onclick = () => openAddAppModal();
-      container.appendChild(newAddBtn);
+  /*
+    function renderWorkApps(apps) {
+      const container = document.getElementById('work-apps-container');
+      container.innerHTML = '';
+      if (!apps || apps.length === 0) {
+        container.innerHTML = '<p style="color: #6b7280; margin-bottom: 8px;">使用アプリはありません。</p>';
+      } else {
+        apps.forEach(app => {
+          const div = document.createElement('div');
+          div.style.display = 'flex';
+          div.style.alignItems = 'center';
+          div.style.justifyContent = 'space-between';
+          div.style.marginBottom = '8px';
+          div.style.padding = '8px';
+          div.style.backgroundColor = 'var(--md-sys-color-surface-variant)';
+          div.style.borderRadius = '8px';
+  
+          const nameSpan = document.createElement('span');
+          nameSpan.textContent = app.value || app.key;
+  
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'btn btn-sm btn-secondary';
+          removeBtn.textContent = '削除';
+          removeBtn.onclick = () => removeWorkApp(currentWorkId, app.key);
+  
+          div.appendChild(nameSpan);
+          div.appendChild(removeBtn);
+          container.appendChild(div);
+        });
+      }
+  
+      // 追加ボタン
+      const addBtn = container.querySelector('button[data-action="add-app"]');
+      if (!addBtn) {
+        const newAddBtn = document.createElement('button');
+        newAddBtn.className = 'btn btn-sm';
+        newAddBtn.textContent = '+ Add App';
+        newAddBtn.dataset.action = 'add-app';
+        newAddBtn.onclick = () => openAddAppModal();
+        container.appendChild(newAddBtn);
+      }
     }
-  }
+  */
 
   function openAddAssigneeDropdown(buttonElement, workId, currentAssignees) {
     // 既に割り当てられているメンバーを取得
@@ -3864,7 +3868,7 @@
     if (!currentWorkId) return;
 
     // 既に割り当てられているメンバーを取得
-    callGAS('getItemById', SHEET_NAMES.WORKS, currentWorkId).then(work => {
+    callGAS('getItemById', SHEET_NAMES.CREATIVES, currentWorkId).then(work => {
       const assignedEmails = (work.assignees || []).map(a => a.member_email);
       const availableMembers = (membersData || []).filter(m => !assignedEmails.includes(m.member_email));
 
@@ -3913,67 +3917,78 @@
     });
   }
 
-  function openAddAppModal() {
-    if (!currentWorkId) return;
-
-    // 既に割り当てられているアプリを取得
-    callGAS('getItemById', SHEET_NAMES.WORKS, currentWorkId).then(work => {
-      const assignedAppKeys = (work.apps || []).map(a => a.key);
-      const availableApps = (configData['APP'] || []).filter(app => !assignedAppKeys.includes(app.config_key));
-
-      if (availableApps.length === 0) {
-        alert('追加できるアプリがいません');
-        return;
-      }
-
-      // 簡易的な選択UI
-      const optionsContainer = document.createElement('div');
-      optionsContainer.className = 'popup-editor';
-      optionsContainer.style.position = 'fixed';
-      optionsContainer.style.top = '50%';
-      optionsContainer.style.left = '50%';
-      optionsContainer.style.transform = 'translate(-50%, -50%)';
-      optionsContainer.style.zIndex = '2000';
-      optionsContainer.style.maxHeight = '400px';
-      optionsContainer.style.overflowY = 'auto';
-      optionsContainer.style.padding = '16px';
-
-      const title = document.createElement('h3');
-      title.textContent = '使用アプリを追加';
-      title.style.marginTop = '0';
-      optionsContainer.appendChild(title);
-
-      availableApps.forEach(app => {
-        const optionDiv = document.createElement('div');
-        optionDiv.className = 'popup-editor-option';
-        optionDiv.textContent = app.config_value;
-        optionDiv.style.cursor = 'pointer';
-        optionDiv.addEventListener('click', () => {
-          addWorkApp(currentWorkId, app.config_key);
-          optionsContainer.remove();
+  /*
+    function openAddAppModal() {
+      if (!currentWorkId) return;
+  
+      // 既に割り当てられているアプリを取得
+      callGAS('getItemById', SHEET_NAMES.CREATIVES, currentWorkId).then(work => {
+        const assignedAppKeys = (work.apps || []).map(a => a.key);
+        const availableApps = (configData['APP'] || []).filter(app => !assignedAppKeys.includes(app.config_key));
+  
+        if (availableApps.length === 0) {
+          alert('追加できるアプリがいません');
+          return;
+        }
+  
+        // 簡易的な選択UI
+        const optionsContainer = document.createElement('div');
+        optionsContainer.className = 'popup-editor';
+        optionsContainer.style.position = 'fixed';
+        optionsContainer.style.top = '50%';
+        optionsContainer.style.left = '50%';
+        optionsContainer.style.transform = 'translate(-50%, -50%)';
+        optionsContainer.style.zIndex = '2000';
+        optionsContainer.style.maxHeight = '400px';
+        optionsContainer.style.overflowY = 'auto';
+        optionsContainer.style.padding = '16px';
+  
+        const title = document.createElement('h3');
+        title.textContent = '使用アプリを追加';
+        title.style.marginTop = '0';
+        optionsContainer.appendChild(title);
+  
+        availableApps.forEach(app => {
+          const optionDiv = document.createElement('div');
+          optionDiv.className = 'popup-editor-option';
+          optionDiv.textContent = app.config_value;
+          optionDiv.style.cursor = 'pointer';
+          optionDiv.addEventListener('click', () => {
+            addWorkApp(currentWorkId, app.config_key);
+            optionsContainer.remove();
+          });
+          optionsContainer.appendChild(optionDiv);
         });
-        optionsContainer.appendChild(optionDiv);
+  
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'btn btn-secondary';
+        closeBtn.textContent = 'キャンセル';
+        closeBtn.style.marginTop = '16px';
+        closeBtn.onclick = () => optionsContainer.remove();
+        optionsContainer.appendChild(closeBtn);
+  
+        document.body.appendChild(optionsContainer);
       });
-
-      const closeBtn = document.createElement('button');
-      closeBtn.className = 'btn btn-secondary';
-      closeBtn.textContent = 'キャンセル';
-      closeBtn.style.marginTop = '16px';
-      closeBtn.onclick = () => optionsContainer.remove();
-      optionsContainer.appendChild(closeBtn);
-
-      document.body.appendChild(optionsContainer);
-    });
-  }
+    }
+  */
 
   function addWorkAssignee(workId, memberEmail) {
     showLoading();
-    callGAS('createItem', SHEET_NAMES.WORK_ASSIGNMENTS, { work_id: workId, member_email: memberEmail })
+    const member = membersData.find(m => m.member_email === memberEmail);
+    const memberId = member ? member.id : null;
+
+    if (!memberId) {
+      alert('Member not found');
+      hideLoading();
+      return;
+    }
+
+    callGAS('createItem', SHEET_NAMES.MEMBER_ASSIGNMENTS, { creative_id: workId, member_id: memberId })
       .then(() => {
         hideLoading();
         if (currentWorkId) {
           // 担当者表示を更新
-          callGAS('getItemById', SHEET_NAMES.WORKS, currentWorkId).then(work => {
+          callGAS('getItemById', SHEET_NAMES.CREATIVES, currentWorkId).then(work => {
             const assigneesContainer = document.getElementById('work-detail-assignees-header-info');
             if (assigneesContainer) {
               assigneesContainer.innerHTML = '';
@@ -4029,7 +4044,16 @@
     if (!confirm('この担当者を削除しますか？')) return;
 
     showLoading();
-    callGAS('deleteItem', SHEET_NAMES.WORK_ASSIGNMENTS, { work_id: workId, member_email: memberEmail })
+    const member = membersData.find(m => m.member_email === memberEmail);
+    const memberId = member ? member.id : null;
+
+    if (!memberId) {
+      alert('Member not found');
+      hideLoading();
+      return;
+    }
+
+    callGAS('deleteItem', SHEET_NAMES.MEMBER_ASSIGNMENTS, { related_table: SHEET_NAMES.CREATIVES, related_id: workId, member_id: memberId })
       .then(() => {
         hideLoading();
         if (currentWorkId) {
@@ -4041,35 +4065,39 @@
       });
   }
 
-  function addWorkApp(workId, appKey) {
-    showLoading();
-    callGAS('createItem', SHEET_NAMES.APP_ASSIGNMENTS, { work_id: workId, work_apps_key: appKey })
-      .then(() => {
-        hideLoading();
-        if (currentWorkId) {
-          openWorkDetailOverlay(currentWorkId);
-        }
-      })
-      .catch(error => {
-        handleError(error);
-      });
-  }
+  /*
+    function addWorkApp(workId, appKey) {
+      showLoading();
+      callGAS('createItem', SHEET_NAMES.APP_ASSIGNMENTS, { work_id: workId, work_apps_key: appKey })
+        .then(() => {
+          hideLoading();
+          if (currentWorkId) {
+            openWorkDetailOverlay(currentWorkId);
+          }
+        })
+        .catch(error => {
+          handleError(error);
+        });
+    }
+  */
 
-  function removeWorkApp(workId, appKey) {
-    if (!confirm('このアプリを削除しますか？')) return;
-
-    showLoading();
-    callGAS('deleteItem', SHEET_NAMES.APP_ASSIGNMENTS, { work_id: workId, work_apps_key: appKey })
-      .then(() => {
-        hideLoading();
-        if (currentWorkId) {
-          openWorkDetailOverlay(currentWorkId);
-        }
-      })
-      .catch(error => {
-        handleError(error);
-      });
-  }
+  /*
+    function removeWorkApp(workId, appKey) {
+      if (!confirm('このアプリを削除しますか？')) return;
+  
+      showLoading();
+      callGAS('deleteItem', SHEET_NAMES.APP_ASSIGNMENTS, { work_id: workId, work_apps_key: appKey })
+        .then(() => {
+          hideLoading();
+          if (currentWorkId) {
+            openWorkDetailOverlay(currentWorkId);
+          }
+        })
+        .catch(error => {
+          handleError(error);
+        });
+    }
+  */
 
   function openMemberDetail(memberEmail) {
     // JavaScript関数呼び出しを記録（HTTP 429エラー時の再試行用）
@@ -4951,7 +4979,7 @@
     // Worksデータを取得（まだ取得していない場合）
     if (!worksData || worksData.length === 0) {
       showLoading();
-      callGAS('getItems', SHEET_NAMES.WORKS).then(data => {
+      callGAS('getItems', SHEET_NAMES.CREATIVES).then(data => {
         worksData = data;
         hideLoading();
         openModal('modal-new-knowledge');
@@ -5110,7 +5138,7 @@
       state.sortKey = columnKey;
       state.sortOrder = 'asc';
     }
-    const dataLoaders = { [SHEET_NAMES.WORKS]: () => loadData(SHEET_NAMES.WORKS), [SHEET_NAMES.PROJECTS]: () => loadData(SHEET_NAMES.PROJECTS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
+    const dataLoaders = { [SHEET_NAMES.CREATIVES]: () => loadData(SHEET_NAMES.CREATIVES), [SHEET_NAMES.PLANS]: () => loadData(SHEET_NAMES.PLANS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
     if (dataLoaders[tableName]) {
       showLoading();
       dataLoaders[tableName]();
@@ -5121,7 +5149,7 @@
     event.stopPropagation();
     closeFilterMenu();
     const state = tableState[tableName];
-    const data = tableName === SHEET_NAMES.WORKS ? worksData : tableName === SHEET_NAMES.PROJECTS ? projectsData : tableName === SHEET_NAMES.TASKS ? tasksData : membersData;
+    const data = tableName === SHEET_NAMES.CREATIVES ? worksData : tableName === SHEET_NAMES.PLANS ? projectsData : tableName === SHEET_NAMES.TASKS ? tasksData : membersData;
     const uniqueValues = [...new Set(data.map(item => item[columnKey]))].filter(v => v);
     const popup = document.createElement('div');
     popup.id = 'filter-popup';
@@ -5158,7 +5186,7 @@
         delete state.filters[columnKey];
       }
       closeFilterMenu();
-      const dataLoaders = { [SHEET_NAMES.WORKS]: () => loadData(SHEET_NAMES.WORKS), [SHEET_NAMES.PROJECTS]: () => loadData(SHEET_NAMES.PROJECTS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
+      const dataLoaders = { [SHEET_NAMES.CREATIVES]: () => loadData(SHEET_NAMES.CREATIVES), [SHEET_NAMES.PLANS]: () => loadData(SHEET_NAMES.PLANS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
       if (dataLoaders[tableName]) {
         showLoading();
         dataLoaders[tableName]();
@@ -5170,7 +5198,7 @@
     clearBtn.onclick = () => {
       delete state.filters[columnKey];
       closeFilterMenu();
-      const dataLoaders = { [SHEET_NAMES.WORKS]: loadWorksData, [SHEET_NAMES.PROJECTS]: loadProjectsData, [SHEET_NAMES.TASKS]: loadTasksData, [SHEET_NAMES.MEMBERS]: loadMembersData };
+      const dataLoaders = { [SHEET_NAMES.CREATIVES]: loadWorksData, [SHEET_NAMES.PLANS]: loadProjectsData, [SHEET_NAMES.TASKS]: loadTasksData, [SHEET_NAMES.MEMBERS]: loadMembersData };
       if (dataLoaders[tableName]) {
         showLoading();
         dataLoaders[tableName]();
@@ -5228,7 +5256,7 @@
   // ヘルパー関数
   // ============================================
   function getHeaderDef(tableName, field) {
-    const headers = tableName === SHEET_NAMES.WORKS ? worksTableHeaders : tableName === SHEET_NAMES.PROJECTS ? projectsTableHeaders : tableName === SHEET_NAMES.TASKS ? tasksTableHeaders : membersTableHeaders;
+    const headers = tableName === SHEET_NAMES.CREATIVES ? worksTableHeaders : tableName === SHEET_NAMES.PLANS ? projectsTableHeaders : tableName === SHEET_NAMES.TASKS ? tasksTableHeaders : membersTableHeaders;
     return headers.find(h => h.key === field);
   }
   function renderAssignees(assignees) {
@@ -5351,8 +5379,8 @@
     showLoading();
 
     // まずデータ配列を更新する
-    const data = tableName === SHEET_NAMES.WORKS ? worksData : tableName === SHEET_NAMES.PROJECTS ? projectsData : tableName === SHEET_NAMES.TASKS ? tasksData : membersData;
-    const idKey = tableName === SHEET_NAMES.MEMBERS ? 'member_email' : (tableName === SHEET_NAMES.WORKS ? 'work_id' : (tableName === SHEET_NAMES.TASKS ? 'task_id' : 'project_id'));
+    const data = tableName === SHEET_NAMES.CREATIVES ? worksData : tableName === SHEET_NAMES.PLANS ? projectsData : tableName === SHEET_NAMES.TASKS ? tasksData : membersData;
+    const idKey = tableName === SHEET_NAMES.MEMBERS ? 'member_email' : (tableName === SHEET_NAMES.CREATIVES ? 'work_id' : (tableName === SHEET_NAMES.TASKS ? 'task_id' : 'project_id'));
     const item = data.find(d => String(d[idKey]) === String(id));
     if (item) {
       item[field] = newValue;
@@ -5389,14 +5417,14 @@
         if (!success) {
           handleError({ message: '更新に失敗しました。' });
           // 失敗時はデータを再読み込み
-          const dataLoaders = { [SHEET_NAMES.WORKS]: () => loadData(SHEET_NAMES.WORKS), [SHEET_NAMES.PROJECTS]: () => loadData(SHEET_NAMES.PROJECTS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
+          const dataLoaders = { [SHEET_NAMES.CREATIVES]: () => loadData(SHEET_NAMES.CREATIVES), [SHEET_NAMES.PLANS]: () => loadData(SHEET_NAMES.PLANS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
           if (dataLoaders[tableName]) dataLoaders[tableName]();
         }
       })
       .catch(err => {
         handleError(err);
         // エラー時はデータを再読み込み
-        const dataLoaders = { [SHEET_NAMES.WORKS]: () => loadData(SHEET_NAMES.WORKS), [SHEET_NAMES.PROJECTS]: () => loadData(SHEET_NAMES.PROJECTS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
+        const dataLoaders = { [SHEET_NAMES.CREATIVES]: () => loadData(SHEET_NAMES.CREATIVES), [SHEET_NAMES.PLANS]: () => loadData(SHEET_NAMES.PLANS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
         if (dataLoaders[tableName]) dataLoaders[tableName]();
       });
   }
