@@ -44,8 +44,8 @@
         <span id="new-button-main">+</span>
       </div>
       <div id="new-button-dropdown" class="new-button-dropdown">
-        <a onclick="openNewWorkModal(); closeNewButtonDropdown();">制作物</a>
-        <a onclick="openNewProjectModal(); closeNewButtonDropdown();">案件</a>
+        <a onclick="openNewCreativeModal(); closeNewButtonDropdown();">制作物</a>
+        <a onclick="openNewPlanModal(); closeNewButtonDropdown();">企画</a>
         <a id="new-member-dropdown-item" style="display: none;"
           onclick="openNewMemberModal(); closeNewButtonDropdown();">メンバー</a>
         <a onclick="openNewKnowledgeModal(); closeNewButtonDropdown();">ナレッジ</a>
@@ -61,13 +61,13 @@
         <span>🏠</span>
         <span>ホーム</span>
       </div>
-      <div id="works-nav" class="nav-item" onclick="switchTab('works')">
+      <div id="creatives-nav" class="nav-item" onclick="switchTab('creatives')">
         <span>📋</span>
         <span>制作物</span>
       </div>
-      <div id="projects-nav" class="nav-item" onclick="switchTab('projects')">
+      <div id="plans-nav" class="nav-item" onclick="switchTab('plans')">
         <span>📁</span>
-        <span>案件</span>
+        <span>企画</span>
       </div>
       <div id="tasks-nav" class="nav-item" onclick="switchTab('tasks')">
         <span>✓</span>
@@ -77,7 +77,7 @@
         <span>👥</span>
         <span>メンバー</span>
       </div>
-      <div id="knowledge-nav" class="nav-item" onclick="switchTab('knowledge')">
+      <div id="knowledges-nav" class="nav-item" onclick="switchTab('knowledges')">
         <span>💡</span>
         <span>ナレッジ</span>
       </div>
@@ -158,14 +158,13 @@
       </div>
     </div>
 
-    <div id="tab-works" class="tab-content" style="display: none;">
-
+    <div id="tab-creatives" class="tab-content" style="display: none;">
       <div class="card">
         <div class="table-container">
-          <table id="works-table" class="table-full">
+          <table id="creatives-table" class="table-full">
             <thead>
               <tr>
-                <th>案件タイトル</th>
+                <th>企画タイトル</th>
                 <th>制作タイトル</th>
                 <th>ステータス</th>
                 <th>納品期限</th>
@@ -174,28 +173,27 @@
                 <th></th>
               </tr>
             </thead>
-            <tbody id="works-table-body">
+            <tbody id="creatives-table-body">
             </tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <div id="tab-projects" class="tab-content" style="display: none;">
-
+    <div id="tab-plans" class="tab-content" style="display: none;">
       <div class="card">
         <div class="table-container">
-          <table id="projects-table" class="table-full">
+          <table id="plans-table" class="table-full">
             <thead>
               <tr>
-                <th>案件タイトル</th>
+                <th>企画タイトル</th>
                 <th>作成日</th>
                 <th>作成者</th>
                 <th>関連制作物</th>
                 <th></th>
               </tr>
             </thead>
-            <tbody id="projects-table-body">
+            <tbody id="plans-table-body">
             </tbody>
           </table>
         </div>
@@ -250,9 +248,9 @@
       </div>
     </div>
 
-    <div id="tab-knowledge" class="tab-content" style="display: none;">
+    <div id="tab-knowledges" class="tab-content" style="display: none;">
 
-      <div id="knowledge-container" class="grid-container">
+      <div id="knowledges-container" class="grid-container">
       </div>
     </div>
 
@@ -282,21 +280,21 @@
     </div>
   </div>
 
-  <div id="modal-work-detail" class="modal">
+  <div id="modal-creative-detail" class="modal">
     <div class="modal-content">
       <h2 class="modal-title">制作物詳細</h2>
-      <div id="work-detail-content"></div>
+      <div id="creative-detail-content"></div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('modal-work-detail')">閉じる</button>
+        <button class="btn btn-secondary" onclick="closeModal('modal-creative-detail')">閉じる</button>
       </div>
     </div>
   </div>
 
-  <div id="modal-new-work" class="modal">
+  <div id="modal-new-creative" class="modal">
     <div class="modal-content">
       <div class="modal-form-content">
         <h2 class="modal-title">新規制作物作成</h2>
-        <div id="new-work-form"></div>
+        <div id="new-creative-form"></div>
       </div>
       <div class="modal-result-content" style="display: none;">
       </div>
@@ -314,18 +312,18 @@
     </div>
   </div>
 
-  <div id="modal-new-project" class="modal">
+  <div id="modal-new-plan" class="modal">
     <div class="modal-content">
       <div class="modal-form-content">
-        <h2 class="modal-title">新規案件作成</h2>
-        <form id="new-project-form" onsubmit="submitNewProject(event)">
+        <h2 class="modal-title">新規企画作成</h2>
+        <form id="new-plan-form" onsubmit="submitNewPlan(event)">
           <div class="form-group">
-            <label class="form-label">案件タイトル</label>
-            <input type="text" name="project_title" class="input-field" required>
+            <label class="form-label">企画タイトル</label>
+            <input type="text" name="title" class="input-field" required>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary btn-cancel"
-              onclick="closeModal('modal-new-project')">キャンセル</button>
+              onclick="closeModal('modal-new-plan')">キャンセル</button>
             <button type="submit" class="btn btn-primary">作成</button>
           </div>
         </form>
@@ -335,7 +333,7 @@
     </div>
   </div>
 
-  <div id="work-detail-overlay" class="overlay">
+  <div id="creative-detail-overlay" class="overlay">
     <div class="overlay-content">
       <div class="workflow-status-bar" id="workflow-status-bar" style="display: none;">
         <div class="workflow-status-item">
@@ -376,34 +374,34 @@
         </div>
       </div>
       <div class="overlay-body">
-        <!-- 列1: 案件情報など（1/5幅） -->
-        <div class="overlay-column-project">
-          <div class="project-info-section">
-            <div class="project-info-field">
-              <label>案件タイトル</label>
-              <div id="overlay-project-title" class="project-info-value"></div>
+        <!-- 列1: 企画情報など（1/5幅） -->
+        <div class="overlay-column-plan">
+          <div class="plan-info-section">
+            <div class="plan-info-field">
+              <label>企画タイトル</label>
+              <div id="overlay-plan-title" class="plan-info-value"></div>
             </div>
-            <div class="project-info-field">
+            <div class="plan-info-field">
               <label>制作タイトル</label>
-              <div id="overlay-work-title" class="project-info-value"></div>
+              <div id="overlay-work-title" class="plan-info-value"></div>
             </div>
-            <div class="project-info-field">
+            <div class="plan-info-field">
               <label>制作物種別</label>
-              <div id="overlay-work-type" class="project-info-value"></div>
+              <div id="overlay-work-type" class="plan-info-value"></div>
             </div>
-            <div class="project-info-field">
+            <div class="plan-info-field">
               <label>依頼受付優先度</label>
-              <div id="overlay-priority" class="project-info-value"></div>
+              <div id="overlay-priority" class="plan-info-value"></div>
             </div>
-            <div class="project-info-separator"></div>
-            <div class="project-info-field">
+            <div class="plan-info-separator"></div>
+            <div class="plan-info-field">
               <label>依頼者</label>
-              <div id="overlay-client" class="project-info-value"></div>
+              <div id="overlay-client" class="plan-info-value"></div>
             </div>
-            <div class="project-info-field">
+            <div class="plan-info-field">
               <label>担当者</label>
-              <button id="overlay-add-assignee-btn" class="project-info-add-btn">+追加</button>
-              <div id="overlay-assignees" class="project-info-assignees"></div>
+              <button id="overlay-add-assignee-btn" class="plan-info-add-btn">+追加</button>
+              <div id="overlay-assignees" class="plan-info-assignees"></div>
             </div>
           </div>
         </div>
@@ -437,23 +435,22 @@
     </div>
   </div>
 
-  <div id="project-detail-overlay" class="overlay">
+  <div id="plan-detail-overlay" class="overlay">
     <div class="overlay-content">
       <div class="overlay-header-info">
 
       </div>
       <div class="overlay-body">
-        <!-- 左半分: プロジェクト詳細情報 -->
+        <!-- 左半分: 企画詳細情報 -->
         <div class="overlay-main">
-          <div id="project-detail-content-container"
-            style="width: 100%; height: 100%; min-height: 600px; padding: 24px;">
+          <div id="plan-detail-content-container" style="width: 100%; height: 100%; min-height: 600px; padding: 24px;">
           </div>
         </div>
         <!-- 右半分: 関連制作物 -->
         <div class="overlay-side">
           <div class="detail-section">
             <h3>関連制作物</h3>
-            <div id="project-works-container"></div>
+            <div id="plan-creatives-container"></div>
           </div>
         </div>
       </div>

@@ -1,60 +1,62 @@
 <script>
+  const SHEET_NAMES = templateVariables.SHEET_NAMES;
+  // ... existing code ...
+
   // グローバル変数
   let currentUser = null;
-  let worksData = [];
-  let projectsData = [];
+  let creativesData = [];
+  let plansData = [];
   let tasksData = [];
   let membersData = [];
-  let knowledgeData = [];
+  let knowledgesData = [];
   let configData = {};
 
   // テーブルの状態管理（ソート、フィルター）
   let tableState = {
-    works: { sortKey: 'due_datetime', sortOrder: 'asc', filters: {} },
-    projects: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
-    tasks: { sortKey: 'planned_end_datetime', sortOrder: 'asc', filters: {} },
-    members: { sortKey: 'member_name', sortOrder: 'asc', filters: {} },
+    creatives: { sortKey: 'deadline_at', sortOrder: 'asc', filters: {} },
+    plans: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
+    tasks: { sortKey: 'ends_at', sortOrder: 'asc', filters: {} },
+    members: { sortKey: 'nickname', sortOrder: 'asc', filters: {} },
   };
 
   // テーブルヘッダーの定義
-  const worksTableHeaders = [
-    { key: 'work_id', label: 'ID', sortable: true },
-    { key: 'project_title', label: '案件タイトル', sortable: true, filterable: true, editable: false },
-    { key: 'work_title', label: '制作タイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
-    { key: 'work_status_key', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'WORK_STATUS' },
-    { key: 'due_datetime', label: '納品期限', sortable: true, editable: true, editType: 'datetime' },
+  // テーブルヘッダーの定義
+  const creativesTableHeaders = [
+    { key: 'display_id', label: 'ID', sortable: true },
+    { key: 'plan_title', label: '企画タイトル', sortable: true, filterable: true, editable: false },
+    { key: 'title', label: '制作タイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
+    { key: 'creative_status_key', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'CREATIVE_STATUS' },
+    { key: 'deadline_at', label: '納品期限', sortable: true, editable: true, editType: 'datetime' },
     { key: 'client_name', label: '依頼者', sortable: true, filterable: true, editable: false },
     { key: 'assignees', label: '担当者', sortable: false, editable: false }
   ];
 
-  const projectsTableHeaders = [
-    { key: 'project_id', label: 'ID', sortable: true },
-    { key: 'project_title', label: '案件タイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
-    { key: 'project_detail', label: '備考', sortable: false, editable: true, editType: 'text' },
+  const plansTableHeaders = [
+    { key: 'display_id', label: 'ID', sortable: true },
+    { key: 'title', label: '企画タイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
+    { key: 'description', label: '概要', sortable: false, editable: true, editType: 'text' },
     { key: 'created_at', label: '作成日', sortable: true, editable: false },
-    { key: 'creator_name', label: '作成者', sortable: true, filterable: true, editable: false },
-    { key: 'works_count', label: '関連制作物', sortable: true, editable: false }
+    { key: 'created_by_name', label: '作成者', sortable: true, filterable: true, editable: false },
+    { key: 'creatives_count', label: '関連制作物', sortable: true, editable: false }
   ];
 
   const tasksTableHeaders = [
-    { key: 'task_id', label: 'タスクID', sortable: true },
-    { key: 'project_title', label: '案件タイトル', sortable: true, filterable: true, editable: false },
-    { key: 'work_title', label: '制作タイトル', sortable: true, filterable: true, editable: false },
-    { key: 'task_title', label: 'タスクタイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
-    { key: 'status_key', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'TASK_STATUS' },
-    { key: 'priority_key', label: '優先度', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'TASK_PRIORITY' },
-    { key: 'assignee_name', label: '担当者', sortable: true, filterable: true, editable: false },
-    { key: 'planned_end_datetime', label: '予定終了日時', sortable: true, editable: true, editType: 'datetime' }
+    { key: 'display_id', label: 'タスクID', sortable: true },
+    { key: 'parent_task_id', label: '親タスクID', sortable: true, filterable: true, editable: false },
+    { key: 'title', label: 'タスクタイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
+    { key: 'task_status_key', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'TASK_STATUS' },
+    { key: 'priority_key', label: '優先度', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'PRIORITY' },
+    { key: 'assign_to_name', label: '担当者', sortable: true, filterable: true, editable: false },
+    { key: 'ends_at', label: '終了日時', sortable: true, editable: true, editType: 'datetime' }
   ];
 
   const membersTableHeaders = [
     { key: 'detail', label: '', sortable: false },
-    { key: 'avatar', label: '', sortable: false },
-    { key: 'member_name', label: '名前', sortable: true, filterable: true, editable: true, editType: 'text' },
-    { key: 'member_email', label: 'メール', sortable: true, editable: false },
-    { key: 'member_team_key', label: 'チーム', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'TEAM' },
-    { key: 'role_key', label: '権限', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'ROLE' },
-    { key: 'assigned_works_count', label: '担当制作物数', sortable: true, editable: false }
+    { key: 'icon_gfile_id', label: '', sortable: false },
+    { key: 'nickname', label: '名前', sortable: true, filterable: true, editable: true, editType: 'text' },
+    { key: 'email', label: 'メール', sortable: true, editable: false },
+    { key: 'system_role_key', label: '権限', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'SYSTEM_ROLE' },
+    { key: 'assigned_creatives_count', label: '担当制作物数', sortable: true, editable: false }
   ];
 
 
@@ -482,16 +484,16 @@
     const navItemId = activeNavItem.id;
     console.log('ナビゲーションアイテムID:', navItemId);
 
-    if (navItemId === 'works-nav') {
+    if (navItemId === 'creatives-nav') {
       console.log('制作物モーダルを開きます');
-      openNewWorkModal();
-    } else if (navItemId === 'projects-nav') {
-      console.log('制作物モーダルを開きます（案件タブ）');
-      openNewWorkModal();
+      openNewCreativeModal();
+    } else if (navItemId === 'plans-nav') {
+      console.log('制作物モーダルを開きます（企画タブ）');
+      openNewCreativeModal();
     } else if (navItemId === 'members-nav') {
       console.log('メンバーモーダルを開きます');
       openNewMemberModal();
-    } else if (navItemId === 'knowledge-nav') {
+    } else if (navItemId === 'knowledges-nav') {
       console.log('ナレッジモーダルを開きます');
       openNewKnowledgeModal();
     } else {
@@ -521,12 +523,64 @@
   function loadTabData(tabName) {
     showLoading();
     const dataLoaders = {
-      'home': loadHomeData, 'works': loadWorksData, 'projects': loadProjectsData,
-      'tasks': loadTasksData, 'members': loadMembersData, 'knowledge': loadKnowledgeData, 'summary': loadSummaryData,
+      'home': loadHomeData,
+      [SHEET_NAMES.CREATIVES]: () => loadData(SHEET_NAMES.CREATIVES),
+      [SHEET_NAMES.PLANS]: () => loadData(SHEET_NAMES.PLANS),
+      [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS),
+      [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS),
+      [SHEET_NAMES.KNOWLEDGES]: () => loadData(SHEET_NAMES.KNOWLEDGES),
+      'summary': loadSummaryData,
     };
     if (dataLoaders[tabName]) dataLoaders[tabName]();
     else hideLoading();
   }
+
+  function loadData(tableName) {
+    // 依存関係のあるデータを並行して読み込む
+    const promises = [callGAS('getItems', tableName)];
+
+    if (tableName === SHEET_NAMES.CREATIVES) {
+      promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
+      promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
+    } else if (tableName === SHEET_NAMES.TASKS) {
+      promises.push(callGAS('getItems', SHEET_NAMES.CREATIVES));
+      promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
+    }
+
+    Promise.all(promises).then(results => {
+      const data = results[0];
+
+      switch (tableName) {
+        case SHEET_NAMES.CREATIVES:
+          creativesData = data;
+          plansData = results[1] || [];
+          membersData = results[2] || [];
+          renderTable(SHEET_NAMES.CREATIVES, applyFiltersAndSort(SHEET_NAMES.CREATIVES, creativesData), creativesTableHeaders);
+          break;
+        case SHEET_NAMES.PLANS:
+          plansData = data;
+          renderTable(SHEET_NAMES.PLANS, applyFiltersAndSort(SHEET_NAMES.PLANS, plansData), plansTableHeaders);
+          break;
+        case SHEET_NAMES.TASKS:
+          tasksData = data;
+          creativesData = results[1] || [];
+          membersData = results[2] || [];
+          renderTable(SHEET_NAMES.TASKS, applyFiltersAndSort(SHEET_NAMES.TASKS, tasksData), tasksTableHeaders);
+          break;
+        case SHEET_NAMES.MEMBERS:
+          membersData = data;
+          renderTable(SHEET_NAMES.MEMBERS, applyFiltersAndSort(SHEET_NAMES.MEMBERS, membersData), membersTableHeaders);
+          break;
+        case SHEET_NAMES.KNOWLEDGES:
+          knowledgesData = data;
+          renderKnowledgesTable(data);
+          break;
+      }
+      hideLoading();
+    }).catch(handleError);
+  }
+
+  // ... (rest of the file)
 
   // ============================================
   // データ読み込み & 描画
@@ -557,8 +611,8 @@
       // 担当中の制作物を表示
       renderAssignedWorks(data.works || []);
 
-      // 受付中のレビューを表示
-      renderReviewRequests(data.review_requests || []);
+      // 受付中のレビューを表示 (Removed)
+      // renderReviewRequests(data.review_requests || []);
 
       // 最近のナレッジを表示
       renderKnowledge(data.knowledge || []);
@@ -575,7 +629,7 @@
     container.innerHTML = '';
 
     // 非表示にするwork_idをフィルタ
-    const visibleRequests = newRequests.filter(work => !hiddenWorkIds.has(work.work_id));
+    const visibleRequests = newRequests.filter(work => !hiddenWorkIds.has(work.id));
 
     if (visibleRequests.length === 0) {
       container.innerHTML = '<p style="color: #6b7280;">最新の制作依頼はありません</p>';
@@ -585,13 +639,13 @@
     visibleRequests.forEach(work => {
       const card = document.createElement('div');
       card.className = 'home-card';
-      card.dataset.workId = work.work_id;
+      card.dataset.workId = work.id;
 
       // 優先度、制作物種別、依頼者の所属チームを取得
       const priorityLabel = work.priority_key ? getConfigLabel(work.priority_key, 'PRIORITY') : '';
-      const workTypeLabel = work.work_type_key ? getConfigLabel(work.work_type_key, 'WORK_TYPE') : '';
-      const clientTeamLabel = work.work_client_email ? (() => {
-        const client = membersData?.find(m => m.member_email === work.work_client_email);
+      const workTypeLabel = work.creative_type_key ? getConfigLabel(work.creative_type_key, 'CREATIVE_TYPE') : '';
+      const clientTeamLabel = work.client_member_id ? (() => {
+        const client = membersData?.find(m => m.id === work.client_member_id);
         return client ? getConfigLabel(client.member_team_key, 'TEAM') : '';
       })() : '';
 
@@ -600,21 +654,21 @@
 
       card.innerHTML = `
         <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
-          ${work.project_id ? `${escapeHtml(work.project_id)} ` : ''}${escapeHtml(work.project_title || '')}
+          ${work.plan_id ? `${escapeHtml(work.plan_id)} ` : ''}${escapeHtml(work.plan_title || '')}
         </div>
         <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
-          ${escapeHtml(work.work_id)} ${escapeHtml(work.work_title || '')}
+          ${escapeHtml(work.display_id || work.id)} ${escapeHtml(work.title || '')}
         </div>
         ${infoText ? `<div style="font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px;">${escapeHtml(infoText)}</div>` : ''}
         <div class="card-meta" style="margin-bottom: 12px;">
-          <span>納期: <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${formatDateTimeForHome(work.due_datetime)}</span></span>
+          <span>納期: <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${formatDateTimeForHome(work.deadline_at)}</span></span>
         </div>
         <div class="work-accept-decline-buttons">
-          <button class="btn-accept" data-work-id="${escapeHtml(work.work_id)}" data-remaining-ms="${work.remaining_time_ms || 0}">
+          <button class="btn-accept" data-work-id="${escapeHtml(work.id)}" data-remaining-ms="${work.remaining_time_ms || 0}">
             承諾
             <div class="remaining-time" data-remaining-ms="${work.remaining_time_ms || 0}"></div>
           </button>
-          <button class="btn-decline" data-work-id="${escapeHtml(work.work_id)}">保留・辞退</button>
+          <button class="btn-decline" data-work-id="${escapeHtml(work.id)}">保留・辞退</button>
         </div>
       `;
 
@@ -645,7 +699,7 @@
       // カードクリックでwork_detail_overlayを開く（ボタン以外の領域）
       card.addEventListener('click', (e) => {
         if (!e.target.closest('.work-accept-decline-buttons')) {
-          openWorkDetailOverlay(work.work_id);
+          openCreativeDetailOverlay(work.id);
         }
       });
 
@@ -667,20 +721,20 @@
       card.className = 'home-card';
 
       // ステータス色を取得
-      const statusColor = getWorkStatusColor(work.work_status_key);
-      const statusLabel = getConfigLabel(work.work_status_key, 'WORK_STATUS');
+      const statusColor = getWorkStatusColor(work.creative_status_key);
+      const statusLabel = getConfigLabel(work.creative_status_key, 'CREATIVE_STATUS');
 
       // 納期表示
-      const dueDate = formatDateTimeForHome(work.due_datetime);
+      const dueDate = formatDateTimeForHome(work.deadline_at);
 
       card.innerHTML = `
         <div class="home-card-row">
-          <span class="home-card-id">${work.project_id ? escapeHtml(work.project_id) : ''}</span>
-          <span class="home-card-title" title="${escapeHtml(work.project_title || '')}">${escapeHtml(work.project_title || '')}</span>
+          <span class="home-card-id">${work.plan_id ? escapeHtml(work.plan_id) : ''}</span>
+          <span class="home-card-title" title="${escapeHtml(work.plan_title || '')}">${escapeHtml(work.plan_title || '')}</span>
         </div>
         <div class="home-card-row">
-          <span class="home-card-id">${escapeHtml(work.work_id)}</span>
-          <span class="home-card-title" title="${escapeHtml(work.work_title || '')}">${escapeHtml(work.work_title || '')}</span>
+          <span class="home-card-id">${escapeHtml(work.display_id || work.id)}</span>
+          <span class="home-card-title" title="${escapeHtml(work.title || '')}">${escapeHtml(work.title || '')}</span>
         </div>
         <div class="home-card-meta-row">
           <div class="work-status-badge ${statusColor}">${escapeHtml(statusLabel)}</div>
@@ -688,7 +742,7 @@
         </div>
       `;
 
-      card.onclick = () => openWorkDetailOverlay(work.work_id);
+      card.onclick = () => openCreativeDetailOverlay(work.id);
       container.appendChild(card);
     });
   }
@@ -988,16 +1042,16 @@
   }
 
   function loadWorksData() {
-    callGAS('getWorks').then(data => { worksData = data; renderTable('works', applyFiltersAndSort('works', worksData), worksTableHeaders); hideLoading(); }).catch(handleError);
+    callGAS('getWorks').then(data => { worksData = data; renderTable(SHEET_NAMES.WORKS, applyFiltersAndSort(SHEET_NAMES.WORKS, worksData), worksTableHeaders); hideLoading(); }).catch(handleError);
   }
   function loadProjectsData() {
-    callGAS('getProjects').then(data => { projectsData = data; renderTable('projects', applyFiltersAndSort('projects', projectsData), projectsTableHeaders); hideLoading(); }).catch(handleError);
+    callGAS('getProjects').then(data => { projectsData = data; renderTable(SHEET_NAMES.PROJECTS, applyFiltersAndSort(SHEET_NAMES.PROJECTS, projectsData), projectsTableHeaders); hideLoading(); }).catch(handleError);
   }
   function loadTasksData() {
-    callGAS('getTasks').then(data => { tasksData = data; renderTable('tasks', applyFiltersAndSort('tasks', tasksData), tasksTableHeaders); hideLoading(); }).catch(handleError);
+    callGAS('getTasks').then(data => { tasksData = data; renderTable(SHEET_NAMES.TASKS, applyFiltersAndSort(SHEET_NAMES.TASKS, tasksData), tasksTableHeaders); hideLoading(); }).catch(handleError);
   }
   function loadMembersData() {
-    callGAS('getMembers').then(data => { membersData = data; renderTable('members', applyFiltersAndSort('members', membersData), membersTableHeaders); hideLoading(); }).catch(handleError);
+    callGAS('getMembers').then(data => { membersData = data; renderTable(SHEET_NAMES.MEMBERS, applyFiltersAndSort(SHEET_NAMES.MEMBERS, membersData), membersTableHeaders); hideLoading(); }).catch(handleError);
   }
 
   function loadKnowledgeData() {
@@ -1031,6 +1085,7 @@
 
   function renderTable(name, data, headers) {
     const table = document.getElementById(`${name}-table`);
+    if (!table) return;
     const thead = table.querySelector('thead');
     const tbody = table.querySelector('tbody');
     const state = tableState[name];
@@ -1073,7 +1128,7 @@
       return;
     }
 
-    const idKey = name === 'members' ? 'member_email' : (name === 'works' ? 'work_id' : (name === 'tasks' ? 'task_id' : 'project_id'));
+    const idKey = 'id'; // New schema uses 'id' for all tables
 
     data.forEach(item => {
       const row = tbody.insertRow();
@@ -1129,14 +1184,48 @@
           }
         } else {
           switch (header.key) {
-            case 'work_id': content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openWorkDetailOverlay('${item.work_id}')">${escapeHtml(item.work_id)}</button>`; break;
-            case 'project_id': content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openProjectDetailOverlay('${item.project_id}')">${escapeHtml(item.project_id)}</button>`; break;
-            case 'task_id': content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(item.task_id)}</span>`; break;
-            case 'detail': content = `<button class="btn-link" onclick="openMemberDetail('${item.member_email}')">詳細</button>`; break;
-            case 'assignees': content = renderAssignees(item.assignees); break;
-            case 'avatar': content = `<img src="${escapeHtml(item.member_icon || 'https://via.placeholder.com/32')}" class="avatar" alt="">`; break;
-            case 'due_datetime': content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDateTimeForDisplay(currentValue, true))}</span>`; break;
-            case 'planned_end_datetime': content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDateTimeForDisplay(currentValue))}</span>`; break;
+            case 'display_id':
+              if (name === SHEET_NAMES.CREATIVES) {
+                content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openCreativeDetailOverlay('${item.id}')">${escapeHtml(item.display_id || item.id)}</button>`;
+              } else if (name === SHEET_NAMES.PLANS) {
+                content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openPlanDetailOverlay('${item.id}')">${escapeHtml(item.display_id || item.id)}</button>`;
+              } else {
+                content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(item.display_id || item.id)}</span>`;
+              }
+              break;
+            case 'plan_title':
+              if (item.plan_title) content = escapeHtml(item.plan_title);
+              else if (item.plan_id && plansData) {
+                const plan = plansData.find(p => p.id === item.plan_id);
+                content = plan ? escapeHtml(plan.title) : '';
+              }
+              break;
+            case 'client_name':
+              if (item.client_name) content = escapeHtml(item.client_name);
+              else if (item.client_member_id && membersData) {
+                const member = membersData.find(m => m.id === item.client_member_id);
+                content = member ? escapeHtml(member.nickname || member.member_name) : '';
+              }
+              break;
+            case 'assign_to_name':
+              if (item.assign_to_name) content = escapeHtml(item.assign_to_name);
+              else if (item.assign_to && membersData) {
+                const member = membersData.find(m => m.id === item.assign_to);
+                content = member ? escapeHtml(member.nickname || member.member_name) : '';
+              }
+              break;
+            case 'created_by_name':
+              if (item.created_by_name) content = escapeHtml(item.created_by_name);
+              else if (item.created_by && membersData) {
+                const member = membersData.find(m => m.id === item.created_by);
+                content = member ? escapeHtml(member.nickname || member.member_name) : '';
+              }
+              break;
+            case 'detail': content = `<button class="btn-link" onclick="openMemberDetail('${item.id}')">詳細</button>`; break;
+            case 'assignees': content = renderAssignees(item.assignees); break; // assignees needs to be populated in loadData or backend
+            case 'icon_gfile_id': content = `<img src="${escapeHtml(item.icon_gfile_id ? 'https://drive.google.com/thumbnail?id=' + item.icon_gfile_id : 'https://via.placeholder.com/32')}" class="avatar" alt="">`; break;
+            case 'deadline_at': content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDateTimeForDisplay(currentValue, true))}</span>`; break;
+            case 'ends_at': content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDateTimeForDisplay(currentValue))}</span>`; break;
             case 'created_at': content = escapeHtml(formatDate(currentValue)); break;
             default:
               if (typeof currentValue === 'string' && currentValue.length > 10) {
@@ -1172,14 +1261,14 @@
   let currentWork = null;
   let currentProjectId = null;
 
-  function openWorkDetailOverlay(workId) {
+  function openCreativeDetailOverlay(workId) {
     // JavaScript関数呼び出しを記録（HTTP 429エラー時の再試行用）
-    recordJSInvocation('openWorkDetailOverlay', workId);
+    recordJSInvocation('openCreativeDetailOverlay', workId);
 
     showLoading();
     currentWorkId = workId;
     const promises = [
-      callGAS('getWorkById', workId),
+      callGAS('getItemById', SHEET_NAMES.CREATIVES, workId),
       callGAS('getWorkflowTimestamps', workId)
     ];
     if (!membersData || membersData.length === 0) {
@@ -1210,7 +1299,7 @@
       if (newButton) newButton.style.display = 'none';
 
       // ID検索バーにIDを表示
-      const workIdForSearch = `${work.project_id || ''}-${work.work_id || ''}`;
+      const workIdForSearch = `${work.plan_id || ''}-${work.display_id || work.id || ''}`;
       updateIdSearchInput(workIdForSearch);
 
       // ワークフローステータスバーを表示
@@ -1218,16 +1307,16 @@
       if (workflowStatusBar && timestamps) {
         workflowStatusBar.style.display = 'flex';
 
-        // workflow-status-dropdownに全てのWORK_STATUSを表示
+        // workflow-status-dropdownに全てのCREATIVE_STATUSを表示
         const workflowStatusDropdown = document.getElementById('workflow-status-dropdown');
-        if (workflowStatusDropdown && configData.WORK_STATUS) {
+        if (workflowStatusDropdown && configData.CREATIVE_STATUS) {
           workflowStatusDropdown.innerHTML = '';
-          const activeStatuses = configData.WORK_STATUS.filter(status => status.is_active !== false);
+          const activeStatuses = configData.CREATIVE_STATUS.filter(status => status.is_active !== false);
           activeStatuses.forEach(status => {
             const option = document.createElement('option');
             option.value = status.config_key;
             option.textContent = status.config_value;
-            if (status.config_key === work.work_status_key) {
+            if (status.config_key === work.creative_status_key) {
               option.selected = true;
             }
             workflowStatusDropdown.appendChild(option);
@@ -1236,13 +1325,13 @@
           // ドロップダウン変更イベントを追加
           workflowStatusDropdown.onchange = function () {
             const newStatusKey = this.value;
-            if (newStatusKey && newStatusKey !== work.work_status_key) {
+            if (newStatusKey && newStatusKey !== work.creative_status_key) {
               showLoading();
-              callGAS('updateSingleField', 'works', work.work_id, 'work_status_key', newStatusKey)
+              callGAS('updateItem', SHEET_NAMES.CREATIVES, work.id, { creative_status_key: newStatusKey })
                 .then(() => {
                   hideLoading();
                   // 画面を再読み込みしてステータスの日時を更新
-                  openWorkDetailOverlay(work.work_id);
+                  openCreativeDetailOverlay(work.id);
                 })
                 .catch(handleError);
             }
@@ -1265,7 +1354,7 @@
 
         // ステータス表示を更新する関数
         function updateWorkflowStatusDisplay(work, timestamps) {
-          const currentStatus = work.work_status_key;
+          const currentStatus = work.creative_status_key;
 
           // CANCELEDの場合は全ての背景色をgrayに
           const isCanceled = currentStatus === 'CANCELED';
@@ -1308,7 +1397,7 @@
             }
           }
 
-          // 制作: work_status_key が TO-DO の場合は赤、CREATEの場合はオレンジ、それ以外の場合は緑
+          // 制作: creative_status_key が TO-DO の場合は赤、CREATEの場合はオレンジ、それ以外の場合は緑
           // 形式: yyyy/mm/dd(曜日) hh:mm ~
           const productionItem = document.getElementById('workflow-status-production');
           const productionIconWrapper = productionItem ? productionItem.querySelector('.workflow-status-icon-wrapper') : null;
@@ -1334,7 +1423,7 @@
             productionDate.textContent = formatWorkflowDate(timestamps.production) + ' ~';
           }
 
-          // 承認: work_status_key が REVIEW または REVISIONの場合はオレンジ、APPROVEDの場合は緑、それ以外の場合は赤
+          // 承認: creative_status_key が REVIEW または REVISIONの場合はオレンジ、APPROVEDの場合は緑、それ以外の場合は赤
           // 形式: 色がオレンジの場合は yyyy/mm/dd(曜日) hh:mm ~, 色が赤の場合は ~ yyyy/mm/dd(曜日) hh:mm
           const approvalItem = document.getElementById('workflow-status-approval');
           const approvalIconWrapper = approvalItem ? approvalItem.querySelector('.workflow-status-icon-wrapper') : null;
@@ -1370,9 +1459,9 @@
             }
           }
 
-          // 納品: work_status_key が DELIVERED の場合は緑、APPROVED の場合はオレンジ、それ以外の場合は赤
+          // 納品: creative_status_key が DELIVERED の場合は緑、APPROVED の場合はオレンジ、それ以外の場合は赤
           // 形式: 色が緑の場合は yyyy/mm/dd(曜日) hh:mm, 色が赤またはオレンジの場合は ~ yyyy/mm/dd(曜日) hh:mm
-          // 日時の後ろに、due_datetimeまでの残り日数を表示
+          // 日時の後ろに、deadline_atまでの残り日数を表示
           const deliveryItem = document.getElementById('workflow-status-delivery');
           const deliveryIconWrapper = deliveryItem ? deliveryItem.querySelector('.workflow-status-icon-wrapper') : null;
           const deliveryIcon = deliveryItem ? deliveryItem.querySelector('.workflow-status-icon') : null;
@@ -1403,7 +1492,7 @@
 
             // 期限超過のチェック（CANCELEDの場合は無視）
             if (!isCanceled) {
-              const daysRemaining = calculateDaysRemaining(work.due_datetime);
+              const daysRemaining = calculateDaysRemaining(work.deadline_at);
               const isOverdue = daysRemaining !== null && daysRemaining < 0;
 
               if (isOverdue) {
@@ -1449,7 +1538,7 @@
               deliveryDate.classList.add('editable-datetime');
               deliveryDate.onclick = (e) => {
                 e.stopPropagation();
-                openDeliveryDateTimePicker(deliveryDate, work.work_id, timestamps.delivery || work.due_datetime);
+                openDeliveryDateTimePicker(deliveryDate, work.id, timestamps.delivery || work.deadline_at);
               };
             } else {
               deliveryDate.style.cursor = 'default';
@@ -1466,7 +1555,7 @@
             if (currentStatus === 'DELIVERED' || currentStatus === 'CANCELED') {
               daysRemainingItem.style.display = 'none';
             } else {
-              const daysRemaining = calculateDaysRemaining(work.due_datetime);
+              const daysRemaining = calculateDaysRemaining(work.deadline_at);
               if (daysRemaining !== null) {
                 let daysText = '';
                 if (daysRemaining === 0) {
@@ -1723,7 +1812,7 @@
         // データを保存（変更があった場合のみ）
         if (newValueAsISO !== originalValue) {
           showLoading();
-          callGAS('updateSingleField', 'works', workId, 'due_datetime', newValueAsISO)
+          callGAS('updateItem', SHEET_NAMES.WORKS, workId, { due_datetime: newValueAsISO })
             .then(() => {
               hideLoading();
               // 画面を再読み込みしてステータスの日時を更新
@@ -1918,7 +2007,7 @@
           const newValue = workTitleInput.value.trim();
           if (newValue && newValue !== work.work_title) {
             showLoading();
-            callGAS('updateSingleField', 'works', work.work_id, 'work_title', newValue)
+            callGAS('updateItem', SHEET_NAMES.WORKS, work.work_id, { work_title: newValue })
               .then(() => {
                 hideLoading();
               })
@@ -1982,7 +2071,7 @@
             deleteBtn.style.color = 'var(--md-sys-color-error)';
             deleteBtn.onclick = () => {
               showLoading();
-              callGAS('removeWorkAssignee', work.work_id, assignee.member_email)
+              callGAS('deleteItem', SHEET_NAMES.WORK_ASSIGNMENTS, { work_id: work.work_id, member_email: assignee.member_email })
                 .then(() => {
                   openWorkDetailOverlay(work.work_id);
                 })
@@ -2210,19 +2299,19 @@
   }
 
   function handleHeaderCloseClick() {
-    const workDetailOverlay = document.getElementById('work-detail-overlay');
-    const projectDetailOverlay = document.getElementById('project-detail-overlay');
+    const creativeDetailOverlay = document.getElementById('creative-detail-overlay');
+    const planDetailOverlay = document.getElementById('plan-detail-overlay');
 
-    if (workDetailOverlay && workDetailOverlay.classList.contains('show')) {
-      closeWorkDetailOverlay();
+    if (creativeDetailOverlay && creativeDetailOverlay.classList.contains('show')) {
+      closeCreativeDetailOverlay();
     }
-    if (projectDetailOverlay && projectDetailOverlay.classList.contains('show')) {
-      closeProjectDetailOverlay();
+    if (planDetailOverlay && planDetailOverlay.classList.contains('show')) {
+      closePlanDetailOverlay();
     }
   }
 
-  function closeWorkDetailOverlay() {
-    document.getElementById('work-detail-overlay').classList.remove('show');
+  function closeCreativeDetailOverlay() {
+    document.getElementById('creative-detail-overlay').classList.remove('show');
 
     // メインヘッダーを元に戻す
     const headerTitleDefault = document.getElementById('header-title-default');
@@ -2242,7 +2331,7 @@
     }
 
     // ドロップダウンを削除
-    const suggestions = document.getElementById('work-detail-project-suggestions');
+    const suggestions = document.getElementById('creative-detail-plan-suggestions');
     if (suggestions) {
       suggestions.remove();
     }
@@ -2253,15 +2342,15 @@
     clearIdSearchInput();
   }
 
-  function openProjectDetailOverlay(projectId) {
+  function openPlanDetailOverlay(id) {
     // JavaScript関数呼び出しを記録（HTTP 429エラー時の再試行用）
-    recordJSInvocation('openProjectDetailOverlay', projectId);
+    recordJSInvocation('openPlanDetailOverlay', id);
 
     showLoading();
-    currentProjectId = projectId;
-    callGAS('getProjectById', projectId).then(project => {
-      if (!project) {
-        alert('プロジェクトが見つかりません');
+    currentPlanId = id;
+    callGAS('getItemById', SHEET_NAMES.PLANS, id).then(plan => {
+      if (!plan) {
+        alert('企画が見つかりません');
         hideLoading();
         return;
       }
@@ -2277,40 +2366,40 @@
       // }
       // if (headerTitleWorkDetail) {
       //   headerTitleWorkDetail.style.display = 'flex';
-      //   headerTitleWorkDetail.textContent = project.project_id || '';
+      //   headerTitleWorkDetail.textContent = plan.id || '';
       // }
       if (headerCloseBtn) headerCloseBtn.style.display = 'flex';
       if (newButton) newButton.style.display = 'none';
 
       // ヘッダー情報を非表示
-      const headerInfoDiv = document.getElementById('work-detail-header-info');
+      const headerInfoDiv = document.getElementById('creative-detail-header-info');
       if (headerInfoDiv) {
         headerInfoDiv.style.display = 'none';
       }
-      const urlCopyButton = document.getElementById('work-detail-url-copy-button');
+      const urlCopyButton = document.getElementById('creative-detail-url-copy-button');
       if (urlCopyButton) {
         urlCopyButton.style.display = 'none';
       }
 
-      // プロジェクト詳細情報を表示
-      const contentContainer = document.getElementById('project-detail-content-container');
+      // 企画詳細情報を表示
+      const contentContainer = document.getElementById('plan-detail-content-container');
       let html = '<div style="display: flex; flex-direction: column; gap: 24px;">';
 
-      // プロジェクトの全プロパティを表示
-      html += '<div><h2 style="margin: 0 0 16px 0; font-size: 1.5rem; font-weight: 600;">プロジェクト情報</h2>';
+      // 企画の全プロパティを表示
+      html += '<div><h2 style="margin: 0 0 16px 0; font-size: 1.5rem; font-weight: 600;">企画情報</h2>';
       html += '<table class="table-full" style="margin-top: 12px;">';
       html += '<tbody>';
 
       // 各プロパティを表示
-      Object.keys(project).forEach(key => {
-        if (key === 'works') return; // worksは別で表示
-        const value = project[key];
+      Object.keys(plan).forEach(key => {
+        if (key === 'creatives') return; // creativesは別で表示
+        const value = plan[key];
         let displayValue = '';
         if (value === null || value === undefined || value === '') {
           displayValue = '-';
         } else if (key === 'created_at') {
           displayValue = formatDate(value);
-        } else if (key === 'project_detail') {
+        } else if (key === 'description') {
           displayValue = value;
         } else {
           displayValue = escapeHtml(String(value));
@@ -2318,9 +2407,9 @@
 
         let label = key;
         switch (key) {
-          case 'project_id': label = 'プロジェクトID'; break;
-          case 'project_title': label = '案件タイトル'; break;
-          case 'project_detail': label = '備考'; break;
+          case 'id': label = '企画ID'; break;
+          case 'title': label = '企画タイトル'; break;
+          case 'description': label = '備考'; break;
           case 'created_by': label = '作成者'; break;
           case 'created_at': label = '作成日'; break;
           case 'creator_name': label = '作成者名'; break;
@@ -2328,7 +2417,7 @@
         }
 
         html += `<tr><th style="width: 200px; text-align: left; padding: 12px; background: #f9fafb;">${escapeHtml(label)}</th>`;
-        if (key === 'project_detail') {
+        if (key === 'description') {
           html += `<td style="padding: 12px;"><div style="white-space: pre-wrap;">${escapeHtml(value || '-')}</div></td>`;
         } else {
           html += `<td style="padding: 12px;">${displayValue}</td>`;
@@ -2342,36 +2431,36 @@
       contentContainer.innerHTML = html;
 
       // 関連制作物を表示
-      const worksContainer = document.getElementById('project-works-container');
-      if (project.works && project.works.length > 0) {
-        let worksHtml = '<table class="table-full" style="margin-top: 12px;">';
-        worksHtml += '<thead><tr><th>制作ID</th><th>制作タイトル</th><th>ステータス</th><th>納品期限</th></tr></thead>';
-        worksHtml += '<tbody>';
-        project.works.forEach(work => {
-          worksHtml += `<tr>`;
-          worksHtml += `<td><button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openWorkDetailOverlay('${work.work_id}'); closeProjectDetailOverlay();">${escapeHtml(work.work_id)}</button></td>`;
-          worksHtml += `<td>${escapeHtml(work.work_title || '-')}</td>`;
-          worksHtml += `<td>${escapeHtml(getConfigLabel(work.work_status_key, 'WORK_STATUS') || work.work_status_key || '-')}</td>`;
-          worksHtml += `<td><span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDateTimeForDisplay(work.due_datetime) || '-')}</span></td>`;
-          worksHtml += `</tr>`;
+      const creativesContainer = document.getElementById('plan-creatives-container');
+      if (plan.creatives && plan.creatives.length > 0) {
+        let creativesHtml = '<table class="table-full" style="margin-top: 12px;">';
+        creativesHtml += '<thead><tr><th>制作ID</th><th>制作タイトル</th><th>ステータス</th><th>納品期限</th></tr></thead>';
+        creativesHtml += '<tbody>';
+        plan.creatives.forEach(creative => {
+          creativesHtml += `<tr>`;
+          creativesHtml += `<td><button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openCreativeDetailOverlay('${creative.id}'); closePlanDetailOverlay();">${escapeHtml(creative.display_id || creative.id)}</button></td>`;
+          creativesHtml += `<td>${escapeHtml(creative.title || '-')}</td>`;
+          creativesHtml += `<td>${escapeHtml(getConfigLabel(creative.creative_status_key, 'CREATIVE_STATUS') || creative.creative_status_key || '-')}</td>`;
+          creativesHtml += `<td><span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDateTimeForDisplay(creative.deadline_at) || '-')}</span></td>`;
+          creativesHtml += `</tr>`;
         });
-        worksHtml += '</tbody></table>';
-        worksContainer.innerHTML = worksHtml;
+        creativesHtml += '</tbody></table>';
+        creativesContainer.innerHTML = creativesHtml;
       } else {
-        worksContainer.innerHTML = '<p style="color: #6b7280;">関連制作物はありません</p>';
+        creativesContainer.innerHTML = '<p style="color: #6b7280;">関連制作物はありません</p>';
       }
 
-      document.getElementById('project-detail-overlay').classList.add('show');
+      document.getElementById('plan-detail-overlay').classList.add('show');
 
       // ID検索バーにIDを表示
-      updateIdSearchInput(projectId);
+      updateIdSearchInput(id);
 
       hideLoading();
     }).catch(handleError);
   }
 
-  function closeProjectDetailOverlay() {
-    document.getElementById('project-detail-overlay').classList.remove('show');
+  function closePlanDetailOverlay() {
+    document.getElementById('plan-detail-overlay').classList.remove('show');
 
     // ヘッダータイトルを元に戻す
     const headerTitleDefault = document.getElementById('header-title-default');
@@ -2389,16 +2478,16 @@
     if (newButton) newButton.style.display = 'flex';
 
     // ID検索バーをクリア
-    currentProjectId = null;
+    currentPlanId = null;
     clearIdSearchInput();
   }
 
-  function copyWorkDetailUrl() {
-    const urlCopyButton = document.getElementById('work-detail-url-copy-button');
+  function copyCreativeDetailUrl() {
+    const urlCopyButton = document.getElementById('creative-detail-url-copy-button');
     if (!urlCopyButton || !urlCopyButton.dataset.workId) return;
     const workId = urlCopyButton.dataset.workId;
     const url = `${templateVariables.deployedUrl}?work_id=${workId}`;
-    console.log(`work-detail-overlayに直接アクセス可能なURL: ${url}`);
+    console.log(`creative-detail-overlayに直接アクセス可能なURL: ${url}`);
     navigator.clipboard.writeText(url).then(() => {
       // alert('URLをクリップボードにコピーしました');
     }).catch(() => {
@@ -2413,53 +2502,53 @@
     });
   }
 
-  function searchProjectsForWorkDetail(query, workId) {
-    const projectTitleHeader = document.getElementById('work-detail-project-title-header');
-    const suggestionsContainer = document.getElementById('work-detail-project-suggestions');
-    const projectTitleInput = projectTitleHeader.querySelector('input');
+  function searchPlansForCreativeDetail(query, workId) {
+    const planTitleHeader = document.getElementById('creative-detail-plan-title-header');
+    const suggestionsContainer = document.getElementById('creative-detail-plan-suggestions');
+    const planTitleInput = planTitleHeader.querySelector('input');
 
     if (!query) {
       suggestionsContainer.style.display = 'none';
       return;
     }
 
-    // projectsDataが取得されていない場合は取得
-    if (!projectsData || projectsData.length === 0) {
-      callGAS('getProjects').then(data => {
-        projectsData = data;
-        performProjectSearch(query, workId, suggestionsContainer, projectTitleInput);
+    // plansDataが取得されていない場合は取得
+    if (!plansData || plansData.length === 0) {
+      callGAS('getItems', SHEET_NAMES.PLANS).then(data => {
+        plansData = data;
+        performPlanSearch(query, workId, suggestionsContainer, planTitleInput);
       }).catch(handleError);
     } else {
-      performProjectSearch(query, workId, suggestionsContainer, projectTitleInput);
+      performPlanSearch(query, workId, suggestionsContainer, planTitleInput);
     }
   }
 
-  function performProjectSearch(query, workId, suggestionsContainer, projectTitleInput) {
+  function performPlanSearch(query, workId, suggestionsContainer, planTitleInput) {
     const lowerCaseQuery = query.toLowerCase();
-    const filteredProjects = (projectsData || []).filter(p =>
-      p.project_title.toLowerCase().includes(lowerCaseQuery)
+    const filteredPlans = (plansData || []).filter(p =>
+      p.title.toLowerCase().includes(lowerCaseQuery)
     );
 
     suggestionsContainer.innerHTML = '';
 
     // 入力フィールドの位置を取得
-    const inputRect = projectTitleInput.getBoundingClientRect();
+    const inputRect = planTitleInput.getBoundingClientRect();
 
-    filteredProjects.forEach(p => {
+    filteredPlans.forEach(p => {
       const item = document.createElement('div');
       item.className = 'combobox-item';
-      item.textContent = p.project_title;
+      item.textContent = p.title;
       item.onclick = () => {
-        projectTitleInput.value = p.project_title;
-        const oldProjectId = projectTitleInput.dataset.projectId;
-        projectTitleInput.dataset.projectId = p.project_id;
+        planTitleInput.value = p.title;
+        const oldPlanId = planTitleInput.dataset.planId;
+        planTitleInput.dataset.planId = p.id;
         suggestionsContainer.style.display = 'none';
-        // 案件IDを更新
-        if (p.project_id !== oldProjectId) {
+        // 企画IDを更新
+        if (p.id !== oldPlanId) {
           showLoading();
-          callGAS('updateSingleField', 'works', workId, 'project_id', p.project_id)
+          callGAS('updateItem', SHEET_NAMES.CREATIVES, workId, { plan_id: p.id })
             .then(() => {
-              document.getElementById('work-detail-project-id-header').textContent = p.project_id;
+              document.getElementById('creative-detail-plan-id-header').textContent = p.id;
               hideLoading();
             })
             .catch(handleError);
@@ -2473,17 +2562,17 @@
     newItem.innerHTML = `+ 新規作成: <strong>${escapeHtml(query)}</strong>`;
     newItem.onclick = () => {
       showLoading();
-      callGAS('createProject', query).then(projectId => {
-        projectTitleInput.value = query;
-        projectTitleInput.dataset.projectId = projectId;
+      callGAS('createItem', SHEET_NAMES.PLANS, { title: query }).then(planId => {
+        planTitleInput.value = query;
+        planTitleInput.dataset.planId = planId;
         suggestionsContainer.style.display = 'none';
-        document.getElementById('work-detail-project-id-header').textContent = projectId;
-        // 案件IDを更新
-        callGAS('updateSingleField', 'works', workId, 'project_id', projectId)
+        document.getElementById('creative-detail-plan-id-header').textContent = planId;
+        // 企画IDを更新
+        callGAS('updateItem', SHEET_NAMES.CREATIVES, workId, { plan_id: planId })
           .then(() => {
-            // projectsDataを更新
-            if (projectsData) {
-              projectsData.push({ project_id: projectId, project_title: query });
+            // plansDataを更新
+            if (plansData) {
+              plansData.push({ id: planId, title: query });
             }
             hideLoading();
           })
@@ -2499,34 +2588,34 @@
     suggestionsContainer.style.display = 'block';
   }
 
-  function searchProjectsForOverlayProjectTitle(query, workId, currentProjectId) {
-    console.log('[DEBUG] searchProjectsForOverlayProjectTitle called', {
+  function searchPlansForOverlayPlanTitle(query, workId, currentPlanId) {
+    console.log('[DEBUG] searchPlansForOverlayPlanTitle called', {
       query: query,
       workId: workId,
-      currentProjectId: currentProjectId
+      currentPlanId: currentPlanId
     });
 
-    const overlayProjectTitle = document.getElementById('overlay-project-title');
-    if (!overlayProjectTitle) {
-      console.log('[DEBUG] overlayProjectTitle not found');
+    const overlayPlanTitle = document.getElementById('overlay-plan-title');
+    if (!overlayPlanTitle) {
+      console.log('[DEBUG] overlayPlanTitle not found');
       return;
     }
 
-    let dropdownContainer = overlayProjectTitle.querySelector('.overlay-project-title-dropdown');
-    const projectTitleInput = overlayProjectTitle.querySelector('input');
+    let dropdownContainer = overlayPlanTitle.querySelector('.overlay-plan-title-dropdown');
+    const planTitleInput = overlayPlanTitle.querySelector('input');
 
     console.log('[DEBUG] Elements found', {
       dropdownContainer: !!dropdownContainer,
-      projectTitleInput: !!projectTitleInput
+      planTitleInput: !!planTitleInput
     });
 
     // ドロップダウンコンテナが存在しない場合は作成
     if (!dropdownContainer) {
       console.log('[DEBUG] Creating dropdown container');
       dropdownContainer = document.createElement('div');
-      dropdownContainer.className = 'overlay-project-title-dropdown';
+      dropdownContainer.className = 'overlay-plan-title-dropdown';
       dropdownContainer.style.display = 'none';
-      overlayProjectTitle.appendChild(dropdownContainer);
+      overlayPlanTitle.appendChild(dropdownContainer);
     }
 
     if (!query || !query.trim()) {
@@ -2540,50 +2629,50 @@
     const trimmedQuery = query.trim();
 
     // 即座にドロップダウンを表示（検索結果を待たずに）
-    console.log('[DEBUG] Calling performOverlayProjectTitleSearchImmediate');
-    performOverlayProjectTitleSearchImmediate(trimmedQuery, workId, currentProjectId, dropdownContainer, projectTitleInput);
+    console.log('[DEBUG] Calling performOverlayPlanTitleSearchImmediate');
+    performOverlayPlanTitleSearchImmediate(trimmedQuery, workId, currentPlanId, dropdownContainer, planTitleInput);
 
-    // projectsDataが取得されていない場合は取得してから検索結果を更新
-    if (!projectsData || projectsData.length === 0) {
-      callGAS('getProjects').then(data => {
-        projectsData = data;
-        performOverlayProjectTitleSearchUpdate(trimmedQuery, workId, currentProjectId, dropdownContainer, projectTitleInput);
+    // plansDataが取得されていない場合は取得してから検索結果を更新
+    if (!plansData || plansData.length === 0) {
+      callGAS('getItems', SHEET_NAMES.PLANS).then(data => {
+        plansData = data;
+        performOverlayPlanTitleSearchUpdate(trimmedQuery, workId, currentPlanId, dropdownContainer, planTitleInput);
       }).catch(handleError);
     } else {
-      performOverlayProjectTitleSearchUpdate(trimmedQuery, workId, currentProjectId, dropdownContainer, projectTitleInput);
+      performOverlayPlanTitleSearchUpdate(trimmedQuery, workId, currentPlanId, dropdownContainer, planTitleInput);
     }
   }
 
-  function performOverlayProjectTitleSearchImmediate(query, workId, currentProjectId, dropdownContainer, projectTitleInput) {
-    console.log('[DEBUG] performOverlayProjectTitleSearchImmediate called', {
+  function performOverlayPlanTitleSearchImmediate(query, workId, currentPlanId, dropdownContainer, planTitleInput) {
+    console.log('[DEBUG] performOverlayPlanTitleSearchImmediate called', {
       query: query,
       dropdownContainer: !!dropdownContainer,
-      projectTitleInput: !!projectTitleInput
+      planTitleInput: !!planTitleInput
     });
 
-    if (!dropdownContainer || !projectTitleInput) {
+    if (!dropdownContainer || !planTitleInput) {
       console.log('[DEBUG] Missing container or input, returning');
       return;
     }
 
     dropdownContainer.innerHTML = '';
-    dropdownContainer.className = 'overlay-project-title-dropdown popup-editor';
+    dropdownContainer.className = 'overlay-plan-title-dropdown popup-editor';
 
-    // 1. 現在の案件IDの案件タイトルを変更する
-    if (currentProjectId) {
+    // 1. 現在の企画IDの企画タイトルを変更する
+    if (currentPlanId) {
       const updateItem = document.createElement('div');
       updateItem.className = 'popup-editor-option';
-      updateItem.innerHTML = `案件タイトルを変更: <strong>${escapeHtml(currentProjectId)}</strong>`;
+      updateItem.innerHTML = `企画タイトルを変更: <strong>${escapeHtml(currentPlanId)}</strong>`;
       updateItem.onclick = () => {
         // ドロップダウンが選択されたことをマーク
-        projectTitleInput.dataset.dropdownSelected = 'true';
+        planTitleInput.dataset.dropdownSelected = 'true';
         showLoading();
-        callGAS('updateSingleField', 'projects', currentProjectId, 'project_title', query)
+        callGAS('updateItem', SHEET_NAMES.PLANS, currentPlanId, { title: query })
           .then(() => {
-            projectTitleInput.value = query;
+            planTitleInput.value = query;
             dropdownContainer.style.display = 'none';
             // 画面を再読み込み
-            openWorkDetailOverlay(workId);
+            openCreativeDetailOverlay(workId);
           })
           .catch(handleError);
       };
@@ -2596,27 +2685,27 @@
       dropdownContainer.appendChild(updateItem);
     }
 
-    // 2. 案件を新規作成
+    // 2. 企画を新規作成
     const newItem = document.createElement('div');
     newItem.className = 'popup-editor-option';
-    newItem.innerHTML = `案件を新規作成: <strong>${escapeHtml(query)}</strong>`;
+    newItem.innerHTML = `企画を新規作成: <strong>${escapeHtml(query)}</strong>`;
     newItem.onclick = () => {
       // ドロップダウンが選択されたことをマーク
-      projectTitleInput.dataset.dropdownSelected = 'true';
+      planTitleInput.dataset.dropdownSelected = 'true';
       showLoading();
-      callGAS('createProject', query).then(projectId => {
-        projectTitleInput.value = query;
-        projectTitleInput.dataset.projectId = projectId;
+      callGAS('createItem', SHEET_NAMES.PLANS, { title: query }).then(planId => {
+        planTitleInput.value = query;
+        planTitleInput.dataset.planId = planId;
         dropdownContainer.style.display = 'none';
-        // 案件IDを更新
-        callGAS('updateSingleField', 'works', workId, 'project_id', projectId)
+        // 企画IDを更新
+        callGAS('updateItem', SHEET_NAMES.CREATIVES, workId, { plan_id: planId })
           .then(() => {
-            // projectsDataを更新
-            if (projectsData) {
-              projectsData.push({ project_id: projectId, project_title: query });
+            // plansDataを更新
+            if (plansData) {
+              plansData.push({ id: planId, title: query });
             }
             // 画面を再読み込み
-            openWorkDetailOverlay(workId);
+            openCreativeDetailOverlay(workId);
           })
           .catch(handleError);
       }).catch(handleError);
@@ -2629,47 +2718,47 @@
     };
     dropdownContainer.appendChild(newItem);
 
-    // 3. 別案件に変更（検索結果を待たずに表示）
-    const changeProjectItem = document.createElement('div');
-    changeProjectItem.className = 'popup-editor-option';
-    changeProjectItem.id = 'change-project-item';
-    changeProjectItem.innerHTML = '別案件に変更';
-    changeProjectItem.onclick = () => {
+    // 3. 別企画に変更（検索結果を待たずに表示）
+    const changePlanItem = document.createElement('div');
+    changePlanItem.className = 'popup-editor-option';
+    changePlanItem.id = 'change-plan-item';
+    changePlanItem.innerHTML = '別企画に変更';
+    changePlanItem.onclick = () => {
       // ドロップダウンが選択されたことをマーク
-      projectTitleInput.dataset.dropdownSelected = 'true';
+      planTitleInput.dataset.dropdownSelected = 'true';
       dropdownContainer.style.display = 'none';
 
       // work_idを入力するモーダルを表示
-      const inputProjectId = prompt('案件IDを入力してください（例：P0001）:');
-      if (inputProjectId && inputProjectId.trim()) {
-        const trimmedProjectId = inputProjectId.trim().toUpperCase();
+      const inputPlanId = prompt('企画IDを入力してください（例：P0001）:');
+      if (inputPlanId && inputPlanId.trim()) {
+        const trimmedPlanId = inputPlanId.trim().toUpperCase();
         showLoading();
-        callGAS('getProjectById', trimmedProjectId).then(project => {
-          if (!project) {
-            alert('案件が見つかりません');
+        callGAS('getItemById', SHEET_NAMES.PLANS, trimmedPlanId).then(plan => {
+          if (!plan) {
+            alert('企画が見つかりません');
             hideLoading();
             return;
           }
-          // 案件IDを更新
-          callGAS('updateSingleField', 'works', workId, 'project_id', trimmedProjectId)
+          // 企画IDを更新
+          callGAS('updateItem', SHEET_NAMES.CREATIVES, workId, { plan_id: trimmedPlanId })
             .then(() => {
               // 画面を再読み込み
-              openWorkDetailOverlay(workId);
+              openCreativeDetailOverlay(workId);
             })
             .catch(handleError);
         }).catch(handleError);
       }
     };
-    changeProjectItem.onmouseenter = () => {
+    changePlanItem.onmouseenter = () => {
       // マウスホバー時に選択状態を更新
       dropdownContainer.querySelectorAll('.popup-editor-option').forEach((opt) => {
-        opt.classList.toggle('selected', opt === changeProjectItem);
+        opt.classList.toggle('selected', opt === changePlanItem);
       });
     };
-    dropdownContainer.appendChild(changeProjectItem);
+    dropdownContainer.appendChild(changePlanItem);
 
     // 位置を設定
-    const inputRect = projectTitleInput.getBoundingClientRect();
+    const inputRect = planTitleInput.getBoundingClientRect();
     dropdownContainer.style.position = 'absolute';
     dropdownContainer.style.top = `${inputRect.height + 4}px`;
     dropdownContainer.style.left = '0';
@@ -2702,45 +2791,45 @@
     }, 100);
   }
 
-  function performOverlayProjectTitleSearchUpdate(query, workId, currentProjectId, dropdownContainer, projectTitleInput) {
-    if (!dropdownContainer || !projectTitleInput) return;
+  function performOverlayPlanTitleSearchUpdate(query, workId, currentPlanId, dropdownContainer, planTitleInput) {
+    if (!dropdownContainer || !planTitleInput) return;
 
     const lowerCaseQuery = query.toLowerCase();
 
-    // 部分一致するプロジェクトを検索（project_idまたはproject_titleで検索）
-    const filteredProjects = (projectsData || []).filter(p =>
-      p.project_id.toLowerCase().includes(lowerCaseQuery) ||
-      p.project_title.toLowerCase().includes(lowerCaseQuery)
+    // 部分一致する企画を検索（idまたはtitleで検索）
+    const filteredPlans = (plansData || []).filter(p =>
+      p.id.toLowerCase().includes(lowerCaseQuery) ||
+      p.title.toLowerCase().includes(lowerCaseQuery)
     );
 
-    // 「別案件に変更」の項目を取得
-    const changeProjectItem = dropdownContainer.querySelector('#change-project-item');
+    // 「別企画に変更」の項目を取得
+    const changePlanItem = dropdownContainer.querySelector('#change-plan-item');
 
-    // マッチしたプロジェクトがある場合、詳細を表示
-    if (filteredProjects.length > 0 && changeProjectItem) {
-      const firstProject = filteredProjects[0];
-      changeProjectItem.innerHTML = `別案件に変更: <strong>${escapeHtml(firstProject.project_id)} ${escapeHtml(firstProject.project_title)}</strong>`;
+    // マッチした企画がある場合、詳細を表示
+    if (filteredPlans.length > 0 && changePlanItem) {
+      const firstPlan = filteredPlans[0];
+      changePlanItem.innerHTML = `別企画に変更: <strong>${escapeHtml(firstPlan.id)} ${escapeHtml(firstPlan.title)}</strong>`;
 
-      // クリック時の動作を更新（最初のマッチしたプロジェクトを選択）
-      changeProjectItem.onclick = () => {
+      // クリック時の動作を更新（最初のマッチした企画を選択）
+      changePlanItem.onclick = () => {
         // ドロップダウンが選択されたことをマーク
-        projectTitleInput.dataset.dropdownSelected = 'true';
-        projectTitleInput.value = firstProject.project_title;
-        projectTitleInput.dataset.projectId = firstProject.project_id;
+        planTitleInput.dataset.dropdownSelected = 'true';
+        planTitleInput.value = firstPlan.title;
+        planTitleInput.dataset.planId = firstPlan.id;
         dropdownContainer.style.display = 'none';
-        // 案件IDを更新
-        if (firstProject.project_id !== currentProjectId) {
+        // 企画IDを更新
+        if (firstPlan.id !== currentPlanId) {
           showLoading();
-          callGAS('updateSingleField', 'works', workId, 'project_id', firstProject.project_id)
+          callGAS('updateItem', SHEET_NAMES.CREATIVES, workId, { plan_id: firstPlan.id })
             .then(() => {
               // 画面を再読み込み
-              openWorkDetailOverlay(workId);
+              openCreativeDetailOverlay(workId);
             })
             .catch(handleError);
         }
       };
     }
-    // マッチしない場合でも「別案件に変更」は表示し続ける（既に表示されている）
+    // マッチしない場合でも「別企画に変更」は表示し続ける（既に表示されている）
   }
 
   function showSelectEditorForWorkDetail(event, workId, field, currentValue, configType) {
@@ -2768,7 +2857,7 @@
       optionDiv.addEventListener('click', () => {
         if (opt.config_key !== currentValue) {
           showLoading();
-          callGAS('updateSingleField', 'works', workId, field, opt.config_key)
+          callGAS('updateItem', SHEET_NAMES.WORKS, workId, { [field]: opt.config_key })
             .then(() => {
               const statusText = document.getElementById('work-detail-status-text');
               if (statusText) {
@@ -2815,7 +2904,7 @@
       optionDiv.addEventListener('click', () => {
         if (opt.config_key !== currentValue) {
           showLoading();
-          callGAS('updateSingleField', 'works', workId, field, opt.config_key)
+          callGAS('updateItem', SHEET_NAMES.WORKS, workId, { [field]: opt.config_key })
             .then(() => {
               const statusTextHeader = document.getElementById('work-detail-status-text-header');
               if (statusTextHeader) {
@@ -3062,7 +3151,7 @@
 
     if (newValueAsISO !== originalValue) {
       showLoading();
-      callGAS('updateSingleField', 'works', workId, field, newValueAsISO)
+      callGAS('updateItem', SHEET_NAMES.WORKS, workId, { [field]: newValueAsISO })
         .then(() => {
           const textSpan = container.querySelector('.editable-text');
           if (textSpan) {
@@ -3120,7 +3209,7 @@
 
     if (newValueAsISO !== originalValue) {
       showLoading();
-      callGAS('updateSingleField', 'works', workId, field, newValueAsISO)
+      callGAS('updateItem', SHEET_NAMES.WORKS, workId, { [field]: newValueAsISO })
         .then(() => {
           const textSpanHeader = document.getElementById('work-detail-due-text-header');
           const textSpan = document.getElementById('work-detail-due-text');
@@ -3344,7 +3433,7 @@
     if (String(newValue) === String(oldValue)) return;
 
     showLoading();
-    callGAS('updateTask', taskId, { [field]: newValue })
+    callGAS('updateItem', SHEET_NAMES.TASKS, taskId, { [field]: newValue })
       .then(() => {
         hideLoading();
         // Work詳細を再読み込み
@@ -3778,7 +3867,7 @@
     if (!currentWorkId) return;
 
     // 既に割り当てられているメンバーを取得
-    callGAS('getWorkById', currentWorkId).then(work => {
+    callGAS('getItemById', SHEET_NAMES.WORKS, currentWorkId).then(work => {
       const assignedEmails = (work.assignees || []).map(a => a.member_email);
       const availableMembers = (membersData || []).filter(m => !assignedEmails.includes(m.member_email));
 
@@ -3831,7 +3920,7 @@
     if (!currentWorkId) return;
 
     // 既に割り当てられているアプリを取得
-    callGAS('getWorkById', currentWorkId).then(work => {
+    callGAS('getItemById', SHEET_NAMES.WORKS, currentWorkId).then(work => {
       const assignedAppKeys = (work.apps || []).map(a => a.key);
       const availableApps = (configData['APP'] || []).filter(app => !assignedAppKeys.includes(app.config_key));
 
@@ -3882,12 +3971,12 @@
 
   function addWorkAssignee(workId, memberEmail) {
     showLoading();
-    callGAS('addWorkAssignee', workId, memberEmail)
+    callGAS('createItem', SHEET_NAMES.WORK_ASSIGNMENTS, { work_id: workId, member_email: memberEmail })
       .then(() => {
         hideLoading();
         if (currentWorkId) {
           // 担当者表示を更新
-          callGAS('getWorkById', currentWorkId).then(work => {
+          callGAS('getItemById', SHEET_NAMES.WORKS, currentWorkId).then(work => {
             const assigneesContainer = document.getElementById('work-detail-assignees-header-info');
             if (assigneesContainer) {
               assigneesContainer.innerHTML = '';
@@ -3943,7 +4032,7 @@
     if (!confirm('この担当者を削除しますか？')) return;
 
     showLoading();
-    callGAS('removeWorkAssignee', workId, memberEmail)
+    callGAS('deleteItem', SHEET_NAMES.WORK_ASSIGNMENTS, { work_id: workId, member_email: memberEmail })
       .then(() => {
         hideLoading();
         if (currentWorkId) {
@@ -3957,7 +4046,7 @@
 
   function addWorkApp(workId, appKey) {
     showLoading();
-    callGAS('addWorkApp', workId, appKey)
+    callGAS('createItem', SHEET_NAMES.APP_ASSIGNMENTS, { work_id: workId, work_apps_key: appKey })
       .then(() => {
         hideLoading();
         if (currentWorkId) {
@@ -3973,7 +4062,7 @@
     if (!confirm('このアプリを削除しますか？')) return;
 
     showLoading();
-    callGAS('removeWorkApp', workId, appKey)
+    callGAS('deleteItem', SHEET_NAMES.APP_ASSIGNMENTS, { work_id: workId, work_apps_key: appKey })
       .then(() => {
         hideLoading();
         if (currentWorkId) {
@@ -3990,7 +4079,7 @@
     recordJSInvocation('openMemberDetail', memberEmail);
 
     showLoading();
-    callGAS('getMemberByEmail', memberEmail).then(member => {
+    callGAS('getItemById', SHEET_NAMES.MEMBERS, memberEmail).then(member => {
       if (!member) {
         alert('メンバーが見つかりません');
         hideLoading();
@@ -4081,7 +4170,7 @@
   }
 
   function saveMemberNotes(memberEmail, content) {
-    callGAS('updateMember', memberEmail, { member_notes: content })
+    callGAS('updateItem', SHEET_NAMES.MEMBERS, memberEmail, { member_notes: content })
       .then(() => {
         // 保存成功
       })
@@ -4092,29 +4181,29 @@
 
   // project詳細画面は廃止（テーブルに全カラムを表示）
 
-  function openNewWorkModal() {
-    if (!projectsData || projectsData.length === 0) {
+  function openNewCreativeModal() {
+    if (!plansData || plansData.length === 0) {
       showLoading();
-      callGAS('getProjects').then(data => {
-        projectsData = data;
+      callGAS('getItems', SHEET_NAMES.PLANS).then(data => {
+        plansData = data;
         hideLoading();
-        buildNewWorkForm();
-        openModal('modal-new-work');
+        buildNewCreativeForm();
+        openModal('modal-new-creative');
       }).catch(handleError);
     } else {
-      buildNewWorkForm();
-      openModal('modal-new-work');
+      buildNewCreativeForm();
+      openModal('modal-new-creative');
     }
   }
 
-  function buildNewWorkForm() {
-    const formContainer = document.getElementById('new-work-form');
-    const workTypes = configData['WORK_TYPE'] || [];
-    const workTypeOptions = workTypes.map(wt => `<option value="${wt.config_key}">${wt.config_value}</option>`).join('');
-    formContainer.innerHTML = `<form id="new-work-form-element" onsubmit="submitNewWork(event)"> <div class="form-group"> <label class="form-label">案件タイトル</label> <div id="project-combobox" class="combobox-container"> <input type="text" name="project_title" class="input-field" required placeholder="既存の案件タイトルで検索、または新規作成" oninput="searchProjects(this.value)" autocomplete="off"> <input type="hidden" name="project_id"> <div id="project-suggestions" class="combobox-suggestions"></div> </div> </div> <div class="form-group"> <label class="form-label">制作タイトル</label> <input type="text" name="work_title" class="input-field" required> </div> <div class="form-group"> <label class="form-label">制作種別</label> <select name="work_type_key" class="input-field" onchange="updateRegulationPreset(this.value)"> <option value="">選択してください</option> ${workTypeOptions} </select> </div> <div class="form-group"> <label class="form-label">納品期限</label> <div id="new-work-datetime-container" class="datetime-custom-editor" style="display: flex; align-items: center; gap: 4px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; background-color: white;"> <input type="text" class="datetime-segment" data-segment="yyyy" maxlength="4" value="" placeholder="yyyy" style="width: 60px; text-align: center; border: none; outline: none; background: transparent;"> <span class="datetime-separator">/</span> <input type="text" class="datetime-segment" data-segment="mm" maxlength="2" value="" placeholder="mm" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;"> <span class="datetime-separator">/</span> <input type="text" class="datetime-segment" data-segment="dd" maxlength="2" value="" placeholder="dd" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;"> <span class="datetime-separator"> </span> <input type="text" class="datetime-segment" data-segment="hh" maxlength="2" value="" placeholder="hh" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;"> <span class="datetime-separator">:</span> <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="" placeholder="mm" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;"> </div> <input type="hidden" name="due_datetime" id="new-work-due-datetime"> </div> <div class="form-group"> <label class="form-label">制作物の概要</label> <textarea name="work_detail_content" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">デザイン要項</label> <textarea name="work_detail_design" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">入稿規定</label> <textarea name="work_detail_regulation" class="input-field" rows="4"></textarea> </div> <div class="form-group"> <label class="form-label">依頼者からの備考</label> <textarea name="work_detail_note" class="input-field" rows="4"></textarea> </div> <div class="modal-footer"> <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-work')">キャンセル</button> <button type="submit" class="btn btn-primary">作成</button> </div> </form>`;
+  function buildNewCreativeForm() {
+    const formContainer = document.getElementById('new-creative-form');
+    const creativeTypes = configData['CREATIVE_TYPE'] || [];
+    const creativeTypeOptions = creativeTypes.map(wt => `<option value="${wt.config_key}">${wt.config_value}</option>`).join('');
+    formContainer.innerHTML = `<form id="new-creative-form-element" onsubmit="submitNewCreative(event)"> <div class="form-group"> <label class="form-label">企画タイトル</label> <div id="plan-combobox" class="combobox-container"> <input type="text" name="plan_title" class="input-field" required placeholder="既存の企画タイトルで検索、または新規作成" oninput="searchPlans(this.value)" autocomplete="off"> <input type="hidden" name="plan_id"> <div id="plan-suggestions" class="combobox-suggestions"></div> </div> </div> <div class="form-group"> <label class="form-label">制作タイトル</label> <input type="text" name="title" class="input-field" required> </div> <div class="form-group"> <label class="form-label">制作種別</label> <select name="creative_type_key" class="input-field" onchange="updateRegulationPreset(this.value)"> <option value="">選択してください</option> ${creativeTypeOptions} </select> </div> <div class="form-group"> <label class="form-label">納品期限</label> <div id="new-creative-datetime-container" class="datetime-custom-editor" style="display: flex; align-items: center; gap: 4px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; background-color: white;"> <input type="text" class="datetime-segment" data-segment="yyyy" maxlength="4" value="" placeholder="yyyy" style="width: 60px; text-align: center; border: none; outline: none; background: transparent;"> <span class="datetime-separator">/</span> <input type="text" class="datetime-segment" data-segment="mm" maxlength="2" value="" placeholder="mm" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;"> <span class="datetime-separator">/</span> <input type="text" class="datetime-segment" data-segment="dd" maxlength="2" value="" placeholder="dd" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;"> <span class="datetime-separator"> </span> <input type="text" class="datetime-segment" data-segment="hh" maxlength="2" value="" placeholder="hh" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;"> <span class="datetime-separator">:</span> <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="" placeholder="mm" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;"> </div> <input type="hidden" name="deadline_at" id="new-creative-deadline-at"> </div> <div class="form-group"> <label class="form-label">制作物の概要</label> <textarea name="description" class="input-field" rows="4"></textarea> </div> <div class="modal-footer"> <button type="button" class="btn btn-secondary btn-cancel" onclick="closeModal('modal-new-creative')">キャンセル</button> <button type="submit" class="btn btn-primary">作成</button> </div> </form>`;
 
     // IME変換確定時のEnterキーを無視する処理を追加
-    const form = document.getElementById('new-work-form-element');
+    const form = document.getElementById('new-creative-form-element');
     if (form) {
       const textInputs = form.querySelectorAll('input[type="text"], textarea');
       textInputs.forEach(input => {
@@ -4126,8 +4215,8 @@
       });
 
       // カスタム日時入力フィールドの設定
-      const datetimeContainer = document.getElementById('new-work-datetime-container');
-      const hiddenInput = document.getElementById('new-work-due-datetime');
+      const datetimeContainer = document.getElementById('new-creative-datetime-container');
+      const hiddenInput = document.getElementById('new-creative-deadline-at');
       if (datetimeContainer && hiddenInput) {
         const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
 
@@ -4209,29 +4298,29 @@
 
   function updateRegulationPreset(workTypeKey) {
     if (!workTypeKey) return;
-    const workType = (configData['WORK_TYPE'] || []).find(wt => wt.config_key === workTypeKey);
+    const workType = (configData['CREATIVE_TYPE'] || []).find(wt => wt.config_key === workTypeKey);
     if (workType && workType.config_preset_value) {
       document.querySelector('textarea[name="work_detail_regulation"]').value = workType.config_preset_value;
     }
   }
 
-  function searchProjects(query) {
-    const suggestionsContainer = document.getElementById('project-suggestions');
-    const projectIdInput = document.querySelector('#new-work-form-element input[name="project_id"]');
+  function searchPlans(query) {
+    const suggestionsContainer = document.getElementById('plan-suggestions');
+    const planIdInput = document.querySelector('#new-creative-form-element input[name="plan_id"]');
     if (!query) {
       suggestionsContainer.style.display = 'none';
       return;
     }
     const lowerCaseQuery = query.toLowerCase();
-    const filteredProjects = projectsData.filter(p => p.project_title.toLowerCase().includes(lowerCaseQuery));
+    const filteredPlans = plansData.filter(p => p.title.toLowerCase().includes(lowerCaseQuery));
     suggestionsContainer.innerHTML = '';
-    filteredProjects.forEach(p => {
+    filteredPlans.forEach(p => {
       const item = document.createElement('div');
       item.className = 'combobox-item';
-      item.textContent = p.project_title;
+      item.textContent = p.title;
       item.onclick = () => {
-        document.querySelector('#new-work-form-element input[name="project_title"]').value = p.project_title;
-        projectIdInput.value = p.project_id;
+        document.querySelector('#new-creative-form-element input[name="plan_title"]').value = p.title;
+        planIdInput.value = p.id;
         suggestionsContainer.style.display = 'none';
       };
       suggestionsContainer.appendChild(item);
@@ -4240,8 +4329,8 @@
     newItem.className = 'combobox-item';
     newItem.innerHTML = `+ 新規作成: <strong>${escapeHtml(query)}</strong>`;
     newItem.onclick = () => {
-      document.querySelector('#new-work-form-element input[name="project_title"]').value = query;
-      projectIdInput.value = '';
+      document.querySelector('#new-creative-form-element input[name="plan_title"]').value = query;
+      planIdInput.value = '';
       suggestionsContainer.style.display = 'none';
     };
     suggestionsContainer.appendChild(newItem);
@@ -4249,46 +4338,46 @@
   }
 
   document.addEventListener('click', function (event) {
-    const container = document.getElementById('project-combobox');
+    const container = document.getElementById('plan-combobox');
     if (container && !container.contains(event.target)) {
-      const suggestions = document.getElementById('project-suggestions');
+      const suggestions = document.getElementById('plan-suggestions');
       if (suggestions) {
         suggestions.style.display = 'none';
       }
     }
   });
 
-  function submitNewWork(event) {
+  function submitNewCreative(event) {
     event.preventDefault();
     const form = event.target;
 
     // カスタム日時入力フィールドの値を確実に更新
-    const datetimeContainer = document.getElementById('new-work-datetime-container');
-    const hiddenInput = document.getElementById('new-work-due-datetime');
+    const datetimeContainer = document.getElementById('new-creative-datetime-container');
+    const hiddenInput = document.getElementById('new-creative-deadline-at');
     if (datetimeContainer && hiddenInput) {
       const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
       updateNewWorkDateTimeValue(inputs, hiddenInput);
     }
 
     const formData = new FormData(form);
-    const workData = Object.fromEntries(formData.entries());
-    showModalLoading('modal-new-work', `新規制作物を作成しています`);
-    callGAS('createWork', workData)
-      .then(workId => {
-        showModalSuccess('modal-new-work', '新規制作物を作成しました', () => {
-          if (document.getElementById('tab-works').style.display === 'block') {
-            loadWorksData();
+    const creativeData = Object.fromEntries(formData.entries());
+    showModalLoading('modal-new-creative', `新規制作物を作成しています`);
+    callGAS('createItem', SHEET_NAMES.CREATIVES, creativeData)
+      .then(id => {
+        showModalSuccess('modal-new-creative', '新規制作物を作成しました', () => {
+          if (document.getElementById('tab-creatives').style.display === 'block') {
+            loadData(SHEET_NAMES.CREATIVES);
           }
         });
       })
       .catch(error => {
         handleError(error);
-        resetModalState('modal-new-work');
+        resetModalState('modal-new-creative');
       });
   }
 
-  function openNewProjectModal() {
-    const form = document.getElementById('new-project-form');
+  function openNewPlanModal() {
+    const form = document.getElementById('new-plan-form');
     form.reset();
     // IME変換確定時のEnterキーを無視する処理を追加
     const textInputs = form.querySelectorAll('input[type="text"], textarea');
@@ -4299,7 +4388,7 @@
         }
       });
     });
-    openModal('modal-new-project');
+    openModal('modal-new-plan');
   }
   function openNewTaskModal(workId) {
     const form = document.getElementById('new-task-form');
@@ -4576,7 +4665,7 @@
           .then(fileInfo => {
             reviewRequestFiles.push({
               file_id: fileInfo.file_id,
-              file_name: fileInfo.file_name || 'ファイル',
+              file_name: fileInfo.file_name,
               file_url: fileInfo.file_url || ''
             });
             updateReviewRequestFilesList();
@@ -4684,7 +4773,7 @@
     }
 
     showModalLoading('modal-new-review-request', 'レビュー依頼を投稿しています');
-    callGAS('createReviewRequest', reviewRequestData)
+    callGAS('createItem', SHEET_NAMES.REVIEW_REQUESTS, reviewRequestData)
       .then(reviewRequestId => {
         showModalSuccess('modal-new-review-request', 'レビュー依頼を投稿しました', () => {
           if (currentWorkId) {
@@ -4703,7 +4792,7 @@
 
   function openReviewRequestDetailModal(reviewRequestId) {
     showLoading();
-    callGAS('getReviewRequestById', reviewRequestId).then(reviewRequest => {
+    callGAS('getItemById', SHEET_NAMES.REVIEW_REQUESTS, reviewRequestId).then(reviewRequest => {
       const container = document.getElementById('review-request-detail-content');
 
       // ファイル名取得完了まではファイルURLを表示
@@ -4779,7 +4868,7 @@
     const taskData = Object.fromEntries(formData.entries());
 
     showModalLoading('modal-new-task', '新規タスクを作成しています');
-    callGAS('createTask', taskData)
+    callGAS('createItem', SHEET_NAMES.TASKS, taskData)
       .then(taskId => {
         showModalSuccess('modal-new-task', '新規タスクを作成しました', () => {
           // Work詳細を再読み込み
@@ -4833,11 +4922,11 @@
     const memberData = Object.fromEntries(formData.entries());
 
     showModalLoading('modal-new-member', '新規メンバーを登録しています');
-    callGAS('createMember', memberData)
+    callGAS('createItem', SHEET_NAMES.MEMBERS, memberData)
       .then(() => {
         showModalSuccess('modal-new-member', '新規メンバーを登録しました', () => {
           if (document.getElementById('tab-members').style.display === 'block') {
-            loadMembersData();
+            loadData(SHEET_NAMES.MEMBERS);
           }
         });
       })
@@ -4865,7 +4954,7 @@
     // Worksデータを取得（まだ取得していない場合）
     if (!worksData || worksData.length === 0) {
       showLoading();
-      callGAS('getWorks').then(data => {
+      callGAS('getItems', SHEET_NAMES.WORKS).then(data => {
         worksData = data;
         hideLoading();
         openModal('modal-new-knowledge');
@@ -4923,11 +5012,11 @@
     };
 
     showModalLoading('modal-new-knowledge', '新規ナレッジを作成しています');
-    callGAS('createKnowledge', knowledgeData)
+    callGAS('createItem', SHEET_NAMES.KNOWLEDGE, knowledgeData)
       .then(() => {
         showModalSuccess('modal-new-knowledge', '新規ナレッジを作成しました', () => {
           if (document.getElementById('tab-knowledge').style.display === 'block') {
-            loadKnowledgeData();
+            loadData(SHEET_NAMES.KNOWLEDGE);
           }
         });
       })
@@ -5002,17 +5091,17 @@
     setTimeout(() => resetModalState(modalId), 300);
   }
 
-  function submitNewProject(event) {
+  function submitNewPlan(event) {
     event.preventDefault();
-    const projectTitle = event.target.elements.project_title.value;
-    showModalLoading('modal-new-project');
-    callGAS('createProject', projectTitle).then(() => {
-      showModalSuccess('modal-new-project', 'プロジェクトを作成しました', () => {
-        loadProjectsData();
+    const title = event.target.elements.title.value;
+    showModalLoading('modal-new-plan');
+    callGAS('createItem', SHEET_NAMES.PLANS, { title: title }).then(() => {
+      showModalSuccess('modal-new-plan', '企画を作成しました', () => {
+        loadData(SHEET_NAMES.PLANS);
       });
     }).catch(error => {
       handleError(error);
-      resetModalState('modal-new-project');
+      resetModalState('modal-new-plan');
     });
   }
 
@@ -5024,7 +5113,7 @@
       state.sortKey = columnKey;
       state.sortOrder = 'asc';
     }
-    const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'tasks': loadTasksData, 'members': loadMembersData };
+    const dataLoaders = { [SHEET_NAMES.WORKS]: () => loadData(SHEET_NAMES.WORKS), [SHEET_NAMES.PROJECTS]: () => loadData(SHEET_NAMES.PROJECTS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
     if (dataLoaders[tableName]) {
       showLoading();
       dataLoaders[tableName]();
@@ -5035,7 +5124,7 @@
     event.stopPropagation();
     closeFilterMenu();
     const state = tableState[tableName];
-    const data = tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : tableName === 'tasks' ? tasksData : membersData;
+    const data = tableName === SHEET_NAMES.WORKS ? worksData : tableName === SHEET_NAMES.PROJECTS ? projectsData : tableName === SHEET_NAMES.TASKS ? tasksData : membersData;
     const uniqueValues = [...new Set(data.map(item => item[columnKey]))].filter(v => v);
     const popup = document.createElement('div');
     popup.id = 'filter-popup';
@@ -5072,7 +5161,7 @@
         delete state.filters[columnKey];
       }
       closeFilterMenu();
-      const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'tasks': loadTasksData, 'members': loadMembersData };
+      const dataLoaders = { [SHEET_NAMES.WORKS]: () => loadData(SHEET_NAMES.WORKS), [SHEET_NAMES.PROJECTS]: () => loadData(SHEET_NAMES.PROJECTS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
       if (dataLoaders[tableName]) {
         showLoading();
         dataLoaders[tableName]();
@@ -5084,7 +5173,7 @@
     clearBtn.onclick = () => {
       delete state.filters[columnKey];
       closeFilterMenu();
-      const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'tasks': loadTasksData, 'members': loadMembersData };
+      const dataLoaders = { [SHEET_NAMES.WORKS]: loadWorksData, [SHEET_NAMES.PROJECTS]: loadProjectsData, [SHEET_NAMES.TASKS]: loadTasksData, [SHEET_NAMES.MEMBERS]: loadMembersData };
       if (dataLoaders[tableName]) {
         showLoading();
         dataLoaders[tableName]();
@@ -5142,7 +5231,7 @@
   // ヘルパー関数
   // ============================================
   function getHeaderDef(tableName, field) {
-    const headers = tableName === 'works' ? worksTableHeaders : tableName === 'projects' ? projectsTableHeaders : tableName === 'tasks' ? tasksTableHeaders : membersTableHeaders;
+    const headers = tableName === SHEET_NAMES.WORKS ? worksTableHeaders : tableName === SHEET_NAMES.PROJECTS ? projectsTableHeaders : tableName === SHEET_NAMES.TASKS ? tasksTableHeaders : membersTableHeaders;
     return headers.find(h => h.key === field);
   }
   function renderAssignees(assignees) {
@@ -5265,8 +5354,8 @@
     showLoading();
 
     // まずデータ配列を更新する
-    const data = tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : tableName === 'tasks' ? tasksData : membersData;
-    const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : (tableName === 'tasks' ? 'task_id' : 'project_id'));
+    const data = tableName === SHEET_NAMES.WORKS ? worksData : tableName === SHEET_NAMES.PROJECTS ? projectsData : tableName === SHEET_NAMES.TASKS ? tasksData : membersData;
+    const idKey = tableName === SHEET_NAMES.MEMBERS ? 'member_email' : (tableName === SHEET_NAMES.WORKS ? 'work_id' : (tableName === SHEET_NAMES.TASKS ? 'task_id' : 'project_id'));
     const item = data.find(d => String(d[idKey]) === String(id));
     if (item) {
       item[field] = newValue;
@@ -5297,20 +5386,20 @@
     }
 
     // 最後にサーバーに保存する
-    callGAS('updateSingleField', tableName, id, field, newValue)
+    callGAS('updateItem', tableName, id, { [field]: newValue })
       .then(success => {
         hideLoading();
         if (!success) {
           handleError({ message: '更新に失敗しました。' });
           // 失敗時はデータを再読み込み
-          const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'tasks': loadTasksData, 'members': loadMembersData };
+          const dataLoaders = { [SHEET_NAMES.WORKS]: () => loadData(SHEET_NAMES.WORKS), [SHEET_NAMES.PROJECTS]: () => loadData(SHEET_NAMES.PROJECTS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
           if (dataLoaders[tableName]) dataLoaders[tableName]();
         }
       })
       .catch(err => {
         handleError(err);
         // エラー時はデータを再読み込み
-        const dataLoaders = { 'works': loadWorksData, 'projects': loadProjectsData, 'tasks': loadTasksData, 'members': loadMembersData };
+        const dataLoaders = { [SHEET_NAMES.WORKS]: () => loadData(SHEET_NAMES.WORKS), [SHEET_NAMES.PROJECTS]: () => loadData(SHEET_NAMES.PROJECTS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
         if (dataLoaders[tableName]) dataLoaders[tableName]();
       });
   }

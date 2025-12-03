@@ -1,3 +1,9 @@
+function initScriptProperties() {
+    const uuid = Utilities.getUuid();
+    scriptProperties.setProperty('API_KEY', uuid);
+    console.log(`API Key: ${uuid}`);
+}
+
 function initSheets() {
     const REPO_OWNER = 'teppgreen';
     const REPO_NAME = 'zarms';
