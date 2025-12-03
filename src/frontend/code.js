@@ -388,7 +388,7 @@ function createKnowledgeLogic(knowledgeData) {
 
 // --- Config ---
 function getConfigLogic() {
-  let configs = getAllData('config');
+  let configs = getAllData(SHEET_NAMES.CONFIG);
   configs = configs.filter(config => config.is_active === true || config.is_active === 'TRUE' || config.is_active === 'true');
   configs.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   return sanitizeForClient(configs);
@@ -466,7 +466,7 @@ function getReviewRequestsByWorkId(workId) {
 
 function getConfigValue(key, type) {
   // Simplified config lookup
-  const configs = getItems('config');
+  const configs = getItems(SHEET_NAMES.CONFIG);
   const config = configs.find(c => c.config_key === key && c.config_type === type);
   return config ? config.config_value : key;
 }
