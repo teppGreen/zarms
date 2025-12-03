@@ -669,3 +669,37 @@ function createGithubIssue(issueData) {
   console.log('Creating GitHub Issue:', issueData);
   return { number: 999, url: 'https://github.com/example/repo/issues/999' };
 }
+
+// ============================================
+// ヘルパー関数: JSONシリアライズ対策
+// (Dateオブジェクトを自動的にISO文字列に変換する)
+// ============================================
+function sanitizeForClient(data) {
+  if (data === null || data === undefined) {
+    return data;
+  }
+
+  // Dateオブジェクトの場合
+  if (data instanceof Date) {
+    return data.toISOString();
+  }
+
+  // 配列の場合は、各要素を再帰的に処理
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeForClient(item));
+  }
+
+  // プレーンなオブジェクトの場合は、各プロパティを再帰的に処理
+  if (typeof data === 'object' && data.constructor === Object) {
+    const sanitized = {};
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        sanitized[key] = sanitizeForClient(data[key]);
+      }
+    }
+    return sanitized;
+  }
+
+  // それ以外（文字列、数値、ブール値）はそのまま返す
+  return data;
+}
