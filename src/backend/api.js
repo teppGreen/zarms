@@ -69,19 +69,16 @@ function doPost(e) {
                         data: result
                     });
 
-                case 'get_next_id':
-                    const { prefix } = contents;
-                    if (!prefix) throw new Error('Prefix is required for get_next_id operation');
-                    result = generateNextId(sheetName, prefix, idColumnName);
-                    return createResponse({
-                        status: 'success',
-                        data: result
-                    });
+
 
                 case 'create':
                     if (!data) throw new Error('Data is required for create operation');
                     result = createData(sheetName, data, userEmail, idColumnName);
-                    break;
+                    return createResponse({
+                        status: 'success',
+                        message: 'Operation completed successfully',
+                        data: result
+                    });
 
                 case 'update':
                     if (!id || !data) throw new Error('ID and Data are required for update operation');
