@@ -40,19 +40,7 @@ function findData(sheetName, condition) {
   });
 }
 
-/**
- * 新しいIDを採番します。
- * @param {string} sheetName - シート名
- * @param {string} prefix - IDのプレフィックス (例: 'W', 'P', 'T')
- * @returns {string} 新しいID
- */
-function generateNextId(sheetName, prefix) {
-  return callBackendAPI('get_next_id', {
-    sheetName: sheetName,
-    prefix: prefix,
-    idColumnName: ID_COLUMNS[sheetName]
-  });
-}
+
 
 /**
  * シートに新しいデータを追加します。

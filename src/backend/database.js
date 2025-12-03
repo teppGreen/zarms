@@ -139,28 +139,94 @@ function findData(sheetName, condition) {
 
 
 /**
+ * UUIDを生成します。
+ * @returns {string} UUID
+ */
+function generateUuid() {
+    return Utilities.getUuid();
+}
+
+/**
+ * 指定されたカラムの次のシリアル番号を取得します。
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - シートオブジェクト
+ * @param {string} columnName - カラム名
+ * @returns {number} 次のシリアル番号
+ */
+function getNextSerial(sheet, columnName) {
+    const headers = getHeaders(sheet);
+    const colIndex = headers.indexOf(columnName);
+
+    if (colIndex === -1) {
+        throw new Error(`Column not found: ${columnName}`);
+    }
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return 1;
+
+    let maxVal = 0;
+    // 1行目はヘッダーなのでスキップ
+    for (let i = 1; i < data.length; i++) {
+        const val = data[i][colIndex];
+        if (typeof val === 'number' && !isNaN(val)) {
+            if (val > maxVal) {
+                maxVal = val;
+            }
+        }
+    }
+
+    return maxVal + 1;
+}
+
+/**
  * シートに新しいデータを追加します。
  * @param {string} sheetName - シート名
  * @param {Object} dataObject - 追加するデータオブジェクト
  * @param {string} userEmail - 操作ユーザーのEmail
- * @returns {boolean} 成功したかどうか
+ * @param {string} idColumnName - IDカラム名 (Optional)
+ * @returns {Object} 作成されたデータオブジェクト
  */
 function createData(sheetName, dataObject, userEmail, idColumnName) {
     const sheet = getSheet(sheetName);
     const headers = getHeaders(sheet);
+    const newData = { ...dataObject }; // コピーを作成
 
-    const newRow = headers.map(header => dataObject[header] || '');
+    // ID生成ロジック
+    // 1. UUID (PK) の生成
+    // CONFIGテーブル以外で、'id'カラムが存在し、かつ値が未設定の場合
+    if (sheetName !== 'CONFIG' && headers.includes('id') && !newData['id']) {
+        newData['id'] = generateUuid();
+    }
+    // logsテーブルの特例: PKは 'log'
+    if (sheetName === 'logs' && headers.includes('log') && !newData['log']) {
+        newData['log'] = generateUuid();
+    }
+
+    // 2. Serial ID (display_id) の生成
+    // 'display_id' カラムが存在する場合
+    if (headers.includes('display_id') && !newData['display_id']) {
+        newData['display_id'] = getNextSerial(sheet, 'display_id');
+    }
+    // CONFIGテーブルの特例: PK 'id' がシリアル
+    if (sheetName === 'CONFIG' && headers.includes('id') && !newData['id']) {
+        newData['id'] = getNextSerial(sheet, 'id');
+    }
+
+    const newRow = headers.map(header => {
+        const val = newData[header];
+        return (val === undefined || val === null) ? '' : val;
+    });
 
     sheet.appendRow(newRow);
 
     // ログ記録
-    const idColumn = idColumnName;
-    const recordId = idColumn ? dataObject[idColumn] : '';
+    const idColumn = idColumnName || (headers.includes('id') ? 'id' : null);
+    const recordId = idColumn ? newData[idColumn] : '';
+
     if (recordId) {
-        logOperation('add', sheetName, recordId, null, null, dataObject, userEmail);
+        logOperation('add', sheetName, recordId, null, null, newData, userEmail);
     }
 
-    return true;
+    return newData;
 }
 
 /**
@@ -277,50 +343,7 @@ function deleteData(sheetName, condition, userEmail, idColumnName) {
     return deleted;
 }
 
-/**
- * 新しいIDを採番します。
- * @param {string} sheetName - シート名
- * @param {string} prefix - IDのプレフィックス (例: 'W', 'P', 'T')
- * @returns {string} 新しいID
- */
-function generateNextId(sheetName, prefix, idColumnName) {
-    // 同時実行によるID重複を防ぐためにロックを取得
-    // 注: API側でもロックしているが、念のためここでも（あるいはAPI側のロックで十分かもだが、ロジックとして独立させる）
-    // API側で全体をロックしているので、ここでは不要かもしれないが、安全のため残すか、
-    // APIのロックは `doPost` 全体にかかるので、ここで `LockService` を使うと二重ロックになる？
-    // 同一スクリプト内の二重ロックはOKだが、`waitLock`で待つことになる。
-    // API側ですでにロックしているので、ここはロックなしで実行する形にする（APIのロックに依存）。
 
-    const sheet = getSheet(sheetName);
-    const lastRow = sheet.getLastRow();
-
-    // ヘッダー行のインデックスを取得 (1行目と仮定)
-    const headers = getHeaders(sheet);
-    const idColumnIndex = headers.indexOf(idColumnName) + 1;
-
-    if (idColumnIndex === 0) {
-        throw new Error(`ID列 '${idColumnName}' がシート '${sheetName}' に見つかりません。`);
-    }
-
-    let nextIdNumber = 1;
-
-    // データ行が存在する場合のみ最終IDを読み取る (lastRow > 1)
-    if (lastRow > 1) {
-        // 最終行のIDを取得
-        const lastId = sheet.getRange(lastRow, idColumnIndex).getValue();
-        if (lastId && typeof lastId === 'string' && lastId.startsWith(prefix)) {
-            const lastNumber = parseInt(lastId.substring(prefix.length), 10);
-            if (!isNaN(lastNumber)) {
-                nextIdNumber = lastNumber + 1;
-            }
-        }
-    }
-
-    // 4桁のゼロパディング
-    const nextId = prefix + String(nextIdNumber).padStart(4, '0');
-
-    return nextId;
-}
 
 // ============================================
 // ログ記録機能
