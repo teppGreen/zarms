@@ -545,52 +545,6 @@ function getHomeData() {
   });
 }
 
-// ============================================
-// ★★★★★ 追加 ★★★★★
-// 新しいIDを採番する
-// ============================================
-function generateNextId(sheetName, prefix) {
-  // 同時実行によるID重複を防ぐためにロックを取得
-  const lock = LockService.getScriptLock();
-  lock.waitLock(30000); // 最大30秒待機
-
-  try {
-    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(sheetName);
-    const lastRow = sheet.getLastRow();
-
-    // ヘッダー行のインデックスを取得 (1行目と仮定)
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const idColumnName = ID_COLUMNS[sheetName];
-    const idColumnIndex = headers.indexOf(idColumnName) + 1;
-
-    if (idColumnIndex === 0) {
-      throw new Error(`ID列 '${idColumnName}' がシート '${sheetName}' に見つかりません。`);
-    }
-
-    let nextIdNumber = 1;
-
-    // データ行が存在する場合のみ最終IDを読み取る (lastRow > 1)
-    if (lastRow > 1) {
-      // 最終行のIDを取得
-      const lastId = sheet.getRange(lastRow, idColumnIndex).getValue();
-      if (lastId && typeof lastId === 'string' && lastId.startsWith(prefix)) {
-        const lastNumber = parseInt(lastId.substring(prefix.length), 10);
-        if (!isNaN(lastNumber)) {
-          nextIdNumber = lastNumber + 1;
-        }
-      }
-    }
-
-    // 4桁のゼロパディング
-    const nextId = prefix + String(nextIdNumber).padStart(4, '0');
-
-    return nextId;
-
-  } finally {
-    // 必ずロックを解放
-    lock.releaseLock();
-  }
-}
 
 // ============================================
 // Database.gs - データベース操作ヘルパー関数
