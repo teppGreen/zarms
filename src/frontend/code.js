@@ -63,6 +63,14 @@ function canEdit() {
   return true;
 }
 
+function getConfig() {
+  return getConfigLogic();
+}
+
+function getMembers() {
+  return getMembersLogic();
+}
+
 // ============================================
 // 汎用データ操作関数 (Consolidated DB Operations)
 // ============================================
