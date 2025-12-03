@@ -108,6 +108,10 @@ function callBackendAPI(operation, payload) {
   const userEmail = Session.getActiveUser().getEmail();
   const timestamp = new Date().toISOString();
 
+  if (!BACKEND_URL || !BACKEND_URL.includes('/exec')) {
+    throw new Error('Invalid BACKEND_URL. Please check Script Properties. The URL must end with "/exec". Current value: ' + BACKEND_URL);
+  }
+
   const requestPayload = {
     token: API_TOKEN,
     userEmail: userEmail,
@@ -119,14 +123,25 @@ function callBackendAPI(operation, payload) {
   const options = {
     method: 'post',
     contentType: 'application/json',
+    headers: {
+      'Authorization': 'Bearer ' + ScriptApp.getOAuthToken()
+    },
     payload: JSON.stringify(requestPayload),
     muteHttpExceptions: true // エラーハンドリングのため例外をミュート
   };
+
+  Logger.log(`[Backend API] Requesting: ${BACKEND_URL}`);
+  Logger.log(`[Backend API] Payload: ${JSON.stringify({ ...requestPayload, token: '***' })}`); // Token masked
 
   try {
     const response = UrlFetchApp.fetch(BACKEND_URL, options);
     const responseCode = response.getResponseCode();
     const responseText = response.getContentText();
+    const responseHeaders = response.getHeaders();
+
+    Logger.log(`[Backend API] Response Code: ${responseCode}`);
+    Logger.log(`[Backend API] Response Headers: ${JSON.stringify(responseHeaders)}`);
+    Logger.log(`[Backend API] Response Body (first 1000 chars): ${responseText.substring(0, 1000)}`);
     let responseBody;
 
     try {
