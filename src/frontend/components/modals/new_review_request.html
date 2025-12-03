@@ -1,0 +1,45 @@
+<div id="modal-new-review-request" class="modal">
+    <div class="modal-content">
+        <div class="modal-form-content">
+            <h2 class="modal-title">新規レビュー依頼作成</h2>
+            <form id="new-review-request-form" onsubmit="submitNewReviewRequest(event)">
+                <input type="hidden" name="work_id">
+                <div class="form-group">
+                    <label class="form-label">タイトル <span style="color: red;">*</span></label>
+                    <input type="text" name="review_title" class="input-field" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">コメント <span style="color: red;">*</span></label>
+                    <textarea name="review_comment" class="input-field" rows="4" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ファイル（1つ以上）</label>
+                    <div id="review-request-files-container" style="margin-bottom: 12px;">
+                        <div id="review-request-files-list" style="margin-bottom: 12px;"></div>
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" class="btn btn-secondary"
+                                onclick="openGoogleDrivePicker()">Googleドライブから選択</button>
+                            <button type="button" class="btn btn-secondary"
+                                onclick="document.getElementById('review-request-file-input').click()">ファイルをアップロード</button>
+                        </div>
+                        <input type="file" id="review-request-file-input" multiple style="display: none;"
+                            onchange="handleFileUpload(event)">
+                    </div>
+                    <div id="review-request-file-dropzone"
+                        style="border: 2px dashed #ccc; border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; margin-top: 12px;"
+                        ondrop="handleFileDrop(event)" ondragover="handleDragOver(event)"
+                        ondragleave="handleDragLeave(event)">
+                        <p style="margin: 0; color: #6b7280;">ファイルをドラッグアンドドロップ</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-cancel"
+                        onclick="closeModal('modal-new-review-request')">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">投稿</button>
+                </div>
+            </form>
+        </div>
+        <div class="modal-result-content" style="display: none;">
+        </div>
+    </div>
+</div>
