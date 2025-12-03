@@ -126,7 +126,15 @@ function callBackendAPI(operation, payload) {
   try {
     const response = UrlFetchApp.fetch(BACKEND_URL, options);
     const responseCode = response.getResponseCode();
-    const responseBody = JSON.parse(response.getContentText());
+    const responseText = response.getContentText();
+    let responseBody;
+
+    try {
+      responseBody = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse JSON response:', responseText.substring(0, 1000)); // Log first 1000 chars
+      throw new Error(`Invalid JSON response from backend. Status: ${responseCode}`);
+    }
 
     if (responseCode === 200 && responseBody.status === 'success') {
       // read系の場合はデータを返す
