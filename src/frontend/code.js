@@ -750,3 +750,51 @@ function sanitizeForClient(data) {
   // それ以外（文字列、数値、ブール値）はそのまま返す
   return data;
 }
+
+/**
+ * コード（例：W0001）から対象のレコードを検索します
+ * @param {string} code - 検索コード
+ * @returns {Object|null} 検索結果 { item: Object, tableName: string }
+ */
+function searchByCode(code) {
+  if (!code) return null;
+
+  // 1. アルファベットと数字を分ける
+  const match = code.match(/^([A-Z]+)(\d+)$/);
+  if (!match) return null;
+
+  const prefix = match[1];
+  const serialId = parseInt(match[2], 10);
+
+  // 2. PREFIXテーブルからテーブル名を特定
+  // PREFIXテーブルの構造: id_prefix, table_name
+  const prefixes = getAllData(SHEET_NAMES.PREFIX);
+  const prefixRecord = prefixes.find(p => p.id_prefix === prefix);
+
+  if (!prefixRecord) {
+    return null;
+  }
+
+  const tableName = prefixRecord.table_name;
+
+  // 3. 特定したテーブルの該当レコードを検索 (id_serial列)
+  const items = findData(tableName, { id_serial: serialId });
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return {
+    item: sanitizeForClient(items[0]),
+    tableName: tableName
+  };
+}
+
+/**
+ * HTMLファイルの内容をインクルードするための関数
+ * @param {string} filename - インクルードするファイルの拡張子を除いた名前
+ * @returns {string} ファイルの内容
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}

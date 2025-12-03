@@ -41,7 +41,8 @@ const SHEET_NAMES = {
   SKILLS: 'skills',
   TASKS: 'tasks',
   TIMETRACKS: 'timetracks',
-  WIKIS: 'wikis'
+  WIKIS: 'wikis',
+  PREFIX: 'PREFIX'
 };
 
 // IDカラム名の定義
