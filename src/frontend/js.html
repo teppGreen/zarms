@@ -6003,84 +6003,53 @@
   function executeIdSearch(searchValue) {
     if (!searchValue) return;
 
-    // 複数のIDが連なっている場合、最も小さな単位のIDのみを取り出す
-    // project_id > work_id > review_id > task_id の順で優先度が低い
-    let targetId = null;
-    let targetType = null;
-
-    // task_idを検索 (T + 4桁の数字)
-    const taskIdMatch = searchValue.match(/T\d{4}/);
-    if (taskIdMatch) {
-      targetId = taskIdMatch[0];
-      targetType = 'task';
-    }
-
-    // review_idを検索 (R + 4桁の数字)
-    const reviewIdMatch = searchValue.match(/R\d{4}/);
-    if (reviewIdMatch && !targetId) {
-      targetId = reviewIdMatch[0];
-      targetType = 'review';
-    }
-
-    // work_idを検索 (W + 4桁の数字)
-    const workIdMatch = searchValue.match(/W\d{4}/);
-    if (workIdMatch && !targetId) {
-      targetId = workIdMatch[0];
-      targetType = 'work';
-    }
-
-    // project_idを検索 (P + 4桁の数字)
-    const projectIdMatch = searchValue.match(/P\d{4}/);
-    if (projectIdMatch && !targetId) {
-      targetId = projectIdMatch[0];
-      targetType = 'project';
-    }
-
-    if (!targetId) {
-      alert('有効なIDが見つかりません。P0001, W0001, T0001, R0001 の形式で入力してください。');
-      return;
-    }
+    // 1. "P0001-W0001" 形式の対応 (最後のIDをターゲットにする)
+    const parts = searchValue.split('-');
+    const targetCode = parts[parts.length - 1];
 
     handleHeaderCloseClick();
-    // 検索ボックスからフォーカスを外す（入力値は保持）
-    const input = document.getElementById('id-search-input');
-    if (input) {
-      input.blur();
-      input.value = searchValue;
-    }
 
     // 検索実行
-    if (targetType === 'task') {
-      // task_idの場合は、taskからwork_idを取得してwork詳細画面を開く
-      callGAS('getTaskById', targetId).then(task => {
-        if (!task) {
-          alert('タスクが見つかりません');
+    showIdSearchLoading(); // Use existing loading function
+    callGAS('searchByCode', targetCode)
+      .then(result => {
+        hideIdSearchLoading();
+
+        // 検索ボックスからフォーカスを外す
+        const input = document.getElementById('id-search-input');
+        if (input) {
+          input.blur();
+          input.value = searchValue; // 入力値はそのまま保持
+        }
+
+        if (!result) {
+          alert('該当するデータが見つかりません');
           return;
         }
-        openWorkDetailOverlay(task.work_id);
-      }).catch(handleError);
-    } else if (targetType === 'review') {
-      // review_idの場合は、reviewからwork_idを取得してwork詳細画面を開く
-      // new-buttonのスピナーをすぐに表示
-      showLoading();
-      callGAS('getReviewRequestById', targetId).then(reviewRequest => {
-        if (!reviewRequest) {
-          alert('レビューリクエストが見つかりません');
-          hideLoading();
-          return;
+
+        const { item, tableName } = result;
+
+        // テーブル名に応じた処理
+        if (tableName === SHEET_NAMES.TASKS) {
+          // taskの場合はwork詳細を開く
+          if (item.creative_id) {
+            openWorkDetailOverlay(item.creative_id);
+          } else {
+            alert('タスクに関連付けられた制作物が見つかりません');
+          }
+        } else if (tableName === SHEET_NAMES.CREATIVES) {
+          openWorkDetailOverlay(item.id);
+        } else if (tableName === SHEET_NAMES.PLANS) {
+          openProjectDetailOverlay(item.id);
+        } else {
+          console.log('Unknown table for search result:', tableName);
+          alert('このIDタイプの詳細は表示できません: ' + tableName);
         }
-        openWorkDetailOverlay(reviewRequest.work_id);
-      }).catch(error => {
-        handleError(error);
-        hideLoading();
+      })
+      .catch(err => {
+        hideIdSearchLoading();
+        handleError(err);
       });
-    } else if (targetType === 'work') {
-      // work_idの場合はwork詳細画面を開く
-      openWorkDetailOverlay(targetId);
-    } else if (targetType === 'project') {
-      // project_idの場合はproject詳細画面を開く
-      openProjectDetailOverlay(targetId);
-    }
   }
 
   function handleIdSearchClick() {
@@ -6105,9 +6074,22 @@
 
   function handleIdSearchInput(event) {
     const input = event.target;
-    // 半角英数とハイフンに変換し、大文字にする
-    let value = input.value.replace(/[^A-Za-z0-9-]/g, '').toUpperCase();
-    input.value = value;
+    let value = input.value;
+
+    // 全角英数字を半角に変換
+    value = value.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function (s) {
+      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+    });
+
+    // 小文字を大文字に変換
+    value = value.toUpperCase();
+
+    // 許可された文字以外を削除 (ハイフンは許可)
+    value = value.replace(/[^A-Z0-9-]/g, '');
+
+    if (input.value !== value) {
+      input.value = value;
+    }
   }
 
   function handleIdSearchKeydown(event) {
