@@ -29,3 +29,9 @@ const ID_COLUMNS = {
   [SHEET_NAMES.REVIEW_REQUESTS]: 'review_request_id',
   [SHEET_NAMES.REVIEW_REQUEST_FILES]: 'file_id',
 };
+
+// バックエンドのWebアプリURL (デプロイ後に書き換えてください)
+const BACKEND_URL = 'YOUR_BACKEND_SCRIPT_URL_HERE';
+
+// 固定トークン
+const API_TOKEN = 'zarms-secure-token-2025';
