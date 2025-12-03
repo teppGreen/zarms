@@ -20,3 +20,147 @@
         </div>
     </div>
 </div>
+
+<script>
+    let currentPlanId = null;
+
+    function openPlanDetailOverlay(id) {
+        // JavaScript関数呼び出しを記録（HTTP 429エラー時の再試行用）
+        recordJSInvocation('openPlanDetailOverlay', id);
+
+        showLoading();
+        currentPlanId = id;
+        callGAS('getItemById', SHEET_NAMES.PLANS, id).then(plan => {
+            if (!plan) {
+                alert('企画が見つかりません');
+                hideLoading();
+                return;
+            }
+
+            // ヘッダータイトルを変更
+            // const headerTitleDefault = document.getElementById('header-title-default');
+            // const headerTitleWorkDetail = document.getElementById('header-title-work-detail');
+            const headerCloseBtn = document.getElementById('header-close-btn');
+            const newButton = document.getElementById('new-button');
+
+            // if (headerTitleDefault) {
+            //   headerTitleDefault.style.display = 'none';
+            // }
+            // if (headerTitleWorkDetail) {
+            //   headerTitleWorkDetail.style.display = 'flex';
+            //   headerTitleWorkDetail.textContent = plan.id || '';
+            // }
+            if (headerCloseBtn) headerCloseBtn.style.display = 'flex';
+            if (newButton) newButton.style.display = 'none';
+
+            // ヘッダー情報を非表示
+            const headerInfoDiv = document.getElementById('creative-detail-header-info');
+            if (headerInfoDiv) {
+                headerInfoDiv.style.display = 'none';
+            }
+            const urlCopyButton = document.getElementById('creative-detail-url-copy-button');
+            if (urlCopyButton) {
+                urlCopyButton.style.display = 'none';
+            }
+
+            // 企画詳細情報を表示
+            const contentContainer = document.getElementById('plan-detail-content-container');
+            let html = '<div style="display: flex; flex-direction: column; gap: 24px;">';
+
+            // 企画の全プロパティを表示
+            html += '<div><h2 style="margin: 0 0 16px 0; font-size: 1.5rem; font-weight: 600;">企画情報</h2>';
+            html += '<table class="table-full" style="margin-top: 12px;">';
+            html += '<tbody>';
+
+            // 各プロパティを表示
+            Object.keys(plan).forEach(key => {
+                if (key === 'creatives') return; // creativesは別で表示
+                const value = plan[key];
+                let displayValue = '';
+                if (value === null || value === undefined || value === '') {
+                    displayValue = '-';
+                } else if (key === 'created_at') {
+                    displayValue = formatDate(value);
+                } else if (key === 'description') {
+                    displayValue = value;
+                } else {
+                    displayValue = escapeHtml(String(value));
+                }
+
+                let label = key;
+                switch (key) {
+                    case 'id': label = '企画ID'; break;
+                    case 'title': label = '企画タイトル'; break;
+                    case 'description': label = '備考'; break;
+                    case 'created_by': label = '作成者'; break;
+                    case 'created_at': label = '作成日'; break;
+                    case 'creator_name': label = '作成者名'; break;
+                    default: label = key;
+                }
+
+                html += `<tr><th style="width: 200px; text-align: left; padding: 12px; background: #f9fafb;">${escapeHtml(label)}</th>`;
+                if (key === 'description') {
+                    html += `<td style="padding: 12px;"><div style="white-space: pre-wrap;">${escapeHtml(value || '-')}</div></td>`;
+                } else {
+                    html += `<td style="padding: 12px;">${displayValue}</td>`;
+                }
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+            html += '</div>';
+
+            contentContainer.innerHTML = html;
+
+            // 関連制作物を表示
+            const creativesContainer = document.getElementById('plan-creatives-container');
+            if (plan.creatives && plan.creatives.length > 0) {
+                let creativesHtml = '<table class="table-full" style="margin-top: 12px;">';
+                creativesHtml += '<thead><tr><th>制作ID</th><th>制作タイトル</th><th>ステータス</th><th>納品期限</th></tr></thead>';
+                creativesHtml += '<tbody>';
+                plan.creatives.forEach(creative => {
+                    creativesHtml += `<tr>`;
+                    creativesHtml += `<td><button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openCreativeDetailOverlay('${creative.id}'); closePlanDetailOverlay();">${escapeHtml(creative.display_id || creative.id)}</button></td>`;
+                    creativesHtml += `<td>${escapeHtml(creative.title || '-')}</td>`;
+                    creativesHtml += `<td>${escapeHtml(getConfigLabel(creative.creative_status_key, 'CREATIVE_STATUS') || creative.creative_status_key || '-')}</td>`;
+                    creativesHtml += `<td><span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDateTimeForDisplay(creative.deadline_at) || '-')}</span></td>`;
+                    creativesHtml += `</tr>`;
+                });
+                creativesHtml += '</tbody></table>';
+                creativesContainer.innerHTML = creativesHtml;
+            } else {
+                creativesContainer.innerHTML = '<p style="color: #6b7280;">関連制作物はありません</p>';
+            }
+
+            document.getElementById('plan-detail-overlay').classList.add('show');
+
+            // ID検索バーにIDを表示
+            updateIdSearchInput(id);
+
+            hideLoading();
+        }).catch(handleError);
+    }
+
+    function closePlanDetailOverlay() {
+        document.getElementById('plan-detail-overlay').classList.remove('show');
+
+        // ヘッダータイトルを元に戻す
+        const headerTitleDefault = document.getElementById('header-title-default');
+        const headerTitleWorkDetail = document.getElementById('header-title-work-detail');
+        const headerCloseBtn = document.getElementById('header-close-btn');
+        const newButton = document.getElementById('new-button');
+
+        if (headerTitleDefault) {
+            headerTitleDefault.style.display = 'flex';
+        }
+        if (headerTitleWorkDetail) {
+            headerTitleWorkDetail.style.display = 'none';
+        }
+        if (headerCloseBtn) headerCloseBtn.style.display = 'none';
+        if (newButton) newButton.style.display = 'flex';
+
+        // ID検索バーをクリア
+        currentPlanId = null;
+        clearIdSearchInput();
+    }
+</script>
