@@ -22,7 +22,8 @@ function getAllData(sheetName) {
 function getDataById(sheetName, id) {
   return callBackendAPI('read_by_id', {
     sheetName: sheetName,
-    id: id
+    id: id,
+    idColumnName: ID_COLUMNS[sheetName]
   });
 }
 
@@ -48,7 +49,8 @@ function findData(sheetName, condition) {
 function generateNextId(sheetName, prefix) {
   return callBackendAPI('get_next_id', {
     sheetName: sheetName,
-    prefix: prefix
+    prefix: prefix,
+    idColumnName: ID_COLUMNS[sheetName]
   });
 }
 
@@ -61,7 +63,8 @@ function generateNextId(sheetName, prefix) {
 function createData(sheetName, dataObject) {
   return callBackendAPI('create', {
     sheetName: sheetName,
-    data: dataObject
+    data: dataObject,
+    idColumnName: ID_COLUMNS[sheetName]
   });
 }
 
@@ -76,7 +79,8 @@ function updateData(sheetName, id, updateDataObject) {
   return callBackendAPI('update', {
     sheetName: sheetName,
     id: id,
-    data: updateDataObject
+    data: updateDataObject,
+    idColumnName: ID_COLUMNS[sheetName]
   });
 }
 
@@ -89,7 +93,8 @@ function updateData(sheetName, id, updateDataObject) {
 function deleteData(sheetName, condition) {
   return callBackendAPI('delete', {
     sheetName: sheetName,
-    condition: condition
+    condition: condition,
+    idColumnName: ID_COLUMNS[sheetName]
   });
 }
 
