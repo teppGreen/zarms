@@ -521,6 +521,14 @@
   }
 
   function loadTabData(tabName) {
+    console.log(`loadTabData called for: ${tabName}`);
+    console.log('App.pages state:', App.pages);
+    if (App.pages && App.pages[tabName]) {
+      console.log(`App.pages.${tabName} state:`, App.pages[tabName]);
+    } else {
+      console.warn(`App.pages.${tabName} is undefined`);
+    }
+
     showLoading();
     let loader = null;
 
@@ -1912,7 +1920,7 @@
   // ヘルパー関数
   // ============================================
   function getHeaderDef(tableName, field) {
-    const headers = tableName === SHEET_NAMES.CREATIVES ? worksTableHeaders : tableName === SHEET_NAMES.PLANS ? projectsTableHeaders : tableName === SHEET_NAMES.TASKS ? tasksTableHeaders : membersTableHeaders;
+    const headers = tableName === SHEET_NAMES.CREATIVES ? creativesTableHeaders : tableName === SHEET_NAMES.PLANS ? plansTableHeaders : tableName === SHEET_NAMES.TASKS ? tasksTableHeaders : membersTableHeaders;
     return headers.find(h => h.key === field);
   }
   function renderAssignees(assignees) {
