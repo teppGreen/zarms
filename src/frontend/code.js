@@ -40,7 +40,7 @@ function getCurrentUser() {
     throw new Error('ユーザー情報が見つかりません');
   }
 
-  return sanitizeForClient(member);
+  return member;
 }
 
 function getUserRole() {
@@ -180,7 +180,7 @@ function getCreativesLogic() {
   const creatives = getAllData(SHEET_NAMES.CREATIVES);
   // Enrichment is now done in frontend or here if needed.
   // For now, return raw data to let frontend handle joins, or minimal enrichment.
-  return sanitizeForClient(creatives);
+  return creatives;
 }
 
 function getCreativeByIdLogic(id) {
@@ -191,7 +191,7 @@ function getCreativeByIdLogic(id) {
   // For compatibility with updated frontend, we return the creative object.
   // We can add 'assignees' if we want to pre-fetch.
   creative.assignees = getCreativeAssignees(creative.id);
-  return sanitizeForClient(creative);
+  return creative;
 }
 
 function createCreativeLogic(data) {
@@ -228,13 +228,13 @@ function createCreativeLogic(data) {
 // --- Plans ---
 function getPlansLogic() {
   const plans = getAllData(SHEET_NAMES.PLANS);
-  return sanitizeForClient(plans.map(plan => {
+  return plans.map(plan => {
     // plan.created_by_name = getMemberName(plan.created_by); // created_by is now member ID
     // const creativeStats = getPlanCreativeStats(plan.id);
     // plan.creatives_count = creativeStats.count;
     // plan.creatives_status = creativeStats.status;
     return plan;
-  }));
+  });
 }
 
 function getPlanByIdLogic(id) {
@@ -242,7 +242,7 @@ function getPlanByIdLogic(id) {
   if (!plan) return null;
   // plan.creator_name = getMemberName(plan.created_by);
   plan.creatives = getCreativesByPlanId(plan.id);
-  return sanitizeForClient(plan);
+  return plan;
 }
 
 function createPlanLogic(data) {
@@ -270,10 +270,10 @@ function createPlanLogic(data) {
 // --- Members ---
 function getMembersLogic() {
   const members = getAllData('members');
-  return sanitizeForClient(members.map(member => {
+  return members.map(member => {
     member.assigned_works_count = countAssignedWorks(member.member_email);
     return member;
-  }));
+  });
 }
 
 function getMemberByIdLogic(id) {
@@ -283,7 +283,7 @@ function getMemberByIdLogic(id) {
   // const creativeIds = assignments.map(a => a.creative_id);
   // const allCreatives = getAllData(SHEET_NAMES.CREATIVES);
   // member.assigned_creatives = allCreatives.filter(c => creativeIds.includes(c.id));
-  return sanitizeForClient(member);
+  return member;
 }
 
 function createMemberLogic(memberData) {
@@ -312,7 +312,7 @@ function updateMemberLogic(memberEmail, memberData) {
 // --- Tasks ---
 function getTasksLogic() {
   const tasks = getAllData(SHEET_NAMES.TASKS);
-  return sanitizeForClient(tasks.map(task => {
+  return tasks.map(task => {
     // task.assignee_name = getMemberName(task.assign_to);
     // task.creative_title = getCreativeTitle(task.creative_id);
     // const creative = getDataById(SHEET_NAMES.CREATIVES, task.creative_id);
@@ -321,12 +321,12 @@ function getTasksLogic() {
     //   task.plan_title = getPlanTitle(creative.plan_id);
     // }
     return task;
-  }));
+  });
 }
 
 function getTaskByIdLogic(taskId) {
   const task = getDataById(SHEET_NAMES.TASKS, taskId);
-  return task ? sanitizeForClient(task) : null;
+  return task ? task : null;
 }
 
 function createTaskLogic(taskData) {
@@ -364,7 +364,7 @@ function getKnowledgesLogic() {
   //   return item;
   // });
   // enriched.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  return sanitizeForClient(knowledges);
+  return knowledges;
 }
 
 function createKnowledgeLogic(knowledgeData) {
@@ -387,7 +387,7 @@ function getConfigLogic() {
   let configs = getAllData(SHEET_NAMES.CONFIG);
   configs = configs.filter(config => config.is_active === true || config.is_active === 'TRUE' || config.is_active === 'true');
   configs.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-  return sanitizeForClient(configs);
+  return configs;
 }
 
 // --- Assignments ---
@@ -464,10 +464,10 @@ function getCreativesByPlanId(planId) {
 
 function getTasksByWorkId(workId) {
   const tasks = findData(SHEET_NAMES.TASKS, { creative_id: workId });
-  return sanitizeForClient(tasks.map(task => {
+  return tasks.map(task => {
     task.assignee_name = getMemberName(task.assign_to);
     return task;
-  }));
+  });
 }
 
 /*
@@ -551,14 +551,14 @@ function getHomeData() {
   const member = members.length > 0 ? members[0] : null;
 
   if (!member) {
-    return sanitizeForClient({
+    return {
       greeting: 'こんにちは',
       memberName: 'ゲスト',
       new_requests: [],
       works: [],
       review_requests: [],
       knowledge: []
-    });
+    };
   }
 
   const newRequests = getAvailableCreatives(member.id);
@@ -570,14 +570,14 @@ function getHomeData() {
   if (hour < 11) greeting = 'おはようございます';
   else if (hour >= 18) greeting = 'こんばんは';
 
-  return sanitizeForClient({
+  return {
     greeting: greeting,
     memberName: member.nickname || member.member_name,
     new_requests: newRequests || [],
     works: assignedWorks || [],
     review_requests: [],
     knowledge: knowledge || []
-  });
+  };
 }
 
 function getAvailableCreatives(memberId) {
@@ -753,7 +753,7 @@ function searchByCode(code) {
   }
 
   return {
-    item: sanitizeForClient(items[0]),
+    item: items[0],
     tableName: tableName
   };
 }
