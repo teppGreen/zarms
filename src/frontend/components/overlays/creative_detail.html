@@ -103,6 +103,8 @@
 </div>
 
 <script>
+    App.overlays.creativeDetail = {};
+
     let currentWorkId = null;
     let currentWork = null;
     let currentProjectId = null;
@@ -2535,4 +2537,31 @@
                 handleError(error);
             });
     }
+    // Expose functions to global App namespace
+    Object.assign(App.overlays.creativeDetail, {
+        open: openCreativeDetailOverlay,
+        close: closeCreativeDetailOverlay,
+        copyUrl: copyCreativeDetailUrl,
+        searchPlans: searchPlansForCreativeDetail,
+        performPlanSearch: performPlanSearch,
+        searchProjectsForTitle: searchProjectsForOverlayProjectTitle,
+        performProjectTitleSearchImmediate: performOverlayProjectTitleSearchImmediate,
+        performProjectTitleSearchUpdate: performOverlayProjectTitleSearchUpdate,
+        showSelectEditor: showSelectEditorForWorkDetail,
+        showSelectEditorHeader: showSelectEditorForWorkDetailHeader,
+        openDateTimePicker: openDateTimePickerForWorkDetail,
+        openDateTimePickerHeader: openDateTimePickerForWorkDetailHeader,
+        saveDateTime: saveWorkDetailDateTime,
+        saveDateTimeHeader: saveWorkDetailDateTimeHeader,
+        cancelDateTime: cancelWorkDetailDateTime,
+        renderTasks: renderWorkTasks,
+        getTaskStatusColor: getTaskStatusColor,
+        editTaskField: editTaskField,
+        updateTaskField: updateTaskField,
+        openEditTaskModal: openEditTaskModal,
+        getMemberNameById: getMemberNameById,
+        openAddAssigneeDropdown: openAddAssigneeDropdown,
+        addAssignee: addWorkAssignee,
+        removeAssignee: removeWorkAssignee
+    });
 </script>

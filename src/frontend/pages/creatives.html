@@ -21,7 +21,20 @@
 </div>
 
 <script>
-    function loadWorksData() {
-        callGAS('getAllData', SHEET_NAMES.CREATIVES).then(data => { worksData = data; renderTable(SHEET_NAMES.CREATIVES, applyFiltersAndSort(SHEET_NAMES.CREATIVES, worksData), worksTableHeaders); hideLoading(); }).catch(handleError);
-    }
+    // Namespace initialization
+    App.pages.creatives = {};
+
+    App.pages.creatives.loadData = function () {
+        const promises = [callGAS('getItems', SHEET_NAMES.CREATIVES)];
+        promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
+        promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
+
+        Promise.all(promises).then(results => {
+            worksData = results[0];
+            plansData = results[1] || [];
+            membersData = results[2] || [];
+            renderTable(SHEET_NAMES.CREATIVES, applyFiltersAndSort(SHEET_NAMES.CREATIVES, worksData), worksTableHeaders);
+            hideLoading();
+        }).catch(handleError);
+    };
 </script>

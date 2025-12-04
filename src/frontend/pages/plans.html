@@ -17,3 +17,12 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Namespace initialization
+    App.pages.plans = {};
+
+    App.pages.plans.loadData = function () {
+        callGAS('getAllData', SHEET_NAMES.PLANS).then(data => { projectsData = data; renderTable(SHEET_NAMES.PLANS, applyFiltersAndSort(SHEET_NAMES.PLANS, projectsData), projectsTableHeaders); hideLoading(); }).catch(handleError);
+    };
+</script>

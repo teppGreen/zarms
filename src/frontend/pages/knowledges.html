@@ -3,3 +3,24 @@
     <div id="knowledges-container" class="grid-container">
     </div>
 </div>
+
+<script>
+    // Namespace initialization
+    App.pages.knowledges = {};
+
+    App.pages.knowledges.loadData = function () {
+        callGAS('getKnowledge').then(data => {
+            knowledgeData = data;
+            const container = document.getElementById('knowledges-container');
+            container.innerHTML = '';
+            if (!knowledgeData || knowledgeData.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 40px;">ナレッジがありません</p>';
+                return;
+            }
+            knowledgeData.forEach(item => {
+                container.innerHTML += `<div class="card"> <div style="margin-bottom: 8px;"> <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span> </div> <div style="margin-bottom: 12px; font-size: 0.875rem; color: #6b7280;"> ${escapeHtml(item.work_title)} </div> <div style="margin-bottom: 12px;"> ${escapeHtml(item.knowledge_content.substring(0, 150))}... </div> <div style="font-size: 0.75rem; color: #9ca3af;"> ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)} </div> </div>`;
+            });
+            hideLoading();
+        }).catch(handleError);
+    };
+</script>

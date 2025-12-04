@@ -523,61 +523,32 @@
   function loadTabData(tabName) {
     showLoading();
     const dataLoaders = {
-      'home': loadHomeData,
-      [SHEET_NAMES.CREATIVES]: () => loadData(SHEET_NAMES.CREATIVES),
-      [SHEET_NAMES.PLANS]: () => loadData(SHEET_NAMES.PLANS),
-      [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS),
-      [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS),
-      [SHEET_NAMES.KNOWLEDGES]: () => loadData(SHEET_NAMES.KNOWLEDGES),
-      'summary': loadSummaryData,
+      'home': App.pages.home.loadData,
+      [SHEET_NAMES.CREATIVES]: App.pages.creatives.loadData,
+      [SHEET_NAMES.PLANS]: App.pages.plans.loadData,
+      [SHEET_NAMES.TASKS]: App.pages.tasks.loadData,
+      [SHEET_NAMES.MEMBERS]: App.pages.members.loadData,
+      [SHEET_NAMES.KNOWLEDGES]: App.pages.knowledges.loadData,
+      'summary': App.pages.summary.loadData,
     };
     if (dataLoaders[tabName]) dataLoaders[tabName]();
     else hideLoading();
   }
 
   function loadData(tableName) {
-    // 依存関係のあるデータを並行して読み込む
-    const promises = [callGAS('getItems', tableName)];
-
-    if (tableName === SHEET_NAMES.CREATIVES) {
-      promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
-      promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
-    } else if (tableName === SHEET_NAMES.TASKS) {
-      promises.push(callGAS('getItems', SHEET_NAMES.CREATIVES));
-      promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
-    }
-
-    Promise.all(promises).then(results => {
-      const data = results[0];
-
-      switch (tableName) {
-        case SHEET_NAMES.CREATIVES:
-          creativesData = data;
-          plansData = results[1] || [];
-          membersData = results[2] || [];
-          renderTable(SHEET_NAMES.CREATIVES, applyFiltersAndSort(SHEET_NAMES.CREATIVES, creativesData), creativesTableHeaders);
-          break;
-        case SHEET_NAMES.PLANS:
-          plansData = data;
-          renderTable(SHEET_NAMES.PLANS, applyFiltersAndSort(SHEET_NAMES.PLANS, plansData), plansTableHeaders);
-          break;
-        case SHEET_NAMES.TASKS:
-          tasksData = data;
-          creativesData = results[1] || [];
-          membersData = results[2] || [];
-          renderTable(SHEET_NAMES.TASKS, applyFiltersAndSort(SHEET_NAMES.TASKS, tasksData), tasksTableHeaders);
-          break;
-        case SHEET_NAMES.MEMBERS:
-          membersData = data;
-          renderTable(SHEET_NAMES.MEMBERS, applyFiltersAndSort(SHEET_NAMES.MEMBERS, membersData), membersTableHeaders);
-          break;
-        case SHEET_NAMES.KNOWLEDGES:
-          knowledgesData = data;
-          renderKnowledgesTable(data);
-          break;
-      }
+    const loaderMap = {
+      [SHEET_NAMES.CREATIVES]: App.pages.creatives.loadData,
+      [SHEET_NAMES.PLANS]: App.pages.plans.loadData,
+      [SHEET_NAMES.TASKS]: App.pages.tasks.loadData,
+      [SHEET_NAMES.MEMBERS]: App.pages.members.loadData,
+      [SHEET_NAMES.KNOWLEDGES]: App.pages.knowledges.loadData,
+    };
+    if (loaderMap[tableName]) {
+      loaderMap[tableName]();
+    } else {
+      console.error(`No loader found for table: ${tableName}`);
       hideLoading();
-    }).catch(handleError);
+    }
   }
 
   // ... (rest of the file)
@@ -617,44 +588,13 @@
     }).catch(handleError);
   }
 
-  function loadProjectsData() {
-    callGAS('getAllData', SHEET_NAMES.PLANS).then(data => { projectsData = data; renderTable(SHEET_NAMES.PLANS, applyFiltersAndSort(SHEET_NAMES.PLANS, projectsData), projectsTableHeaders); hideLoading(); }).catch(handleError);
-  }
-  function loadTasksData() {
-    callGAS('getTasks').then(data => { tasksData = data; renderTable(SHEET_NAMES.TASKS, applyFiltersAndSort(SHEET_NAMES.TASKS, tasksData), tasksTableHeaders); hideLoading(); }).catch(handleError);
-  }
-  function loadMembersData() {
-    callGAS('getMembers').then(data => { membersData = data; renderTable(SHEET_NAMES.MEMBERS, applyFiltersAndSort(SHEET_NAMES.MEMBERS, membersData), membersTableHeaders); hideLoading(); }).catch(handleError);
-  }
 
-  function loadKnowledgeData() {
-    callGAS('getKnowledge').then(data => {
-      knowledgeData = data;
-      const container = document.getElementById('knowledge-container');
-      container.innerHTML = '';
-      if (!knowledgeData || knowledgeData.length === 0) {
-        container.innerHTML = '<p style="color: #6b7280; grid-column: 1 / -1;">データがありません</p>';
-      } else {
-        knowledgeData.forEach(item => {
-          container.innerHTML += `<div class="card"> <div style="margin-bottom: 8px;"> <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span> </div> <div style="margin-bottom: 12px; font-size: 0.875rem; color: #6b7280;"> ${escapeHtml(item.work_title)} </div> <div style="margin-bottom: 12px;"> ${escapeHtml(item.knowledge_content.substring(0, 150))}... </div> <div style="font-size: 0.75rem; color: #9ca3af;"> ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)} </div> </div>`;
-        });
-      }
-      hideLoading();
-    }).catch(handleError);
-  }
 
-  function loadSummaryData() {
-    google.charts.load('current', { 'packages': ['corechart'] });
-    google.charts.setOnLoadCallback(() => {
-      callGAS('getSummaryData').then(data => {
-        drawChart('chart-work-status', 'pie', data.workStatus, 'Status', 'Count', { pieHole: 0.4 });
-        drawChart('chart-assignee', 'column', data.assignee, 'Member', 'Works', { legend: { position: 'none' } });
-        drawChart('chart-work-type', 'pie', data.workType, 'Type', 'Count');
-        drawChart('chart-monthly', 'line', data.monthly, 'Month', 'Works', { curveType: 'function', legend: { position: 'none' } });
-        hideLoading();
-      }).catch(handleError);
-    });
-  }
+
+
+
+
+
 
   function renderTable(name, data, headers) {
     const table = document.getElementById(`${name}-table`);
@@ -759,9 +699,9 @@
           switch (header.key) {
             case 'display_id':
               if (name === SHEET_NAMES.CREATIVES) {
-                content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openCreativeDetailOverlay('${item.id}')">${escapeHtml(item.display_id || item.id)}</button>`;
+                content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="App.overlays.creativeDetail.open('${item.id}')">${escapeHtml(item.display_id || item.id)}</button>`;
               } else if (name === SHEET_NAMES.PLANS) {
-                content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="openPlanDetailOverlay('${item.id}')">${escapeHtml(item.display_id || item.id)}</button>`;
+                content = `<button class="btn-link" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="App.overlays.planDetail.open('${item.id}')">${escapeHtml(item.display_id || item.id)}</button>`;
               } else {
                 content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(item.display_id || item.id)}</span>`;
               }
@@ -814,21 +754,11 @@
     });
   }
 
-  function drawChart(elementId, chartType, data, hAxis, vAxis, options = {}) {
-    const container = document.getElementById(elementId);
-    if (!data || Object.keys(data).length === 0) {
-      container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 40px;">データがありません</p>';
-      return;
-    }
-    const chartData = [[hAxis, vAxis]];
-    Object.keys(data).forEach(key => {
-      const label = hAxis === 'Status' ? getConfigLabel(key, 'WORK_STATUS') : key;
-      chartData.push([label, data[key]]);
-    });
-    const dataTable = google.visualization.arrayToDataTable(chartData);
-    const chart = new google.visualization[chartType === 'line' ? 'LineChart' : chartType === 'column' ? 'ColumnChart' : 'PieChart'](container);
-    chart.draw(dataTable, options);
-  }
+
+
+
+
+
 
 
 
