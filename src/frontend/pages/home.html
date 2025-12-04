@@ -38,7 +38,10 @@
     // セッション中に非表示にするwork_idを管理
     let hiddenWorkIds = new Set();
 
-    function loadHomeData() {
+    // Namespace initialization
+    App.pages.home = {};
+
+    App.pages.home.loadData = function () {
         // membersDataが取得されていない場合は取得
         const promises = [callGAS('getHomeData')];
         if (!membersData || membersData.length === 0) {
@@ -71,7 +74,7 @@
 
             hideLoading();
         }).catch(handleError);
-    }
+    };
 
     function renderNewRequests(newRequests) {
         const container = document.getElementById('home-new-requests-container');

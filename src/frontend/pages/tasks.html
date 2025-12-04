@@ -22,3 +22,22 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Namespace initialization
+    App.pages.tasks = {};
+
+    App.pages.tasks.loadData = function () {
+        const promises = [callGAS('getItems', SHEET_NAMES.TASKS)];
+        promises.push(callGAS('getItems', SHEET_NAMES.CREATIVES));
+        promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
+
+        Promise.all(promises).then(results => {
+            tasksData = results[0];
+            creativesData = results[1] || [];
+            membersData = results[2] || [];
+            renderTable(SHEET_NAMES.TASKS, applyFiltersAndSort(SHEET_NAMES.TASKS, tasksData), tasksTableHeaders);
+            hideLoading();
+        }).catch(handleError);
+    };
+</script>

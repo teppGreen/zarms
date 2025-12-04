@@ -22,3 +22,38 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Namespace initialization
+    App.pages.summary = {};
+
+    App.pages.summary.loadData = function () {
+        google.charts.load('current', { 'packages': ['corechart'] });
+        google.charts.setOnLoadCallback(() => {
+            callGAS('getSummaryData').then(data => {
+                App.pages.summary.drawChart('chart-work-status', 'pie', data.workStatus, 'Status', 'Count', { pieHole: 0.4 });
+                App.pages.summary.drawChart('chart-assignee', 'column', data.assignee, 'Member', 'Works', { legend: { position: 'none' } });
+                App.pages.summary.drawChart('chart-work-type', 'pie', data.workType, 'Type', 'Count');
+                App.pages.summary.drawChart('chart-monthly', 'line', data.monthly, 'Month', 'Works', { curveType: 'function', legend: { position: 'none' } });
+                hideLoading();
+            }).catch(handleError);
+        });
+    };
+
+    App.pages.summary.drawChart = function (elementId, chartType, data, hAxis, vAxis, options = {}) {
+        const container = document.getElementById(elementId);
+        if (!container) return;
+        if (!data || Object.keys(data).length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 40px;">データがありません</p>';
+            return;
+        }
+        const chartData = [[hAxis, vAxis]];
+        Object.keys(data).forEach(key => {
+            const label = hAxis === 'Status' ? getConfigLabel(key, 'WORK_STATUS') : key;
+            chartData.push([label, data[key]]);
+        });
+        const dataTable = google.visualization.arrayToDataTable(chartData);
+        const chart = new google.visualization[chartType === 'line' ? 'LineChart' : chartType === 'column' ? 'ColumnChart' : 'PieChart'](container);
+        chart.draw(dataTable, options);
+    };
+</script>

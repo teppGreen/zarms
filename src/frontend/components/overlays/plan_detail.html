@@ -22,6 +22,8 @@
 </div>
 
 <script>
+    App.overlays.planDetail = {};
+
     let currentPlanId = null;
 
     function openPlanDetailOverlay(id) {
@@ -163,4 +165,9 @@
         currentPlanId = null;
         clearIdSearchInput();
     }
+    // Expose functions to global App namespace
+    Object.assign(App.overlays.planDetail, {
+        open: openPlanDetailOverlay,
+        close: closePlanDetailOverlay
+    });
 </script>

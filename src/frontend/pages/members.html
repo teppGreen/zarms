@@ -20,3 +20,12 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Namespace initialization
+    App.pages.members = {};
+
+    App.pages.members.loadData = function () {
+        callGAS('getAllData', SHEET_NAMES.MEMBERS).then(data => { membersData = data; renderTable(SHEET_NAMES.MEMBERS, applyFiltersAndSort(SHEET_NAMES.MEMBERS, membersData), membersTableHeaders); hideLoading(); }).catch(handleError);
+    };
+</script>
