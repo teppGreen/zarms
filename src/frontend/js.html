@@ -522,31 +522,28 @@
 
   function loadTabData(tabName) {
     showLoading();
-    const dataLoaders = {
-      'home': App.pages.home.loadData,
-      [SHEET_NAMES.CREATIVES]: App.pages.creatives.loadData,
-      [SHEET_NAMES.PLANS]: App.pages.plans.loadData,
-      [SHEET_NAMES.TASKS]: App.pages.tasks.loadData,
-      [SHEET_NAMES.MEMBERS]: App.pages.members.loadData,
-      [SHEET_NAMES.KNOWLEDGES]: App.pages.knowledges.loadData,
-      'summary': App.pages.summary.loadData,
-    };
-    if (dataLoaders[tabName]) dataLoaders[tabName]();
-    else hideLoading();
-  }
+    let loader = null;
 
-  function loadData(tableName) {
-    const loaderMap = {
-      [SHEET_NAMES.CREATIVES]: App.pages.creatives.loadData,
-      [SHEET_NAMES.PLANS]: App.pages.plans.loadData,
-      [SHEET_NAMES.TASKS]: App.pages.tasks.loadData,
-      [SHEET_NAMES.MEMBERS]: App.pages.members.loadData,
-      [SHEET_NAMES.KNOWLEDGES]: App.pages.knowledges.loadData,
-    };
-    if (loaderMap[tableName]) {
-      loaderMap[tableName]();
+    if (tabName === 'home') {
+      if (App.pages.home && App.pages.home.loadData) loader = App.pages.home.loadData;
+    } else if (tabName === SHEET_NAMES.CREATIVES) {
+      if (App.pages.creatives && App.pages.creatives.loadData) loader = App.pages.creatives.loadData;
+    } else if (tabName === SHEET_NAMES.PLANS) {
+      if (App.pages.plans && App.pages.plans.loadData) loader = App.pages.plans.loadData;
+    } else if (tabName === SHEET_NAMES.TASKS) {
+      if (App.pages.tasks && App.pages.tasks.loadData) loader = App.pages.tasks.loadData;
+    } else if (tabName === SHEET_NAMES.MEMBERS) {
+      if (App.pages.members && App.pages.members.loadData) loader = App.pages.members.loadData;
+    } else if (tabName === SHEET_NAMES.KNOWLEDGES) {
+      if (App.pages.knowledges && App.pages.knowledges.loadData) loader = App.pages.knowledges.loadData;
+    } else if (tabName === 'summary') {
+      if (App.pages.summary && App.pages.summary.loadData) loader = App.pages.summary.loadData;
+    }
+
+    if (loader) {
+      loader();
     } else {
-      console.error(`No loader found for table: ${tableName}`);
+      console.warn(`No loader found for tab: ${tabName}`);
       hideLoading();
     }
   }
@@ -1054,7 +1051,7 @@
       .then(id => {
         showModalSuccess('modal-new-creative', '新規制作物を作成しました', () => {
           if (document.getElementById('tab-creatives').style.display === 'block') {
-            loadData(SHEET_NAMES.CREATIVES);
+            loadTabData(SHEET_NAMES.CREATIVES);
           }
         });
       })
@@ -1614,7 +1611,7 @@
       .then(() => {
         showModalSuccess('modal-new-member', '新規メンバーを登録しました', () => {
           if (document.getElementById('tab-members').style.display === 'block') {
-            loadData(SHEET_NAMES.MEMBERS);
+            loadTabData(SHEET_NAMES.MEMBERS);
           }
         });
       })
@@ -1700,11 +1697,11 @@
     };
 
     showModalLoading('modal-new-knowledge', '新規ナレッジを作成しています');
-    callGAS('createItem', SHEET_NAMES.KNOWLEDGE, knowledgeData)
+    callGAS('createItem', SHEET_NAMES.KNOWLEDGES, knowledgeData)
       .then(() => {
         showModalSuccess('modal-new-knowledge', '新規ナレッジを作成しました', () => {
-          if (document.getElementById('tab-knowledge').style.display === 'block') {
-            loadData(SHEET_NAMES.KNOWLEDGE);
+          if (document.getElementById('tab-knowledges').style.display === 'block') {
+            loadTabData(SHEET_NAMES.KNOWLEDGES);
           }
         });
       })
@@ -1785,7 +1782,7 @@
     showModalLoading('modal-new-plan');
     callGAS('createItem', SHEET_NAMES.PLANS, { title: title }).then(() => {
       showModalSuccess('modal-new-plan', '企画を作成しました', () => {
-        loadData(SHEET_NAMES.PLANS);
+        loadTabData(SHEET_NAMES.PLANS);
       });
     }).catch(error => {
       handleError(error);
@@ -1801,10 +1798,8 @@
       state.sortKey = columnKey;
       state.sortOrder = 'asc';
     }
-    const dataLoaders = { [SHEET_NAMES.CREATIVES]: () => loadData(SHEET_NAMES.CREATIVES), [SHEET_NAMES.PLANS]: () => loadData(SHEET_NAMES.PLANS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
-    if (dataLoaders[tableName]) {
-      showLoading();
-      dataLoaders[tableName]();
+    if (tableName) {
+      loadTabData(tableName);
     }
   }
 
@@ -1849,10 +1844,8 @@
         delete state.filters[columnKey];
       }
       closeFilterMenu();
-      const dataLoaders = { [SHEET_NAMES.CREATIVES]: () => loadData(SHEET_NAMES.CREATIVES), [SHEET_NAMES.PLANS]: () => loadData(SHEET_NAMES.PLANS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
-      if (dataLoaders[tableName]) {
-        showLoading();
-        dataLoaders[tableName]();
+      if (tableName) {
+        loadTabData(tableName);
       }
     };
     const clearBtn = document.createElement('button');
@@ -2065,15 +2058,17 @@
         if (!success) {
           handleError({ message: '更新に失敗しました。' });
           // 失敗時はデータを再読み込み
-          const dataLoaders = { [SHEET_NAMES.CREATIVES]: () => loadData(SHEET_NAMES.CREATIVES), [SHEET_NAMES.PLANS]: () => loadData(SHEET_NAMES.PLANS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
-          if (dataLoaders[tableName]) dataLoaders[tableName]();
+          if (tableName) {
+            loadTabData(tableName);
+          }
         }
       })
       .catch(err => {
         handleError(err);
         // エラー時はデータを再読み込み
-        const dataLoaders = { [SHEET_NAMES.CREATIVES]: () => loadData(SHEET_NAMES.CREATIVES), [SHEET_NAMES.PLANS]: () => loadData(SHEET_NAMES.PLANS), [SHEET_NAMES.TASKS]: () => loadData(SHEET_NAMES.TASKS), [SHEET_NAMES.MEMBERS]: () => loadData(SHEET_NAMES.MEMBERS) };
-        if (dataLoaders[tableName]) dataLoaders[tableName]();
+        if (tableName) {
+          loadTabData(tableName);
+        }
       });
   }
 
