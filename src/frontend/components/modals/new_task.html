@@ -1,37 +1,36 @@
-<div id="modal-new-task" class="modal">
-    <div class="modal-content">
-        <div class="modal-form-content">
-            <h2 class="modal-title">新規タスク作成</h2>
-            <form id="new-task-form" onsubmit="submitNewTask(event)">
-                <input type="hidden" name="creative_id">
-                <div class="form-group">
-                    <label class="form-label">タスク名</label>
-                    <input type="text" name="task_title" class="input-field" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">担当者</label>
-                    <select name="assign_to" class="input-field"></select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">ステータス</label>
-                    <select name="status_key" class="input-field"></select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">優先度</label>
-                    <select name="priority_key" class="input-field"></select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">終了予定日</label>
-                    <input type="datetime-local" name="planned_end_datetime" class="input-field">
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-cancel"
-                        onclick="closeModal('modal-new-task')">キャンセル</button>
-                    <button type="submit" class="btn btn-primary">作成</button>
-                </div>
-            </form>
+<dialog id="modal-new-task" class="modal">
+    <h5 class="bold">新規タスク作成</h5>
+    <form id="new-task-form" onsubmit="submitNewTask(event)">
+        <div class="modal-content">
+            <input type="hidden" name="creative_id">
+            <div class="field label border">
+                <input type="text" name="task_title" required>
+                <label>タスク名</label>
+            </div>
+            <div class="field label border">
+                <select name="assign_to"></select>
+                <label>担当者</label>
+                <i>arrow_drop_down</i>
+            </div>
+            <div class="field label border">
+                <select name="status_key"></select>
+                <label>ステータス</label>
+                <i>arrow_drop_down</i>
+            </div>
+            <div class="field label border">
+                <select name="priority_key"></select>
+                <label>優先度</label>
+                <i>arrow_drop_down</i>
+            </div>
+            <div class="field label border">
+                <input type="datetime-local" name="planned_end_datetime">
+                <label>終了予定日</label>
+            </div>
         </div>
-        <div class="modal-result-content" style="display: none;">
-        </div>
-    </div>
-</div>
+        <nav class="right-align">
+            <button class="border" type="button" onclick="closeModal('modal-new-task')">キャンセル</button>
+            <button type="submit">作成</button>
+        </nav>
+        <div class="modal-result-content" style="display: none;"></div>
+    </form>
+</dialog>

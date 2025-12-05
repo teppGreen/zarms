@@ -1,44 +1,42 @@
-<div id="modal-new-member" class="modal">
-    <div class="modal-content">
-        <div class="modal-form-content">
-            <h2 class="modal-title">新規メンバー登録</h2>
-            <form id="new-member-form" onsubmit="submitNewMember(event)">
-                <div class="form-group">
-                    <label class="form-label">メールアドレス <span style="color: red;">*</span></label>
-                    <input type="email" name="member_email" class="input-field" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">名前 <span style="color: red;">*</span></label>
-                    <input type="text" name="member_name" class="input-field" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">SlackメンバーID</label>
-                    <input type="text" name="slack_member_id" class="input-field">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">アイコンURL</label>
-                    <input type="url" name="member_icon" class="input-field">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">チーム <span style="color: red;">*</span></label>
-                    <select name="member_team_key" class="input-field" required></select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">権限 <span style="color: red;">*</span></label>
-                    <select name="role_key" class="input-field" required></select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">備考</label>
-                    <textarea name="member_notes" class="input-field" rows="4"></textarea>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-cancel"
-                        onclick="closeModal('modal-new-member')">キャンセル</button>
-                    <button type="submit" class="btn btn-primary">登録</button>
-                </div>
-            </form>
+<dialog id="modal-new-member" class="modal">
+    <h5 class="bold">新規メンバー登録</h5>
+    <form id="new-member-form" onsubmit="submitNewMember(event)">
+        <div class="modal-content">
+            <div class="field label border">
+                <input type="email" name="member_email" required>
+                <label>メールアドレス <span class="error-text">*</span></label>
+            </div>
+            <div class="field label border">
+                <input type="text" name="member_name" required>
+                <label>名前 <span class="error-text">*</span></label>
+            </div>
+            <div class="field label border">
+                <input type="text" name="slack_member_id">
+                <label>SlackメンバーID</label>
+            </div>
+            <div class="field label border">
+                <input type="url" name="member_icon">
+                <label>アイコンURL</label>
+            </div>
+            <div class="field label border">
+                <select name="member_team_key" required></select>
+                <label>チーム <span class="error-text">*</span></label>
+                <i>arrow_drop_down</i>
+            </div>
+            <div class="field label border">
+                <select name="role_key" required></select>
+                <label>権限 <span class="error-text">*</span></label>
+                <i>arrow_drop_down</i>
+            </div>
+            <div class="field label border">
+                <textarea name="member_notes" rows="4"></textarea>
+                <label>備考</label>
+            </div>
         </div>
-        <div class="modal-result-content" style="display: none;">
-        </div>
-    </div>
-</div>
+        <nav class="right-align">
+            <button class="border" type="button" onclick="closeModal('modal-new-member')">キャンセル</button>
+            <button type="submit">登録</button>
+        </nav>
+        <div class="modal-result-content" style="display: none;"></div>
+    </form>
+</dialog>

@@ -1,35 +1,33 @@
 <div id="tab-home" class="tab-content">
-    <div class="card">
-        <h1 id="home-greeting" class="main-title">こんにちは</h1>
-        <p class="main-subtitle">今日も良い一日を！</p>
-    </div>
+    <article class="fill primary-container">
+        <div class="row">
+            <div class="max">
+                <h4 id="home-greeting">こんにちは</h4>
+                <p>今日も良い一日を！</p>
+            </div>
+        </div>
+    </article>
 
-    <div class="home-body">
-        <!-- 列1: 最新の制作依頼（1/5幅） -->
-        <div class="home-column-new-requests">
-            <h2 class="section-title">最新の制作依頼</h2>
-            <div id="home-new-requests-container" class="home-scroll-container">
-            </div>
+    <div class="grid">
+        <!-- 列1: 最新の制作依頼 -->
+        <div class="s12 m6 l3">
+            <h5 class="center-align">最新の制作依頼</h5>
+            <div id="home-new-requests-container"></div>
         </div>
-        <!-- 列2-3: 担当中の制作物（1/5幅） -->
-        <div class="home-column-assigned-works">
-            <h2 class="section-title">担当中の制作物</h2>
-            <div id="home-creatives-container" class="home-scroll-container">
-            </div>
+        <!-- 列2-3: 担当中の制作物 -->
+        <div class="s12 m6 l3">
+            <h5 class="center-align">担当中の制作物</h5>
+            <div id="home-creatives-container"></div>
         </div>
-        <!-- スペース（1/5幅） -->
-        <div class="home-column-spacer"></div>
-        <!-- 列4: 受付中のレビュー（1/5幅） -->
-        <div class="home-column-review-requests">
-            <h2 class="section-title">受付中のレビュー</h2>
-            <div id="home-review-requests-container" class="home-scroll-container">
-            </div>
+        <!-- 列4: 受付中のレビュー -->
+        <div class="s12 m6 l3">
+            <h5 class="center-align">受付中のレビュー</h5>
+            <div id="home-review-requests-container"></div>
         </div>
-        <!-- 列5: 最近のナレッジ（1/5幅） -->
-        <div class="home-column-knowledge">
-            <h2 class="section-title">最近のナレッジ</h2>
-            <div id="home-knowledge-container" class="home-scroll-container">
-            </div>
+        <!-- 列5: 最近のナレッジ -->
+        <div class="s12 m6 l3">
+            <h5 class="center-align">最近のナレッジ</h5>
+            <div id="home-knowledge-container"></div>
         </div>
     </div>
 </div>
@@ -85,13 +83,13 @@
         const visibleRequests = newRequests.filter(creative => !hiddenCreativeIds.has(creative.id));
 
         if (visibleRequests.length === 0) {
-            container.innerHTML = '<p style="color: #6b7280;">最新の制作依頼はありません</p>';
+            container.innerHTML = '<article class="transparent"><i>info</i><p>最新の制作依頼はありません</p></article>';
             return;
         }
 
         visibleRequests.forEach(creative => {
-            const card = document.createElement('div');
-            card.className = 'home-card';
+            const card = document.createElement('article');
+            card.className = 'no-padding';
             card.dataset.creativeId = creative.id;
 
             // 優先度、制作物種別、依頼者の所属チームを取得
@@ -103,26 +101,26 @@
             })() : '';
 
             const infoParts = [priorityLabel, creativeTypeLabel, clientTeamLabel].filter(Boolean);
-            const infoText = infoParts.length > 0 ? infoParts.join('|') : '';
+            const infoText = infoParts.length > 0 ? infoParts.join(' | ') : '';
 
             card.innerHTML = `
-        <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
-          ${creative.plan_id ? `${escapeHtml(creative.plan_id)} ` : ''}${escapeHtml(creative.plan_title || '')}
+        <div class="padding">
+            <div class="row">
+                <div class="max">
+                    <h6 class="small">${creative.plan_id ? `${escapeHtml(creative.plan_id)} ` : ''}${escapeHtml(creative.plan_title || '')}</h6>
+                    <h5 class="bold">${escapeHtml(creative.display_id || creative.id)} ${escapeHtml(creative.title || '')}</h5>
+                    ${infoText ? `<div class="small-text">${escapeHtml(infoText)}</div>` : ''}
+                    <div class="chip small">納期: ${formatDateTimeForHome(creative.deadline_at)}</div>
+                </div>
+            </div>
         </div>
-        <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
-          ${escapeHtml(creative.display_id || creative.id)} ${escapeHtml(creative.title || '')}
-        </div>
-        ${infoText ? `<div style="font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px;">${escapeHtml(infoText)}</div>` : ''}
-        <div class="card-meta" style="margin-bottom: 12px;">
-          <span>納期: <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${formatDateTimeForHome(creative.deadline_at)}</span></span>
-        </div>
-        <div class="work-accept-decline-buttons">
-          <button class="btn-accept" data-creative-id="${escapeHtml(creative.id)}" data-remaining-ms="${creative.remaining_time_ms || 0}">
-            承諾
-            <div class="remaining-time" data-remaining-ms="${creative.remaining_time_ms || 0}"></div>
-          </button>
-          <button class="btn-decline" data-creative-id="${escapeHtml(creative.id)}">保留・辞退</button>
-        </div>
+        <nav class="padding">
+            <button class="max btn-accept" data-creative-id="${escapeHtml(creative.id)}" data-remaining-ms="${creative.remaining_time_ms || 0}">
+                承諾
+                <span class="remaining-time badge" data-remaining-ms="${creative.remaining_time_ms || 0}"></span>
+            </button>
+            <button class="max secondary btn-decline" data-creative-id="${escapeHtml(creative.id)}">保留・辞退</button>
+        </nav>
       `;
 
             // 承諾ボタンのイベントリスナー
@@ -151,7 +149,7 @@
 
             // カードクリックでwork_detail_overlayを開く（ボタン以外の領域）
             card.addEventListener('click', (e) => {
-                if (!e.target.closest('.work-accept-decline-buttons')) {
+                if (!e.target.closest('button')) {
                     openCreativeDetailOverlay(creative.id);
                 }
             });
@@ -165,33 +163,39 @@
         container.innerHTML = '';
 
         if (creatives.length === 0) {
-            container.innerHTML = '<p style="color: #6b7280;">担当中の制作物はありません</p>';
+            container.innerHTML = '<article class="transparent"><i>info</i><p>担当中の制作物はありません</p></article>';
             return;
         }
 
         creatives.forEach(creative => {
-            const card = document.createElement('div');
-            card.className = 'home-card';
-
-            // ステータス色を取得
-            const statusColor = getCreativeStatusColor(creative.creative_status_key);
+            const card = document.createElement('article');
+            card.className = 'no-padding ripple';
+            // ステータス色を取得 (mapped to BeerCSS classes if possible, or keep custom utils)
+            // BeerCSS has colors like 'primary', 'secondary', 'error', 'tertiary'.
+            // Using inline style for status badge compat for now, or converting helpers.
             const statusLabel = getConfigLabel(creative.creative_status_key, 'CREATIVE_STATUS');
-
-            // 納期表示
             const dueDate = formatDateTimeForHome(creative.deadline_at);
 
+            let statusClass = 'tertiary';
+            if (creative.creative_status_key === 'TODO' || creative.creative_status_key === 'APPROVED') {
+                statusClass = 'error';
+            } else if (creative.creative_status_key === 'CREATE' || creative.creative_status_key === 'REVIEW' || creative.creative_status_key === 'REVISION') {
+                statusClass = 'warning'; // 'warning' isn't standard BeerCSS, 'tertiary' or 'secondary' maybe? 'secondary-container'? 
+                // BeerCSS defines --md-sys-color-error, but maybe not warning. I'll use custom colors or standard pallet.
+                // Reverting to secondary-container or similar.
+                statusClass = 'secondary';
+            } else if (creative.creative_status_key === 'DELIVERED') {
+                statusClass = 'primary';
+            }
+
             card.innerHTML = `
-        <div class="home-card-row">
-          <span class="home-card-id">${creative.plan_id ? escapeHtml(creative.plan_id) : ''}</span>
-          <span class="home-card-title" title="${escapeHtml(creative.plan_title || '')}">${escapeHtml(creative.plan_title || '')}</span>
-        </div>
-        <div class="home-card-row">
-          <span class="home-card-id">${escapeHtml(creative.display_id || creative.id)}</span>
-          <span class="home-card-title" title="${escapeHtml(creative.title || '')}">${escapeHtml(creative.title || '')}</span>
-        </div>
-        <div class="home-card-meta-row">
-          <div class="work-status-badge ${statusColor}">${escapeHtml(statusLabel)}</div>
-          <span class="home-card-due-date">納期: ${dueDate}</span>
+        <div class="padding">
+            <h6 class="small">${creative.plan_id ? escapeHtml(creative.plan_id) : ''} ${escapeHtml(creative.plan_title || '')}</h6>
+            <h5 class="bold">${escapeHtml(creative.display_id || creative.id)} ${escapeHtml(creative.title || '')}</h5>
+            <div class="row">
+                <span class="badge ${statusClass}">${escapeHtml(statusLabel)}</span>
+                <span class="small-text">納期: ${dueDate}</span>
+            </div>
         </div>
       `;
 
@@ -205,24 +209,34 @@
         container.innerHTML = '';
 
         if (reviewRequests.length === 0) {
-            container.innerHTML = '<p style="color: #6b7280;">受付中のレビューはありません</p>';
+            container.innerHTML = '<article class="transparent"><i>info</i><p>受付中のレビューはありません</p></article>';
             return;
         }
 
         reviewRequests.forEach(reviewRequest => {
-            const card = document.createElement('div');
-            card.className = 'home-card';
+            const card = document.createElement('article');
+            card.className = 'no-padding ripple';
 
-            // due_datetimeを「~10/24(水) 15:00」形式で表示
             const dueDateHtml = reviewRequest.due_datetime
                 ? formatDateForReview(reviewRequest.due_datetime)
                 : '';
 
-            // 作成者情報
             const creatorIcon = reviewRequest.creator_icon || '';
             const creatorName = reviewRequest.creator_name || '不明';
 
-            // 最初に登録されたファイルを取得（created_atでソート）
+            card.innerHTML = `
+        <img src="https://via.placeholder.com/800x450" class="responsive top-round" alt="サムネイル">
+        <div class="padding">
+             <h5 class="bold">${escapeHtml(reviewRequest.review_request_id || '')} ${escapeHtml(reviewRequest.review_title || '')}</h5>
+             <div class="row middle-align">
+                <img src="${escapeHtml(creatorIcon)}" class="circle tiny" alt="${escapeHtml(creatorName)}">
+                <span>${escapeHtml(creatorName)}</span>
+                <span class="small-text right-align max">${dueDateHtml}</span>
+             </div>
+        </div>
+      `;
+
+            // Thumbnail loader logic preserved but updated selector
             let firstFile = null;
             if (reviewRequest.files && reviewRequest.files.length > 0) {
                 const sortedFiles = [...reviewRequest.files].sort((a, b) => {
@@ -233,63 +247,14 @@
                 firstFile = sortedFiles[0];
             }
 
-            // サムネイル用のプレースホルダー
-            const thumbnailHtml = firstFile && firstFile.file_id
-                ? `<div class="review-thumbnail-container" data-file-id="${escapeHtml(firstFile.file_id)}">
-             <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: var(--md-sys-color-surface-variant);">
-               <span style="color: var(--md-sys-color-on-surface-variant); font-size: 0.75rem;">読み込み中...</span>
-             </div>
-           </div>`
-                : '';
-
-            card.innerHTML = `
-        ${thumbnailHtml}
-        <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); font-family: 'Roboto Mono', monospace; font-weight: 500; word-wrap: break-word;">
-          ${escapeHtml(reviewRequest.review_request_id || '')} ${escapeHtml(reviewRequest.review_title || '')}
-        </div>
-        <div class="card-meta">
-          <span class="review-creator">
-            <img src="${escapeHtml(creatorIcon)}" class="review-creator-icon" alt="${escapeHtml(creatorName)}">
-            <span>${escapeHtml(creatorName)}</span>
-          </span>  
-          <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">
-            ${dueDateHtml || ''}
-          </span>
-        </div>
-      `;
+            if (firstFile && firstFile.file_id) {
+                const img = card.querySelector('img.responsive');
+                img.src = `https://drive.google.com/thumbnail?id=${firstFile.file_id}&sz=w800-h450`;
+            }
 
             card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
             container.appendChild(card);
-
-            // サムネイルを非同期で読み込む（タブの読み込み完了後）
-            if (firstFile && firstFile.file_id) {
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        loadReviewThumbnail(card.querySelector('.review-thumbnail-container'), firstFile.file_id);
-                    });
-                });
-            }
         });
-    }
-
-    function loadReviewThumbnail(container, fileId) {
-        if (!container) return;
-
-        // Google DriveのサムネイルURLを生成
-        const thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w800-h450`;
-
-        const img = document.createElement('img');
-        img.className = 'review-thumbnail';
-        img.src = thumbnailUrl;
-        img.alt = 'サムネイル';
-        img.onerror = () => {
-            // サムネイルの読み込みに失敗した場合はプレースホルダーを表示
-            container.innerHTML = '<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: var(--md-sys-color-surface-variant);"><span style="color: var(--md-sys-color-on-surface-variant); font-size: 0.75rem;">サムネイルなし</span></div>';
-        };
-        img.onload = () => {
-            container.innerHTML = '';
-            container.appendChild(img);
-        };
     }
 
     function renderKnowledge(knowledgeList) {
@@ -297,87 +262,54 @@
         container.innerHTML = '';
 
         if (knowledgeList.length === 0) {
-            container.innerHTML = '<p style="color: #6b7280;">最近のナレッジはありません</p>';
+            container.innerHTML = '<article class="transparent"><i>info</i><p>最近のナレッジはありません</p></article>';
             return;
         }
 
-        // 縦スクロールが必要ない数だけ表示するため、まず全て表示してから調整
-        const cards = [];
-        let totalHeight = 0;
-        const containerHeight = container.clientHeight || 600; // デフォルト高さ
-
         knowledgeList.forEach((item, index) => {
-            const card = document.createElement('div');
-            card.className = 'knowledge-card';
+            const card = document.createElement('article');
+            card.className = 'no-padding ripple';
             card.dataset.knowledgeId = item.knowledge_id;
 
-            // knowledge_contentを原則全文表示
             const contentHtml = item.knowledge_content || '';
-
-            // 作成者情報
             const creatorIcon = item.creator_icon || 'https://via.placeholder.com/24';
             const creatorName = item.creator_name || '';
 
             card.innerHTML = `
-        <div class="knowledge-content">${contentHtml}</div>
-        <div class="card-meta">
-          <span class="review-creator">
-            <img src="${escapeHtml(creatorIcon)}" class="review-creator-icon" alt="${escapeHtml(creatorName)}">
-            <span>${escapeHtml(creatorName)}</span>
-          </span>  
-          <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">
-            ${formatDateTimeForHome(item.created_at)}
-          </span>
+        <div class="padding knowledge-content">${contentHtml}</div>
+        <div class="padding top-border row middle-align">
+           <img src="${escapeHtml(creatorIcon)}" class="circle tiny" alt="${escapeHtml(creatorName)}">
+           <span class="small-text">${escapeHtml(creatorName)}</span>
+           <span class="small-text max right-align">${formatDateTimeForHome(item.created_at)}</span>
         </div>
       `;
 
             card.onclick = () => openKnowledgeDetailModal(item.knowledge_id);
-            cards.push(card);
+            container.appendChild(card);
         });
-
-        // 全てのカードを追加
-        cards.forEach(card => container.appendChild(card));
-
-        // 1つのナレッジだけで縦スクロールが必要な場合は省略
-        if (cards.length > 0) {
-            const firstCard = cards[0];
-            const firstCardHeight = firstCard.scrollHeight;
-            if (firstCardHeight > containerHeight * 0.8) {
-                // はみ出た部分を...で省略
-                const contentDiv = firstCard.querySelector('.knowledge-content');
-                if (contentDiv) {
-                    contentDiv.classList.add('knowledge-content-truncated');
-                }
-            }
-        }
     }
 
     function calculateRemainingTime(ms) {
         if (!ms || ms <= 0) return '';
-
-        const totalSeconds = ms / 1000; // ミリ秒を秒に変換（小数点以下も保持）
-        const hours = Math.floor(totalSeconds / 3600); // 時間部分の取得（小数切り捨て）
-        const minutes = Math.floor((totalSeconds % 3600) / 60); // 分部分の取得（小数切り捨て）
-        const seconds = Math.floor(totalSeconds % 60); // ミリ秒部分は切り捨て（整数部分のみ）
-
+        const totalSeconds = ms / 1000;
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = Math.floor(totalSeconds % 60);
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
 
-    // 残り時間をリアルタイムで更新するためのinterval ID
     let remainingTimeIntervalId = null;
 
     function updateRemainingTimes() {
-        const acceptButtons = document.querySelectorAll('.btn-accept[data-remaining-ms]');
+        const acceptButtons = document.querySelectorAll('.btn-accept');
         const now = new Date().getTime();
 
         acceptButtons.forEach(button => {
             const initialRemainingMs = parseInt(button.dataset.remainingMs) || 0;
             if (initialRemainingMs <= 0) return;
 
-            // 初期時刻を取得（データ属性から）
             const initialTimeAttr = button.dataset.initialTime;
             if (!initialTimeAttr) {
-                // 初回のみ、現在時刻を記録
                 button.dataset.initialTime = now.toString();
                 return;
             }
@@ -389,22 +321,17 @@
             const remainingTimeElement = button.querySelector('.remaining-time');
             if (remainingTimeElement) {
                 if (remainingMs > 0) {
-                    const remainingTime = calculateRemainingTime(remainingMs);
-                    remainingTimeElement.textContent = `${remainingTime}`;
+                    remainingTimeElement.textContent = calculateRemainingTime(remainingMs);
+                } else {
+                    remainingTimeElement.textContent = "期限切れ";
                 }
             }
         });
     }
 
     function startRemainingTimeUpdates() {
-        // 既存のintervalをクリア
-        if (remainingTimeIntervalId) {
-            clearInterval(remainingTimeIntervalId);
-        }
-
-        // 1秒ごとに更新
+        if (remainingTimeIntervalId) clearInterval(remainingTimeIntervalId);
         remainingTimeIntervalId = setInterval(updateRemainingTimes, 1000);
-        // 即座に1回実行
         updateRemainingTimes();
     }
 
@@ -416,28 +343,19 @@
     }
 
     function getCreativeStatusColor(statusKey) {
-        if (statusKey === 'TODO' || statusKey === 'APPROVED') {
-            return 'status-red';
-        } else if (statusKey === 'CREATE' || statusKey === 'REVIEW' || statusKey === 'REVISION') {
-            return 'status-orange';
-        } else if (statusKey === 'DELIVERED') {
-            return 'status-green';
-        }
-        return 'status-red';
+        if (statusKey === 'TODO' || statusKey === 'APPROVED') return 'error';
+        if (statusKey === 'CREATE' || statusKey === 'REVIEW' || statusKey === 'REVISION') return 'secondary';
+        if (statusKey === 'DELIVERED') return 'primary';
+        return 'error';
     }
 
     function formatDateForReview(dueDatetime) {
         if (!dueDatetime) return '';
         try {
             const date = new Date(dueDatetime);
-            const year = String(date.getFullYear()).padStart(4, '0');
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
+            const digits = [date.getFullYear(), date.getMonth() + 1, date.getDate(), date.getHours(), date.getMinutes()].map(num => String(num).padStart(2, '0'));
             const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-            const weekday = weekdays[date.getDay()];
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-            return `~ ${year}/${month}/${day}(${weekday}) ${hours}:${minutes}`;
+            return `~ ${digits[0].substring(2)}/${digits[1]}/${digits[2]}(${weekdays[date.getDay()]}) ${digits[3]}:${digits[4]}`;
         } catch (e) {
             return '';
         }
@@ -447,9 +365,7 @@
         showLoading();
         callGAS('acceptCreative', creativeId).then(result => {
             hideLoading();
-            // セッション中は非表示にする
             hiddenCreativeIds.add(creativeId);
-            // 最新の制作依頼セクションを再描画
             callGAS('getHomeData').then(data => {
                 renderNewRequests(data.new_requests || []);
             }).catch(handleError);
@@ -457,9 +373,7 @@
     }
 
     function handleDeclineCreative(creativeId) {
-        // セッション中は非表示にする（フロントエンドで管理）
         hiddenCreativeIds.add(creativeId);
-        // 最新の制作依頼セクションを再描画
         callGAS('getHomeData').then(data => {
             renderNewRequests(data.new_requests || []);
         }).catch(handleError);
@@ -469,14 +383,9 @@
         if (!dateString) return 'yyyy/mm/dd(曜日) hh:mm';
         try {
             const dt = new Date(dateString);
-            const year = dt.getFullYear();
-            const month = String(dt.getMonth() + 1).padStart(2, '0');
-            const day = String(dt.getDate()).padStart(2, '0');
+            const digits = [dt.getFullYear(), dt.getMonth() + 1, dt.getDate(), dt.getHours(), dt.getMinutes()].map(num => String(num).padStart(2, '0'));
             const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-            const weekday = weekdays[dt.getDay()];
-            const hours = String(dt.getHours()).padStart(2, '0');
-            const minutes = String(dt.getMinutes()).padStart(2, '0');
-            return `${year}/${month}/${day}(${weekday}) ${hours}:${minutes}`;
+            return `${digits[0]}/${digits[1]}/${digits[2]}(${weekdays[dt.getDay()]}) ${digits[3]}:${digits[4]}`;
         } catch (e) {
             return 'yyyy/mm/dd(曜日) hh:mm';
         }

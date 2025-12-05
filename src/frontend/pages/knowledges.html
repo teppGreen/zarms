@@ -1,7 +1,21 @@
 <div id="tab-knowledges" class="tab-content" style="display: none;">
-
-    <div id="knowledges-container" class="grid-container">
-    </div>
+    <article class="no-padding">
+        <div class="scroll">
+            <table id="knowledges-table" class="stripes">
+                <thead>
+                    <tr>
+                        <th>ナレッジ種別</th>
+                        <th>作成日</th>
+                        <th>作成者</th>
+                        <th>内容</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="knowledges-table-body">
+                </tbody>
+            </table>
+        </div>
+    </article>
 </div>
 
 <script>
@@ -11,14 +25,31 @@
     App.pages.knowledges.loadData = function () {
         callGAS('getKnowledge').then(data => {
             knowledgeData = data;
-            const container = document.getElementById('knowledges-container');
-            container.innerHTML = '';
+            const container = document.getElementById('knowledges-table-body');
+            container.innerHTML = ''; // Clear existing rows
             if (!knowledgeData || knowledgeData.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 40px;">ナレッジがありません</p>';
+                // If no data, display message in the table body
+                container.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #6b7280; padding: 40px;">ナレッジがありません</td></tr>';
+                hideLoading();
                 return;
             }
             knowledgeData.forEach(item => {
-                container.innerHTML += `<div class="card"> <div style="margin-bottom: 8px;"> <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span> </div> <div style="margin-bottom: 12px; font-size: 0.875rem; color: #6b7280;"> ${escapeHtml(item.work_title)} </div> <div style="margin-bottom: 12px;"> ${escapeHtml(item.knowledge_content.substring(0, 150))}... </div> <div style="font-size: 0.75rem; color: #9ca3af;"> ${formatDate(item.created_at)} - ${escapeHtml(item.creator_name)} </div> </div>`;
+                container.innerHTML += `
+                    <tr>
+                        <td><span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span></td>
+                        <td>${formatDate(item.created_at)}</td>
+                        <td>${escapeHtml(item.creator_name)}</td>
+                        <td>
+                            <div style="font-weight: bold; margin-bottom: 4px;">${escapeHtml(item.work_title)}</div>
+                            <div>${escapeHtml(item.knowledge_content.substring(0, 150))}...</div>
+                        </td>
+                        <td>
+                            <button class="button-icon" onclick="App.pages.knowledges.openKnowledgeDetail('${item.id}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
             });
             hideLoading();
         }).catch(handleError);
