@@ -35,6 +35,7 @@ function getDataById(sheetName, id) {
  */
 function findData(sheetName, condition) {
   return callBackendAPI('find', {
+    userEmail: Session.getActiveUser().getEmail(),
     sheetName: sheetName,
     condition: condition
   });
@@ -50,6 +51,7 @@ function findData(sheetName, condition) {
  */
 function createData(sheetName, dataObject) {
   return callBackendAPI('create', {
+    userEmail: Session.getActiveUser().getEmail(),
     sheetName: sheetName,
     data: dataObject,
     idColumnName: ID_COLUMNS[sheetName]
@@ -65,6 +67,7 @@ function createData(sheetName, dataObject) {
  */
 function updateData(sheetName, id, updateDataObject) {
   return callBackendAPI('update', {
+    userEmail: Session.getActiveUser().getEmail(),
     sheetName: sheetName,
     id: id,
     data: updateDataObject,
@@ -80,6 +83,7 @@ function updateData(sheetName, id, updateDataObject) {
  */
 function deleteData(sheetName, condition) {
   return callBackendAPI('delete', {
+    userEmail: Session.getActiveUser().getEmail(),
     sheetName: sheetName,
     condition: condition,
     idColumnName: ID_COLUMNS[sheetName]

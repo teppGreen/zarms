@@ -157,31 +157,31 @@
     gap: 24px;
   }
 
-  #work-detail-header-info {
+  #creative-detail-header-info {
     display: none;
     flex: 1;
     margin-left: 24px;
     font-size: 0.875rem;
   }
 
-  #work-detail-header-row1,
-  #work-detail-header-row2 {
+  #creative-detail-header-row1,
+  #creative-detail-header-row2 {
     white-space: nowrap;
     flex-wrap: wrap;
   }
 
-  #work-detail-header-info>div>div {
+  #creative-detail-header-info>div>div {
     white-space: nowrap;
     flex-shrink: 0;
   }
 
-  .work-detail-status-container,
-  .work-detail-due-container {
+  .creative-detail-status-container,
+  .creative-detail-due-container {
     white-space: nowrap;
     flex-shrink: 0;
   }
 
-  #work-detail-assignees-header-info img.avatar {
+  #creative-detail-assignees-header-info img.avatar {
     vertical-align: middle;
     display: inline-block;
   }
@@ -1481,7 +1481,7 @@
     margin-bottom: 4px;
   }
 
-  #work-detail-document-container {
+  #creative-detail-document-container {
     width: 100%;
     height: 100%;
     overflow: hidden;
@@ -1497,13 +1497,13 @@
     min-height: 400px;
   }
 
-  #work-detail-document-container:empty::before {
+  #creative-detail-document-container:empty::before {
     content: 'ドキュメント埋め込み';
     font-size: 1.5rem;
     color: var(--md-sys-color-on-surface);
   }
 
-  #work-detail-document-container iframe {
+  #creative-detail-document-container iframe {
     width: 100%;
     height: 100%;
     max-width: 100%;
@@ -1728,14 +1728,14 @@
 
   @media (min-width: 768px) {
 
-    #home-works-container.grid-container,
+    #home-creatives-container.grid-container,
     #knowledge-container.grid-container {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
   @media (min-width: 1024px) {
-    #home-works-container.grid-container {
+    #home-creatives-container.grid-container {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
@@ -1789,7 +1789,7 @@
     overflow: hidden;
   }
 
-  .home-column-assigned-works {
+  .home-column-assigned-creatives {
     flex: 0 1 20%;
     min-width: 0;
     min-height: 0;
@@ -1842,7 +1842,7 @@
 
   /* ホームタブ用セクションタイトル */
   .home-column-new-requests .section-title,
-  .home-column-assigned-works .section-title,
+  .home-column-assigned-creatives .section-title,
   .home-column-review-requests .section-title,
   .home-column-knowledge .section-title {
     margin-top: 0;
@@ -1853,7 +1853,7 @@
   }
 
   /* ステータス色分け */
-  .work-status-badge {
+  .creative-status-badge {
     display: inline-block;
     padding: 4px 12px;
     border-radius: 9999px;
@@ -1864,17 +1864,17 @@
     right: 8px;
   }
 
-  .work-status-badge.status-red {
+  .creative-status-badge.status-red {
     background-color: #FEE2E2;
     color: #991B1B;
   }
 
-  .work-status-badge.status-orange {
+  .creative-status-badge.status-orange {
     background-color: #FED7AA;
     color: #9A3412;
   }
 
-  .work-status-badge.status-green {
+  .creative-status-badge.status-green {
     background-color: #D1FAE5;
     color: #065F46;
   }
@@ -1946,7 +1946,7 @@
   }
 
   /* 承諾/辞退ボタン */
-  .work-accept-decline-buttons {
+  .creative-accept-decline-buttons {
     display: flex;
     gap: 8px;
     margin-top: 12px;
@@ -2247,7 +2247,7 @@
   /* Unified Card Styles - カード系コンテンツの統一スタイル */
   .task-card,
   .review-card,
-  .work-card {
+  .creative-card {
     background-color: var(--md-sys-color-surface);
     border: 1px solid var(--md-sys-color-surface-variant);
     border-radius: 12px;
@@ -2262,7 +2262,7 @@
 
   .task-card:hover,
   .review-card:hover,
-  .work-card:hover {
+  .creative-card:hover {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transform: translateY(-2px);
     z-index: 1000;
@@ -2490,86 +2490,6 @@
 
     to {
       opacity: 1;
-    }
-  }
-
-  /* 全画面タイトル画面 */
-  .fullscreen-title {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: var(--md-sys-color-background);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
-    /* animation: fullscreenTitleFadeIn 0.6s var(--ease-emphasized) both; */
-  }
-
-  .fullscreen-title-text {
-    font-size: 3rem;
-    font-weight: 700;
-    color: var(--md-sys-color-on-background);
-    margin: 0;
-    text-align: center;
-    letter-spacing: 0.02em;
-    animation: fullscreenTitleTextIn 0.8s var(--ease-emphasized) both;
-  }
-
-  /* アニメーションアウト用クラス */
-  .fullscreen-title.fade-out {
-    animation: fullscreenTitleFadeOut 0.5s var(--ease-standard) both;
-  }
-
-  .fullscreen-title.fade-out .fullscreen-title-text {
-    animation: fullscreenTitleTextOut 0.5s var(--ease-standard) both;
-  }
-
-  /* アニメーションイン - Material Design準拠 */
-  @keyframes fullscreenTitleFadeIn {
-    from {
-      opacity: 0;
-    }
-
-    to {
-      opacity: 1;
-    }
-  }
-
-  @keyframes fullscreenTitleTextIn {
-    from {
-      opacity: 0;
-      transform: scale(0.9) translateY(20px);
-    }
-
-    to {
-      opacity: 1;
-      transform: scale(1) translateY(0);
-    }
-  }
-
-  /* アニメーションアウト - Material Design準拠 */
-  @keyframes fullscreenTitleFadeOut {
-    from {
-      opacity: 1;
-    }
-
-    to {
-      opacity: 0;
-    }
-  }
-
-  @keyframes fullscreenTitleTextOut {
-    from {
-      opacity: 1;
-      transform: scale(1) translateY(0);
-    }
-
-    to {
-      opacity: 0;
-      transform: scale(0.95) translateY(-10px);
     }
   }
 
