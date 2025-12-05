@@ -11,7 +11,7 @@ function doGet(e) {
 
   return template.evaluate()
     .setTitle('ZARMS')
-    .setFaviconUrl('https://drive.google.com/file/d/1rnkYniTkiKnVk5jNbx7V1nRrmwP6altL' + '&.png')
+    .setFaviconUrl('https://drive.google.com/uc?id=1rnkYniTkiKnVk5jNbx7V1nRrmwP6altL' + '&.png')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
@@ -130,13 +130,13 @@ function getItems(tableName) {
 function getItemById(tableName, id) {
   switch (tableName) {
     case SHEET_NAMES.CREATIVES:
-      return getCreativeByIdLogic(id);
+      return getCreativeById(id);
     case SHEET_NAMES.PLANS:
-      return getPlanByIdLogic(id);
+      return getPlanById(id);
     case SHEET_NAMES.TASKS:
-      return getTaskByIdLogic(id);
+      return getTaskById(id);
     case SHEET_NAMES.MEMBERS:
-      return getMemberByIdLogic(id);
+      return getMemberById(id);
     default:
       return getDataById(tableName, id);
   }
@@ -151,17 +151,17 @@ function getItemById(tableName, id) {
 function createItem(tableName, data) {
   switch (tableName) {
     case SHEET_NAMES.CREATIVES:
-      return createCreativeLogic(data);
+      return createCreative(data);
     case SHEET_NAMES.PLANS:
-      return createPlanLogic(data);
+      return createPlan(data);
     case SHEET_NAMES.MEMBERS:
-      return createMemberLogic(data);
+      return createMember(data);
     case SHEET_NAMES.TASKS:
-      return createTaskLogic(data);
+      return createTask(data);
     case SHEET_NAMES.KNOWLEDGES:
-      return createKnowledgeLogic(data);
+      return createKnowledge(data);
     case SHEET_NAMES.MEMBER_ASSIGNMENTS:
-      return addMemberAssignmentLogic(data);
+      return addMemberAssignment(data);
     default:
       return createData(tableName, data);
   }
@@ -177,7 +177,7 @@ function createItem(tableName, data) {
 function updateItem(tableName, id, data) {
   switch (tableName) {
     case SHEET_NAMES.MEMBERS:
-      return updateMemberLogic(id, data);
+      return updateMember(id, data);
     default:
       return updateData(tableName, id, data);
   }
@@ -198,14 +198,14 @@ function deleteItem(tableName, condition) {
 // ============================================
 
 // --- Creatives ---
-function getCreativesLogic() {
+function getCreatives() {
   const creatives = getAllData(SHEET_NAMES.CREATIVES);
   // Enrichment is now done in frontend or here if needed.
   // For now, return raw data to let frontend handle joins, or minimal enrichment.
   return creatives;
 }
 
-function getCreativeByIdLogic(id) {
+function getCreativeById(id) {
   const creative = getDataById(SHEET_NAMES.CREATIVES, id);
   if (!creative) return null;
 
@@ -216,7 +216,7 @@ function getCreativeByIdLogic(id) {
   return creative;
 }
 
-function createCreativeLogic(data) {
+function createCreative(data) {
   const userEmail = Session.getActiveUser().getEmail();
   const now = new Date();
 
@@ -247,7 +247,7 @@ function createCreativeLogic(data) {
 
 // --- Projects ---
 // --- Plans ---
-function getPlansLogic() {
+function getPlans() {
   const plans = getAllData(SHEET_NAMES.PLANS);
   return plans.map(plan => {
     // plan.created_by_name = getMemberName(plan.created_by); // created_by is now member ID
@@ -258,7 +258,7 @@ function getPlansLogic() {
   });
 }
 
-function getPlanByIdLogic(id) {
+function getPlanById(id) {
   const plan = getDataById(SHEET_NAMES.PLANS, id);
   if (!plan) return null;
   // plan.creator_name = getMemberName(plan.created_by);
@@ -266,7 +266,7 @@ function getPlanByIdLogic(id) {
   return plan;
 }
 
-function createPlanLogic(data) {
+function createPlan(data) {
   const planTitle = data.title || data; // Handle string or object
 
   const userEmail = Session.getActiveUser().getEmail();
