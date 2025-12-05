@@ -20,7 +20,6 @@
   };
 
   // テーブルヘッダーの定義
-  // テーブルヘッダーの定義
   const creativesTableHeaders = [
     { key: 'display_id', label: 'ID', sortable: true },
     { key: 'plan_title', label: '企画タイトル', sortable: true, filterable: true, editable: false },
@@ -74,10 +73,8 @@
 
     // 新規作成ボタンのクリック
     if (newButton) {
-      console.log('新規作成ボタンが見つかりました。イベントリスナーを設定します。');
       // onclickを使用して確実に設定
       newButton.onclick = function (event) {
-        console.log('新規作成ボタンがクリックされました', event);
         handleMainButtonClick(event);
       };
 
@@ -85,12 +82,10 @@
       const newButtonMain = document.getElementById('new-button-main');
       if (newButtonMain) {
         newButtonMain.onclick = function (event) {
-          console.log('新規作成ボタン（span）がクリックされました', event);
           handleMainButtonClick(event);
         };
       }
     } else {
-      console.error('新規作成ボタンが見つかりませんでした！');
       // リトライ（DOMがまだ読み込まれていない場合）
       setTimeout(initializeNewButton, 100);
       return;
@@ -119,7 +114,6 @@
 
   // 初期化
   async function initializeApp() {
-    console.log('initializeApp が呼び出されました');
 
     // 全画面タイトルの最小表示時間を確保（アニメーションが適切に表示されるように）
     const titleStartTime = Date.now();
@@ -127,7 +121,6 @@
 
     // 新規作成ボタンを最初に初期化（エラーが発生しても確実に実行されるように）
     try {
-      console.log('initializeNewButton を呼び出します');
       initializeNewButton();
     } catch (error) {
       console.error('initializeNewButton でエラーが発生しました:', error);
@@ -141,49 +134,19 @@
     }
 
     try {
-      // URLパラメータからwork_idを取得して詳細画面を開く（最優先処理）
+      // URLパラメータからcreative_idを取得して詳細画面を開く（最優先処理）
       const urlParam = templateVariables.urlParam;
-      console.log(`URLのパラメータ: ${JSON.stringify(urlParam)}`);
-      if (urlParam.work_id) {
-        const workId = urlParam.work_id;
-        if (workId) openWorkDetailOverlay(workId);
+      if (urlParam.creative_id) {
+        const creativeId = urlParam.creative_id;
+        if (creativeId) openCreativeDetailOverlay(creativeId);
       }
     } catch (error) {
       console.error('URLパラメータ処理でエラーが発生しました:', error);
     }
-
-    // 最小表示時間を確保してから全画面タイトルを非表示にする
-    try {
-      const elapsedTime = Date.now() - titleStartTime;
-      const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
-
-      setTimeout(() => {
-        hideFullscreenTitle();
-      }, remainingTime);
-    } catch (error) {
-      console.error('全画面タイトル非表示処理でエラーが発生しました:', error);
-    }
-  }
-
-  // 全画面タイトルを非表示にする関数
-  function hideFullscreenTitle() {
-    const fullscreenTitle = document.getElementById('fullscreen-title');
-    if (!fullscreenTitle) {
-      return;
-    }
-
-    // アニメーションアウトクラスを追加
-    fullscreenTitle.classList.add('fade-out');
-
-    // アニメーション完了後にdisplay=noneにする
-    setTimeout(() => {
-      fullscreenTitle.style.display = 'none';
-    }, 500); // アニメーション時間（0.5s）に合わせる
   }
 
   // 複数の方法で初期化を試みる
   if (document.readyState === 'loading') {
-    console.log('DOMContentLoaded を待機します');
     document.addEventListener('DOMContentLoaded', initializeApp);
   } else {
     console.log('DOMContentLoaded は既に発火済み。即座に実行します');
@@ -508,7 +471,7 @@
   // ============================================
 
   function switchTab(tabName) {
-    // closeWorkDetailOverlay();
+    // closeCreativeDetailOverlay();
     // ホームタブ以外に切り替える場合は残り時間の更新を停止
     if (tabName !== 'home') {
       stopRemainingTimeUpdates();
@@ -580,7 +543,6 @@
           <div style="margin-bottom: 12px;">
             <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(knowledge.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span>
           </div>
-          <h3 style="margin: 0 0 8px 0; font-size: 1.125rem; font-weight: 600;">${escapeHtml(knowledge.work_title)}</h3>
           <p style="margin: 0; color: #6b7280; font-size: 0.875rem;">${formatDate(knowledge.created_at)} - ${escapeHtml(knowledge.creator_name)}</p>
         </div>
         <div style="margin-bottom: 24px;">
@@ -779,9 +741,9 @@
         return;
       }
 
-      // 担当しているWorksを取得
-      const assignedWorks = (worksData || []).filter(work => {
-        return work.assignees && work.assignees.some(a => a.member_email === memberEmail);
+      // 担当しているCreativesを取得
+      const assignedCreatives = (creativesData || []).filter(creative => {
+        return creative.assignees && creative.assignees.some(a => a.member_email === memberEmail);
       });
 
       const content = document.getElementById('member-detail-content');
@@ -817,7 +779,7 @@
         </div>
         <div class="detail-section">
           <h3>担当している制作物</h3>
-          ${assignedWorks.length === 0 ? '<p style="color: #6b7280;">担当している制作物はありません</p>' : `
+          ${assignedcreatives.length === 0 ? '<p style="color: #6b7280;">担当している制作物はありません</p>' : `
             <table class="table-full" style="margin-top: 12px;">
               <thead>
                 <tr>
@@ -827,11 +789,11 @@
                 </tr>
               </thead>
               <tbody>
-                ${assignedWorks.map(work => `
+                ${assignedcreatives.map(creative => `
                   <tr>
-                    <td>${escapeHtml(work.project_title)}</td>
-                    <td><button class="btn-link" onclick="openWorkDetailOverlay('${work.work_id}'); closeModal('modal-member-detail');">${escapeHtml(work.work_title)}</button></td>
-                    <td>${escapeHtml(getConfigLabel(work.work_status_key, 'WORK_STATUS'))}</td>
+                    <td>${escapeHtml(creative.project_title)}</td>
+                    <td><button class="btn-link" onclick="openCreativeDetailOverlay('${creative.creative_id}'); closeModal('modal-member-detail');">${escapeHtml(creative.creative_title)}</button></td>
+                    <td>${escapeHtml(getConfigLabel(creative.creative_status_key, 'CREATIVE_STATUS'))}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -932,7 +894,7 @@
             }
 
             // 隠しフィールドに値を更新
-            updateNewWorkDateTimeValue(inputs, hiddenInput);
+            updateNewCreativeDateTimeValue(inputs, hiddenInput);
           });
 
           // キーボード操作
@@ -972,7 +934,7 @@
     }
   }
 
-  function updateNewWorkDateTimeValue(inputs, hiddenInput) {
+  function updateNewCreativeDateTimeValue(inputs, hiddenInput) {
     const values = Array.from(inputs).map(input => input.value);
     const [yyyy, mm, dd, hh, min] = values;
 
@@ -989,11 +951,11 @@
     }
   }
 
-  function updateRegulationPreset(workTypeKey) {
-    if (!workTypeKey) return;
-    const workType = (configData['CREATIVE_TYPE'] || []).find(wt => wt.config_key === workTypeKey);
-    if (workType && workType.config_preset_value) {
-      document.querySelector('textarea[name="work_detail_regulation"]').value = workType.config_preset_value;
+  function updateRegulationPreset(creativeTypeKey) {
+    if (!creativeTypeKey) return;
+    const creativeType = (configData['CREATIVE_TYPE'] || []).find(wt => wt.config_key === creativeTypeKey);
+    if (creativeType && creativeType.config_preset_value) {
+      document.querySelector('textarea[name="creative_detail_regulation"]').value = creativeType.config_preset_value;
     }
   }
 
@@ -1049,7 +1011,7 @@
     const hiddenInput = document.getElementById('new-creative-deadline-at');
     if (datetimeContainer && hiddenInput) {
       const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
-      updateNewWorkDateTimeValue(inputs, hiddenInput);
+      updateNewCreativeDateTimeValue(inputs, hiddenInput);
     }
 
     const formData = new FormData(form);
@@ -1083,9 +1045,9 @@
     });
     openModal('modal-new-plan');
   }
-  function openNewTaskModal(workId) {
+  function openNewTaskModal(creativeId) {
     const form = document.getElementById('new-task-form');
-    form.elements.work_id.value = workId;
+    form.elements.creative_id.value = creativeId;
 
     // IME変換確定時のEnterキーを無視する処理を追加
     const textInputs = form.querySelectorAll('input[type="text"], textarea');
@@ -1252,14 +1214,14 @@
   }
 
   let reviewRequestFiles = [];
-  let currentReviewRequestWorkId = null;
+  let currentReviewRequestCreativeId = null;
 
-  function openNewReviewRequestModal(workId) {
-    currentReviewRequestWorkId = workId;
+  function openNewReviewRequestModal(creativeId) {
+    currentReviewRequestCreativeId = creativeId;
     reviewRequestFiles = [];
     const form = document.getElementById('new-review-request-form');
     form.reset();
-    form.elements.work_id.value = workId;
+    form.elements.creative_id.value = creativeId;
 
     // IME変換確定時のEnterキーを無視する処理を追加
     const textInputs = form.querySelectorAll('input[type="text"], textarea');
@@ -1381,8 +1343,8 @@
       reader.onload = (e) => {
         const base64Data = e.target.result.split(',')[1];
         // ファイルをアップロード
-        if (currentReviewRequestWorkId) {
-          callGAS('uploadFileToWorkFolder', currentReviewRequestWorkId, base64Data, file.name, file.type)
+        if (currentReviewRequestCreativeId) {
+          callGAS('uploadFileToCreativeFolder', currentReviewRequestCreativeId, base64Data, file.name, file.type)
             .then(uploadedFile => {
               reviewRequestFiles.push({
                 file_id: uploadedFile.file_id,
@@ -1409,8 +1371,8 @@
       const reader = new FileReader();
       reader.onload = (e) => {
         const base64Data = e.target.result.split(',')[1];
-        if (currentReviewRequestWorkId) {
-          callGAS('uploadFileToWorkFolder', currentReviewRequestWorkId, base64Data, file.name, file.type)
+        if (currentReviewRequestCreativeId) {
+          callGAS('uploadFileToCreativeFolder', currentReviewRequestCreativeId, base64Data, file.name, file.type)
             .then(uploadedFile => {
               reviewRequestFiles.push({
                 file_id: uploadedFile.file_id,
@@ -1449,7 +1411,7 @@
 
     const formData = new FormData(form);
     const reviewRequestData = {
-      work_id: form.elements.work_id.value,
+      creative_id: form.elements.creative_id.value,
       review_title: formData.get('review_title'),
       review_comment: formData.get('review_comment'),
       file_ids: reviewRequestFiles.map(f => f.file_id)
@@ -1469,8 +1431,8 @@
     callGAS('createItem', SHEET_NAMES.REVIEW_REQUESTS, reviewRequestData)
       .then(reviewRequestId => {
         showModalSuccess('modal-new-review-request', 'レビュー依頼を投稿しました', () => {
-          if (currentWorkId) {
-            openWorkDetailOverlay(currentWorkId);
+          if (currentcreativeId) {
+            openCreativeDetailOverlay(currentCreativeId);
           }
           if (document.getElementById('tab-home').style.display === 'block') {
             loadHomeData();
@@ -1564,9 +1526,9 @@
     callGAS('createItem', SHEET_NAMES.TASKS, taskData)
       .then(taskId => {
         showModalSuccess('modal-new-task', '新規タスクを作成しました', () => {
-          // Work詳細を再読み込み
-          if (currentWorkId) {
-            openWorkDetailOverlay(currentWorkId);
+          // Creative詳細を再読み込み
+          if (currentCreativeId) {
+            openCreativeDetailOverlay(currentCreativeId);
           }
         });
       })
@@ -1644,11 +1606,11 @@
       typeSelect.appendChild(option);
     });
 
-    // Worksデータを取得（まだ取得していない場合）
-    if (!worksData || worksData.length === 0) {
+    // Creativesデータを取得（まだ取得していない場合）
+    if (!creativesData || creativesData.length === 0) {
       showLoading();
       callGAS('getItems', SHEET_NAMES.CREATIVES).then(data => {
-        worksData = data;
+        creativesData = data;
         hideLoading();
         openModal('modal-new-knowledge');
         initRichTextEditors();
@@ -1659,47 +1621,47 @@
     }
   }
 
-  function searchWorksForKnowledge(query) {
-    const suggestionsContainer = document.getElementById('work-suggestions-knowledge');
-    const workIdInput = document.querySelector('#new-knowledge-form input[name="work_id"]');
+  function searchCreativesForKnowledge(query) {
+    const creativeIdInput = document.querySelector('#new-knowledge-form input[name="creative_id"]');
+    const suggestionsContainer = document.getElementById('creative-suggestions-knowledge');
     if (!query) {
       suggestionsContainer.style.display = 'none';
       return;
     }
     const lowerCaseQuery = query.toLowerCase();
-    const filteredWorks = (worksData || []).filter(w =>
-      w.work_title.toLowerCase().includes(lowerCaseQuery) ||
-      (w.project_title && w.project_title.toLowerCase().includes(lowerCaseQuery))
+    const filteredCreatives = (creativesData || []).filter(w =>
+      w.title.toLowerCase().includes(lowerCaseQuery) ||
+      (w.plan_title && w.plan_title.toLowerCase().includes(lowerCaseQuery))
     );
     suggestionsContainer.innerHTML = '';
-    filteredWorks.forEach(work => {
+    filteredCreatives.forEach(creative => {
       const item = document.createElement('div');
       item.className = 'combobox-item';
-      item.textContent = `${work.project_title} - ${work.work_title}`;
+      item.textContent = `${creative.plan_title} - ${creative.title}`;
       item.onclick = () => {
-        document.querySelector('#new-knowledge-form input[name="work_search"]').value = `${work.project_title} - ${work.work_title}`;
-        workIdInput.value = work.work_id;
+        document.querySelector('#new-knowledge-form input[name="creative_search"]').value = `${creative.plan_title} - ${creative.title}`;
+        creativeIdInput.value = creative.id;
         suggestionsContainer.style.display = 'none';
       };
       suggestionsContainer.appendChild(item);
     });
-    suggestionsContainer.style.display = filteredWorks.length > 0 ? 'block' : 'none';
+    suggestionsContainer.style.display = filteredCreatives.length > 0 ? 'block' : 'none';
   }
 
   function submitNewKnowledge(event) {
     event.preventDefault();
     const form = event.target;
-    const workId = form.elements.work_id.value;
+    const creativeId = form.elements.creative_id.value;
     const knowledgeTypeKey = form.elements.knowledge_type_key.value;
     const knowledgeContent = document.getElementById('knowledge-content-editor').innerHTML;
 
-    if (!workId) {
+    if (!creativeId) {
       alert('制作物を選択してください');
       return;
     }
 
     const knowledgeData = {
-      work_id: workId,
+      creative_id: creativeId,
       knowledge_type_key: knowledgeTypeKey,
       knowledge_content: knowledgeContent
     };
@@ -1815,7 +1777,7 @@
     event.stopPropagation();
     closeFilterMenu();
     const state = tableState[tableName];
-    const data = tableName === SHEET_NAMES.CREATIVES ? worksData : tableName === SHEET_NAMES.PLANS ? projectsData : tableName === SHEET_NAMES.TASKS ? tasksData : membersData;
+    const data = tableName === SHEET_NAMES.CREATIVES ? creativesData : tableName === SHEET_NAMES.PLANS ? plansData : tableName === SHEET_NAMES.TASKS ? tasksData : membersData;
     const uniqueValues = [...new Set(data.map(item => item[columnKey]))].filter(v => v);
     const popup = document.createElement('div');
     popup.id = 'filter-popup';
@@ -1862,7 +1824,7 @@
     clearBtn.onclick = () => {
       delete state.filters[columnKey];
       closeFilterMenu();
-      const dataLoaders = { [SHEET_NAMES.CREATIVES]: loadWorksData, [SHEET_NAMES.PLANS]: loadProjectsData, [SHEET_NAMES.TASKS]: loadTasksData, [SHEET_NAMES.MEMBERS]: loadMembersData };
+      const dataLoaders = { [SHEET_NAMES.CREATIVES]: loadcreativesData, [SHEET_NAMES.PLANS]: loadProjectsData, [SHEET_NAMES.TASKS]: loadTasksData, [SHEET_NAMES.MEMBERS]: loadMembersData };
       if (dataLoaders[tableName]) {
         showLoading();
         dataLoaders[tableName]();
@@ -2028,8 +1990,8 @@
     showLoading();
 
     // まずデータ配列を更新する
-    const data = tableName === SHEET_NAMES.CREATIVES ? worksData : tableName === SHEET_NAMES.PLANS ? projectsData : tableName === SHEET_NAMES.TASKS ? tasksData : membersData;
-    const idKey = tableName === SHEET_NAMES.MEMBERS ? 'member_email' : (tableName === SHEET_NAMES.CREATIVES ? 'work_id' : (tableName === SHEET_NAMES.TASKS ? 'task_id' : 'project_id'));
+    const data = tableName === SHEET_NAMES.CREATIVES ? creativesData : tableName === SHEET_NAMES.PLANS ? plansData : tableName === SHEET_NAMES.TASKS ? tasksData : membersData;
+    const idKey = tableName === SHEET_NAMES.MEMBERS ? 'member_email' : (tableName === SHEET_NAMES.CREATIVES ? 'id' : (tableName === SHEET_NAMES.TASKS ? 'id' : 'id'));
     const item = data.find(d => String(d[idKey]) === String(id));
     if (item) {
       item[field] = newValue;
@@ -2112,8 +2074,8 @@
     event.stopPropagation();
     const container = event.currentTarget;
     const header = getHeaderDef(tableName, field);
-    const data = (tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : membersData);
-    const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : 'project_id');
+    const data = (tableName === 'creatives' ? creativesData : tableName === 'projects' ? projectsData : membersData);
+    const idKey = tableName === 'members' ? 'member_email' : (tableName === 'creatives' ? 'creative_id' : 'project_id');
     const item = data.find(d => d[idKey] === id);
     const currentValue = item ? item[field] : '';
 
@@ -2151,11 +2113,11 @@
 
     let originalValue = '';
     if (tableName === 'task') {
-      // タスクの場合は、現在開いているWork詳細からタスクデータを取得
-      const container = document.getElementById('work-tasks-container');
+      // タスクの場合は、現在開いているCreative詳細からタスクデータを取得
+      const container = document.getElementById('creative-tasks-container');
       const row = container.querySelector(`tr[data-task-id="${id}"]`);
       if (row) {
-        // タスクデータを再取得する必要がある場合は、getWorkByIdを呼び出す
+        // タスクデータを再取得する必要がある場合は、getCreativeByIdを呼び出す
         // 簡易版として、現在の表示から値を取得
         const cell = row.querySelector(`td[data-field="${field}"]`);
         if (cell) {
@@ -2163,9 +2125,9 @@
           if (textSpan) {
             // 表示されているテキストから日時を推測するのは難しいので、
             // バックエンドから再取得する
-            if (currentWorkId) {
-              callGAS('getWorkById', currentWorkId).then(work => {
-                const task = work.tasks.find(t => t.task_id === id);
+            if (currentCreativeId) {
+              callGAS('getCreativeById', currentCreativeId).then(creative => {
+                const task = creative.tasks.find(t => t.task_id === id);
                 if (task) {
                   openDateTimePickerForTask(id, field, task[field] || '');
                 }
@@ -2178,8 +2140,8 @@
       return;
     }
 
-    const data = (tableName === 'works' ? worksData : tableName === 'projects' ? projectsData : membersData);
-    const idKey = tableName === 'members' ? 'member_email' : (tableName === 'works' ? 'work_id' : 'project_id');
+    const data = (tableName === 'creatives' ? creativesData : tableName === 'projects' ? projectsData : membersData);
+    const idKey = tableName === 'members' ? 'member_email' : (tableName === 'creatives' ? 'creative_id' : 'project_id');
     const item = data.find(d => String(d[idKey]) === String(id));
     originalValue = item ? item[field] : '';
 
@@ -2388,7 +2350,7 @@
 
   function openDateTimePickerForTask(taskId, field, originalValue) {
     // タスクの日時編集用のヘルパー関数
-    const container = document.getElementById('work-tasks-container');
+    const container = document.getElementById('creative-tasks-container');
     const row = container.querySelector(`tr[data-task-id="${taskId}"]`);
     if (!row) return;
 
@@ -2553,101 +2515,12 @@
     }
   }
 
-  function updateIdSearchInput(idValue) {
-    console.log('[DEBUG] updateIdSearchInput called', {
-      idValue: idValue,
-      currentWorkId: currentWorkId,
-      currentProjectId: currentProjectId,
-      hasCurrentWork: !!currentWork
-    });
-
-    const input = document.getElementById('id-search-input');
-    if (!input) {
-      console.log('[DEBUG] updateIdSearchInput: input not found');
-      return;
-    }
-
-    console.log('[DEBUG] updateIdSearchInput: checking activeElement', {
-      activeElement: document.activeElement,
-      input: input,
-      isInputFocused: document.activeElement === input
-    });
-
-    // フォーカス中は何もしない
-    if (document.activeElement === input) {
-      console.log('[DEBUG] updateIdSearchInput: input is focused, returning');
-      return;
-    }
-
-    // idValueが直接指定された場合
-    if (idValue) {
-      console.log('[DEBUG] updateIdSearchInput: setting idValue directly', idValue);
-      input.value = idValue;
-      input.removeAttribute('placeholder');
-      return;
-    }
-
-    // work詳細画面が表示中の場合
-    if (currentWork) {
-      const workDetailOverlay = document.getElementById('work-detail-overlay');
-      const isOverlayVisible = workDetailOverlay && workDetailOverlay.classList.contains('show');
-      const headerTitle = document.getElementById('header-title-work-detail-header');
-      const headerTitleText = headerTitle ? headerTitle.textContent : null;
-
-      console.log('[DEBUG] updateIdSearchInput: checking work detail', {
-        isOverlayVisible: isOverlayVisible,
-        headerTitleText: headerTitleText,
-        shouldSetWorkId: isOverlayVisible && headerTitleText === 'CTMS v3.0'
-      });
-
-      if (isOverlayVisible) {
-        if (headerTitle && headerTitle.textContent === 'CTMS v3.0') {
-          // 保持しているworkデータからIDを構築（APIリクエスト不要）
-          const workIdForSearch = `${currentWork.project_id || ''}-${currentWork.work_id || ''}`;
-          console.log('[DEBUG] updateIdSearchInput: setting workIdForSearch', workIdForSearch);
-          input.value = workIdForSearch;
-          input.removeAttribute('placeholder');
-          return;
-        }
-      }
-    }
-
-    // project詳細画面が表示中の場合
-    if (currentProjectId) {
-      const projectDetailOverlay = document.getElementById('project-detail-overlay');
-      const isOverlayVisible = projectDetailOverlay && projectDetailOverlay.classList.contains('show');
-
-      console.log('[DEBUG] updateIdSearchInput: checking project detail', {
-        isOverlayVisible: isOverlayVisible,
-        shouldSetProjectId: isOverlayVisible
-      });
-
-      if (isOverlayVisible) {
-        console.log('[DEBUG] updateIdSearchInput: setting projectId', currentProjectId);
-        input.value = currentProjectId;
-        input.removeAttribute('placeholder');
-        return;
-      }
-    }
-
-    // どちらも表示されていない場合はクリア
-    console.log('[DEBUG] updateIdSearchInput: clearing input');
-    clearIdSearchInput();
-  }
-
   function clearIdSearchInput() {
     const input = document.getElementById('id-search-input');
     if (!input) return;
 
     input.value = '';
     input.placeholder = 'ID検索';
-  }
-
-  function handleIdSearchFocus(event) {
-    const input = event.target;
-    // valueをクリアしてplaceholderを設定
-    input.value = '';
-    input.placeholder = 'ID検索（例：P0001, W0001, T0001, R0001）';
   }
 
   // ID検索の共通処理
@@ -2682,14 +2555,9 @@
 
         // テーブル名に応じた処理
         if (tableName === SHEET_NAMES.TASKS) {
-          // taskの場合はwork詳細を開く
-          if (item.creative_id) {
-            openWorkDetailOverlay(item.creative_id);
-          } else {
-            alert('タスクに関連付けられた制作物が見つかりません');
-          }
+          openTaskDetailOverlay(item.id);
         } else if (tableName === SHEET_NAMES.CREATIVES) {
-          openWorkDetailOverlay(item.id);
+          openCreativeDetailOverlay(item.id);
         } else if (tableName === SHEET_NAMES.PLANS) {
           openProjectDetailOverlay(item.id);
         } else {

@@ -4,7 +4,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CTMS v3.0</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
@@ -26,43 +25,28 @@
 </head>
 
 <body>
-  <!-- 全画面タイトル画面 -->
-  <div id="fullscreen-title" class="fullscreen-title">
-    <h1 class="fullscreen-title-text">ZARMS 2026</h1>
-  </div>
-
-  <?!= include('components/header'); ?>
-
-  <?!= include('components/sidebar'); ?>
+  <?!= include('components/overlays/header'); ?>
+  <?!= include('components/overlays/sidebar'); ?>
 
   <div class="main-content">
-    <script>console.log('Before including pages/home');</script>
     <?!= include('pages/home'); ?>
-    <script>console.log('After including pages/home');</script>
     <?!= include('pages/creatives'); ?>
     <?!= include('pages/plans'); ?>
     <?!= include('pages/tasks'); ?>
     <?!= include('pages/members'); ?>
     <?!= include('pages/knowledges'); ?>
-    <?!= include('pages/summary'); ?>
+    <?!= include('pages/analytics'); ?>
   </div>
 
   <!-- Modals -->
-  <?!= include('components/modals/creative_detail'); ?>
+  <?!= include('components/modals/detail_creative'); ?>
+  <?!= include('components/modals/detail_knowledge'); ?>
+  <?!= include('components/modals/detail_member'); ?>
   <?!= include('components/modals/new_creative'); ?>
-  <?!= include('components/modals/member_detail'); ?>
   <?!= include('components/modals/new_plan'); ?>
   <?!= include('components/modals/new_task'); ?>
-  <?!= include('components/modals/new_review_request'); ?>
-  <?!= include('components/modals/review_request_detail'); ?>
-  <?!= include('components/modals/knowledge_detail'); ?>
   <?!= include('components/modals/new_member'); ?>
   <?!= include('components/modals/new_knowledge'); ?>
-  <?!= include('components/modals/github_issue'); ?>
-
-  <!-- Overlays -->
-  <?!= include('components/overlays/creative_detail'); ?>
-  <?!= include('components/overlays/plan_detail'); ?>
 
   <script>
     const templateVariables = <?!= JSON.stringify(templateVariables) ?>;

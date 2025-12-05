@@ -1,31 +1,46 @@
 // ============================================
-// Code.gs - メインロジックとWebアプリのエントリーポイント
+// code.gs - メインロジックとWebアプリのエントリーポイント
 // ============================================
 
 // Webアプリのエントリーポイント
 function doGet(e) {
-  const userEmail = Session.getActiveUser().getEmail();
+  // starting.html をテンプレートとして作成
+  const template = HtmlService.createTemplateFromFile('starting');
+  // URLパラメータをテンプレート変数として渡す（JSON文字列化して渡すことでJS内で扱いやすくする）
+  template.initialParams = JSON.stringify(e.parameter || {});
 
+  return template.evaluate()
+    .setTitle('ZARMS')
+    .setFaviconUrl('https://drive.google.com/file/d/1rnkYniTkiKnVk5jNbx7V1nRrmwP6altL' + '&.png')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * クライアントサイドから呼ばれ、認証チェック後にメインアプリのHTMLを返す
+ * @param {Object} params - URLパラメータ
+ * @returns {string} HTMLコンテンツ
+ */
+function loadMainApplication(params) {
   // 認証チェック
-  if (!isAuthorizedUser(userEmail)) {
+  const userEmail = Session.getActiveUser().getEmail();
+  if (!checkPermission()) {
     const template = HtmlService.createTemplate(
-      '<h1>アクセス権限がありません</h1><p>このシステムへのアクセスが許可されていません。管理者にお問い合わせください。</p>'
+      `<h1>アクセス権限がありません</h1>` +
+      `<p>ZARMSへのアクセスが許可されていません。間違いだと思われる場合は、総務ユニットまでお問い合わせください。</p>` +
+      `<p>ログイン中のアカウント: ${userEmail}</p>`
     );
-    return HtmlService.createHtmlOutput(template.evaluate())
-      .setTitle('CTMS - アクセス拒否');
+    return template.evaluate().getContent();
   }
 
   // メインUIを返す
   const template = HtmlService.createTemplateFromFile("index");
   template.templateVariables = {
-    urlParam: e.parameter,
-    deployedUrl: ScriptApp.getService().getUrl(),
+    urlParam: params || {},
     SHEET_NAMES: SHEET_NAMES
   };
 
-  return template.evaluate()
-    .setTitle('CTMS v3.0')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  return template.evaluate().getContent();
 }
 
 // ============================================
@@ -43,32 +58,39 @@ function getCurrentUser() {
   return member;
 }
 
+// ============================================
+// ユーザー認証・認可処理
+// ============================================
+
+// 現在のユーザーの権限を取得
 function getUserRole() {
   const user = getCurrentUser();
-  return user ? user.role_key : null;
+  return user ? user.system_role_key : null;
 }
 
-function isAdmin() {
-  const role = getUserRole();
-  return role === 'ADMIN';
+function getRoleLevel(roleKey) {
+  const roleLevels = {
+    'ADMIN': 3,
+    'EDITOR': 2,
+    'VIEWER': 1,
+    'NONE': 0
+  };
+  return roleLevels[roleKey] || 0;
 }
 
-function isAuthorizedUser(email) {
-  // 簡易的なチェック。実際にはメンバーテーブルに存在するかなどで判定
-  return true;
-}
+// 特定の操作が許可されているかチェック
+function checkPermission(operation) {
+  const userRole = getUserRole();
 
-function canEdit() {
-  // 編集権限のチェックロジック
-  return true;
-}
+  const permissions = {
+    'view': 1,           // VIEWER以上
+    'edit': 2,           // EDITOR以上
+    'delete': 3          // ADMIN
+  };
 
-function getConfig() {
-  return getConfigLogic();
-}
+  const requiredLevel = permissions[operation] || 1;
 
-function getMembers() {
-  return getMembersLogic();
+  return getRoleLevel(userRole) >= requiredLevel;
 }
 
 // ============================================
@@ -83,17 +105,17 @@ function getMembers() {
 function getItems(tableName) {
   switch (tableName) {
     case SHEET_NAMES.CREATIVES:
-      return getCreativesLogic();
+      return getCreatives();
     case SHEET_NAMES.PLANS:
-      return getPlansLogic();
+      return getPlans();
     case SHEET_NAMES.MEMBERS:
-      return getMembersLogic();
+      return getMembers();
     case SHEET_NAMES.TASKS:
-      return getTasksLogic();
+      return getTasks();
     case SHEET_NAMES.KNOWLEDGES:
-      return getKnowledgesLogic();
+      return getKnowledges();
     case SHEET_NAMES.CONFIG:
-      return getConfigLogic();
+      return getConfig();
     default:
       return getAllData(tableName);
   }
@@ -220,7 +242,6 @@ function createCreativeLogic(data) {
   };
 
   const created = createData(SHEET_NAMES.CREATIVES, newCreative);
-  // sendNewWorkNotification(created.id);
   return created;
 }
 
@@ -268,15 +289,11 @@ function createPlanLogic(data) {
 }
 
 // --- Members ---
-function getMembersLogic() {
-  const members = getAllData('members');
-  return members.map(member => {
-    member.assigned_works_count = countAssignedWorks(member.member_email);
-    return member;
-  });
+function getMembers() {
+  return getAllData('members');
 }
 
-function getMemberByIdLogic(id) {
+function getMemberById(id) {
   const member = getDataById(SHEET_NAMES.MEMBERS, id);
   if (!member) return null;
   // const assignments = findData(SHEET_NAMES.MEMBER_ASSIGNMENTS, { member_id: id });
@@ -286,7 +303,7 @@ function getMemberByIdLogic(id) {
   return member;
 }
 
-function createMemberLogic(memberData) {
+function createMember(memberData) {
   if (!isAdmin()) throw new Error('この操作にはADMIN権限が必要です');
   const userEmail = Session.getActiveUser().getEmail();
   const now = new Date();
@@ -304,32 +321,26 @@ function createMemberLogic(memberData) {
   return createData('members', newMember);
 }
 
-function updateMemberLogic(memberEmail, memberData) {
+function updateMember(memberEmail, memberData) {
   if (!isAdmin()) throw new Error('この操作にはADMIN権限が必要です');
   return updateData('members', memberEmail, memberData);
 }
 
 // --- Tasks ---
-function getTasksLogic() {
+function getTasks() {
   const tasks = getAllData(SHEET_NAMES.TASKS);
   return tasks.map(task => {
-    // task.assignee_name = getMemberName(task.assign_to);
-    // task.creative_title = getCreativeTitle(task.creative_id);
-    // const creative = getDataById(SHEET_NAMES.CREATIVES, task.creative_id);
-    // if (creative) {
-    //   task.plan_id = creative.plan_id;
-    //   task.plan_title = getPlanTitle(creative.plan_id);
-    // }
+    task.assignee_name = getMemberName(task.assign_to);
     return task;
   });
 }
 
-function getTaskByIdLogic(taskId) {
+function getTaskById(taskId) {
   const task = getDataById(SHEET_NAMES.TASKS, taskId);
   return task ? task : null;
 }
 
-function createTaskLogic(taskData) {
+function createTask(taskData) {
   const userEmail = Session.getActiveUser().getEmail();
   const now = new Date();
   const newTask = {
@@ -354,7 +365,7 @@ function createTaskLogic(taskData) {
 }
 
 // --- Knowledges ---
-function getKnowledgesLogic() {
+function getKnowledges() {
   const knowledges = getAllData(SHEET_NAMES.KNOWLEDGES);
   // const enriched = knowledges.map(item => {
   //   const creator = getItemById(SHEET_NAMES.MEMBERS, item.created_by);
@@ -367,7 +378,7 @@ function getKnowledgesLogic() {
   return knowledges;
 }
 
-function createKnowledgeLogic(knowledgeData) {
+function createKnowledge(knowledgeData) {
   const userEmail = Session.getActiveUser().getEmail();
   const now = new Date();
   const newKnowledge = {
@@ -383,7 +394,7 @@ function createKnowledgeLogic(knowledgeData) {
 }
 
 // --- Config ---
-function getConfigLogic() {
+function getConfig() {
   let configs = getAllData(SHEET_NAMES.CONFIG);
   configs = configs.filter(config => config.is_active === true || config.is_active === 'TRUE' || config.is_active === 'true');
   configs.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -391,7 +402,7 @@ function getConfigLogic() {
 }
 
 // --- Assignments ---
-function addMemberAssignmentLogic(data) {
+function addMemberAssignment(data) {
   const userEmail = Session.getActiveUser().getEmail();
   const now = new Date();
   const newAssignment = {
@@ -462,30 +473,13 @@ function getCreativesByPlanId(planId) {
   return creatives;
 }
 
-function getTasksByWorkId(workId) {
-  const tasks = findData(SHEET_NAMES.TASKS, { creative_id: workId });
+function getTasksByCreativeId(creativeId) {
+  const tasks = findData(SHEET_NAMES.TASKS, { creative_id: creativeId });
   return tasks.map(task => {
     task.assignee_name = getMemberName(task.assign_to);
     return task;
   });
 }
-
-/*
-function getWorkApps(workId) {
-  const assignments = findData('app_assignments', { work_id: workId });
-  return assignments.map(assignment => {
-    const appConfig = getConfigValue(assignment.work_apps_key, 'APP');
-    return { key: assignment.work_apps_key, value: appConfig };
-  });
-}
-*/
-
-/*
-function getReviewRequestsByWorkId(workId) {
-  // Assuming review requests logic is similar
-  return findData('review_requests', { work_id: workId });
-}
-*/
 
 function getConfigValue(key, type) {
   // Simplified config lookup
@@ -499,14 +493,14 @@ function isProjectTitleDuplicate(projectTitle) {
   return projects.length > 0;
 }
 
-function getProjectWorkStats(projectId) {
-  const works = findData(SHEET_NAMES.CREATIVES, { plan_id: projectId });
+function getProjectCreativeStats(projectId) {
+  const creatives = findData(SHEET_NAMES.CREATIVES, { plan_id: projectId });
   const statusCounts = {};
-  works.forEach(work => {
-    const status = work.creative_status_key;
+  creatives.forEach(creative => {
+    const status = creative.creative_status_key;
     statusCounts[status] = (statusCounts[status] || 0) + 1;
   });
-  return { count: works.length, status: statusCounts };
+  return { count: creatives.length, status: statusCounts };
 }
 
 function getCreativesByPlanId(planId) {
@@ -530,17 +524,6 @@ function getOrCreatePlanId(planTitle) {
   }
 }
 
-function countAssignedWorks(memberEmail) {
-  // member_emailからmember_idを取得する必要があるが、ここでは簡易的にmember_assignmentsを検索できない（member_idが必要）
-  // パフォーマンス懸念があるが、member_idを取得する
-  const members = findData(SHEET_NAMES.MEMBERS, { email: memberEmail });
-  if (members.length === 0) return 0;
-  const memberId = members[0].id;
-
-  const assignments = findData(SHEET_NAMES.MEMBER_ASSIGNMENTS, { member_id: memberId, related_table: SHEET_NAMES.CREATIVES });
-  return assignments.length;
-}
-
 // ============================================
 // Other Specific Functions (kept as is or refactored)
 // ============================================
@@ -555,14 +538,14 @@ function getHomeData() {
       greeting: 'こんにちは',
       memberName: 'ゲスト',
       new_requests: [],
-      works: [],
+      assigned_creatives: [],
       review_requests: [],
       knowledge: []
     };
   }
 
   const newRequests = getAvailableCreatives(member.id);
-  const assignedWorks = getAssignedCreatives(member.id);
+  const assignedCreatives = getAssignedCreatives(member.id);
   const knowledge = getAllData(SHEET_NAMES.KNOWLEDGES);
 
   const hour = new Date().getHours();
@@ -574,7 +557,7 @@ function getHomeData() {
     greeting: greeting,
     memberName: member.nickname || member.member_name,
     new_requests: newRequests || [],
-    works: assignedWorks || [],
+    assigned_creatives: assignedCreatives || [],
     review_requests: [],
     knowledge: knowledge || []
   };
@@ -592,8 +575,6 @@ function getAssignedCreatives(memberId) {
   return allCreatives.filter(c => creativeIds.includes(c.id));
 }
 
-// Removed legacy functions: getAvailableWorks, getAssignedWorksWithTasks, getReviewRequestsForUser
-
 function updateSingleField(tableName, id, field, value) {
   if (!canEdit()) throw new Error('この操作には編集権限が必要です。');
   if (tableName === 'members' && field === 'role_key' && !isAdmin()) {
@@ -603,80 +584,48 @@ function updateSingleField(tableName, id, field, value) {
   return updateItem(tableName, id, updateObject);
 }
 
-function sendNewWorkNotification(workId) {
-  // Placeholder
-}
-
-function createWorkFolder(workId, workTitle) {
+function createCreativeFolder(creativeId, creativeTitle) {
   // Placeholder
   return 'folder_id_placeholder';
 }
 
-function createWorkDocument(workId, workTitle, content, design, regulation, note, folderId) {
+function createCreativeDocument(creativeId, creativeTitle, content, design, regulation, note, folderId) {
   // Placeholder
   return { documentId: 'doc_id', tabId: 'tab_id' };
 }
 
-function getWorkflowTimestamps(workId) {
+function getCreativeflowTimestamps(creativeId) {
   // Keep as is, but use string literals
-  const work = getDataById(SHEET_NAMES.CREATIVES, workId);
-  if (!work) return null;
+  const creative = getDataById(SHEET_NAMES.CREATIVES, creativeId);
+  if (!creative) return null;
   const logs = getAllData(SHEET_NAMES.LOGS);
   // ... logic ...
   return {};
 }
 
-function acceptWork(workId) {
+function acceptCreative(creativeId) {
   const userEmail = Session.getActiveUser().getEmail();
   const members = findData(SHEET_NAMES.MEMBERS, { email: userEmail });
   if (members.length === 0) throw new Error('Member not found');
   const memberId = members[0].id;
 
-  const existing = findData(SHEET_NAMES.MEMBER_ASSIGNMENTS, { related_table: SHEET_NAMES.CREATIVES, related_id: workId, member_id: memberId });
+  const existing = findData(SHEET_NAMES.MEMBER_ASSIGNMENTS, { related_table: SHEET_NAMES.CREATIVES, related_id: creativeId, member_id: memberId });
   if (existing.length > 0) return { success: true, message: '既に承諾済みです' };
 
   const newAssignment = {
     related_table: SHEET_NAMES.CREATIVES,
-    related_id: workId,
+    related_id: creativeId,
     member_id: memberId,
-    role_key: 'MEMBER', // Default role
-    created_by: userEmail,
-    created_at: new Date()
+    role_key: 'MEMBER' // Default role
   };
   createData(SHEET_NAMES.MEMBER_ASSIGNMENTS, newAssignment);
   return { success: true, message: '承諾しました' };
 }
 
-function getSummaryData() {
+function getAnalyticsData() {
   // Placeholder
   return {};
 }
-
-// --- Review Requests ---
-/*
-function createReviewRequestLogic(data) {
-  const userEmail = Session.getActiveUser().getEmail();
-  const id = Utilities.getUuid();
-  const now = new Date();
-  const newItem = {
-    review_request_id: id,
-    work_id: data.work_id,
-    review_title: data.review_title,
-    review_comment: data.review_comment,
-    created_by: userEmail,
-    created_at: now,
-    files: (data.file_ids || []).map(fid => ({ file_id: fid }))
-  };
-  createData('review_requests', newItem);
-  return id;
-}
-*/
-
-/*
-function getReviewRequestByIdLogic(id) {
-  return getDataById('review_requests', id);
-}
-*/
 
 // --- External Services & Utilities ---
 function getOAuthToken() {
@@ -696,28 +645,6 @@ function getDriveFileInfo(fileId) {
     return { file_id: fileId, file_name: 'Unknown File', file_url: '#' };
   }
 }
-
-function uploadFileToWorkFolder(workId, base64Data, fileName, mimeType) {
-  const work = getItemById(SHEET_NAMES.CREATIVES, workId);
-  if (!work || !work.gfolder_id) throw new Error('Work folder not found');
-  const folder = DriveApp.getFolderById(work.gfolder_id);
-  const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, fileName);
-  const file = folder.createFile(blob);
-  return {
-    file_id: file.getId(),
-    file_name: file.getName(),
-    file_url: file.getUrl()
-  };
-}
-
-function createGithubIssue(issueData) {
-  // Placeholder for GitHub Issue creation
-  // In a real implementation, this would call GitHub API
-  console.log('Creating GitHub Issue:', issueData);
-  return { number: 999, url: 'https://github.com/example/repo/issues/999' };
-}
-
-
 
 /**
  * コード（例：W0001）から対象のレコードを検索します

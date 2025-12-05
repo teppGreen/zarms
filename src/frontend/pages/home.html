@@ -14,7 +14,7 @@
         <!-- 列2-3: 担当中の制作物（1/5幅） -->
         <div class="home-column-assigned-works">
             <h2 class="section-title">担当中の制作物</h2>
-            <div id="home-works-container" class="home-scroll-container">
+            <div id="home-creatives-container" class="home-scroll-container">
             </div>
         </div>
         <!-- スペース（1/5幅） -->
@@ -36,7 +36,7 @@
 
 <script>
     // セッション中に非表示にするwork_idを管理
-    let hiddenWorkIds = new Set();
+    let hiddenCreativeIds = new Set();
 
     // Namespace initialization
     console.log('Initializing App.pages.home');
@@ -62,7 +62,7 @@
             renderNewRequests(data.new_requests || []);
 
             // 担当中の制作物を表示
-            renderAssignedWorks(data.works || []);
+            renderAssignedCreatives(data.creatives || []);
 
             // 受付中のレビューを表示
             renderReviewRequests(data.review_requests || []);
@@ -82,46 +82,46 @@
         container.innerHTML = '';
 
         // 非表示にするwork_idをフィルタ
-        const visibleRequests = newRequests.filter(work => !hiddenWorkIds.has(work.id));
+        const visibleRequests = newRequests.filter(creative => !hiddenCreativeIds.has(creative.id));
 
         if (visibleRequests.length === 0) {
             container.innerHTML = '<p style="color: #6b7280;">最新の制作依頼はありません</p>';
             return;
         }
 
-        visibleRequests.forEach(work => {
+        visibleRequests.forEach(creative => {
             const card = document.createElement('div');
             card.className = 'home-card';
-            card.dataset.workId = work.id;
+            card.dataset.creativeId = creative.id;
 
             // 優先度、制作物種別、依頼者の所属チームを取得
-            const priorityLabel = work.priority_key ? getConfigLabel(work.priority_key, 'PRIORITY') : '';
-            const workTypeLabel = work.creative_type_key ? getConfigLabel(work.creative_type_key, 'CREATIVE_TYPE') : '';
-            const clientTeamLabel = work.client_member_id ? (() => {
-                const client = membersData?.find(m => m.id === work.client_member_id);
+            const priorityLabel = creative.priority_key ? getConfigLabel(creative.priority_key, 'PRIORITY') : '';
+            const creativeTypeLabel = creative.creative_type_key ? getConfigLabel(creative.creative_type_key, 'CREATIVE_TYPE') : '';
+            const clientTeamLabel = creative.client_member_id ? (() => {
+                const client = membersData?.find(m => m.id === creative.client_member_id);
                 return client ? getConfigLabel(client.member_team_key, 'TEAM') : '';
             })() : '';
 
-            const infoParts = [priorityLabel, workTypeLabel, clientTeamLabel].filter(Boolean);
+            const infoParts = [priorityLabel, creativeTypeLabel, clientTeamLabel].filter(Boolean);
             const infoText = infoParts.length > 0 ? infoParts.join('|') : '';
 
             card.innerHTML = `
         <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
-          ${work.plan_id ? `${escapeHtml(work.plan_id)} ` : ''}${escapeHtml(work.plan_title || '')}
+          ${creative.plan_id ? `${escapeHtml(creative.plan_id)} ` : ''}${escapeHtml(creative.plan_title || '')}
         </div>
         <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; font-family: 'Roboto Mono', monospace; font-weight: 500;">
-          ${escapeHtml(work.display_id || work.id)} ${escapeHtml(work.title || '')}
+          ${escapeHtml(creative.display_id || creative.id)} ${escapeHtml(creative.title || '')}
         </div>
         ${infoText ? `<div style="font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px;">${escapeHtml(infoText)}</div>` : ''}
         <div class="card-meta" style="margin-bottom: 12px;">
-          <span>納期: <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${formatDateTimeForHome(work.deadline_at)}</span></span>
+          <span>納期: <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${formatDateTimeForHome(creative.deadline_at)}</span></span>
         </div>
         <div class="work-accept-decline-buttons">
-          <button class="btn-accept" data-work-id="${escapeHtml(work.id)}" data-remaining-ms="${work.remaining_time_ms || 0}">
+          <button class="btn-accept" data-creative-id="${escapeHtml(creative.id)}" data-remaining-ms="${creative.remaining_time_ms || 0}">
             承諾
-            <div class="remaining-time" data-remaining-ms="${work.remaining_time_ms || 0}"></div>
+            <div class="remaining-time" data-remaining-ms="${creative.remaining_time_ms || 0}"></div>
           </button>
-          <button class="btn-decline" data-work-id="${escapeHtml(work.id)}">保留・辞退</button>
+          <button class="btn-decline" data-creative-id="${escapeHtml(creative.id)}">保留・辞退</button>
         </div>
       `;
 
@@ -130,9 +130,9 @@
             if (acceptButton) {
                 acceptButton.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const workId = acceptButton.dataset.workId;
-                    if (workId) {
-                        handleAcceptWork(workId);
+                    const creativeId = acceptButton.dataset.creativeId;
+                    if (creativeId) {
+                        handleAcceptCreative(creativeId);
                     }
                 });
             }
@@ -142,9 +142,9 @@
             if (declineButton) {
                 declineButton.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const workId = declineButton.dataset.workId;
-                    if (workId) {
-                        handleDeclineWork(workId);
+                    const creativeId = declineButton.dataset.creativeId;
+                    if (creativeId) {
+                        handleDeclineCreative(creativeId);
                     }
                 });
             }
@@ -152,7 +152,7 @@
             // カードクリックでwork_detail_overlayを開く（ボタン以外の領域）
             card.addEventListener('click', (e) => {
                 if (!e.target.closest('.work-accept-decline-buttons')) {
-                    openCreativeDetailOverlay(work.id);
+                    openCreativeDetailOverlay(creative.id);
                 }
             });
 
@@ -160,34 +160,34 @@
         });
     }
 
-    function renderAssignedWorks(works) {
-        const container = document.getElementById('home-works-container');
+    function renderAssignedCreatives(creatives) {
+        const container = document.getElementById('home-creatives-container');
         container.innerHTML = '';
 
-        if (works.length === 0) {
+        if (creatives.length === 0) {
             container.innerHTML = '<p style="color: #6b7280;">担当中の制作物はありません</p>';
             return;
         }
 
-        works.forEach(work => {
+        creatives.forEach(creative => {
             const card = document.createElement('div');
             card.className = 'home-card';
 
             // ステータス色を取得
-            const statusColor = getWorkStatusColor(work.creative_status_key);
-            const statusLabel = getConfigLabel(work.creative_status_key, 'CREATIVE_STATUS');
+            const statusColor = getCreativeStatusColor(creative.creative_status_key);
+            const statusLabel = getConfigLabel(creative.creative_status_key, 'CREATIVE_STATUS');
 
             // 納期表示
-            const dueDate = formatDateTimeForHome(work.deadline_at);
+            const dueDate = formatDateTimeForHome(creative.deadline_at);
 
             card.innerHTML = `
         <div class="home-card-row">
-          <span class="home-card-id">${work.plan_id ? escapeHtml(work.plan_id) : ''}</span>
-          <span class="home-card-title" title="${escapeHtml(work.plan_title || '')}">${escapeHtml(work.plan_title || '')}</span>
+          <span class="home-card-id">${creative.plan_id ? escapeHtml(creative.plan_id) : ''}</span>
+          <span class="home-card-title" title="${escapeHtml(creative.plan_title || '')}">${escapeHtml(creative.plan_title || '')}</span>
         </div>
         <div class="home-card-row">
-          <span class="home-card-id">${escapeHtml(work.display_id || work.id)}</span>
-          <span class="home-card-title" title="${escapeHtml(work.title || '')}">${escapeHtml(work.title || '')}</span>
+          <span class="home-card-id">${escapeHtml(creative.display_id || creative.id)}</span>
+          <span class="home-card-title" title="${escapeHtml(creative.title || '')}">${escapeHtml(creative.title || '')}</span>
         </div>
         <div class="home-card-meta-row">
           <div class="work-status-badge ${statusColor}">${escapeHtml(statusLabel)}</div>
@@ -195,7 +195,7 @@
         </div>
       `;
 
-            card.onclick = () => openCreativeDetailOverlay(work.id);
+            card.onclick = () => openCreativeDetailOverlay(creative.id);
             container.appendChild(card);
         });
     }
@@ -415,7 +415,7 @@
         }
     }
 
-    function getWorkStatusColor(statusKey) {
+    function getCreativeStatusColor(statusKey) {
         if (statusKey === 'TODO' || statusKey === 'APPROVED') {
             return 'status-red';
         } else if (statusKey === 'CREATE' || statusKey === 'REVIEW' || statusKey === 'REVISION') {
@@ -443,12 +443,12 @@
         }
     }
 
-    function handleAcceptWork(workId) {
+    function handleAcceptCreative(creativeId) {
         showLoading();
-        callGAS('acceptWork', workId).then(result => {
+        callGAS('acceptCreative', creativeId).then(result => {
             hideLoading();
             // セッション中は非表示にする
-            hiddenWorkIds.add(workId);
+            hiddenCreativeIds.add(creativeId);
             // 最新の制作依頼セクションを再描画
             callGAS('getHomeData').then(data => {
                 renderNewRequests(data.new_requests || []);
@@ -456,9 +456,9 @@
         }).catch(handleError);
     }
 
-    function handleDeclineWork(workId) {
+    function handleDeclineCreative(creativeId) {
         // セッション中は非表示にする（フロントエンドで管理）
-        hiddenWorkIds.add(workId);
+        hiddenCreativeIds.add(creativeId);
         // 最新の制作依頼セクションを再描画
         callGAS('getHomeData').then(data => {
             renderNewRequests(data.new_requests || []);
