@@ -1,0 +1,83 @@
+<dialog id="modal-plan-detail" class="modal large">
+    <div class="row no-space align-center">
+        <div class="max">
+            <h5 class="bold mb-0">企画詳細</h5>
+        </div>
+        <button class="circle transparent" onclick="ui('#modal-plan-detail')">
+            <i>close</i>
+        </button>
+    </div>
+
+    <div id="plan-detail-content" class="padding">
+        <!-- Dynamic Content -->
+    </div>
+
+    <nav class="right-align">
+        <button class="border" onclick="ui('#modal-plan-detail')">閉じる</button>
+    </nav>
+</dialog>
+
+<script>
+    App.overlays.planDetail = {
+        currentId: null,
+        isLoading: false,
+
+        open: function (id) {
+            if (!id || typeof id !== 'string') {
+                console.warn('App.overlays.planDetail.open called with invalid ID:', id);
+                return;
+            }
+            if (this.isLoading) return;
+
+            console.log('App.overlays.planDetail.open called with:', id);
+            this.currentId = id;
+            this.isLoading = true;
+            showLoading();
+
+            callGAS('getItemById', SHEET_NAMES.PLANS, id)
+                .then(plan => {
+                    if (!plan) {
+                        alert('企画が見つかりません');
+                        this.isLoading = false;
+                        hideLoading();
+                        return;
+                    }
+
+                    this.render(plan);
+                    ui('#modal-plan-detail');
+                    this.isLoading = false;
+                    hideLoading();
+                })
+                .catch(error => {
+                    this.isLoading = false;
+                    handleError(error);
+                });
+        },
+
+        render: function (plan) {
+            const container = document.getElementById('plan-detail-content');
+            if (!container) return;
+
+            const statusLabel = getConfigLabel(plan.plan_status_key, 'PLAN_STATUS');
+            const displayId = plan.display_id || plan.id;
+
+            container.innerHTML = `
+                <div class="row">
+                    <div class="col s12">
+                        <div class="chip small">${escapeHtml(statusLabel)}</div>
+                        <h4 class="bold no-margin">${escapeHtml(displayId)} ${escapeHtml(plan.title)}</h4>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="row">
+                     <div class="col s12">
+                        <label class="active">概要</label>
+                        <div class="markdown-body">${escapeHtml(plan.description || '概要なし').replace(/\n/g, '<br>')}</div>
+                     </div>
+                </div>
+            `;
+        }
+    };
+</script>

@@ -35,7 +35,6 @@ function getDataById(sheetName, id) {
  */
 function findData(sheetName, condition) {
   return callBackendAPI('find', {
-    userEmail: Session.getActiveUser().getEmail(),
     sheetName: sheetName,
     condition: condition
   });
@@ -51,7 +50,6 @@ function findData(sheetName, condition) {
  */
 function createData(sheetName, dataObject) {
   return callBackendAPI('create', {
-    userEmail: Session.getActiveUser().getEmail(),
     sheetName: sheetName,
     data: dataObject,
     idColumnName: ID_COLUMNS[sheetName]
@@ -67,7 +65,6 @@ function createData(sheetName, dataObject) {
  */
 function updateData(sheetName, id, updateDataObject) {
   return callBackendAPI('update', {
-    userEmail: Session.getActiveUser().getEmail(),
     sheetName: sheetName,
     id: id,
     data: updateDataObject,
@@ -83,7 +80,6 @@ function updateData(sheetName, id, updateDataObject) {
  */
 function deleteData(sheetName, condition) {
   return callBackendAPI('delete', {
-    userEmail: Session.getActiveUser().getEmail(),
     sheetName: sheetName,
     condition: condition,
     idColumnName: ID_COLUMNS[sheetName]
@@ -98,7 +94,6 @@ function deleteData(sheetName, condition) {
  */
 function callBackendAPI(operation, payload) {
   const userEmail = Session.getActiveUser().getEmail();
-  const timestamp = new Date().toISOString();
 
   if (!BACKEND_URL || !BACKEND_URL.includes('/exec')) {
     throw new Error('Invalid BACKEND_URL. Please check Script Properties. The URL must end with "/exec". Current value: ' + BACKEND_URL);
@@ -106,8 +101,7 @@ function callBackendAPI(operation, payload) {
 
   const requestPayload = {
     token: API_TOKEN,
-    userEmail: userEmail,
-    timestamp: timestamp,
+    userId: userEmail,
     operation: operation,
     ...payload
   };

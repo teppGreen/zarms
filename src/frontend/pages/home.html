@@ -52,10 +52,18 @@
             } else {
                 promises.push(Promise.resolve(membersData));
             }
+            if (!directoriesData || directoriesData.length === 0) {
+                promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES));
+            } else {
+                promises.push(Promise.resolve(directoriesData));
+            }
 
-            Promise.all(promises).then(([data, members]) => {
+            Promise.all(promises).then(([data, members, directories]) => {
                 if (!membersData || membersData.length === 0) {
                     membersData = members;
+                }
+                if (!directoriesData || directoriesData.length === 0) {
+                    directoriesData = directories;
                 }
 
                 const greetingEl = document.getElementById('home-greeting');
@@ -68,9 +76,6 @@
 
                 // 担当中の制作物を表示
                 renderAssignedCreatives(data.assigned_creatives || []);
-
-                // 受付中のレビューを表示
-                renderReviewRequests(data.review_requests || []);
 
                 // 最近のナレッジを表示
                 renderKnowledge(data.knowledge || []);
@@ -105,10 +110,10 @@
             const priorityLabel = creative.priority_key ? getConfigLabel(creative.priority_key, 'PRIORITY') : '';
             const creativeTypeLabel = creative.creative_type_key ? getConfigLabel(creative.creative_type_key, 'CREATIVE_TYPE') : '';
             let clientTeamLabel = '';
-            if (creative.client_member_id && typeof membersData !== 'undefined') {
-                const client = membersData.find(m => m.id === creative.client_member_id);
-                if (client) {
-                    clientTeamLabel = getConfigLabel(client.member_team_key, 'TEAM');
+            if (creative.client_directory_id && typeof directoriesData !== 'undefined') {
+                const directory = directoriesData.find(d => d.id === creative.client_directory_id);
+                if (directory) {
+                    clientTeamLabel = directory.name;
                 }
             }
 
@@ -162,7 +167,7 @@
             // カードクリックでDetailを開く（ボタン以外の領域）
             card.addEventListener('click', (e) => {
                 if (!e.target.closest('button')) {
-                    openCreativeDetailOverlay(creative.id);
+                    App.overlays.creativeDetail.open(creative.id);
                 }
             });
 
@@ -207,7 +212,7 @@
         </div>
       `;
 
-            card.onclick = () => openCreativeDetailOverlay(creative.id);
+            card.onclick = () => App.overlays.creativeDetail.open(creative.id);
             container.appendChild(card);
         });
     }

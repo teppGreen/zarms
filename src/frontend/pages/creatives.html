@@ -28,11 +28,13 @@
         const promises = [callGAS('getItems', SHEET_NAMES.CREATIVES)];
         promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
         promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
+        promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES));
 
         Promise.all(promises).then(results => {
             creativesData = results[0];
             plansData = results[1] || [];
             membersData = results[2] || [];
+            directoriesData = results[3] || [];
             renderTable(SHEET_NAMES.CREATIVES, applyFiltersAndSort(SHEET_NAMES.CREATIVES, creativesData), creativesTableHeaders);
             hideLoading();
         }).catch(handleError);

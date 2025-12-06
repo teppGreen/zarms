@@ -1,7 +1,159 @@
 <dialog id="modal-creative-detail" class="modal large">
-    <h5 class="bold">制作物詳細</h5>
-    <div id="creative-detail-content"></div>
+    <div class="row no-space align-center">
+        <div class="max">
+            <h5 class="bold mb-0">制作物詳細</h5>
+        </div>
+        <button class="circle transparent" onclick="ui('#modal-creative-detail')">
+            <i>close</i>
+        </button>
+    </div>
+
+    <div id="creative-detail-content" class="padding">
+        <!-- Dynamic Content -->
+    </div>
+
     <nav class="right-align">
-        <button class="border" onclick="closeModal('modal-creative-detail')">閉じる</button>
+        <button class="border" onclick="ui('#modal-creative-detail')">閉じる</button>
     </nav>
 </dialog>
+
+<script>
+    App.overlays.creativeDetail = {
+        currentId: null,
+        isLoading: false,
+
+        open: function (id) {
+            // 文字列以外のID（イベントオブジェクトなど）や空のIDを無視
+            if (!id || typeof id !== 'string') {
+                console.warn('App.overlays.creativeDetail.open called with invalid ID:', id);
+                return;
+            }
+
+            // 連打防止
+            if (this.isLoading) {
+                console.log('App.overlays.creativeDetail is already loading. Ignoring request.');
+                return;
+            }
+
+            console.log('App.overlays.creativeDetail.open called with:', id);
+            this.currentId = id;
+            this.isLoading = true;
+            showLoading();
+
+            const promises = [
+                callGAS('getItemById', SHEET_NAMES.CREATIVES, id)
+            ];
+
+            // 必要なマスタデータがなければ取得
+            if (typeof directoriesData === 'undefined' || directoriesData.length === 0) {
+                promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES));
+            } else {
+                promises.push(Promise.resolve(null));
+            }
+
+            if (typeof plansData === 'undefined' || plansData.length === 0) {
+                promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
+            } else {
+                promises.push(Promise.resolve(null));
+            }
+
+            if (typeof membersData === 'undefined' || membersData.length === 0) {
+                promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
+            } else {
+                promises.push(Promise.resolve(null));
+            }
+
+            Promise.all(promises).then(([creative, dirs, plans, members]) => {
+                if (dirs) directoriesData = dirs;
+                if (plans) plansData = plans;
+                if (members) membersData = members;
+
+                if (!creative) {
+                    alert('制作物が見つかりません');
+                    this.isLoading = false;
+                    hideLoading();
+                    return;
+                }
+
+                this.render(creative);
+                ui('#modal-creative-detail');
+                this.isLoading = false;
+                hideLoading();
+            }).catch(error => {
+                this.isLoading = false;
+                handleError(error);
+            });
+        },
+
+        render: function (creative) {
+            const container = document.getElementById('creative-detail-content');
+            if (!container) return;
+
+            // マスタデータからの名称解決
+            const getPlanName = (id) => {
+                if (!id) return '';
+                const plan = plansData.find(p => p.id === id);
+                return plan ? plan.title : '';
+            };
+
+            const getDirectoryName = (id) => {
+                if (!id) return '';
+                const dir = directoriesData.find(d => d.id === id);
+                return dir ? dir.name : '';
+            };
+
+            const statusLabel = getConfigLabel(creative.creative_status_key, 'CREATIVE_STATUS');
+            const typeLabel = getConfigLabel(creative.creative_type_key, 'CREATIVE_TYPE');
+            const priorityLabel = getConfigLabel(creative.priority_key, 'PRIORITY');
+
+            const planTitle = getPlanName(creative.plan_id);
+            const clientName = creative.client_directory_id ? getDirectoryName(creative.client_directory_id) : (creative.client_name || '-');
+            const displayId = creative.display_id || creative.id;
+
+            container.innerHTML = `
+                <div class="row">
+                    <div class="col s12">
+                        <div class="chip small">${escapeHtml(typeLabel)}</div>
+                        <div class="chip small">${escapeHtml(statusLabel)}</div>
+                        ${creative.priority_key ? `<div class="chip small">${escapeHtml(priorityLabel)}</div>` : ''}
+                        
+                        <div class="space"></div>
+                        
+                        ${planTitle ? `<div class="small-text">${escapeHtml(planTitle)}</div>` : ''}
+                        <h4 class="bold no-margin">${escapeHtml(displayId)} ${escapeHtml(creative.title)}</h4>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col s12 m6">
+                        <div class="field middle-align">
+                            <i class="primary-text">calendar_today</i>
+                            <div class="max">
+                                <label>納品期限</label>
+                                <div>${formatDateTimeForDisplay(creative.deadline_at)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col s12 m6">
+                        <div class="field middle-align">
+                            <i class="primary-text">business</i>
+                            <div class="max">
+                                <label>依頼元</label>
+                                <div>${escapeHtml(clientName)}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="row">
+                     <div class="col s12">
+                        <label class="active">概要</label>
+                        <div class="markdown-body">${escapeHtml(creative.description || '概要なし').replace(/\n/g, '<br>')}</div>
+                     </div>
+                </div>
+            `;
+        }
+    };
+</script>
