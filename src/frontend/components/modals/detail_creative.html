@@ -9,7 +9,7 @@
     </div>
 
     <div id="creative-detail-content" class="padding">
-        <!-- Dynamic Content -->
+        <!-- Dynamic Content: 4分割グリッドレイアウト -->
     </div>
 
     <nav class="right-align">
@@ -21,15 +21,14 @@
     App.overlays.creativeDetail = {
         currentId: null,
         isLoading: false,
+        currentItem: null, // Optimistic UI用にデータを保持
 
         open: function (id) {
-            // 文字列以外のID（イベントオブジェクトなど）や空のIDを無視
             if (!id || typeof id !== 'string') {
                 console.warn('App.overlays.creativeDetail.open called with invalid ID:', id);
                 return;
             }
 
-            // 連打防止
             if (this.isLoading) {
                 console.log('App.overlays.creativeDetail is already loading. Ignoring request.');
                 return;
@@ -44,7 +43,6 @@
                 callGAS('getItemById', SHEET_NAMES.CREATIVES, id)
             ];
 
-            // 必要なマスタデータがなければ取得
             if (typeof directoriesData === 'undefined' || directoriesData.length === 0) {
                 promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES));
             } else {
@@ -75,6 +73,7 @@
                     return;
                 }
 
+                this.currentItem = creative;
                 this.render(creative);
                 ui('#modal-creative-detail');
                 this.isLoading = false;
@@ -89,7 +88,6 @@
             const container = document.getElementById('creative-detail-content');
             if (!container) return;
 
-            // マスタデータからの名称解決
             const getPlanName = (id) => {
                 if (!id) return '';
                 const plan = plansData.find(p => p.id === id);
@@ -105,55 +103,297 @@
             const statusLabel = getConfigLabel(creative.creative_status_key, 'CREATIVE_STATUS');
             const typeLabel = getConfigLabel(creative.creative_type_key, 'CREATIVE_TYPE');
             const priorityLabel = getConfigLabel(creative.priority_key, 'PRIORITY');
-
             const planTitle = getPlanName(creative.plan_id);
-            const clientName = creative.client_directory_id ? getDirectoryName(creative.client_directory_id) : (creative.client_name || '-');
+            const clientName = creative.client_directory_id ? getDirectoryName(creative.client_directory_id) : '-';
+            const contractorName = creative.contractor_directory_id ? getDirectoryName(creative.contractor_directory_id) : '-';
             const displayId = creative.display_id || creative.id;
 
+            // 4分割グリッドレイアウト
             container.innerHTML = `
-                <div class="row">
-                    <div class="col s12">
-                        <div class="chip small">${escapeHtml(typeLabel)}</div>
-                        <div class="chip small">${escapeHtml(statusLabel)}</div>
-                        ${creative.priority_key ? `<div class="chip small">${escapeHtml(priorityLabel)}</div>` : ''}
-                        
-                        <div class="space"></div>
-                        
-                        ${planTitle ? `<div class="small-text">${escapeHtml(planTitle)}</div>` : ''}
-                        <h4 class="bold no-margin">${escapeHtml(displayId)} ${escapeHtml(creative.title)}</h4>
-                    </div>
-                </div>
+        <div class="grid">
+          <!-- 左カラム (s12 m3): 基本情報 -->
+          <div class="s12 m3">
+            <h6>基本情報</h6>
+            <div class="space"></div>
+            
+            <!-- タイト le -->
+            <div class="field label border">
+              <input type="text" id="creative-title-input" value="${escapeHtml(creative.title)}" onchange="App.overlays.creativeDetail.updateField('title', this.value)">
+              <label>タイトル</label>
+            </div>
 
-                <div class="row">
-                    <div class="col s12 m6">
-                        <div class="field middle-align">
-                            <i class="primary-text">calendar_today</i>
-                            <div class="max">
-                                <label>納品期限</label>
-                                <div>${formatDateTimeForDisplay(creative.deadline_at)}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col s12 m6">
-                        <div class="field middle-align">
-                            <i class="primary-text">business</i>
-                            <div class="max">
-                                <label>依頼元</label>
-                                <div>${escapeHtml(clientName)}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <!-- ステータス -->
+            <div class="field label border">
+              <select id="creative-status-select" onchange="App.overlays.creativeDetail.updateField('creative_status_key', this.value)">
+                ${this.renderEnumOptions('CREATIVE_STATUS', creative.creative_status_key)}
+              </select>
+              <label>ステータス</label>
+            </div>
 
-                <div class="divider"></div>
+            <!-- タイプ -->
+            <div class="field label border">
+              <select id="creative-type-select" onchange="App.overlays.creativeDetail.updateField('creative_type_key', this.value)">
+                ${this.renderEnumOptions('CREATIVE_TYPE', creative.creative_type_key)}
+              </select>
+              <label>タイプ</label>
+            </div>
 
-                <div class="row">
-                     <div class="col s12">
-                        <label class="active">概要</label>
-                        <div class="markdown-body">${escapeHtml(creative.description || '概要なし').replace(/\n/g, '<br>')}</div>
-                     </div>
+            <!-- 優先度 -->
+            <div class="field label border">
+              <select id="creative-priority-select" onchange="App.overlays.creativeDetail.updateField('priority_key', this.value)">
+                ${this.renderEnumOptions('PRIORITY', creative.priority_key)}
+              </select>
+              <label>優先度</label>
+            </div>
+
+            <!-- 納品期限 -->
+            <div class="field label border">
+              <input type="datetime-local" id="creative-deadline-input" value="${formatDateTimeForInput(creative.deadline_at)}" onchange="App.overlays.creativeDetail.updateField('deadline_at', this.value)">
+              <label>納品期限</label>
+            </div>
+
+            <!-- 依頼元 -->
+            <div class="field label border">
+              <input type="text" id="creative-client-input" value="${escapeHtml(clientName)}" readonly>
+              <label>依頼元</label>
+            </div>
+
+            <!-- 依頼先 -->
+            <div class="field label border">
+              <input type="text" id="creative-contractor-input" value="${escapeHtml(contractorName)}" readonly>
+              <label>依頼先</label>
+            </div>
+
+            <div class="space"></div>
+
+            <!-- メンバー管理 -->
+            <h6>担当者</h6>
+            <div id="creative-members-container">
+              <!-- Chips UI for members -->
+              読み込み中...
+            </div>
+          </div>
+
+          <!-- 中央カラム (s12 m6): コンテンツ -->
+          <div class="s12 m6">
+            <!-- タブボタン -->
+            <div class="tabs">
+              <a class="active" data-ui="#tab-documents-${creative.id}">ドキュメント</a>
+              <a data-ui="#tab-relations-${creative.id}">リレーション</a>
+              <a data-ui="#tab-tasks-${creative.id}">タスク</a>
+            </div>
+
+            <!-- ドキュメントタブ -->
+            <div id="tab-documents-${creative.id}" class="page active">
+              <article class="no-padding">
+                ${creative.document_gfile_id ?
+                    `<iframe src="https://docs.google.com/document/d/${creative.document_gfile_id}/preview" width="100%" height="600px"></iframe>` :
+                    '<p class="padding">ドキュメントが設定されていません</p>'
+                }
+              </article>
+            </div>
+
+            <!-- リレーションタブ -->
+            <div id="tab-relations-${creative.id}" class="page">
+              <article>
+                <h6>関連付けられたアイテム</h6>
+                <div id="creative-relations-container">
+                  読み込み中...
                 </div>
+                <button class="border" onclick="App.overlays.creativeDetail.addRelation()">+ 関連付けを追加</button>
+              </article>
+            </div>
+
+            <!-- タスクタブ -->
+            <div id="tab-tasks-${creative.id}" class="page">
+              <article>
+                <h6>タスク一覧</h6>
+                <div id="creative-tasks-container">
+                  読み込み中...
+                </div>
+                <button class="border" onclick="App.overlays.creativeDetail.addTask()">+ タスクを追加</button>
+              </article>
+            </div>
+          </div>
+
+          <!-- 右カラム (s12 m3): ノート -->
+          <div class="s12 m3">
+            <h6>ノート</h6>
+            <div id="creative-notes-container" class="notes-container">
+              <!-- コメント表示エリア -->
+              <div id="creative-notes-list" class="notes-list">
+                読み込み中...
+              </div>
+              <!-- コメント入力 -->
+              <div class="field label border">
+                <textarea id="creative-note-input" rows="3"></textarea>
+                <label>コメントを追加...</label>
+              </div>
+              <button class="small" onclick="App.overlays.creativeDetail.postNote()">投稿</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+            // メンバー、リレーション、タスク、ノートの読み込み
+            this.loadMembers(creative.id);
+            this.loadRelations(creative.id);
+            this.loadTasks(creative.id);
+            this.loadNotes(creative.id);
+        },
+
+        renderEnumOptions: function (enumType, selectedValue) {
+            const options = configData[enumType] || [];
+            return options.map(opt =>
+                `<option value="${escapeHtml(opt.config_key)}" ${opt.config_key === selectedValue ? 'selected' : ''}>${escapeHtml(opt.config_value)}</option>`
+            ).join('');
+        },
+
+        /**
+         * Optimistic UI: フィールド更新
+         */
+        updateField: function (field, value) {
+            const id = this.currentId;
+            if (!id) return;
+
+            // フィールドの値を変換（datetime-localの場合）
+            let finalValue = value;
+            if (field === 'deadline_at' && value) {
+                const d = new Date(value);
+                finalValue = d.toISOString();
+            }
+
+            // Optimistic UI: グローバル変数を即座に更新
+            const oldItem = { ...this.currentItem };
+            this.currentItem[field] = finalValue;
+            updateLocalData(SHEET_NAMES.CREATIVES, id, { [field]: finalValue });
+
+            // バックグラウンドで保存
+            callGAS('updateItem', SHEET_NAMES.CREATIVES, id, { [field]: finalValue })
+                .then(success => {
+                    if (!success) {
+                        alert('更新に失敗しました');
+                        // ロールバック
+                        this.currentItem[field] = oldItem[field];
+                        rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
+                        this.render(this.currentItem);
+                    }
+                })
+                .catch(error => {
+                    handleError(error);
+                    // ロールバック
+                    this.currentItem[field] = oldItem[field];
+                    rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
+                    this.render(this.currentItem);
+                });
+        },
+
+        loadMembers: function (creativeId) {
+            // member_assignmentsから担当者を取得
+            callGAS('getItems', 'member_assignments')
+                .then(assignments => {
+                    const creativeAssignments = assignments.filter(a => a.related_table === SHEET_NAMES.CREATIVES && a.related_id === creativeId);
+                    const container = document.getElementById('creative-members-container');
+                    if (!container) return;
+
+                    if (creativeAssignments.length === 0) {
+                        container.innerHTML = '<p class="small-text">担当者が割り当てられていません</p>';
+                        return;
+                    }
+
+                    container.innerHTML = creativeAssignments.map(assignment => {
+                        const member = membersData.find(m => m.id === assignment.member_id);
+                        if (!member) return '';
+                        return `<span class="chip">${escapeHtml(member.nickname || '')}<i onclick="App.overlays.creativeDetail.removeMember('${assignment.id}')">close</i></span>`;
+                    }).join('');
+                })
+                .catch(handleError);
+        },
+
+        loadRelations: function (creativeId) {
+            // assignmentsテーブルから関連を取得
+            const container = document.getElementById('creative-relations-container');
+            if (!container) return;
+            container.innerHTML = '<p class="small-text">リレーション機能は実装予定です</p>';
+        },
+
+        loadTasks: function (creativeId) {
+            // tasksテーブルから関連タスクを取得
+            const container = document.getElementById('creative-tasks-container');
+            if (!container) return;
+            container.innerHTML = '<p class="small-text">タスク機能は実装予定です</p>';
+        },
+
+        loadNotes: function (creativeId) {
+            // notesテーブルからコメントを取得
+            callGAS('getItems', 'notes')
+                .then(allNotes => {
+                    const notes = allNotes.filter(n => n.related_table === SHEET_NAMES.CREATIVES && n.related_id === creativeId && !n.is_deleted);
+                    const container = document.getElementById('creative-notes-list');
+                    if (!container) return;
+
+                    if (notes.length === 0) {
+                        container.innerHTML = '<p class="small-text">コメントはありません</p>';
+                        return;
+                    }
+
+                    // 時系列順（新しいものが下）
+                    notes.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+                    container.innerHTML = notes.map(note => {
+                        const author = membersData.find(m => m.id === note.created_by);
+                        const authorName = author ? (author.nickname || author.email) : '不明';
+                        return `
+              <div class="note-item">
+                <div class="note-header">
+                  <strong>${escapeHtml(authorName)}</strong>
+                  <span class="small-text">${formatDate(note.created_at)}</span>
+                </div>
+                <div class="note-content">${escapeHtml(note.content)}</div>
+              </div>
             `;
+                    }).join('');
+                })
+                .catch(handleError);
+        },
+
+        postNote: function () {
+            const input = document.getElementById('creative-note-input');
+            if (!input || !input.value.trim()) return;
+
+            const content = input.value.trim();
+            const creativeId = this.currentId;
+
+            const noteData = {
+                content: content,
+                related_table: SHEET_NAMES.CREATIVES,
+                related_id: creativeId
+            };
+
+            callGAS('createItem', 'notes', noteData)
+                .then(() => {
+                    input.value = '';
+                    this.loadNotes(creativeId);
+                })
+                .catch(handleError);
+        },
+
+        addRelation: function () {
+            alert('リレーション追加機能は実装予定です');
+        },
+
+        addTask: function () {
+            alert('タスク追加機能は実装予定です');
+        },
+
+        removeMember: function (assignmentId) {
+            if (!confirm('この担当者を削除しますか？')) return;
+
+            callGAS('deleteItem', 'member_assignments', { id: assignmentId })
+                .then(() => {
+                    this.loadMembers(this.currentId);
+                })
+                .catch(handleError);
         }
     };
 </script>
