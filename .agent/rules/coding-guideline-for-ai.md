@@ -9,3 +9,5 @@ trigger: always_on
 - js.html 内でのスクリプトレットの使用を許可してください
 - backendとfrontendは、別のAppsScriptプロジェクトで動作します
 - データベース設計は、常に schema.mmd を正としてください。
+- カスタムCSSは原則使用しないでください
+- CSSライブラリはbeercss (https://github.com/beercss/beercss/tree/main/docs) を使用してください

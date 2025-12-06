@@ -1,63 +1,246 @@
 <script>
   const SHEET_NAMES = templateVariables.SHEET_NAMES;
-  // ... existing code ...
 
   // グローバル変数
-  let currentUser = null;
-  let creativesData = [];
-  let plansData = [];
-  let tasksData = [];
-  let membersData = [];
-  let knowledgesData = [];
   let configData = {};
+  let advertisementsData = [];
+  let budgetsData = [];
+  let creativesData = [];
+  let directoriesData = [];
+  let eventsData = [];
+  let expensesData = [];
+  let formsData = [];
+  let hardwaresData = [];
+  let jobsData = [];
+  let knowledgesData = [];
+  let licensesData = [];
+  let mediumsData = [];
+  let membersData = [];
+  let merchandisesData = [];
+  let musicsData = [];
+  let plansData = [];
+  let questionsData = [];
+  let resourcesData = [];
+  let shiftsData = [];
+  let skillsData = [];
+  let tasksData = [];
+  // let timetracksData = [];
+  let wikisData = [];
 
   // テーブルの状態管理（ソート、フィルター）
   let tableState = {
+    budgets: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
     creatives: { sortKey: 'deadline_at', sortOrder: 'asc', filters: {} },
-    plans: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
-    tasks: { sortKey: 'ends_at', sortOrder: 'asc', filters: {} },
+    directories: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+    events: { sortKey: 'start_date', sortOrder: 'asc', filters: {} },
+    expenses: { sortKey: 'paid_on', sortOrder: 'asc', filters: {} },
+    forms: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
+    hardwares: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+    jobs: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+    knowledges: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
+    licenses: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+    mediums: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
     members: { sortKey: 'nickname', sortOrder: 'asc', filters: {} },
+    merchandises: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+    musics: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
+    plans: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+    questions: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
+    resources: { sortKey: 'created_at', sortOrder: 'asc', filters: {} },
+    shifts: { sortKey: 'starts_at', sortOrder: 'asc', filters: {} },
+    skills: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+    tasks: { sortKey: 'ends_at', sortOrder: 'asc', filters: {} },
+    wikis: { sortKey: 'created_at', sortOrder: 'desc', filters: {} }
   };
 
   // テーブルヘッダーの定義
+  const advertisementsTableHeaders = [
+    { key: 'display_id', label: '広報ID', sortable: true },
+    { key: 'advertisement_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'ADVERTISEMENT_STATUS' },
+    { key: 'title', label: 'タイトル', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'gfolder_url', label: 'フォルダ', sortable: true, filterable: false, editable: true, editType: 'gfolder' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
+  ];
+
+  const budgetsTableHeaders = [
+    { key: 'display_id', label: '予算ID', sortable: true },
+    { key: 'plan_id', label: '企画ID', sortable: true, filterable: true, editable: true, editType: 'plan' },
+    { key: 'budget_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'BUDGET_STATUS' },
+    { key: 'budget_type_value', label: 'ジャンル', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'BUDGET_TYPE' },
+    { key: 'amount', label: '金額', sortable: true, filterable: false, editable: true, editType: 'int' },
+    { key: 'requesting_directory_name', label: '申請元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+    { key: 'managing_directory_name', label: '管理元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
+  ];
+
   const creativesTableHeaders = [
-    { key: 'display_id', label: 'ID', sortable: true },
-    { key: 'plan_title', label: '企画タイトル', sortable: true, filterable: true, editable: false },
-    { key: 'title', label: '制作タイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
-    { key: 'creative_status_key', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'CREATIVE_STATUS' },
+    { key: 'display_id', label: '制作物ID', sortable: true },
+    { key: 'title', label: 'タイトル', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'creative_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', enumType: 'CREATIVE_STATUS' },
+    { key: 'creative_type_value', label: 'ジャンル', sortable: true, filterable: true, editable: true, editType: 'select', enumType: 'CREATIVE_TYPE' },
     { key: 'deadline_at', label: '納品期限', sortable: true, editable: true, editType: 'datetime' },
-    { key: 'client_name', label: '依頼者', sortable: true, filterable: true, editable: false },
-    { key: 'assignees', label: '担当者', sortable: false, editable: false }
+    { key: 'client_directory_name', label: '依頼元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+    { key: 'contractor_directory_name', label: '依頼先', sortable: true, filterable: true, editable: true, editType: 'directory' },
+    { key: 'gfolder_url', label: 'フォルダ', sortable: true, filterable: false, editable: true, editType: 'gfolder' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
+  ];
+
+  const directoriesTableHeaders = [
+    { key: 'display_id', label: '組織ID', sortable: true },
+    { key: 'name', label: '名称', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'directory_type_value', label: 'ジャンル', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'DIRECTORY_TYPE' },
+    { key: 'summary', label: '概要', sortable: false, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'slack_channel_url', label: 'Slackチャンネル', sortable: false, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'gfolder_url', label: 'フォルダ', sortable: true, filterable: false, editable: true, editType: 'gfolder' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+  ];
+
+  const eventsTableHeaders = [
+    { key: 'display_id', label: 'ID', sortable: true },
+    { key: 'event_type_value', label: 'ジャンル', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'EVENT_TYPE' },
+    { key: 'title', label: 'タイトル', sortable: true, filterable: true, editable: true, editType: 'varchar' },
+    { key: 'description', label: '説明', sortable: false, filterable: false, editable: true, editType: 'text' },
+    { key: 'location', label: '場所', sortable: false, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'owner_directory_name', label: '主催元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+    { key: 'starts_at', label: '開始', sortable: true, filterable: false, editable: true, editType: 'datetime' },
+    { key: 'ends_at', label: '終了', sortable: true, filterable: false, editable: true, editType: 'datetime' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+  ];
+
+  const expensesTableHeader = [
+    { key: 'display_id', label: '支出ID', sortable: true },
+    { key: 'budget_id', label: '予算ID', sortable: true },
+    { key: 'expense_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'EXPENSE_STATUS' },
+    { key: 'expense_type_value', label: '支出勘定科目', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'EXPENSE_TYPE' },
+    { key: 'title', label: 'タイトル', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'amount', label: '金額', sortable: true, filterable: false, editable: true, editType: 'int' },
+    { key: 'receipt_gfile_id', label: '領収書', sortable: false, filterable: false, editable: true, editType: 'gfile' },
+    { key: 'invoice_gfile_id', label: '請求書', sortable: false, filterable: false, editable: true, editType: 'gfile' },
+    { key: 'paid_on', label: '支払日', sortable: true, filterable: false, editable: true, editType: 'date' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+  ]
+
+  const forms = [
+    { key: 'display_id', label: 'ID', sortable: true },
+    { key: 'owner_directory_name', label: '管理元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+    { key: 'title', label: 'タイトル', sortable: true, filterable: false, editable: false },
+    { key: 'edit_url', label: '編集URL', sortable: false, editable: false },
+    { key: 'shorten_url', label: '回答URL', sortable: false, editable: false },
+    { key: 'destination_gfile_url', label: 'シートURL', sortable: false, editable: false },
+    { key: 'is_email_collected', label: 'メアド収集', sortable: true, editable: false },
+    { key: 'response_count', label: '回答数', sortable: true, editable: false },
+    { key: 'limit_response_per_form', label: '回答制限(全体)', sortable: true, editable: false, editType: 'int' },
+    { key: 'limit_response_per_user', label: '回答制限(ユーザー)', sortable: true, editable: false, editType: 'int' },
+    { key: 'starts_accepting_response_at', label: '回答受付開始', sortable: true, editable: false, editType: 'datetime' },
+    { key: 'ends_accepting_response_at', label: '回答受付終了', sortable: true, editable: false, editType: 'datetime' },
+  ];
+
+  const hardwaresTableHeaders = [
+    { key: 'display_id', label: '備品ID', sortable: true },
+    { key: 'hardware_type_value', label: 'ジャンル', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'HARDWARE_TYPE' },
+    { key: 'name', label: '名称', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'quantity', label: '数量', sortable: true, filterable: false, editable: true, editType: 'int' },
+    { key: 'managing_directory_name', label: '管理元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+  ];
+
+  const licensesTableHeaders = [
+    { key: 'display_id', label: 'ライセンスID', sortable: true },
+    { key: 'license_type', label: 'タイプ', sortable: true, filterable: true, editable: true, editType: 'varchar' },
+    { key: 'site_url', label: 'サイトURL', sortable: true, filterable: true, editable: true, editType: 'varchar' },
+    { key: 'terms_url', label: '規約URL', sortable: true, filterable: true, editable: true, editType: 'varchar' },
+    { key: 'managing_directory_name', label: '管理元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+  ];
+
+  const mediumsTableHeaders = [
+    { key: 'display_id', label: 'メディアID', sortable: true },
+    { key: 'medium_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'MEDIUM_STATUS' },
+    { key: 'name', label: '名称', sortable: true, filterable: true, editable: true, editType: 'varchar' },
+    { key: 'site_url', label: 'サイトURL', sortable: true, filterable: true, editable: true, editType: 'varchar' },
+    { key: 'managing_directory_name', label: '管理元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+  ];
+
+  const membersTableHeaders = [
+    { key: 'icon_gfile_id', label: '', sortable: false },
+    { key: 'nickname', label: '名前', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'email', label: 'メールアドレス', sortable: true, editable: false },
+    { key: 'phone_number', label: '電話番号', sortable: true, editable: true, editType: 'varchar' },
+    { key: 'profile', label: 'プロフィール', sortable: true, editable: true, editType: 'varchar' },
+    { key: 'portfolio', label: 'ポートフォリオ', sortable: true, editable: true, editType: 'varchar' },
+    { key: 'system_role_key', label: 'システム権限', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'SYSTEM_ROLE' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+  ];
+
+  const marchandisesTableHeaders = [
+    { key: 'display_id', label: '商品ID', sortable: true },
+    { key: 'marchandise_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'MARCHANDISE_STATUS' },
+    { key: 'name', label: '商品名', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'model_number', label: 'モデル番号', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'deliverable_count', label: '納品数', sortable: true, filterable: false, editable: true, editType: 'int' },
+    { key: 'price', label: '価格', sortable: true, filterable: false, editable: true, editType: 'int' },
+    { key: 'price_tax_rate', label: '税率', sortable: true, filterable: true, editable: true, editType: 'int' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+  ];
+
+  const musicsTableHeaders = [
+    { key: 'display_id', label: '楽曲ID', sortable: true },
+    { key: 'plan_id', label: '企画ID', sortable: true, filterable: true, editable: true, editType: 'plan' },
+    { key: 'music_type_value', label: 'タイプ', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'MUSIC_TYPE' },
+    { key: 'music_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'MUSIC_STATUS' },
+    { key: 'title', label: '曲名', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'artist_name', label: 'アーティスト', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'jasrac_code', label: 'JASRAC作品コード', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'nextone_code', label: 'NexTone作品コード', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'audio_url', label: '原盤URL', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'is_used', label: '使用', sortable: true, filterable: true, editable: true, editType: 'boolean' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
   ];
 
   const plansTableHeaders = [
+    { key: 'thumbnail_file_id', label: '', sortable: false, editable: true, editType: 'gfile' },
     { key: 'display_id', label: 'ID', sortable: true },
-    { key: 'title', label: '企画タイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
-    { key: 'description', label: '概要', sortable: false, editable: true, editType: 'text' },
-    { key: 'created_at', label: '作成日', sortable: true, editable: false },
-    { key: 'created_by_name', label: '作成者', sortable: true, filterable: true, editable: false },
-    { key: 'creatives_count', label: '関連制作物', sortable: true, editable: false }
+    { key: 'plan_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'PLAN_STATUS' },
+    { key: 'title', label: 'タイトル', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'dur_minutes', label: '所要分数', sortable: true, filterable: false, editable: true, editType: 'int' },
+    { key: 'dur_days', label: '所要日数', sortable: true, filterable: false, editable: true, editType: 'int' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
+  ];
+
+  const questionsTableHeaders = [
+    { key: 'display_id', label: '質問ID', sortable: true },
+    { key: 'question_content', label: '質問', sortable: true, filterable: false, editable: false, editType: 'text' },
+    { key: 'questioned_directory_name', label: '問い合わせ元', sortable: true, filterable: false, editable: true, editType: 'directory' },
+    { key: 'answered_directory_name', label: '回答元', sortable: true, filterable: false, editable: true, editType: 'directory' },
+    { key: 'opened_at', label: '開始日', sortable: true, editable: false },
+    { key: 'closed_at', label: '終了日', sortable: true, editable: false },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
+  ];
+
+  const resourcesTableHeaders = [
+    { key: 'display_id', label: 'リソースID', sortable: true },
+    { key: 'resource_type_value', label: 'タイプ', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'RESOURCE_TYPE' },
+    { key: 'name', label: '名称', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'url', label: 'URL', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
   ];
 
   const tasksTableHeaders = [
     { key: 'display_id', label: 'タスクID', sortable: true },
     { key: 'parent_task_id', label: '親タスクID', sortable: true, filterable: true, editable: false },
     { key: 'title', label: 'タスクタイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
-    { key: 'task_status_key', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'TASK_STATUS' },
-    { key: 'priority_key', label: '優先度', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'PRIORITY' },
+    { key: 'task_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'TASK_STATUS' },
+    { key: 'priority_value', label: '優先度', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'PRIORITY' },
     { key: 'assign_to_name', label: '担当者', sortable: true, filterable: true, editable: false },
+    { key: 'starts_at', label: '開始日時', sortable: true, editable: true, editType: 'datetime' },
     { key: 'ends_at', label: '終了日時', sortable: true, editable: true, editType: 'datetime' }
   ];
 
-  const membersTableHeaders = [
-    { key: 'detail', label: '', sortable: false },
-    { key: 'icon_gfile_id', label: '', sortable: false },
-    { key: 'nickname', label: '名前', sortable: true, filterable: true, editable: true, editType: 'text' },
-    { key: 'email', label: 'メール', sortable: true, editable: false },
-    { key: 'system_role_key', label: '権限', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'SYSTEM_ROLE' },
-    { key: 'assigned_creatives_count', label: '担当制作物数', sortable: true, editable: false }
+  const wikisTableHeaders = [
+    { key: 'display_id', label: 'WikiID', sortable: true },
+    { key: 'title', label: 'タイトル', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+    { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
   ];
-
 
   // 新規作成ボタンの初期化関数
   function initializeNewButton() {
@@ -115,10 +298,6 @@
   // 初期化
   async function initializeApp() {
 
-    // 全画面タイトルの最小表示時間を確保（アニメーションが適切に表示されるように）
-    const titleStartTime = Date.now();
-    const minDisplayTime = 1000; // 最小表示時間（ミリ秒）
-
     // 新規作成ボタンを最初に初期化（エラーが発生しても確実に実行されるように）
     try {
       initializeNewButton();
@@ -131,17 +310,6 @@
       await loadInitialData();
     } catch (error) {
       console.error('loadInitialData でエラーが発生しました:', error);
-    }
-
-    try {
-      // URLパラメータからcreative_idを取得して詳細画面を開く（最優先処理）
-      const urlParam = templateVariables.urlParam;
-      if (urlParam.creative_id) {
-        const creativeId = urlParam.creative_id;
-        if (creativeId) openCreativeDetailOverlay(creativeId);
-      }
-    } catch (error) {
-      console.error('URLパラメータ処理でエラーが発生しました:', error);
     }
   }
 
@@ -161,22 +329,16 @@
     showLoading();
 
     return Promise.all([
-      callGAS('getCurrentUser'),
+      callGAS('getActiveUser'),
       callGAS('getConfig', null),
-      callGAS('getUserRole')
-    ]).then(([user, config, role]) => {
-      currentUser = user;
+    ]).then(([user, config]) => {
       configData = groupConfigByType(config);
-
-      if (role === 'ADMIN') {
-        document.getElementById('new-member-dropdown-item').style.display = 'block';
-      }
 
       hideLoading();
       if (shouldSwitchTab) {
         switchTab('home');
       }
-      return { user, config, role };
+      return { user, config };
     }).catch(handleError);
   }
 
@@ -538,7 +700,7 @@
 
   function openKnowledgeDetailModal(knowledgeId) {
     showLoading();
-    callGAS('getKnowledge').then(knowledgeList => {
+    callGAS('getItems', SHEET_NAMES.KNOWLEDGES).then(knowledgeList => {
       const knowledge = knowledgeList.find(k => k.knowledge_id === knowledgeId);
       if (!knowledge) {
         alert('ナレッジが見つかりません');
@@ -708,9 +870,9 @@
               break;
             case 'client_name':
               if (item.client_name) content = escapeHtml(item.client_name);
-              else if (item.client_member_id && membersData) {
-                const member = membersData.find(m => m.id === item.client_member_id);
-                content = member ? escapeHtml(member.nickname || member.member_name) : '';
+              else if (item.client_directory_id && directoriesData) {
+                const dir = directoriesData.find(d => d.id === item.client_directory_id);
+                content = dir ? escapeHtml(dir.name) : '';
               }
               break;
             case 'assign_to_name':
@@ -818,7 +980,7 @@
                 ${assignedcreatives.map(creative => `
                   <tr>
                     <td>${escapeHtml(creative.project_title)}</td>
-                    <td><button class="btn-link" onclick="openCreativeDetailOverlay('${creative.creative_id}'); closeModal('modal-member-detail');">${escapeHtml(creative.creative_title)}</button></td>
+                    <td><button class="btn-link" onclick="App.pages.creativeDetail.openDetailModal('${creative.creative_id}'); closeModal('modal-member-detail');">${escapeHtml(creative.creative_title)}</button></td>
                     <td>${escapeHtml(getConfigLabel(creative.creative_status_key, 'CREATIVE_STATUS'))}</td>
                   </tr>
                 `).join('')}
@@ -863,10 +1025,23 @@
   // project詳細画面は廃止（テーブルに全カラムを表示）
 
   function openNewCreativeModal() {
+    const promises = [];
     if (!plansData || plansData.length === 0) {
+      promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
+    } else {
+      promises.push(Promise.resolve(plansData));
+    }
+    if (!directoriesData || directoriesData.length === 0) {
+      promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES));
+    } else {
+      promises.push(Promise.resolve(directoriesData));
+    }
+
+    if (promises.length > 0) {
       showLoading();
-      callGAS('getItems', SHEET_NAMES.PLANS).then(data => {
-        plansData = data;
+      Promise.all(promises).then(([plans, directories]) => {
+        if (!plansData || plansData.length === 0) plansData = plans;
+        if (!directoriesData || directoriesData.length === 0) directoriesData = directories;
         hideLoading();
         buildNewCreativeForm();
         openModal('modal-new-creative');
@@ -881,6 +1056,13 @@
     const formContainer = document.getElementById('new-creative-form');
     const creativeTypes = configData['CREATIVE_TYPE'] || [];
     const creativeTypeOptions = creativeTypes.map(wt => `<option value="${wt.config_key}">${wt.config_value}</option>`).join('');
+
+    // ディレクトリ（依頼元組織）の選択肢を作成
+    const directoryOptions = (directoriesData || [])
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      .map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`)
+      .join('');
+
     formContainer.innerHTML = `<form id="new-creative-form-element" onsubmit="submitNewCreative(event)">
       <div class="field label border">
         <input type="text" name="plan_title" required placeholder=" " oninput="searchPlans(this.value)" autocomplete="off">
@@ -891,6 +1073,14 @@
       <div class="field label border">
         <input type="text" name="title" required>
         <label>制作タイトル</label>
+      </div>
+      <div class="field label border">
+        <select name="client_directory_id">
+          <option value="">選択してください</option>
+          ${directoryOptions}
+        </select>
+        <label>依頼元組織</label>
+        <i>arrow_drop_down</i>
       </div>
       <div class="field label border">
         <select name="creative_type_key" onchange="updateRegulationPreset(this.value)">
@@ -1313,59 +1503,6 @@
     }
   }
 
-  function handleFileUpload(event) {
-    const files = Array.from(event.target.files);
-    files.forEach(file => {
-      // ファイルをbase64エンコードして送信する準備
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64Data = e.target.result.split(',')[1];
-        // ファイルをアップロード
-        if (currentReviewRequestCreativeId) {
-          callGAS('uploadFileToCreativeFolder', currentReviewRequestCreativeId, base64Data, file.name, file.type)
-            .then(uploadedFile => {
-              reviewRequestFiles.push({
-                file_id: uploadedFile.file_id,
-                file_name: uploadedFile.file_name,
-                file_url: uploadedFile.file_url
-              });
-              updateReviewRequestFilesList();
-            })
-            .catch(handleError);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-    event.target.value = '';
-  }
-
-  function handleFileDrop(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    const dropzone = event.currentTarget;
-    dropzone.style.borderColor = '#ccc';
-    const files = Array.from(event.dataTransfer.files);
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64Data = e.target.result.split(',')[1];
-        if (currentReviewRequestCreativeId) {
-          callGAS('uploadFileToCreativeFolder', currentReviewRequestCreativeId, base64Data, file.name, file.type)
-            .then(uploadedFile => {
-              reviewRequestFiles.push({
-                file_id: uploadedFile.file_id,
-                file_name: uploadedFile.file_name,
-                file_url: uploadedFile.file_url
-              });
-              updateReviewRequestFilesList();
-            })
-            .catch(handleError);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
   function handleDragOver(event) {
     event.preventDefault();
     event.stopPropagation();
@@ -1378,112 +1515,7 @@
     event.currentTarget.style.borderColor = '#ccc';
   }
 
-  function submitNewReviewRequest(event) {
-    event.preventDefault();
-    const form = event.target;
 
-    if (reviewRequestFiles.length === 0) {
-      alert('ファイルを1つ以上添付してください。');
-      return;
-    }
-
-    const formData = new FormData(form);
-    const reviewRequestData = {
-      creative_id: form.elements.creative_id.value,
-      review_title: formData.get('review_title'),
-      review_comment: formData.get('review_comment'),
-      file_ids: reviewRequestFiles.map(f => f.file_id)
-    };
-
-    if (!reviewRequestData.review_title) {
-      alert('タイトルを入力してください。');
-      return;
-    }
-
-    if (!reviewRequestData.review_comment) {
-      alert('コメントを入力してください。');
-      return;
-    }
-
-    showModalLoading('modal-new-review-request', 'レビュー依頼を投稿しています');
-    callGAS('createItem', SHEET_NAMES.REVIEW_REQUESTS, reviewRequestData)
-      .then(reviewRequestId => {
-        showModalSuccess('modal-new-review-request', 'レビュー依頼を投稿しました', () => {
-          if (currentcreativeId) {
-            openCreativeDetailOverlay(currentCreativeId);
-          }
-          if (document.getElementById('tab-home').style.display === 'block') {
-            loadHomeData();
-          }
-        });
-      })
-      .catch(error => {
-        handleError(error);
-        resetModalState('modal-new-review-request');
-      });
-  }
-
-  function openReviewRequestDetailModal(reviewRequestId) {
-    showLoading();
-    callGAS('getItemById', SHEET_NAMES.REVIEW_REQUESTS, reviewRequestId).then(reviewRequest => {
-      const container = document.getElementById('review-request-detail-content');
-
-      // ファイル名取得完了まではファイルURLを表示
-      let filesHtml = '';
-      if (reviewRequest.files && reviewRequest.files.length > 0) {
-        filesHtml = reviewRequest.files.map(file => {
-          if (file.file_name && file.file_name !== 'ファイルが見つかりません') {
-            // ファイル名が取得済み
-            return `<div style="margin-bottom: 8px;">
-              <a href="${file.file_url}" target="_blank" style="color: #3b82f6; text-decoration: underline;">${escapeHtml(file.file_name)}</a>
-            </div>`;
-          } else {
-            // ファイル名が未取得の場合はURLを表示
-            return `<div style="margin-bottom: 8px;">
-              <a href="${file.file_url}" target="_blank" style="color: #3b82f6; text-decoration: underline;">${escapeHtml(file.file_url || 'ファイルURL')}</a>
-            </div>`;
-          }
-        }).join('');
-      } else {
-        filesHtml = '<p style="color: #6b7280;">ファイルはありません</p>';
-      }
-
-      container.innerHTML = `
-        <div style="margin-bottom: 24px;">
-          <h3 style="margin: 0 0 8px 0; font-size: 1.125rem; font-weight: 600;">${escapeHtml(reviewRequest.review_title)}</h3>
-          <p style="margin: 0; color: #6b7280; font-size: 0.875rem;">${escapeHtml(reviewRequest.review_comment)}</p>
-        </div>
-        <div style="margin-bottom: 24px;">
-          <h4 style="margin: 0 0 12px 0; font-size: 1rem; font-weight: 600;">ファイル</h4>
-          <div id="review-request-files-list">
-            ${filesHtml}
-          </div>
-        </div>
-      `;
-      hideLoading();
-      openModal('modal-review-request-detail');
-
-      // ファイル名を取得（非同期）
-      if (reviewRequest.files && reviewRequest.files.length > 0) {
-        Promise.all(reviewRequest.files.map(file =>
-          callGAS('getDriveFileInfo', file.file_id).then(fileInfo => {
-            return { file_id: file.file_id, file_name: fileInfo.file_name, file_url: file.file_url };
-          }).catch(() => {
-            return { file_id: file.file_id, file_name: 'ファイルが見つかりません', file_url: file.file_url };
-          })
-        )).then(filesWithNames => {
-          const filesListContainer = document.getElementById('review-request-files-list');
-          if (filesListContainer) {
-            filesListContainer.innerHTML = filesWithNames.map(file =>
-              `<div style="margin-bottom: 8px;">
-                <a href="${file.file_url}" target="_blank" style="color: #3b82f6; text-decoration: underline;">${escapeHtml(file.file_name)}</a>
-              </div>`
-            ).join('');
-          }
-        });
-      }
-    }).catch(handleError);
-  }
 
   function submitNewTask(event) {
     event.preventDefault();
@@ -1505,9 +1537,14 @@
       .then(taskId => {
         showModalSuccess('modal-new-task', '新規タスクを作成しました', () => {
           // Creative詳細を再読み込み
-          if (currentCreativeId) {
-            openCreativeDetailOverlay(currentCreativeId);
-          }
+          showModalSuccess('modal-new-task', '新規タスクを作成しました', () => {
+            // Creative詳細を再読み込み
+            if (currentReviewRequestCreativeId) { // Note: variable name was currentCreativeId in snippet but check logic
+              App.overlays.creativeDetail.open(currentReviewRequestCreativeId);
+            } else if (typeof currentCreativeId !== 'undefined') {
+              App.overlays.creativeDetail.open(currentCreativeId);
+            }
+          });
         });
       })
       .catch(error => {
@@ -1656,36 +1693,6 @@
       .catch(error => {
         handleError(error);
         resetModalState('modal-new-knowledge');
-      });
-  }
-
-  function openGithubIssueModal() {
-    const form = document.getElementById('github-issue-form');
-    form.reset();
-    openModal('modal-github-issue');
-  }
-
-  function submitGithubIssue(event) {
-    event.preventDefault();
-    const form = event.target;
-    const formData = new FormData(form);
-
-    const issueData = {
-      title: formData.get('issue_title'),
-      body: formData.get('issue_body'),
-      labels: Array.from(form.elements.issue_labels.selectedOptions).map(opt => opt.value)
-    };
-
-    showModalLoading('modal-github-issue', 'GitHubイシューを登録しています');
-    callGAS('createGithubIssue', issueData)
-      .then((result) => {
-        showModalSuccess('modal-github-issue', `GitHubイシューを登録しました\nイシュー番号: #${result.number}`, () => {
-          // Success callback - nothing to do for now
-        });
-      })
-      .catch(error => {
-        handleError(error);
-        resetModalState('modal-github-issue');
       });
   }
 
@@ -2115,125 +2122,6 @@
     ui(menu, trigger);
   }
 
-
-
-
-
-  function openDateTimePicker(event, tableName, id, field) {
-    event.stopPropagation();
-    // Use native datetime-local input
-
-    const table = document.getElementById(`${tableName}-table`);
-    const row = table.querySelector(`tr[data-id="${id}"]`);
-    if (!row) return;
-    const cell = row.querySelector(`td[data-field="${field}"]`);
-    if (!cell) return;
-
-    if (cell.classList.contains('editing')) return;
-    cell.classList.add('editing');
-
-    const data = (tableName === SHEET_NAMES.TASKS ? tasksData : tableName === SHEET_NAMES.CREATIVES ? creativesData : tableName === SHEET_NAMES.PLANS ? plansData : membersData);
-    const idKey = tableName === SHEET_NAMES.MEMBERS ? 'member_email' : 'id';
-    const item = data.find(d => String(d[idKey]) === String(id));
-    const originalValue = item ? item[field] : '';
-
-    // Create input 
-    cell.innerHTML = '';
-    const input = document.createElement('input');
-    input.type = 'datetime-local';
-    // Format value for input: YYYY-MM-DDTHH:mm
-    if (originalValue) {
-      // Assume originalValue is ISO string or close to it
-      // We might need to slice seconds if present
-      input.value = originalValue.slice(0, 16);
-    }
-    input.className = 'inline-edit-input'; // Reuse class or new one
-    // BeerCSS inputs are styled by default if inside field, but here we are raw.
-    // Add some style?
-    input.style.width = '100%';
-
-    cell.appendChild(input);
-    input.focus();
-
-    const onSave = () => {
-      let newValue = input.value;
-      if (newValue) newValue += ':00'; // Append seconds if needed by backend expectation (ISO format usually has seconds?)
-      // Actually backend might handle it.
-      // If empty, newValue is empty string.
-
-      // Basic formatting to ISO if needed
-      if (newValue && newValue.length === 16) newValue += ':00';
-      if (newValue) {
-        const d = new Date(newValue);
-        newValue = d.toISOString();
-      }
-
-      cell.innerHTML = '';
-      // Re-render cell content via loadTabData logic? 
-      // Or just text for now until saveChange updates it properly
-      cell.textContent = formatDateTimeForDisplay(newValue);
-
-      cell.classList.remove('editing');
-      if (newValue !== originalValue) {
-        saveChange(tableName, id, field, newValue, originalValue);
-      } else {
-        // Restore original if no change (re-render whole cell to get icons back?)
-        // actually saveChange usually re-renders the cell/row on success.
-        // For now just putting text is fine, saveChange callback will re-render.
-        // But if we didn't save, we need to restore UI.
-        // We can call generic re-render function or just let it be text.
-        // Ideally we call renderTable again or update the specific cell structure.
-        // Since renderTable is complex, let's just trigger a reload or rely on saveChange's reload on error?
-        // If no change, we should manually restore.
-        const header = getHeaderDef(tableName, field);
-        // Re-create the view structure (text + edit button)
-        const datetimeContainer = document.createElement('div');
-        datetimeContainer.className = 'row no-space align-center';
-        const datetimeText = document.createElement('span');
-        datetimeText.className = 'editable-text max';
-        datetimeText.textContent = formatDateTimeForDisplay(originalValue);
-        const datetimeBtn = document.createElement('button');
-        datetimeBtn.className = 'circle transparent small';
-        datetimeBtn.innerHTML = '<i>edit</i>';
-        datetimeContainer.appendChild(datetimeText);
-        datetimeContainer.appendChild(datetimeBtn);
-        datetimeContainer.addEventListener('click', (e) => {
-          openDateTimePicker(e, tableName, id, field);
-        });
-        cell.innerHTML = '';
-        cell.appendChild(datetimeContainer);
-      }
-    };
-
-    input.addEventListener('blur', onSave);
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') input.blur();
-      if (e.key === 'Escape') {
-        // Cancel
-        input.removeEventListener('blur', onSave); // Prevent save
-        cell.innerHTML = '';
-        // Restore view
-        const header = getHeaderDef(tableName, field);
-        const datetimeContainer = document.createElement('div');
-        datetimeContainer.className = 'row no-space align-center';
-        const datetimeText = document.createElement('span');
-        datetimeText.className = 'editable-text max';
-        datetimeText.textContent = formatDateTimeForDisplay(originalValue);
-        const datetimeBtn = document.createElement('button');
-        datetimeBtn.className = 'circle transparent small';
-        datetimeBtn.innerHTML = '<i>edit</i>';
-        datetimeContainer.appendChild(datetimeText);
-        datetimeContainer.appendChild(datetimeBtn);
-        datetimeContainer.addEventListener('click', (e) => {
-          openDateTimePicker(e, tableName, id, field);
-        });
-        cell.appendChild(datetimeContainer);
-        cell.classList.remove('editing');
-      }
-    });
-
-  }
-
   // ---- タスク日時編集（ネイティブ） ----
   function openDateTimePickerForTask(taskId, field, originalValue) {
     const container = document.getElementById('creative-tasks-container');
@@ -2287,7 +2175,7 @@
       cell.appendChild(datetimeContainer);
 
       if (newValue !== originalValue) {
-        updateTaskField(taskId, field, newValue, originalValue);
+        App.pages.taskDetail.updateTaskField(taskId, field, newValue, originalValue);
       }
     };
 
@@ -2373,11 +2261,13 @@
 
         // テーブル名に応じた処理
         if (tableName === SHEET_NAMES.TASKS) {
-          openTaskDetailOverlay(item.id);
+          App.pages.taskDetail.openDetailModal(item.id);
         } else if (tableName === SHEET_NAMES.CREATIVES) {
-          openCreativeDetailOverlay(item.id);
+          App.pages.creativeDetail.openDetailModal(item.id);
         } else if (tableName === SHEET_NAMES.PLANS) {
-          openProjectDetailOverlay(item.id);
+          App.pages.planDetail.openDetailModal(item.id);
+        } else if (tableName === SHEET_NAMES.KNOWLEDGES) {
+          App.pages.knowledgeDetail.openDetailModal(item.id);
         } else {
           console.log('Unknown table for search result:', tableName);
           alert('このIDタイプの詳細は表示できません: ' + tableName);
@@ -2397,6 +2287,12 @@
     executeIdSearch(searchValue);
   }
 
+  function handleIdSearchFocus(event) {
+    const input = event.target;
+    // フォーカスが当たった時の処理
+    console.log('[DEBUG] handleIdSearchFocus triggered');
+  }
+
   function handleIdSearchBlur(event) {
     const input = event.target;
     console.log('[DEBUG] handleIdSearchBlur triggered', {
@@ -2404,9 +2300,6 @@
       activeElement: document.activeElement,
       isInputFocused: document.activeElement === input
     });
-
-    // フォーカスが外れたら、詳細画面が表示中の場合はIDを再設定
-    updateIdSearchInput();
   }
 
   function handleIdSearchInput(event) {
@@ -2436,5 +2329,15 @@
       const searchValue = input.value.trim();
       executeIdSearch(searchValue);
     }
+  }
+
+  // ============================================
+  // 追加された関数
+  // ============================================
+
+  function handleHeaderCloseClick() {
+    // 詳細画面を閉じる処理
+    closeAllPopups();
+    switchTab('home');
   }
 </script>
