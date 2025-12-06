@@ -3,6 +3,7 @@
 // ============================================
 
 const scriptProperties = PropertiesService.getScriptProperties();
+const API_TOKEN = scriptProperties.getProperty('API_TOKEN');
 let SPREADSHEET_ID = scriptProperties.getProperty('SPREADSHEET_ID');
 
 if (!SPREADSHEET_ID) {
@@ -13,6 +14,3 @@ if (!SPREADSHEET_ID) {
         // SPREADSHEET_ID remains null or undefined, which will be handled gracefully later or cause a proper error response
     }
 }
-
-// 固定トークン (本番環境ではScriptProperties推奨だが、要件に従い定数定義)
-const API_TOKEN = scriptProperties.getProperty('API_TOKEN');
