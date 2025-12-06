@@ -24,7 +24,7 @@ function doPost(e) {
 
             // リクエストボディの解析
             const contents = JSON.parse(e.postData.contents);
-            const { token, userEmail, timestamp, operation, sheetName, data, id, condition, idColumnName } = contents;
+            const { token, user, timestamp, operation, sheetName, data, id, condition, idColumnName } = contents;
 
             // トークン検証
             if (token !== API_TOKEN) {
@@ -35,7 +35,7 @@ function doPost(e) {
             }
 
             // 必須パラメータの簡易チェック
-            if (!userEmail || !operation || !sheetName) {
+            if (!user || !operation || !sheetName) {
                 return createResponse({
                     status: 'error',
                     message: 'Missing required parameters'
@@ -55,7 +55,7 @@ function doPost(e) {
 
                 case 'read_by_id':
                     if (!id) throw new Error('ID is required for read_by_id operation');
-                    result = getDataById(sheetName, id, idColumnName);
+                    result = getDataById(sheetName, idColumnName, id);
                     return createResponse({
                         status: 'success',
                         data: result
@@ -69,26 +69,29 @@ function doPost(e) {
                         data: result
                     });
 
-
-
                 case 'create':
                     if (!data) throw new Error('Data is required for create operation');
-                    result = createData(sheetName, data, userEmail, idColumnName);
+                    result = createData(user.id, sheetName, idColumnName, data);
                     return createResponse({
                         status: 'success',
-                        message: 'Operation completed successfully',
                         data: result
                     });
 
                 case 'update':
                     if (!id || !data) throw new Error('ID and Data are required for update operation');
-                    result = updateData(sheetName, id, data, userEmail, idColumnName);
-                    break;
+                    result = updateData(user.id, sheetName, idColumnName, id, data);
+                    return createResponse({
+                        status: 'success',
+                        data: result
+                    });
 
                 case 'delete':
                     if (!condition) throw new Error('Condition is required for delete operation');
-                    result = deleteData(sheetName, condition, userEmail, idColumnName);
-                    break;
+                    result = deleteData(user.id, sheetName, idColumnName, condition);
+                    return createResponse({
+                        status: 'success',
+                        data: result
+                    });
 
                 default:
                     return createResponse({
@@ -97,17 +100,7 @@ function doPost(e) {
                     }, 400);
             }
 
-            if (result) {
-                return createResponse({
-                    status: 'success',
-                    message: 'Operation completed successfully'
-                });
-            } else {
-                return createResponse({
-                    status: 'error',
-                    message: 'Operation failed (record not found or no changes made)'
-                }, 404);
-            }
+            return result;
 
         } catch (error) {
             // ロック取得タイムアウトまたはその他のエラー

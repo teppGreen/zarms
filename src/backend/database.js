@@ -36,11 +36,11 @@ function getHeaders(sheet) {
 /**
  * 2次元配列のデータをオブジェクトの配列に変換します。
  * @param {string[]} headers - ヘッダーの配列
- * @param {any[][]} data - データの2次元配列
+ * @param {any[][]} datas - データの2次元配列
  * @returns {Object[]} オブジェクトの配列
  */
-function mapData(headers, data) {
-    return data.map(row => {
+function mapData(headers, datas) {
+    return datas.map(row => {
         const obj = {};
         headers.forEach((header, index) => {
             obj[header] = row[index];
@@ -56,13 +56,12 @@ function mapData(headers, data) {
  */
 function getAllData(sheetName) {
     const sheet = getSheet(sheetName);
-    const dataRange = sheet.getDataRange();
-    const values = dataRange.getValues();
+    const datas = sheet.getDataRange().getValues();
 
-    if (values.length <= 1) return [];
+    if (datas.length <= 1) return [];
 
-    const headers = values.shift();
-    return mapData(headers, values);
+    const headers = datas.shift();
+    return mapData(headers, datas);
 }
 
 /**
@@ -71,22 +70,22 @@ function getAllData(sheetName) {
  * @param {any} id - 検索するID
  * @returns {Object|null} 見つかったデータオブジェクト、またはnull
  */
-function getDataById(sheetName, id, idColumnName) {
+function getDataById(sheetName, idColumnName, id) {
     const idColumn = idColumnName;
     if (!idColumn) {
         throw new Error(`ID列が定義されていません: ${sheetName}`);
     }
 
     const sheet = getSheet(sheetName);
-    const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) return null;
+    const datas = sheet.getDataRange().getValues();
+    if (datas.length <= 1) return null;
 
-    const headers = data[0];
+    const headers = datas[0];
     const idIndex = headers.indexOf(idColumn);
 
-    for (let i = 1; i < data.length; i++) {
-        if (data[i][idIndex] === id) {
-            const row = data[i];
+    for (let i = 1; i < datas.length; i++) {
+        if (datas[i][idIndex] === id) {
+            const row = datas[i];
             const obj = {};
             headers.forEach((header, index) => {
                 obj[header] = row[index];
@@ -181,11 +180,11 @@ function getNextSerial(sheet, columnName) {
  * シートに新しいデータを追加します。
  * @param {string} sheetName - シート名
  * @param {Object} dataObject - 追加するデータオブジェクト
- * @param {string} userEmail - 操作ユーザーのEmail
+ * @param {string} userId - 操作ユーザーのID
  * @param {string} idColumnName - IDカラム名 (Optional)
  * @returns {Object} 作成されたデータオブジェクト
  */
-function createData(sheetName, dataObject, userEmail, idColumnName) {
+function createData(userId, sheetName, idColumnName, dataObject) {
     const sheet = getSheet(sheetName);
     const headers = getHeaders(sheet);
     const newData = { ...dataObject }; // コピーを作成
@@ -223,7 +222,7 @@ function createData(sheetName, dataObject, userEmail, idColumnName) {
     const recordId = idColumn ? newData[idColumn] : '';
 
     if (recordId) {
-        logOperation('add', sheetName, recordId, null, null, newData, userEmail);
+        logOperation('ADD', sheetName, recordId, null, null, newData, userId);
     }
 
     return newData;
@@ -237,7 +236,7 @@ function createData(sheetName, dataObject, userEmail, idColumnName) {
  * @param {string} userEmail - 操作ユーザーのEmail
  * @returns {boolean} 成功したかどうか
  */
-function updateData(sheetName, id, updateDataObject, userEmail, idColumnName) {
+function updateData(userId, sheetName, idColumnName, id, updateDataObject) {
     const idColumn = idColumnName;
     if (!idColumn) {
         throw new Error(`ID列が定義されていません: ${sheetName}`);
@@ -282,7 +281,7 @@ function updateData(sheetName, id, updateDataObject, userEmail, idColumnName) {
             const newValue = updateDataObject[key];
 
             // 各フィールドごとに個別のログを記録
-            logOperation('modified', sheetName, id, key, oldValue, newValue, userEmail);
+            logOperation('MODIFIED', sheetName, id, key, oldValue, newValue, userId);
         }
     });
 
@@ -293,10 +292,10 @@ function updateData(sheetName, id, updateDataObject, userEmail, idColumnName) {
  * 条件に一致する行を削除します。
  * @param {string} sheetName - シート名
  * @param {Object} condition - 削除する行の条件 (例: { work_id: '...', member_email: '...' })
- * @param {string} userEmail - 操作ユーザーのEmail
+ * @param {string} userId - 操作ユーザーのID
  * @returns {boolean} 少なくとも1行削除されたかどうか
  */
-function deleteData(sheetName, condition, userEmail, idColumnName) {
+function deleteData(userId, sheetName, idColumnName, condition) {
     const sheet = getSheet(sheetName);
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
@@ -336,7 +335,7 @@ function deleteData(sheetName, condition, userEmail, idColumnName) {
         const idColumn = idColumnName;
         deletedRecords.forEach(record => {
             const recordId = idColumn ? record[idColumn] : JSON.stringify(condition);
-            logOperation('delete', sheetName, recordId, null, record, null, userEmail);
+            logOperation('DELETE', sheetName, recordId, null, record, null, userId);
         });
     }
 
@@ -368,16 +367,10 @@ function initializeLogSheet() {
  * @param {string|null} columnId - カラムID（更新時のみ、変更されたカラム名）
  * @param {any|null} oldValue - 変更前の値（更新・削除時のみ。更新時は単一フィールドの値、削除時はレコード全体のJSON）
  * @param {any|null} newValue - 変更後の値（追加・更新時のみ。更新時は単一フィールドの値、追加時はレコード全体のJSON）
- * @param {string} userEmail - 操作ユーザーのEmail
+ * @param {string} userId - 操作ユーザーのID
  */
-function logOperation(operationType, tableName, recordId, columnId, oldValue, newValue, userEmail) {
-    // ログシートへの操作はログを記録しない（循環記録回避）
-    if (tableName === 'logs') {
-        return;
-    }
-
+function logOperation(operationType, tableName, recordId, columnId, oldValue, newValue, userId) {
     try {
-        // 引数で受け取ったuserEmailを使用
         const logId = Utilities.getUuid();
         const now = new Date();
 
@@ -389,7 +382,7 @@ function logOperation(operationType, tableName, recordId, columnId, oldValue, ne
         let oldValueJson = '';
         let newValueJson = '';
 
-        if (operationType === 'modified') {
+        if (log_type_key === 'MODIFIED') {
             // 更新時は単一フィールドの値のみを保存
             oldValueJson = oldValue !== null && oldValue !== undefined ? JSON.stringify(sanitizeForClient(oldValue)) : '';
             newValueJson = newValue !== null && newValue !== undefined ? JSON.stringify(sanitizeForClient(newValue)) : '';
@@ -403,9 +396,9 @@ function logOperation(operationType, tableName, recordId, columnId, oldValue, ne
             switch (header) {
                 case 'log_id':
                     return logId;
-                case 'user_email':
-                    return userEmail;
-                case 'operation_type':
+                case 'user_id':
+                    return userId;
+                case 'log_type_key':
                     return operationType;
                 case 'table_name':
                     return tableName;

@@ -131,21 +131,18 @@
       { msg: "データベースに接続中..." },
       { msg: "ユーザーテーブルを読込中..." },
       { msg: "ユーザープロファイルを検索中..." },
-      { msg: "権限レベルを確認中..." }
+      { msg: "権限レベルを確認中..." },
+      { msg: "認証中..." }
     ];
 
     const statusText = document.getElementById('status-text');
     const progressBar = document.getElementById('progress-bar');
 
     let currentStep = 0;
-    const maxIntervalSec = 2000; // ランダム時間の上限（ミリ秒）
+    const maxIntervalSec = 1000;
 
-    // ステップごとにランダムな待機時間を設定して実行する関数
     function runAuthProcess() {
       if (currentStep >= steps.length) {
-        // ステップ完了後も待機（サーバーからの応答待ち）
-        // statusText.innerText = "アプリケーションを起動中...";
-        // progressBar.style.width = '100%';
         return;
       }
 
@@ -162,11 +159,7 @@
       }, 200);
 
       currentStep++;
-
-      // 0以上 maxIntervalSec未満 でランダムな待機時間を生成
       const intervalTime = Math.random() * maxIntervalSec;
-
-      // 次の処理を予約
       setTimeout(runAuthProcess, intervalTime);
     }
 
@@ -177,7 +170,8 @@
     // 画面描写と同時にバックグラウンドでメインアプリを取得しに行く
     google.script.run
       .withSuccessHandler(function (html) {
-        // メインアプリのHTMLで現在のドキュメントを置き換え
+        statusText.innerText = "アプリケーションを起動中...";
+        progressBar.style.width = '100%';
         document.open();
         document.write(html);
         document.close();
