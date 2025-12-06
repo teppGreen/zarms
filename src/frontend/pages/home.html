@@ -37,46 +37,55 @@
     let hiddenCreativeIds = new Set();
 
     // Namespace initialization
-    console.log('Initializing App.pages.home');
-    App.pages.home = {};
+    if (typeof App === 'undefined') {
+        console.error('App is not defined');
+    } else {
 
-    App.pages.home.loadData = function () {
-        // membersDataが取得されていない場合は取得
-        const promises = [callGAS('getHomeData')];
-        if (!membersData || membersData.length === 0) {
-            promises.push(callGAS('getMembers'));
-        } else {
-            promises.push(Promise.resolve(membersData));
-        }
+        console.log('Initializing App.pages.home');
+        App.pages.home = {};
 
-        Promise.all(promises).then(([data, members]) => {
+        App.pages.home.loadData = function () {
+            // membersDataが取得されていない場合は取得
+            const promises = [callGAS('getHomeData')];
             if (!membersData || membersData.length === 0) {
-                membersData = members;
+                promises.push(callGAS('getMembers'));
+            } else {
+                promises.push(Promise.resolve(membersData));
             }
 
-            document.getElementById('home-greeting').textContent = `${data.greeting}、${data.memberName}さん。`;
+            Promise.all(promises).then(([data, members]) => {
+                if (!membersData || membersData.length === 0) {
+                    membersData = members;
+                }
 
-            // 最新の制作依頼を表示
-            renderNewRequests(data.new_requests || []);
+                const greetingEl = document.getElementById('home-greeting');
+                if (greetingEl) {
+                    greetingEl.textContent = `${data.greeting}、${data.memberName}さん。`;
+                }
 
-            // 担当中の制作物を表示
-            renderAssignedCreatives(data.creatives || []);
+                // 最新の制作依頼を表示
+                renderNewRequests(data.new_requests || []);
 
-            // 受付中のレビューを表示
-            renderReviewRequests(data.review_requests || []);
+                // 担当中の制作物を表示
+                renderAssignedCreatives(data.assigned_creatives || []);
 
-            // 最近のナレッジを表示
-            renderKnowledge(data.knowledge || []);
+                // 受付中のレビューを表示
+                renderReviewRequests(data.review_requests || []);
 
-            // 残り時間のリアルタイム更新を開始
-            startRemainingTimeUpdates();
+                // 最近のナレッジを表示
+                renderKnowledge(data.knowledge || []);
 
-            hideLoading();
-        }).catch(handleError);
-    };
+                // 残り時間のリアルタイム更新を開始
+                startRemainingTimeUpdates();
+
+                hideLoading();
+            }).catch(handleError);
+        };
+    }
 
     function renderNewRequests(newRequests) {
         const container = document.getElementById('home-new-requests-container');
+        if (!container) return;
         container.innerHTML = '';
 
         // 非表示にするwork_idをフィルタ
@@ -95,10 +104,13 @@
             // 優先度、制作物種別、依頼者の所属チームを取得
             const priorityLabel = creative.priority_key ? getConfigLabel(creative.priority_key, 'PRIORITY') : '';
             const creativeTypeLabel = creative.creative_type_key ? getConfigLabel(creative.creative_type_key, 'CREATIVE_TYPE') : '';
-            const clientTeamLabel = creative.client_member_id ? (() => {
-                const client = membersData?.find(m => m.id === creative.client_member_id);
-                return client ? getConfigLabel(client.member_team_key, 'TEAM') : '';
-            })() : '';
+            let clientTeamLabel = '';
+            if (creative.client_member_id && typeof membersData !== 'undefined') {
+                const client = membersData.find(m => m.id === creative.client_member_id);
+                if (client) {
+                    clientTeamLabel = getConfigLabel(client.member_team_key, 'TEAM');
+                }
+            }
 
             const infoParts = [priorityLabel, creativeTypeLabel, clientTeamLabel].filter(Boolean);
             const infoText = infoParts.length > 0 ? infoParts.join(' | ') : '';
@@ -147,7 +159,7 @@
                 });
             }
 
-            // カードクリックでwork_detail_overlayを開く（ボタン以外の領域）
+            // カードクリックでDetailを開く（ボタン以外の領域）
             card.addEventListener('click', (e) => {
                 if (!e.target.closest('button')) {
                     openCreativeDetailOverlay(creative.id);
@@ -160,6 +172,7 @@
 
     function renderAssignedCreatives(creatives) {
         const container = document.getElementById('home-creatives-container');
+        if (!container) return;
         container.innerHTML = '';
 
         if (creatives.length === 0) {
@@ -170,21 +183,16 @@
         creatives.forEach(creative => {
             const card = document.createElement('article');
             card.className = 'no-padding ripple';
-            // ステータス色を取得 (mapped to BeerCSS classes if possible, or keep custom utils)
-            // BeerCSS has colors like 'primary', 'secondary', 'error', 'tertiary'.
-            // Using inline style for status badge compat for now, or converting helpers.
+
             const statusLabel = getConfigLabel(creative.creative_status_key, 'CREATIVE_STATUS');
             const dueDate = formatDateTimeForHome(creative.deadline_at);
-
             let statusClass = 'tertiary';
-            if (creative.creative_status_key === 'TODO' || creative.creative_status_key === 'APPROVED') {
+            const sk = creative.creative_status_key;
+            if (sk === 'TODO' || sk === 'APPROVED') {
                 statusClass = 'error';
-            } else if (creative.creative_status_key === 'CREATE' || creative.creative_status_key === 'REVIEW' || creative.creative_status_key === 'REVISION') {
-                statusClass = 'warning'; // 'warning' isn't standard BeerCSS, 'tertiary' or 'secondary' maybe? 'secondary-container'? 
-                // BeerCSS defines --md-sys-color-error, but maybe not warning. I'll use custom colors or standard pallet.
-                // Reverting to secondary-container or similar.
+            } else if (sk === 'CREATE' || sk === 'REVIEW' || sk === 'REVISION') {
                 statusClass = 'secondary';
-            } else if (creative.creative_status_key === 'DELIVERED') {
+            } else if (sk === 'DELIVERED') {
                 statusClass = 'primary';
             }
 
@@ -206,6 +214,7 @@
 
     function renderReviewRequests(reviewRequests) {
         const container = document.getElementById('home-review-requests-container');
+        if (!container) return;
         container.innerHTML = '';
 
         if (reviewRequests.length === 0) {
@@ -236,7 +245,7 @@
         </div>
       `;
 
-            // Thumbnail loader logic preserved but updated selector
+            // Thumbnail loader logic
             let firstFile = null;
             if (reviewRequest.files && reviewRequest.files.length > 0) {
                 const sortedFiles = [...reviewRequest.files].sort((a, b) => {
@@ -249,7 +258,7 @@
 
             if (firstFile && firstFile.file_id) {
                 const img = card.querySelector('img.responsive');
-                img.src = `https://drive.google.com/thumbnail?id=${firstFile.file_id}&sz=w800-h450`;
+                if (img) img.src = `https:/\/drive.google.com/thumbnail?id=${firstFile.file_id}&sz=w800-h450`;
             }
 
             card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
@@ -259,6 +268,7 @@
 
     function renderKnowledge(knowledgeList) {
         const container = document.getElementById('home-knowledge-container');
+        if (!container) return;
         container.innerHTML = '';
 
         if (knowledgeList.length === 0) {
@@ -340,13 +350,6 @@
             clearInterval(remainingTimeIntervalId);
             remainingTimeIntervalId = null;
         }
-    }
-
-    function getCreativeStatusColor(statusKey) {
-        if (statusKey === 'TODO' || statusKey === 'APPROVED') return 'error';
-        if (statusKey === 'CREATE' || statusKey === 'REVIEW' || statusKey === 'REVISION') return 'secondary';
-        if (statusKey === 'DELIVERED') return 'primary';
-        return 'error';
     }
 
     function formatDateForReview(dueDatetime) {
