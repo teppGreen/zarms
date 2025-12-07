@@ -1,0 +1,167 @@
+<dialog id="modal-select-directories" class="modal">
+    <div class="row no-space align-center">
+        <div class="max">
+            <h5 class="bold mb-0">組織を選択</h5>
+        </div>
+        <button class="circle transparent" onclick="ui('#modal-select-directories')">
+            <i>close</i>
+        </button>
+    </div>
+
+    <div class="padding">
+        <!-- 検索バー -->
+        <div class="field round border prefix">
+            <i>search</i>
+            <input type="text" id="directory-search-input" placeholder="IDまたは名前で検索..."
+                oninput="App.modals.selectDirectories.filterResults()">
+        </div>
+
+        <!-- フィルタ -->
+        <div class="row">
+            <div class="field label border s12 m6">
+                <select id="directory-type-filter" onchange="App.modals.selectDirectories.filterResults()">
+                    <option value="">すべて</option>
+                    <!-- ENUMから動的に生成 -->
+                </select>
+                <label>組織タイプ</label>
+            </div>
+        </div>
+
+        <div class="space"></div>
+
+        <!-- 結果リスト -->
+        <div id="directory-results-container" style="max-height: 400px; overflow-y: auto;">
+            <!-- 動的に生成 -->
+        </div>
+    </div>
+
+    <nav class="right-align">
+        <button class="border" onclick="ui('#modal-select-directories')">キャンセル</button>
+        <button onclick="App.modals.selectDirectories.confirm()">選択</button>
+    </nav>
+</dialog>
+
+<script>
+    App.modals.selectDirectories = {
+        callback: null,
+        selectedIds: [],
+        allDirectories: [],
+        multiSelect: false,
+
+        open: function (options = {}) {
+            this.callback = options.callback || null;
+            this.multiSelect = options.multiSelect || false;
+            this.selectedIds = options.preSelected || [];
+
+            // directoriesDataをロード
+            if (!directoriesData || directoriesData.length === 0) {
+                showLoading();
+                callGAS('getItems', SHEET_NAMES.DIRECTORIES)
+                    .then(directories => {
+                        directoriesData = directories;
+                        this.allDirectories = directories;
+                        this.render();
+                        hideLoading();
+                        ui('#modal-select-directories');
+                    })
+                    .catch(handleError);
+            } else {
+                this.allDirectories = directoriesData;
+                this.render();
+                ui('#modal-select-directories');
+            }
+        },
+
+        render: function () {
+            // タイプフィルタのオプションを生成
+            const typeFilter = document.getElementById('directory-type-filter');
+            if (typeFilter && configData['DIRECTORY_TYPE']) {
+                const options = configData['DIRECTORY_TYPE'].map(opt =>
+                    `<option value="${escapeHtml(opt.config_key)}">${escapeHtml(opt.config_value)}</option>`
+                ).join('');
+                typeFilter.innerHTML = '<option value="">すべて</option>' + options;
+            }
+
+            this.filterResults();
+        },
+
+        filterResults: function () {
+            const searchInput = document.getElementById('directory-search-input');
+            const typeFilter = document.getElementById('directory-type-filter');
+            const container = document.getElementById('directory-results-container');
+
+            if (!container) return;
+
+            const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+            const selectedType = typeFilter ? typeFilter.value : '';
+
+            // フィルタリング
+            let filtered = this.allDirectories.filter(dir => {
+                const matchesSearch = !searchTerm ||
+                    (dir.display_id && dir.display_id.toLowerCase().includes(searchTerm)) ||
+                    (dir.name && dir.name.toLowerCase().includes(searchTerm));
+
+                const matchesType = !selectedType || dir.directory_type_key === selectedType;
+
+                return matchesSearch && matchesType;
+            });
+
+            // 表示
+            if (filtered.length === 0) {
+                container.innerHTML = '<p class="padding">該当する組織が見つかりません</p>';
+                return;
+            }
+
+            container.innerHTML = filtered.map(dir => {
+                const isSelected = this.selectedIds.includes(dir.id);
+                const fullName = this.getFullName(dir);
+
+                return `
+          <label class="checkbox">
+            <input type="${this.multiSelect ? 'checkbox' : 'radio'}" 
+                   name="directory-select" 
+                   value="${escapeHtml(dir.id)}" 
+                   ${isSelected ? 'checked' : ''}
+                   onchange="App.modals.selectDirectories.toggleSelection('${dir.id}', this.checked)">
+            <span>
+              <strong>${escapeHtml(dir.display_id || dir.id)}</strong> 
+              ${escapeHtml(fullName)}
+            </span>
+          </label>
+        `;
+            }).join('');
+        },
+
+        getFullName: function (directory) {
+            if (!directory.parent_directory_id) {
+                return directory.name || '';
+            }
+
+            const parent = directoriesData.find(d => d.id === directory.parent_directory_id);
+            if (!parent) {
+                return directory.name || '';
+            }
+
+            return this.getFullName(parent) + ' / ' + (directory.name || '');
+        },
+
+        toggleSelection: function (id, checked) {
+            if (this.multiSelect) {
+                if (checked && !this.selectedIds.includes(id)) {
+                    this.selectedIds.push(id);
+                } else if (!checked) {
+                    this.selectedIds = this.selectedIds.filter(sid => sid !== id);
+                }
+            } else {
+                this.selectedIds = checked ? [id] : [];
+            }
+        },
+
+        confirm: function () {
+            if (this.callback) {
+                this.callback(this.selectedIds);
+            }
+            ui('#modal-select-directories');
+        }
+    };
+</script>
