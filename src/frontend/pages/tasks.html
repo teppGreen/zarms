@@ -3,19 +3,10 @@
         <div class="scroll">
             <table id="tasks-table" class="stripes">
                 <thead>
-                    <tr>
-                        <th>タスクID</th>
-                        <th>案件タイトル</th>
-                        <th>制作タイトル</th>
-                        <th>タスクタイトル</th>
-                        <th>ステータス</th>
-                        <th>優先度</th>
-                        <th>担当者</th>
-                        <th>予定終了日時</th>
-                        <th></th>
-                    </tr>
+                    <!-- ヘッダーは renderTable() で動的生成 -->
                 </thead>
-                <tbody id="tasks-table-body">
+                <tbody>
+                    <!-- ボディは renderTable() で動的生成 -->
                 </tbody>
             </table>
         </div>
@@ -35,6 +26,8 @@
             tasksData = results[0];
             creativesData = results[1] || [];
             membersData = results[2] || [];
+
+            // ReadOnlyテーブルをレンダリング（行クリックで詳細モーダルを開く）
             renderTable(SHEET_NAMES.TASKS, applyFiltersAndSort(SHEET_NAMES.TASKS, tasksData), tasksTableHeaders);
             hideLoading();
         }).catch(handleError);

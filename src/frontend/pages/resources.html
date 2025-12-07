@@ -1,1 +1,33 @@
 <!-- resourcesテーブルを表示するページ -->
+
+<div id="tab-resources" class="tab-content" style="display: none;">
+    <article class="no-padding">
+        <div class="scroll">
+            <table id="resources-table" class="stripes">
+                <thead>
+                    <!-- ヘッダーは renderTable() で動的生成 -->
+                </thead>
+                <tbody>
+                    <!-- ボディは renderTable() で動的生成 -->
+                </tbody>
+            </table>
+        </div>
+    </article>
+</div>
+
+<script>
+    // Namespace initialization
+    App.pages.resources = {};
+
+    App.pages.resources.loadData = function () {
+        callGAS('getItems', SHEET_NAMES.RESOURCES)
+            .then(data => {
+                resourcesData = data;
+
+                // ReadOnlyテーブルをレンダリング
+                renderTable(SHEET_NAMES.RESOURCES, applyFiltersAndSort(SHEET_NAMES.RESOURCES, resourcesData), resourcesTableHeaders);
+                hideLoading();
+            })
+            .catch(handleError);
+    };
+</script>

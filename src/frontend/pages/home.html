@@ -1,4 +1,5 @@
 <div id="tab-home" class="tab-content">
+    <!-- ヘッダー（挨拶）-->
     <article class="fill primary-container">
         <div class="row">
             <div class="max">
@@ -8,394 +9,228 @@
         </div>
     </article>
 
+    <!-- 4カラムレイアウト -->
     <div class="grid">
-        <!-- 列1: 最新の制作依頼 -->
+        <!-- Column 1: 新規依頼 (s12 m6 l3) -->
         <div class="s12 m6 l3">
-            <h5 class="center-align">最新の制作依頼</h5>
-            <div id="home-new-requests-container"></div>
+            <h6>新規依頼</h6>
+            <div id="home-new-requests-container">
+                <!-- 動的に生成 -->
+            </div>
         </div>
-        <!-- 列2-3: 担当中の制作物 -->
+
+        <!-- Column 2: タスク (s12 m6 l3) -->
         <div class="s12 m6 l3">
-            <h5 class="center-align">担当中の制作物</h5>
-            <div id="home-creatives-container"></div>
+            <h6>マイタスク</h6>
+            <div id="home-tasks-container">
+                <!-- 動的に生成 -->
+            </div>
         </div>
-        <!-- 列4: 受付中のレビュー -->
+
+        <!-- Column 3: リレーション (s12 m6 l3) -->
         <div class="s12 m6 l3">
-            <h5 class="center-align">受付中のレビュー</h5>
-            <div id="home-review-requests-container"></div>
+            <div class="row no-space align-center">
+                <h6 class="max">リレーション</h6>
+                <div class="field suffix border round small">
+                    <select id="relation-type-select" onchange="App.pages.home.loadRelations()">
+                        <option value="creatives">制作物</option>
+                        <option value="advertisements">広告</option>
+                        <option value="plans">企画</option>
+                    </select>
+                </div>
+            </div>
+            <div id="home-relations-container">
+                <!-- 動的に生成 -->
+            </div>
         </div>
-        <!-- 列5: 最近のナレッジ -->
+
+        <!-- Column 4: Reserved (s12 m6 l3) -->
         <div class="s12 m6 l3">
-            <h5 class="center-align">最近のナレッジ</h5>
-            <div id="home-knowledge-container"></div>
+            <h6>その他</h6>
+            <div id="home-reserved-container">
+                <!-- 将来の拡張用 -->
+                <article class="transparent">
+                    <i>info</i>
+                    <p class="small-text">今後の機能拡張用スペース</p>
+                </article>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-    // セッション中に非表示にするwork_idを管理
-    let hiddenCreativeIds = new Set();
-
     // Namespace initialization
-    if (typeof App === 'undefined') {
-        console.error('App is not defined');
-    } else {
+    App.pages.home = {};
 
-        console.log('Initializing App.pages.home');
-        App.pages.home = {};
+    App.pages.home.loadData = function () {
+        const promises = [callGAS('getItems', SHEET_NAMES.CREATIVES)];
+        promises.push(callGAS('getItems', SHEET_NAMES.TASKS));
 
-        App.pages.home.loadData = function () {
-            // membersDataが取得されていない場合は取得
-            const promises = [callGAS('getHomeData')];
-            if (!membersData || membersData.length === 0) {
-                promises.push(callGAS('getMembers'));
-            } else {
-                promises.push(Promise.resolve(membersData));
+        if (!membersData || membersData.length === 0) {
+            promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
+        } else {
+            promises.push(Promise.resolve(null));
+        }
+
+        if (!plansData || plansData.length === 0) {
+            promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
+        } else {
+            promises.push(Promise.resolve(null));
+        }
+
+        Promise.all(promises).then(([creatives, tasks, members, plans]) => {
+            if (members) membersData = members;
+            if (plans) plansData = plans;
+            creativesData = creatives;
+            tasksData = tasks;
+
+            // 挨拶を更新
+            const greetingEl = document.getElementById('home-greeting');
+            if (greetingEl) {
+                const hour = new Date().getHours();
+                let greeting = 'こんにちは';
+                if (hour < 12) greeting = 'おはようございます';
+                else if (hour >= 18) greeting = 'こんばんは';
+
+                greetingEl.textContent = greeting;
             }
-            if (!directoriesData || directoriesData.length === 0) {
-                promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES));
-            } else {
-                promises.push(Promise.resolve(directoriesData));
-            }
 
-            Promise.all(promises).then(([data, members, directories]) => {
-                if (!membersData || membersData.length === 0) {
-                    membersData = members;
-                }
-                if (!directoriesData || directoriesData.length === 0) {
-                    directoriesData = directories;
-                }
+            // Column 1: 新規依頼（未着手のcreatives, forms, questions）
+            App.pages.home.renderNewRequests(creatives);
 
-                const greetingEl = document.getElementById('home-greeting');
-                if (greetingEl) {
-                    greetingEl.textContent = `${data.greeting}、${data.memberName}さん。`;
-                }
+            // Column 2: マイタスク（自分が担当で未完了）
+            App.pages.home.renderMyTasks(tasks);
 
-                // 最新の制作依頼を表示
-                renderNewRequests(data.new_requests || []);
+            // Column 3: リレーション（初期表示は制作物）
+            App.pages.home.loadRelations();
 
-                // 担当中の制作物を表示
-                renderAssignedCreatives(data.assigned_creatives || []);
+            hideLoading();
+        }).catch(handleError);
+    };
 
-                // 最近のナレッジを表示
-                renderKnowledge(data.knowledge || []);
-
-                // 残り時間のリアルタイム更新を開始
-                startRemainingTimeUpdates();
-
-                hideLoading();
-            }).catch(handleError);
-        };
-    }
-
-    function renderNewRequests(newRequests) {
+    /**
+     * Column 1: 新規依頼
+     * ステータスが未着手（creative_status_key === 'TODO'）の制作物を表示
+     */
+    App.pages.home.renderNewRequests = function (creatives) {
         const container = document.getElementById('home-new-requests-container');
         if (!container) return;
-        container.innerHTML = '';
 
-        // 非表示にするwork_idをフィルタ
-        const visibleRequests = newRequests.filter(creative => !hiddenCreativeIds.has(creative.id));
+        const newRequests = creatives.filter(c =>
+            c.creative_status_key === 'TODO' ||
+            c.creative_status_key === 'APPROVED'
+        ).slice(0, 10); // 最新10件
 
-        if (visibleRequests.length === 0) {
-            container.innerHTML = '<article class="transparent"><i>info</i><p>最新の制作依頼はありません</p></article>';
+        if (newRequests.length === 0) {
+            container.innerHTML = '<article class="transparent"><i>info</i><p>新規依頼はありません</p></article>';
             return;
         }
 
-        visibleRequests.forEach(creative => {
-            const card = document.createElement('article');
-            card.className = 'no-padding';
-            card.dataset.creativeId = creative.id;
-
-            // 優先度、制作物種別、依頼者の所属チームを取得
-            const priorityLabel = creative.priority_key ? getConfigLabel(creative.priority_key, 'PRIORITY') : '';
-            const creativeTypeLabel = creative.creative_type_key ? getConfigLabel(creative.creative_type_key, 'CREATIVE_TYPE') : '';
-            let clientTeamLabel = '';
-            if (creative.client_directory_id && typeof directoriesData !== 'undefined') {
-                const directory = directoriesData.find(d => d.id === creative.client_directory_id);
-                if (directory) {
-                    clientTeamLabel = directory.name;
-                }
-            }
-
-            const infoParts = [priorityLabel, creativeTypeLabel, clientTeamLabel].filter(Boolean);
-            const infoText = infoParts.length > 0 ? infoParts.join(' | ') : '';
-
-            card.innerHTML = `
-        <div class="padding">
-            <div class="row">
-                <div class="max">
-                    <h6 class="small">${creative.plan_id ? `${escapeHtml(creative.plan_id)} ` : ''}${escapeHtml(creative.plan_title || '')}</h6>
-                    <h5 class="bold">${escapeHtml(creative.display_id || creative.id)} ${escapeHtml(creative.title || '')}</h5>
-                    ${infoText ? `<div class="small-text">${escapeHtml(infoText)}</div>` : ''}
-                    <div class="chip small">納期: ${formatDateTimeForHome(creative.deadline_at)}</div>
-                </div>
-            </div>
-        </div>
-        <nav class="padding">
-            <button class="max btn-accept" data-creative-id="${escapeHtml(creative.id)}" data-remaining-ms="${creative.remaining_time_ms || 0}">
-                承諾
-                <span class="remaining-time badge" data-remaining-ms="${creative.remaining_time_ms || 0}"></span>
-            </button>
-            <button class="max secondary btn-decline" data-creative-id="${escapeHtml(creative.id)}">保留・辞退</button>
-        </nav>
-      `;
-
-            // 承諾ボタンのイベントリスナー
-            const acceptButton = card.querySelector('.btn-accept');
-            if (acceptButton) {
-                acceptButton.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const creativeId = acceptButton.dataset.creativeId;
-                    if (creativeId) {
-                        handleAcceptCreative(creativeId);
-                    }
-                });
-            }
-
-            // 辞退ボタンのイベントリスナー
-            const declineButton = card.querySelector('.btn-decline');
-            if (declineButton) {
-                declineButton.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const creativeId = declineButton.dataset.creativeId;
-                    if (creativeId) {
-                        handleDeclineCreative(creativeId);
-                    }
-                });
-            }
-
-            // カードクリックでDetailを開く（ボタン以外の領域）
-            card.addEventListener('click', (e) => {
-                if (!e.target.closest('button')) {
-                    App.overlays.creativeDetail.open(creative.id);
-                }
-            });
-
-            container.appendChild(card);
-        });
-    }
-
-    function renderAssignedCreatives(creatives) {
-        const container = document.getElementById('home-creatives-container');
-        if (!container) return;
-        container.innerHTML = '';
-
-        if (creatives.length === 0) {
-            container.innerHTML = '<article class="transparent"><i>info</i><p>担当中の制作物はありません</p></article>';
-            return;
-        }
-
-        creatives.forEach(creative => {
-            const card = document.createElement('article');
-            card.className = 'no-padding ripple';
-
+        container.innerHTML = newRequests.map(creative => {
             const statusLabel = getConfigLabel(creative.creative_status_key, 'CREATIVE_STATUS');
-            const dueDate = formatDateTimeForHome(creative.deadline_at);
-            let statusClass = 'tertiary';
-            const sk = creative.creative_status_key;
-            if (sk === 'TODO' || sk === 'APPROVED') {
-                statusClass = 'error';
-            } else if (sk === 'CREATE' || sk === 'REVIEW' || sk === 'REVISION') {
-                statusClass = 'secondary';
-            } else if (sk === 'DELIVERED') {
-                statusClass = 'primary';
-            }
+            const priorityLabel = getConfigLabel(creative.priority_key, 'PRIORITY');
 
-            card.innerHTML = `
-        <div class="padding">
-            <h6 class="small">${creative.plan_id ? escapeHtml(creative.plan_id) : ''} ${escapeHtml(creative.plan_title || '')}</h6>
-            <h5 class="bold">${escapeHtml(creative.display_id || creative.id)} ${escapeHtml(creative.title || '')}</h5>
-            <div class="row">
-                <span class="badge ${statusClass}">${escapeHtml(statusLabel)}</span>
-                <span class="small-text">納期: ${dueDate}</span>
-            </div>
-        </div>
-      `;
+            return `
+                <article class="no-padding small-padding border" style="cursor: pointer; margin-bottom: 8px;" onclick="App.overlays.creativeDetail.open('${creative.id}')">
+                    <div class="small-text"><strong>${escapeHtml(creative.display_id || creative.id)}</strong></div>
+                    <div class="small-text">${escapeHtml(creative.title || '')}</div>
+                    <div class="row no-space" style="margin-top: 4px;">
+                        <span class="chip small">${escapeHtml(statusLabel)}</span>
+                        ${priorityLabel ? `<span class="chip small">${escapeHtml(priorityLabel)}</span>` : ''}
+                    </div>
+                    ${creative.deadline_at ? `<div class="small-text" style="margin-top: 4px;">納期: ${formatDate(creative.deadline_at)}</div>` : ''}
+                </article>
+            `;
+        }).join('');
+    };
 
-            card.onclick = () => App.overlays.creativeDetail.open(creative.id);
-            container.appendChild(card);
-        });
-    }
-
-    function renderReviewRequests(reviewRequests) {
-        const container = document.getElementById('home-review-requests-container');
+    /**
+     * Column 2: マイタスク
+     * 自分が担当者で、ステータスが未完了（task_status_key !== 'DONE'）のタスクを表示
+     */
+    App.pages.home.renderMyTasks = function (tasks) {
+        const container = document.getElementById('home-tasks-container');
         if (!container) return;
-        container.innerHTML = '';
 
-        if (reviewRequests.length === 0) {
-            container.innerHTML = '<article class="transparent"><i>info</i><p>受付中のレビューはありません</p></article>';
+        // 現在のユーザーを取得（仮）
+        const currentUserEmail = templateVariables?.email;
+        const currentUser = membersData.find(m => m.email === currentUserEmail);
+
+        const myTasks = tasks.filter(t =>
+            t.assign_to === currentUser?.id &&
+            t.task_status_key !== 'DONE'
+        ).sort((a, b) => {
+            // ends_at昇順でソート
+            const aDate = a.ends_at ? new Date(a.ends_at) : new Date('9999-12-31');
+            const bDate = b.ends_at ? new Date(b.ends_at) : new Date('9999-12-31');
+            return aDate - bDate;
+        }).slice(0, 10);
+
+        if (myTasks.length === 0) {
+            container.innerHTML = '<article class="transparent"><i>info</i><p>タスクはありません</p></article>';
             return;
         }
 
-        reviewRequests.forEach(reviewRequest => {
-            const card = document.createElement('article');
-            card.className = 'no-padding ripple';
+        container.innerHTML = myTasks.map(task => {
+            const statusLabel = getConfigLabel(task.task_status_key, 'TASK_STATUS');
+            const priorityLabel = getConfigLabel(task.priority_key, 'PRIORITY');
 
-            const dueDateHtml = reviewRequest.due_datetime
-                ? formatDateForReview(reviewRequest.due_datetime)
-                : '';
+            return `
+                <article class="no-padding small-padding border" style="cursor: pointer; margin-bottom: 8px;" onclick="if(App.overlays.taskDetail) App.overlays.taskDetail.open('${task.id}')">
+                    <div class="small-text"><strong>${escapeHtml(task.display_id || task.id)}</strong></div>
+                    <div class="small-text">${escapeHtml(task.title || '')}</div>
+                    <div class="row no-space" style="margin-top: 4px;">
+                        <span class="chip small">${escapeHtml(statusLabel)}</span>
+                        ${priorityLabel ? `<span class="chip small">${escapeHtml(priorityLabel)}</span>` : ''}
+                    </div>
+                    ${task.ends_at ? `<div class="small-text" style="margin-top: 4px;">期限: ${formatDate(task.ends_at)}</div>` : ''}
+                </article>
+            `;
+        }).join('');
+    };
 
-            const creatorIcon = reviewRequest.creator_icon || '';
-            const creatorName = reviewRequest.creator_name || '不明';
+    /**
+     * Column 3: リレーション
+     * ドロップダウンで選択されたタイプに応じてassignmentsテーブルから関連アイテムを表示
+     */
+    App.pages.home.loadRelations = function () {
+        const container = document.getElementById('home-relations-container');
+        const typeSelect = document.getElementById('relation-type-select');
 
-            card.innerHTML = `
-        <img src="https://via.placeholder.com/800x450" class="responsive top-round" alt="サムネイル">
-        <div class="padding">
-             <h5 class="bold">${escapeHtml(reviewRequest.review_request_id || '')} ${escapeHtml(reviewRequest.review_title || '')}</h5>
-             <div class="row middle-align">
-                <img src="${escapeHtml(creatorIcon)}" class="circle tiny" alt="${escapeHtml(creatorName)}">
-                <span>${escapeHtml(creatorName)}</span>
-                <span class="small-text right-align max">${dueDateHtml}</span>
-             </div>
-        </div>
-      `;
+        if (!container || !typeSelect) return;
 
-            // Thumbnail loader logic
-            let firstFile = null;
-            if (reviewRequest.files && reviewRequest.files.length > 0) {
-                const sortedFiles = [...reviewRequest.files].sort((a, b) => {
-                    const dateA = new Date(a.created_at || 0);
-                    const dateB = new Date(b.created_at || 0);
-                    return dateA - dateB;
-                });
-                firstFile = sortedFiles[0];
-            }
+        const selectedType = typeSelect.value;
 
-            if (firstFile && firstFile.file_id) {
-                const img = card.querySelector('img.responsive');
-                if (img) img.src = `https:/\/drive.google.com/thumbnail?id=${firstFile.file_id}&sz=w800-h450`;
-            }
+        // 現在は簡易実装：creativesDataから表示
+        let items = [];
 
-            card.onclick = () => openReviewRequestDetailModal(reviewRequest.review_request_id);
-            container.appendChild(card);
-        });
-    }
+        switch (selectedType) {
+            case 'creatives':
+                items = creativesData.slice(0, 10);
+                break;
+            case 'advertisements':
+                items = advertisementsData ? advertisementsData.slice(0, 10) : [];
+                break;
+            case 'plans':
+                items = plansData.slice(0, 10);
+                break;
+        }
 
-    function renderKnowledge(knowledgeList) {
-        const container = document.getElementById('home-knowledge-container');
-        if (!container) return;
-        container.innerHTML = '';
-
-        if (knowledgeList.length === 0) {
-            container.innerHTML = '<article class="transparent"><i>info</i><p>最近のナレッジはありません</p></article>';
+        if (items.length === 0) {
+            container.innerHTML = '<article class="transparent"><i>info</i><p>関連アイテムはありません</p></article>';
             return;
         }
 
-        knowledgeList.forEach((item, index) => {
-            const card = document.createElement('article');
-            card.className = 'no-padding ripple';
-            card.dataset.knowledgeId = item.knowledge_id;
+        container.innerHTML = items.map(item => {
+            const displayId = item.display_id || item.id;
+            const title = item.title || item.name || '';
 
-            const contentHtml = item.knowledge_content || '';
-            const creatorIcon = item.creator_icon || 'https://via.placeholder.com/24';
-            const creatorName = item.creator_name || '';
-
-            card.innerHTML = `
-        <div class="padding knowledge-content">${contentHtml}</div>
-        <div class="padding top-border row middle-align">
-           <img src="${escapeHtml(creatorIcon)}" class="circle tiny" alt="${escapeHtml(creatorName)}">
-           <span class="small-text">${escapeHtml(creatorName)}</span>
-           <span class="small-text max right-align">${formatDateTimeForHome(item.created_at)}</span>
-        </div>
-      `;
-
-            card.onclick = () => openKnowledgeDetailModal(item.knowledge_id);
-            container.appendChild(card);
-        });
-    }
-
-    function calculateRemainingTime(ms) {
-        if (!ms || ms <= 0) return '';
-        const totalSeconds = ms / 1000;
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = Math.floor(totalSeconds % 60);
-        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    }
-
-    let remainingTimeIntervalId = null;
-
-    function updateRemainingTimes() {
-        const acceptButtons = document.querySelectorAll('.btn-accept');
-        const now = new Date().getTime();
-
-        acceptButtons.forEach(button => {
-            const initialRemainingMs = parseInt(button.dataset.remainingMs) || 0;
-            if (initialRemainingMs <= 0) return;
-
-            const initialTimeAttr = button.dataset.initialTime;
-            if (!initialTimeAttr) {
-                button.dataset.initialTime = now.toString();
-                return;
-            }
-
-            const initialTime = parseInt(initialTimeAttr);
-            const elapsed = now - initialTime;
-            const remainingMs = initialRemainingMs - elapsed;
-
-            const remainingTimeElement = button.querySelector('.remaining-time');
-            if (remainingTimeElement) {
-                if (remainingMs > 0) {
-                    remainingTimeElement.textContent = calculateRemainingTime(remainingMs);
-                } else {
-                    remainingTimeElement.textContent = "期限切れ";
-                }
-            }
-        });
-    }
-
-    function startRemainingTimeUpdates() {
-        if (remainingTimeIntervalId) clearInterval(remainingTimeIntervalId);
-        remainingTimeIntervalId = setInterval(updateRemainingTimes, 1000);
-        updateRemainingTimes();
-    }
-
-    function stopRemainingTimeUpdates() {
-        if (remainingTimeIntervalId) {
-            clearInterval(remainingTimeIntervalId);
-            remainingTimeIntervalId = null;
-        }
-    }
-
-    function formatDateForReview(dueDatetime) {
-        if (!dueDatetime) return '';
-        try {
-            const date = new Date(dueDatetime);
-            const digits = [date.getFullYear(), date.getMonth() + 1, date.getDate(), date.getHours(), date.getMinutes()].map(num => String(num).padStart(2, '0'));
-            const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-            return `~ ${digits[0].substring(2)}/${digits[1]}/${digits[2]}(${weekdays[date.getDay()]}) ${digits[3]}:${digits[4]}`;
-        } catch (e) {
-            return '';
-        }
-    }
-
-    function handleAcceptCreative(creativeId) {
-        showLoading();
-        callGAS('acceptCreative', creativeId).then(result => {
-            hideLoading();
-            hiddenCreativeIds.add(creativeId);
-            callGAS('getHomeData').then(data => {
-                renderNewRequests(data.new_requests || []);
-            }).catch(handleError);
-        }).catch(handleError);
-    }
-
-    function handleDeclineCreative(creativeId) {
-        hiddenCreativeIds.add(creativeId);
-        callGAS('getHomeData').then(data => {
-            renderNewRequests(data.new_requests || []);
-        }).catch(handleError);
-    }
-
-    function formatDateTimeForHome(dateString) {
-        if (!dateString) return 'yyyy/mm/dd(曜日) hh:mm';
-        try {
-            const dt = new Date(dateString);
-            const digits = [dt.getFullYear(), dt.getMonth() + 1, dt.getDate(), dt.getHours(), dt.getMinutes()].map(num => String(num).padStart(2, '0'));
-            const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-            return `${digits[0]}/${digits[1]}/${digits[2]}(${weekdays[dt.getDay()]}) ${digits[3]}:${digits[4]}`;
-        } catch (e) {
-            return 'yyyy/mm/dd(曜日) hh:mm';
-        }
-    }
+            return `
+                <article class="no-padding small-padding border" style="cursor: pointer; margin-bottom: 8px;" onclick="if(App.overlays.${selectedType === 'creatives' ? 'creativeDetail' : selectedType === 'plans' ? 'planDetail' : 'advertisementDetail'}) App.overlays.${selectedType === 'creatives' ? 'creativeDetail' : selectedType === 'plans' ? 'planDetail' : 'advertisementDetail'}.open('${item.id}')">
+                    <div class="small-text"><strong>${escapeHtml(displayId)}</strong></div>
+                    <div class="small-text">${escapeHtml(title)}</div>
+                </article>
+            `;
+        }).join('');
+    };
 </script>

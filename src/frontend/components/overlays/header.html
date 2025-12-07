@@ -1,15 +1,24 @@
 <header class="fixed">
     <nav>
-
         <h5 class="max" id="header-title-default">ZARMS 2026</h5>
         <h5 class="max" id="header-title-detail-header" style="display: none;"></h5>
 
-        <div class="field round border prefix min" id="id-search-container">
-            <input type="text" id="id-search-input" placeholder="ID検索" onkeydown="handleIdSearchKeydown(event)"
-                oninput="handleIdSearchInput(event)" onfocus="handleIdSearchFocus(event)"
-                onblur="handleIdSearchBlur(event)">
-            <menu id="id-search-menu" class="min"></menu>
-            <button class="transparent circle" id="id-search-button" onclick="handleIdSearchClick()">
+        <!-- 強化された検索バー -->
+        <div class="field round border prefix" id="search-container" style="min-width: 300px;">
+            <select id="search-target" style="border: none; background: transparent; padding: 4px;">
+                <option value="all">すべて</option>
+                <option value="id">ID</option>
+                <option value="title">タイトル</option>
+            </select>
+            <input type="text" id="search-input" placeholder="検索..." onkeydown="handleSearchKeydown(event)"
+                oninput="handleSearchInput(event)" onfocus="handleSearchFocus(event)" onblur="handleSearchBlur(event)">
+
+            <!-- 検索結果ドロップダウン -->
+            <menu id="search-results-menu" class="min"
+                style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--surface); border: 1px solid var(--outline); border-radius: 8px; max-height: 300px; overflow-y: auto; z-index: 1000;">
+            </menu>
+
+            <button class="transparent circle" onclick="handleSearchClick()">
                 <i>search</i>
             </button>
         </div>

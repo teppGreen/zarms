@@ -1,17 +1,14 @@
+<!-- knowledgesテーブルを表示するページ -->
+
 <div id="tab-knowledges" class="tab-content" style="display: none;">
     <article class="no-padding">
         <div class="scroll">
             <table id="knowledges-table" class="stripes">
                 <thead>
-                    <tr>
-                        <th>ナレッジ種別</th>
-                        <th>作成日</th>
-                        <th>作成者</th>
-                        <th>内容</th>
-                        <th></th>
-                    </tr>
+                    <!-- ヘッダーは renderTable() で動的生成 -->
                 </thead>
-                <tbody id="knowledges-table-body">
+                <tbody>
+                    <!-- ボディは renderTable() で動的生成 -->
                 </tbody>
             </table>
         </div>
@@ -23,34 +20,21 @@
     App.pages.knowledges = {};
 
     App.pages.knowledges.loadData = function () {
-        callGAS('getKnowledge').then(data => {
-            knowledgeData = data;
-            const container = document.getElementById('knowledges-table-body');
-            container.innerHTML = ''; // Clear existing rows
-            if (!knowledgeData || knowledgeData.length === 0) {
-                // If no data, display message in the table body
-                container.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #6b7280; padding: 40px;">ナレッジがありません</td></tr>';
-                hideLoading();
-                return;
-            }
-            knowledgeData.forEach(item => {
-                container.innerHTML += `
-                    <tr>
-                        <td><span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(item.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span></td>
-                        <td>${formatDate(item.created_at)}</td>
-                        <td>${escapeHtml(item.creator_name)}</td>
-                        <td>
-                            <div style="font-weight: bold; margin-bottom: 4px;">${escapeHtml(item.work_title)}</div>
-                            <div>${escapeHtml(item.knowledge_content.substring(0, 150))}...</div>
-                        </td>
-                        <td>
-                            <button class="button-icon" onclick="openKnowledgeDetailModal('${item.id}')">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            });
+        const promises = [callGAS('getItems', SHEET_NAMES.KNOWLEDGES)];
+
+        // 必要に応じて関連データも取得
+        if (!membersData || membersData.length === 0) {
+            promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
+        } else {
+            promises.push(Promise.resolve(null));
+        }
+
+        Promise.all(promises).then(results => {
+            knowledgesData = results[0];
+            if (results[1]) membersData = results[1];
+
+            // ReadOnlyテーブルをレンダリング
+            renderTable(SHEET_NAMES.KNOWLEDGES, applyFiltersAndSort(SHEET_NAMES.KNOWLEDGES, knowledgesData), knowledgesTableHeaders);
             hideLoading();
         }).catch(handleError);
     };

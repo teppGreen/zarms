@@ -633,10 +633,13 @@
   // ============================================
 
   function switchTab(tabName) {
-    // closeCreativeDetailOverlay();
-    // ホームタブ以外に切り替える場合は残り時間の更新を停止
-    if (tabName !== 'home') {
-      stopRemainingTimeUpdates();
+    // 他のタブに切り替える前にhomeタブの処理を停止
+    const currentTab = document.querySelector('.tab-content:not([style*="display: none"])');
+    if (currentTab && currentTab.id === 'tab-home') {
+      // stopRemainingTimeUpdatesが存在する場合のみ呼び出し
+      if (typeof stopRemainingTimeUpdates === 'function') {
+        stopRemainingTimeUpdates();
+      }
     }
     const sidebarLinks = document.querySelectorAll('nav.left a');
     if (sidebarLinks.length > 0) {
@@ -2256,10 +2259,234 @@
           alert('このIDタイプの詳細は表示できません: ' + tableName);
         }
       })
-      .catch(err => {
+      .catch(error => {
         hideIdSearchLoading();
-        handleError(err);
+        handleError(error);
       });
+  }
+
+  // ============================================
+  // 強化された検索機能
+  // ============================================
+
+  /**
+   * 検索入力時のハンドラー（リアルタイム候補表示）
+   */
+  function handleSearchInput(event) {
+    const input = event.target;
+    const searchValue = input.value.trim();
+    const searchTarget = document.getElementById('search-target').value;
+    const resultsMenu = document.getElementById('search-results-menu');
+
+    if (!searchValue) {
+      resultsMenu.style.display = 'none';
+      return;
+    }
+
+    // ID検索の場合
+    if (searchTarget === 'id') {
+      // リアルタイム検索はせず、Enterキー押下時に実行
+      resultsMenu.style.display = 'none';
+      return;
+    }
+
+    // テキスト検索の場合
+    const results = performTextSearch(searchValue, searchTarget);
+    displaySearchResults(results);
+  }
+
+  /**
+   * キーダウンハンドラー（Enter検索）
+   */
+  function handleSearchKeydown(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleSearchClick();
+    }
+  }
+
+  /**
+   * フォーカスハンドラー
+   */
+  function handleSearchFocus(event) {
+    // 既に入力値がある場合は候補を再表示
+    const input = event.target;
+    if (input.value.trim()) {
+      handleSearchInput(event);
+    }
+  }
+
+  /**
+   * ブラーハンドラー（少し遅延してメニューを閉じる）
+   */
+  function handleSearchBlur(event) {
+    setTimeout(() => {
+      const resultsMenu = document.getElementById('search-results-menu');
+      if (resultsMenu) {
+        resultsMenu.style.display = 'none';
+      }
+    }, 200);
+  }
+
+  /**
+   * 検索ボタンクリック / Enterキー押下時の検索実行
+   */
+  function handleSearchClick() {
+    const input = document.getElementById('search-input');
+    const searchValue = input.value.trim();
+    const searchTarget = document.getElementById('search-target').value;
+
+    if (!searchValue) return;
+
+    const resultsMenu = document.getElementById('search-results-menu');
+    resultsMenu.style.display = 'none';
+
+    // ID検索の場合
+    if (searchTarget === 'id') {
+      performIdSearch(searchValue);
+    } else {
+      // テキスト検索の場合は候補を表示
+      const results = performTextSearch(searchValue, searchTarget);
+      if (results.length === 1) {
+        // 結果が1件のみの場合は直接開く
+        openDetailModal(results[0]);
+      } else if (results.length > 0) {
+        // 複数の場合はドロップダウン表示
+        displaySearchResults(results);
+      } else {
+        alert('該当するデータが見つかりません');
+      }
+    }
+  }
+
+  /**
+   * ID検索の実行
+   */
+  function performIdSearch(searchValue) {
+    const parts = searchValue.split('-');
+    const targetCode = parts[parts.length - 1];
+
+    showLoading();
+    callGAS('searchByCode', targetCode)
+      .then(result => {
+        hideLoading();
+
+        if (!result) {
+          alert('該当するデータが見つかりません');
+          return;
+        }
+
+        const { item, tableName } = result;
+        openDetailModal({ item, tableName, id: item.id });
+      })
+      .catch(error => {
+        hideLoading();
+        handleError(error);
+      });
+  }
+
+  /**
+   * テキスト検索の実行（フロントエンドデータから検索）
+   */
+  function performTextSearch(searchValue, searchTarget) {
+    const results = [];
+    const searchLower = searchValue.toLowerCase();
+
+    // 検索対象のテーブルとフィールドを定義
+    const searchConfigs = [
+      { data: creativesData, tableName: SHEET_NAMES.CREATIVES, fields: ['title', 'display_id'] },
+      { data: plansData, tableName: SHEET_NAMES.PLANS, fields: ['title', 'display_id'] },
+      { data: tasksData, tableName: SHEET_NAMES.TASKS, fields: ['title', 'display_id'] },
+      { data: membersData, tableName: SHEET_NAMES.MEMBERS, fields: ['nickname', 'email'] }
+    ];
+
+    searchConfigs.forEach(config => {
+      if (!config.data) return;
+
+      config.data.forEach(item => {
+        let matches = false;
+
+        if (searchTarget === 'all') {
+          // すべてのフィールドを検索
+          matches = config.fields.some(field => {
+            const value = item[field];
+            return value && value.toString().toLowerCase().includes(searchLower);
+          });
+        } else if (searchTarget === 'title') {
+          // タイトルのみ検索
+          const titleField = config.fields.find(f => f.includes('title') || f.includes('nickname'));
+          if (titleField) {
+            const value = item[titleField];
+            matches = value && value.toString().toLowerCase().includes(searchLower);
+          }
+        }
+
+        if (matches) {
+          results.push({
+            item: item,
+            tableName: config.tableName,
+            id: item.id,
+            displayText: `[${config.tableName}] ${item.display_id || item.id}: ${item.title || item.nickname || item.email || ''}`
+          });
+        }
+      });
+    });
+
+    return results.slice(0, 20); // 最大20件
+  }
+
+  /**
+   * 検索結果をドロップダウンに表示
+   */
+  function displaySearchResults(results) {
+    const resultsMenu = document.getElementById('search-results-menu');
+    if (!resultsMenu) return;
+
+    if (results.length === 0) {
+      resultsMenu.style.display = 'none';
+      return;
+    }
+
+    resultsMenu.innerHTML = results.map(result => {
+      return `
+        <a class="row" style="padding: 8px 16px; cursor: pointer;" onclick='openDetailModalFromSearch(${JSON.stringify(result).replace(/'/g, "\\'")}); event.stopPropagation();'>
+          <span class="small-text">${escapeHtml(result.displayText)}</span>
+        </a>
+      `;
+    }).join('');
+
+    resultsMenu.style.display = 'block';
+  }
+
+  /**
+   * 検索結果から詳細モーダルを開く（グローバル関数）
+   */
+  window.openDetailModalFromSearch = function (result) {
+    openDetailModal(result);
+    const resultsMenu = document.getElementById('search-results-menu');
+    if (resultsMenu) resultsMenu.style.display = 'none';
+    const input = document.getElementById('search-input');
+    if (input) input.value = '';
+  };
+
+  /**
+   * テーブル名に応じた詳細モーダルを開く
+   */
+  function openDetailModal(result) {
+    const { tableName, id } = result;
+
+    if (tableName === SHEET_NAMES.CREATIVES && App.overlays.creativeDetail) {
+      App.overlays.creativeDetail.open(id);
+    } else if (tableName === SHEET_NAMES.PLANS && App.overlays.planDetail) {
+      App.overlays.planDetail.open(id);
+    } else if (tableName === SHEET_NAMES.TASKS && App.overlays.taskDetail) {
+      App.overlays.taskDetail.open(id);
+    } else if (tableName === SHEET_NAMES.MEMBERS && App.overlays.memberDetail) {
+      App.overlays.memberDetail.open(id);
+    } else {
+      console.log('Unknown table for search result:', tableName);
+      alert('このテーブルの詳細は表示できません: ' + tableName);
+    }
   }
 
   function handleIdSearchClick() {
@@ -2420,6 +2647,7 @@
       [SHEET_NAMES.EVENTS]: eventsTableHeaders,
       [SHEET_NAMES.EXPENSES]: expensesTableHeader,
       [SHEET_NAMES.HARDWARES]: hardwaresTableHeaders,
+      [SHEET_NAMES.KNOWLEDGES]: knowledgesTableHeaders,
       [SHEET_NAMES.LICENSES]: licensesTableHeaders,
       [SHEET_NAMES.MEDIUMS]: mediumsTableHeaders,
       [SHEET_NAMES.MEMBERS]: membersTableHeaders,
