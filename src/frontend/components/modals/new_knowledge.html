@@ -1,6 +1,6 @@
 <dialog id="modal-new-knowledge" class="modal large">
     <h5 class="bold">新規ナレッジ作成</h5>
-    <form id="new-knowledge-form" onsubmit="window.App.modals.new_knowledge.submit(event)">
+    <form id="new-knowledge-form" onsubmit="App.modals.new_knowledge.submit(event)">
         <div class="modal-content">
             <div class="field label border">
                 <select name="knowledge_type_key" required></select>
@@ -9,7 +9,7 @@
             </div>
             <div class="field label border">
                 <input type="text" name="creative_search" placeholder=" "
-                    oninput="window.App.modals.new_knowledge.searchCreatives(this.value)" autocomplete="off">
+                    oninput="App.modals.new_knowledge.searchCreatives(this.value)" autocomplete="off">
                 <label>紐づける制作物 <span class="error-text">*</span></label>
                 <input type="hidden" name="creative_id">
                 <div id="creative-suggestions-knowledge" class="menu"></div>
@@ -48,9 +48,9 @@
 
 <script>
     (function () {
-        window.App.modals.new_knowledge = window.App.modals.new_knowledge || {};
+        App.modals.new_knowledge = App.modals.new_knowledge || {};
 
-        window.App.modals.new_knowledge.open = function () {
+        App.modals.new_knowledge.open = function () {
             const form = document.getElementById('new-knowledge-form');
             form.reset();
             document.getElementById('knowledge-content-editor').innerHTML = '';
@@ -81,7 +81,7 @@
             }
         };
 
-        window.App.modals.new_knowledge.searchCreatives = function (query) {
+        App.modals.new_knowledge.searchCreatives = function (query) {
             const creativeIdInput = document.querySelector('#new-knowledge-form input[name="creative_id"]');
             const suggestionsContainer = document.getElementById('creative-suggestions-knowledge');
             if (!query) {
@@ -108,7 +108,7 @@
             suggestionsContainer.style.display = filteredCreatives.length > 0 ? 'block' : 'none';
         };
 
-        window.App.modals.new_knowledge.submit = function (event) {
+        App.modals.new_knowledge.submit = function (event) {
             event.preventDefault();
             const form = event.target;
             const creativeId = form.elements.creative_id.value;

@@ -1,13 +1,13 @@
 <script>
     (function () {
         // テーブルレンダリング用の名前空間を初期化
-        if (!window.App.utils) window.App.utils = {};
-        window.App.utils.tables = {};
+        if (!App.utils) App.utils = {};
+        App.utils.tables = {};
 
         /**
          * テーブルを描画する
          */
-        window.App.utils.tables.render = function (name, data, headers) {
+        App.utils.tables.render = function (name, data, headers) {
             const table = document.getElementById(`${name}-table`);
             if (!table) return;
             const thead = table.querySelector('thead');
@@ -31,7 +31,7 @@
                         sortIcon.className = 'valign-middle';
                         sortIcon.textContent = state.sortKey === header.key ? (state.sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'swap_vert';
                         th.style.cursor = 'pointer';
-                        th.addEventListener('click', () => window.App.utils.tables.sort(name, header.key));
+                        th.addEventListener('click', () => App.utils.tables.sort(name, header.key));
                         iconsDiv.appendChild(sortIcon);
                     }
                     if (header.filterable) {
@@ -39,7 +39,7 @@
                         filterIcon.className = 'valign-middle';
                         filterIcon.textContent = 'filter_list';
                         filterIcon.style.cursor = 'pointer';
-                        filterIcon.addEventListener('click', (e) => window.App.utils.tables.showFilterMenu(e, name, header.key));
+                        filterIcon.addEventListener('click', (e) => App.utils.tables.showFilterMenu(e, name, header.key));
                         iconsDiv.appendChild(filterIcon);
                     }
                     th.appendChild(iconsDiv);
@@ -131,7 +131,7 @@
                             content = `<button class="btn-link" onclick="event.stopPropagation(); App.modals.detail_member.open('${item.id}')">詳細</button>`;
                             break;
                         case 'assignees':
-                            content = window.App.utils.tables.renderAssignees(item.assignees);
+                            content = App.utils.tables.renderAssignees(item.assignees);
                             break;
                         case 'icon_gfile_id':
                             content = `<img src="${escapeHtml(item.icon_gfile_id ? 'https://drive.google.com/thumbnail?id=' + item.icon_gfile_id : '')}" class="avatar" alt="">`;
@@ -168,7 +168,7 @@
         /**
          * テーブルをソートする
          */
-        window.App.utils.tables.sort = function (tableName, columnKey) {
+        App.utils.tables.sort = function (tableName, columnKey) {
             const state = tableState[tableName];
             if (state.sortKey === columnKey) {
                 state.sortOrder = state.sortOrder === 'asc' ? 'desc' : 'asc';
@@ -184,9 +184,9 @@
         /**
          * フィルターメニューを表示する
          */
-        window.App.utils.tables.showFilterMenu = function (event, tableName, columnKey) {
+        App.utils.tables.showFilterMenu = function (event, tableName, columnKey) {
             event.stopPropagation();
-            window.App.utils.tables.closeFilterMenu();
+            App.utils.tables.closeFilterMenu();
             const state = tableState[tableName];
             const data = tableName === SHEET_NAMES.CREATIVES ? creativesData : tableName === SHEET_NAMES.PLANS ? plansData : tableName === SHEET_NAMES.TASKS ? tasksData : membersData;
             const uniqueValues = [...new Set(data.map(item => item[columnKey]))].filter(v => v);
@@ -224,7 +224,7 @@
                 } else {
                     delete state.filters[columnKey];
                 }
-                window.App.utils.tables.closeFilterMenu();
+                App.utils.tables.closeFilterMenu();
                 if (tableName) {
                     loadTabData(tableName);
                 }
@@ -234,7 +234,7 @@
             clearBtn.className = 'btn btn-secondary';
             clearBtn.onclick = () => {
                 delete state.filters[columnKey];
-                window.App.utils.tables.closeFilterMenu();
+                App.utils.tables.closeFilterMenu();
                 const dataLoaders = { [SHEET_NAMES.CREATIVES]: loadcreativesData, [SHEET_NAMES.PLANS]: loadProjectsData, [SHEET_NAMES.TASKS]: loadTasksData, [SHEET_NAMES.MEMBERS]: loadMembersData };
                 if (dataLoaders[tableName]) {
                     showLoading();
@@ -250,24 +250,24 @@
             popup.style.top = `${rect.bottom + window.scrollY}px`;
             popup.style.display = 'block';
             popup.addEventListener('click', (e) => { e.stopPropagation(); });
-            setTimeout(() => { document.addEventListener('click', window.App.utils.tables.closeFilterMenu); }, 0);
+            setTimeout(() => { document.addEventListener('click', App.utils.tables.closeFilterMenu); }, 0);
         };
 
         /**
          * フィルターメニューを閉じる
          */
-        window.App.utils.tables.closeFilterMenu = function () {
+        App.utils.tables.closeFilterMenu = function () {
             const popup = document.getElementById('filter-popup');
             if (popup) {
                 popup.remove();
-                document.removeEventListener('click', window.App.utils.tables.closeFilterMenu);
+                document.removeEventListener('click', App.utils.tables.closeFilterMenu);
             }
         };
 
         /**
          * フィルターとソートを適用する
          */
-        window.App.utils.tables.applyFiltersAndSort = function (tableName, data) {
+        App.utils.tables.applyFiltersAndSort = function (tableName, data) {
             const state = tableState[tableName];
             let processedData = [...data];
             const filterKeys = Object.keys(state.filters);
@@ -298,7 +298,7 @@
         /**
          * ヘッダー定義を取得する
          */
-        window.App.utils.tables.getHeaderDef = function (tableName, field) {
+        App.utils.tables.getHeaderDef = function (tableName, field) {
             const headers = tableName === SHEET_NAMES.CREATIVES ? creativesTableHeaders : tableName === SHEET_NAMES.PLANS ? plansTableHeaders : tableName === SHEET_NAMES.TASKS ? tasksTableHeaders : membersTableHeaders;
             return headers.find(h => h.key === field);
         };
@@ -306,7 +306,7 @@
         /**
          * テーブルヘッダーを取得する
          */
-        window.App.utils.tables.getTableHeaders = function (tableName) {
+        App.utils.tables.getTableHeaders = function (tableName) {
             const headersMap = {
                 [SHEET_NAMES.ADVERTISEMENTS]: advertisementsTableHeaders,
                 [SHEET_NAMES.BUDGETS]: budgetsTableHeaders,
@@ -333,7 +333,7 @@
         /**
          * アサイニーを描画する
          */
-        window.App.utils.tables.renderAssignees = function (assignees) {
+        App.utils.tables.renderAssignees = function (assignees) {
             if (!assignees || assignees.length === 0) return '-';
             return `<div class="avatar-stack">${assignees.map(a => `<img src="${a.member_icon || 'https://via.placeholder.com/32'}" class="avatar" title="${escapeHtml(a.member_name)}" alt="${escapeHtml(a.member_name)}">`).join('')}</div>`;
         };
@@ -341,9 +341,9 @@
         /**
          * 特定の行のみを再描画する (Optimistic UI)
          */
-        window.App.utils.tables.reRenderTableRow = function (tableName, id) {
+        App.utils.tables.reRenderTableRow = function (tableName, id) {
             const dataArray = getDataArray(tableName);
-            const headers = window.App.utils.tables.getTableHeaders(tableName);
+            const headers = App.utils.tables.getTableHeaders(tableName);
 
             if (!dataArray || !headers) {
                 console.warn(`reRenderTableRow: テーブル ${tableName} が見つかりません`);

@@ -6,9 +6,9 @@
 
 <script>
     (function () {
-        window.App.modals.new_creative = window.App.modals.new_creative || {};
+        App.modals.new_creative = App.modals.new_creative || {};
 
-        window.App.modals.new_creative.open = function () {
+        App.modals.new_creative.open = function () {
             const promises = [];
             if (!plansData || plansData.length === 0) {
                 promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
@@ -47,9 +47,9 @@
                 .map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`)
                 .join('');
 
-            formContainer.innerHTML = `<form id="new-creative-form-element" onsubmit="window.App.modals.new_creative.submit(event)">
+            formContainer.innerHTML = `<form id="new-creative-form-element" onsubmit="App.modals.new_creative.submit(event)">
       <div class="field label border">
-        <input type="text" name="plan_title" required placeholder=" " oninput="window.App.modals.new_creative.searchPlans(this.value)" autocomplete="off">
+        <input type="text" name="plan_title" required placeholder=" " oninput="App.modals.new_creative.searchPlans(this.value)" autocomplete="off">
         <label>企画タイトル</label>
         <input type="hidden" name="plan_id">
         <div id="plan-suggestions" class="menu"></div>
@@ -67,7 +67,7 @@
         <i>arrow_drop_down</i>
       </div>
       <div class="field label border">
-        <select name="creative_type_key" onchange="window.App.modals.new_creative.updateRegulationPreset(this.value)">
+        <select name="creative_type_key" onchange="App.modals.new_creative.updateRegulationPreset(this.value)">
           <option value="">選択してください</option>
           ${creativeTypeOptions}
         </select>
@@ -103,7 +103,7 @@
             }
         }
 
-        window.App.modals.new_creative.updateRegulationPreset = function (creativeTypeKey) {
+        App.modals.new_creative.updateRegulationPreset = function (creativeTypeKey) {
             if (!creativeTypeKey) return;
             const creativeType = (configData['CREATIVE_TYPE'] || []).find(wt => wt.config_key === creativeTypeKey);
             if (creativeType && creativeType.config_preset_value) {
@@ -111,7 +111,7 @@
             }
         };
 
-        window.App.modals.new_creative.searchPlans = function (query) {
+        App.modals.new_creative.searchPlans = function (query) {
             const suggestionsContainer = document.getElementById('plan-suggestions');
             const planIdInput = document.querySelector('#new-creative-form-element input[name="plan_id"]');
             if (!query) {
@@ -154,7 +154,7 @@
             }
         });
 
-        window.App.modals.new_creative.submit = function (event) {
+        App.modals.new_creative.submit = function (event) {
             event.preventDefault();
             const form = event.target;
 

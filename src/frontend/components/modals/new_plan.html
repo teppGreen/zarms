@@ -1,6 +1,6 @@
 <dialog id="modal-new-plan" class="modal">
     <h5 class="bold">新規企画作成</h5>
-    <form id="new-plan-form" onsubmit="window.App.modals.new_plan.submit(event)">
+    <form id="new-plan-form" onsubmit="App.modals.new_plan.submit(event)">
         <div class="modal-content">
             <div class="field label border">
                 <input type="text" name="title" required>
@@ -17,9 +17,9 @@
 
 <script>
     (function () {
-        window.App.modals.new_plan = window.App.modals.new_plan || {};
+        App.modals.new_plan = App.modals.new_plan || {};
 
-        window.App.modals.new_plan.open = function () {
+        App.modals.new_plan.open = function () {
             const form = document.getElementById('new-plan-form');
             form.reset();
             // IME変換確定時のEnterキーを無視する処理を追加
@@ -34,7 +34,7 @@
             openModal('modal-new-plan');
         };
 
-        window.App.modals.new_plan.submit = function (event) {
+        App.modals.new_plan.submit = function (event) {
             event.preventDefault();
             const title = event.target.elements.title.value;
             showModalLoading('modal-new-plan', '新規企画を作成しています');
