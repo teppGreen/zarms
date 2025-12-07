@@ -1,6 +1,6 @@
 <dialog id="modal-new-task" class="modal">
     <h5 class="bold">新規タスク作成</h5>
-    <form id="new-task-form" onsubmit="window.App.modals.new_task.submit(event)">
+    <form id="new-task-form" onsubmit="App.modals.new_task.submit(event)">
         <div class="modal-content">
             <input type="hidden" name="creative_id">
             <div class="field label border">
@@ -37,9 +37,9 @@
 
 <script>
     (function () {
-        window.App.modals.new_task = window.App.modals.new_task || {};
+        App.modals.new_task = App.modals.new_task || {};
 
-        window.App.modals.new_task.updateDateTimeValue = function (inputs, hiddenInput) {
+        App.modals.new_task.updateDateTimeValue = function (inputs, hiddenInput) {
             const values = Array.from(inputs).map(input => input.value);
             const [yyyy, mm, dd, hh, min] = values;
 
@@ -56,7 +56,7 @@
             }
         };
 
-        window.App.modals.new_task.open = function (creativeId) {
+        App.modals.new_task.open = function (creativeId) {
             const form = document.getElementById('new-task-form');
             form.elements.creative_id.value = creativeId;
 
@@ -140,7 +140,7 @@
                             }
 
                             // 隠しフィールドに値を更新
-                            window.App.modals.new_task.updateDateTimeValue(inputs, datetimeInput);
+                            App.modals.new_task.updateDateTimeValue(inputs, datetimeInput);
                         });
 
                         // キーボード操作
@@ -222,7 +222,7 @@
             openModal('modal-new-task');
         };
 
-        window.App.modals.new_task.submit = function (event) {
+        App.modals.new_task.submit = function (event) {
             event.preventDefault();
             const form = event.target;
 
@@ -231,7 +231,7 @@
             const datetimeInput = form.querySelector('input[name="planned_end_datetime"]');
             if (datetimeContainer && datetimeInput) {
                 const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
-                window.App.modals.new_task.updateDateTimeValue(inputs, datetimeInput);
+                App.modals.new_task.updateDateTimeValue(inputs, datetimeInput);
             }
 
             const formData = new FormData(form);

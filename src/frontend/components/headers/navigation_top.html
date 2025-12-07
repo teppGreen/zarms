@@ -48,14 +48,14 @@
 <script>
     (function () {
         // ヘッダー機能用の名前空間を初期化
-        if (!window.App.utils) window.App.utils = {};
-        if (!window.App.utils.header) window.App.utils.header = {};
+        if (!App.utils) App.utils = {};
+        if (!App.utils.header) App.utils.header = {};
 
         // ============================================
         // 新規作成ボタン
         // ============================================
 
-        window.App.utils.header.closeNewButtonDropdown = function () {
+        App.utils.header.closeNewButtonDropdown = function () {
             const dropdown = document.getElementById('new-button-dropdown');
             if (dropdown) {
                 dropdown.classList.remove('show');
@@ -65,7 +65,7 @@
         /**
          * 「+ 新規作成」ボタンのドロップダウンの表示/非表示を切り替えます。
          */
-        window.App.utils.header.toggleNewButtonDropdown = function (event) {
+        App.utils.header.toggleNewButtonDropdown = function (event) {
             event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
             const dropdown = document.getElementById('new-button-dropdown');
             if (dropdown) {
@@ -76,7 +76,7 @@
         /**
          * メインの「+ 新規作成」ボタンがクリックされたときの処理
          */
-        window.App.utils.header.handleMainButtonClick = function (event) {
+        App.utils.header.handleMainButtonClick = function (event) {
             // アクティブなナビゲーションアイテムを確認してタブを判定
             const activeNavItem = document.querySelector('.nav-item.active');
             console.log('アクティブなナビゲーションアイテム:', activeNavItem);
@@ -91,7 +91,7 @@
                 case 'plans-nav': App.modals.new_plan.open(); break;
                 case 'members-nav': App.modals.new_member.open(); break;
                 case 'knowledges-nav': App.modals.new_knowledge.open(); break;
-                default: window.App.utils.header.toggleNewButtonDropdown(event);
+                default: App.utils.header.toggleNewButtonDropdown(event);
             }
         };
 
@@ -102,7 +102,7 @@
         /**
          * 勤怠ボタンクリック（打刻）
          */
-        window.App.utils.header.handleTimetrackClick = function () {
+        App.utils.header.handleTimetrackClick = function () {
             showLoading();
 
             // 現在のユーザーの最新の勤怠レコードを取得
@@ -164,7 +164,7 @@
         /**
          * プロフィール表示
          */
-        window.App.utils.header.handleUserProfile = function () {
+        App.utils.header.handleUserProfile = function () {
             if (templateVariables?.activeUser && App.overlays.memberDetail) {
                 App.overlays.memberDetail.open(templateVariables.activeUser.email);
             } else {
@@ -175,45 +175,45 @@
         /**
          * ヘッダークローズボタンクリック
          */
-        window.App.utils.header.handleHeaderCloseClick = function () {
+        App.utils.header.handleHeaderCloseClick = function () {
             // 詳細画面を閉じる処理
             if (typeof closeAllPopups === 'function') {
                 closeAllPopups();
             }
-            if (window.App.utils.navigation && window.App.utils.navigation.switchTab) {
-                window.App.utils.navigation.switchTab('home');
+            if (App.utils.navigation && App.utils.navigation.switchTab) {
+                App.utils.navigation.switchTab('home');
             }
         };
 
         // 下位互換性のための関数エイリアス
-        window.handleHeaderCloseClick = window.App.utils.header.handleHeaderCloseClick;
+        window.handleHeaderCloseClick = App.utils.header.handleHeaderCloseClick;
 
     })();
 
     (function () {
         // 検索機能用の名前空間を初期化
-        if (!window.App.utils) window.App.utils = {};
-        if (!window.App.utils.search) window.App.utils.search = {};
+        if (!App.utils) App.utils = {};
+        if (!App.utils.search) App.utils.search = {};
 
         // ============================================
         // ID検索バー
         // ============================================
 
-        window.App.utils.search.showIdSearchLoading = function () {
+        App.utils.search.showIdSearchLoading = function () {
             const container = document.getElementById('id-search-container');
             if (container) {
                 container.classList.add('id-search-loading');
             }
         };
 
-        window.App.utils.search.hideIdSearchLoading = function () {
+        App.utils.search.hideIdSearchLoading = function () {
             const container = document.getElementById('id-search-container');
             if (container) {
                 container.classList.remove('id-search-loading');
             }
         };
 
-        window.App.utils.search.clearIdSearchInput = function () {
+        App.utils.search.clearIdSearchInput = function () {
             const input = document.getElementById('id-search-input');
             if (!input) return;
 
@@ -222,7 +222,7 @@
         };
 
         // ID検索の共通処理
-        window.App.utils.search.executeIdSearch = function (searchValue) {
+        App.utils.search.executeIdSearch = function (searchValue) {
             if (!searchValue) return;
 
             // 1. "P0001-W0001" 形式の対応 (最後のIDをターゲットにする)
@@ -234,10 +234,10 @@
             }
 
             // 検索実行
-            window.App.utils.search.showIdSearchLoading();
+            App.utils.search.showIdSearchLoading();
             callGAS('searchByCode', targetCode)
                 .then(result => {
-                    window.App.utils.search.hideIdSearchLoading();
+                    App.utils.search.hideIdSearchLoading();
 
                     // 検索ボックスからフォーカスを外す
                     const input = document.getElementById('id-search-input');
@@ -268,25 +268,25 @@
                     }
                 })
                 .catch(error => {
-                    window.App.utils.search.hideIdSearchLoading();
+                    App.utils.search.hideIdSearchLoading();
                     handleError(error);
                 });
         };
 
-        window.App.utils.search.handleIdSearchClick = function () {
+        App.utils.search.handleIdSearchClick = function () {
             const input = document.getElementById('id-search-input');
             if (!input) return;
 
             const searchValue = input.value.trim();
-            window.App.utils.search.executeIdSearch(searchValue);
+            App.utils.search.executeIdSearch(searchValue);
         };
 
-        window.App.utils.search.handleIdSearchFocus = function (event) {
+        App.utils.search.handleIdSearchFocus = function (event) {
             const input = event.target;
             console.log('[DEBUG] handleIdSearchFocus triggered');
         };
 
-        window.App.utils.search.handleIdSearchBlur = function (event) {
+        App.utils.search.handleIdSearchBlur = function (event) {
             const input = event.target;
             console.log('[DEBUG] handleIdSearchBlur triggered', {
                 value: input.value,
@@ -295,7 +295,7 @@
             });
         };
 
-        window.App.utils.search.handleIdSearchInput = function (event) {
+        App.utils.search.handleIdSearchInput = function (event) {
             const input = event.target;
             let value = input.value;
 
@@ -315,12 +315,12 @@
             }
         };
 
-        window.App.utils.search.handleIdSearchKeydown = function (event) {
+        App.utils.search.handleIdSearchKeydown = function (event) {
             if (event.key === 'Enter' && !event.isComposing) {
                 event.preventDefault();
                 const input = event.target;
                 const searchValue = input.value.trim();
-                window.App.utils.search.executeIdSearch(searchValue);
+                App.utils.search.executeIdSearch(searchValue);
             }
         };
 
@@ -331,7 +331,7 @@
         /**
          * 検索入力時のハンドラー（リアルタイム候補表示）
          */
-        window.App.utils.search.handleSearchInput = function (event) {
+        App.utils.search.handleSearchInput = function (event) {
             const input = event.target;
             const searchValue = input.value.trim();
             const searchTarget = document.getElementById('search-target').value;
@@ -350,35 +350,35 @@
             }
 
             // テキスト検索の場合
-            const results = window.App.utils.search.performTextSearch(searchValue, searchTarget);
-            window.App.utils.search.displaySearchResults(results);
+            const results = App.utils.search.performTextSearch(searchValue, searchTarget);
+            App.utils.search.displaySearchResults(results);
         };
 
         /**
          * キーダウンハンドラー（Enter検索）
          */
-        window.App.utils.search.handleSearchKeydown = function (event) {
+        App.utils.search.handleSearchKeydown = function (event) {
             if (event.key === 'Enter') {
                 event.preventDefault();
-                window.App.utils.search.handleSearchClick();
+                App.utils.search.handleSearchClick();
             }
         };
 
         /**
          * フォーカスハンドラー
          */
-        window.App.utils.search.handleSearchFocus = function (event) {
+        App.utils.search.handleSearchFocus = function (event) {
             // 既に入力値がある場合は候補を再表示
             const input = event.target;
             if (input.value.trim()) {
-                window.App.utils.search.handleSearchInput(event);
+                App.utils.search.handleSearchInput(event);
             }
         };
 
         /**
          * ブラーハンドラー（少し遅延してメニューを閉じる）
          */
-        window.App.utils.search.handleSearchBlur = function (event) {
+        App.utils.search.handleSearchBlur = function (event) {
             setTimeout(() => {
                 const resultsMenu = document.getElementById('search-results-menu');
                 if (resultsMenu) {
@@ -390,7 +390,7 @@
         /**
          * 検索ボタンクリック / Enterキー押下時の検索実行
          */
-        window.App.utils.search.handleSearchClick = function () {
+        App.utils.search.handleSearchClick = function () {
             const input = document.getElementById('search-input');
             const searchValue = input.value.trim();
             const searchTarget = document.getElementById('search-target').value;
@@ -402,16 +402,16 @@
 
             // ID検索の場合
             if (searchTarget === 'id') {
-                window.App.utils.search.performIdSearch(searchValue);
+                App.utils.search.performIdSearch(searchValue);
             } else {
                 // テキスト検索の場合は候補を表示
-                const results = window.App.utils.search.performTextSearch(searchValue, searchTarget);
+                const results = App.utils.search.performTextSearch(searchValue, searchTarget);
                 if (results.length === 1) {
                     // 結果が1件のみの場合は直接開く
-                    window.App.utils.search.openDetailModal(results[0]);
+                    App.utils.search.openDetailModal(results[0]);
                 } else if (results.length > 0) {
                     // 複数の場合はドロップダウン表示
-                    window.App.utils.search.displaySearchResults(results);
+                    App.utils.search.displaySearchResults(results);
                 } else {
                     alert('該当するデータが見つかりません');
                 }
@@ -421,7 +421,7 @@
         /**
          * ID検索の実行
          */
-        window.App.utils.search.performIdSearch = function (searchValue) {
+        App.utils.search.performIdSearch = function (searchValue) {
             const parts = searchValue.split('-');
             const targetCode = parts[parts.length - 1];
 
@@ -436,7 +436,7 @@
                     }
 
                     const { item, tableName } = result;
-                    window.App.utils.search.openDetailModal({ item, tableName, id: item.id });
+                    App.utils.search.openDetailModal({ item, tableName, id: item.id });
                 })
                 .catch(error => {
                     hideLoading();
@@ -447,7 +447,7 @@
         /**
          * テキスト検索の実行（フロントエンドデータから検索）
          */
-        window.App.utils.search.performTextSearch = function (searchValue, searchTarget) {
+        App.utils.search.performTextSearch = function (searchValue, searchTarget) {
             const results = [];
             const searchLower = searchValue.toLowerCase();
 
@@ -497,7 +497,7 @@
         /**
          * 検索結果をドロップダウンに表示
          */
-        window.App.utils.search.displaySearchResults = function (results) {
+        App.utils.search.displaySearchResults = function (results) {
             const resultsMenu = document.getElementById('search-results-menu');
             if (!resultsMenu) return;
 
@@ -508,7 +508,7 @@
 
             resultsMenu.innerHTML = results.map(result => {
                 return `
-          <a class="row" style="padding: 8px 16px; cursor: pointer;" onclick='window.App.utils.search.openDetailModalFromSearch(${JSON.stringify(result).replace(/'/g, "\\'")}); event.stopPropagation();'>
+          <a class="row" style="padding: 8px 16px; cursor: pointer;" onclick='App.utils.search.openDetailModalFromSearch(${JSON.stringify(result).replace(/'/g, "\\'")}); event.stopPropagation();'>
             <span class="small-text">${escapeHtml(result.displayText)}</span>
           </a>
         `;
@@ -520,8 +520,8 @@
         /**
          * 検索結果から詳細モーダルを開く（グローバル関数）
          */
-        window.App.utils.search.openDetailModalFromSearch = function (result) {
-            window.App.utils.search.openDetailModal(result);
+        App.utils.search.openDetailModalFromSearch = function (result) {
+            App.utils.search.openDetailModal(result);
             const resultsMenu = document.getElementById('search-results-menu');
             if (resultsMenu) resultsMenu.style.display = 'none';
             const input = document.getElementById('search-input');
@@ -531,7 +531,7 @@
         /**
          * テーブル名に応じた詳細モーダルを開く
          */
-        window.App.utils.search.openDetailModal = function (result) {
+        App.utils.search.openDetailModal = function (result) {
             const { tableName, id } = result;
 
             if (tableName === SHEET_NAMES.CREATIVES && App.overlays.creativeDetail) {
@@ -549,7 +549,7 @@
         };
 
         // 下位互換性のためのグローバル関数
-        window.openDetailModalFromSearch = window.App.utils.search.openDetailModalFromSearch;
+        window.openDetailModalFromSearch = App.utils.search.openDetailModalFromSearch;
 
     })();
 </script>

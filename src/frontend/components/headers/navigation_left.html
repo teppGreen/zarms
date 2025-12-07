@@ -92,13 +92,13 @@
 <script>
     (function () {
         // ナビゲーション用の名前空間を初期化
-        if (!window.App.utils) window.App.utils = {};
-        if (!window.App.utils.navigation) window.App.utils.navigation = {};
+        if (!App.utils) App.utils = {};
+        if (!App.utils.navigation) App.utils.navigation = {};
 
         /**
          * タブを切り替える
          */
-        window.App.utils.navigation.switchTab = function (tabName) {
+        App.utils.navigation.switchTab = function (tabName) {
             // 他のタブに切り替える前にhomeタブの処理を停止
             const currentTab = document.querySelector('.tab-content:not([style*="display: none"])');
             if (currentTab && currentTab.id === 'tab-home') {
@@ -120,13 +120,13 @@
             }
             document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
             document.getElementById('tab-' + tabName).style.display = 'block';
-            window.App.utils.navigation.loadTabData(tabName);
+            App.utils.navigation.loadTabData(tabName);
         };
 
         /**
          * タブデータを読み込む
          */
-        window.App.utils.navigation.loadTabData = function (tabName) {
+        App.utils.navigation.loadTabData = function (tabName) {
             console.log(`loadTabData called for: ${tabName}`);
             console.log('App.pages state:', App.pages);
             if (App.pages && App.pages[tabName]) {
