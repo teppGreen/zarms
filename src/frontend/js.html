@@ -242,69 +242,8 @@
     { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
   ];
 
-  // 新規作成ボタンの初期化関数
-  function initializeNewButton() {
-    console.log('initializeNewButton が呼び出されました');
-
-    // --- 新規作成ボタンのロジック ---
-    const newButton = document.getElementById('new-button');
-    const dropdown = document.getElementById('new-button-dropdown');
-    const newButtonContainer = document.querySelector('.new-button-container');
-
-    console.log('newButton:', newButton);
-    console.log('newButtonContainer:', newButtonContainer);
-
-    // 新規作成ボタンのクリック
-    if (newButton) {
-      // onclickを使用して確実に設定
-      newButton.onclick = function (event) {
-        handleMainButtonClick(event);
-      };
-
-      // 子要素（span）からのクリックも確実に処理されるように
-      const newButtonMain = document.getElementById('new-button-main');
-      if (newButtonMain) {
-        newButtonMain.onclick = function (event) {
-          handleMainButtonClick(event);
-        };
-      }
-    } else {
-      // リトライ（DOMがまだ読み込まれていない場合）
-      setTimeout(initializeNewButton, 100);
-      return;
-    }
-
-    // ドキュメント全体（body）をクリックした時の動作（一度だけ設定）
-    if (!window.newButtonClickHandlerInitialized) {
-      document.addEventListener('click', (event) => {
-        // 新規作成ボタン関連の要素がクリックされた場合は処理をスキップ
-        if (newButtonContainer && newButtonContainer.contains(event.target)) {
-          return; // ボタンのクリックイベントを妨げないように早期リターン
-        }
-
-        // ポップアップエディタを閉じる
-        closeAllPopups();
-
-        // ドロップダウンが表示されていて、かつ
-        // クリックされた場所がボタンコンテナの外側の場合にドロップダウンを閉じる
-        if (dropdown && dropdown.classList.contains('show')) {
-          closeNewButtonDropdown();
-        }
-      });
-      window.newButtonClickHandlerInitialized = true;
-    }
-  }
-
   // 初期化
   async function initializeApp() {
-
-    // 新規作成ボタンを最初に初期化（エラーが発生しても確実に実行されるように）
-    try {
-      initializeNewButton();
-    } catch (error) {
-      console.error('initializeNewButton でエラーが発生しました:', error);
-    }
-
     try {
       // データ読み込みを待つ
       await loadInitialData();
@@ -644,40 +583,21 @@
    * メインの「+ 新規作成」ボタンがクリックされたときの処理
    */
   function handleMainButtonClick(event) {
-    console.log('handleMainButtonClick が呼び出されました', event);
-    event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
-    event.preventDefault(); // デフォルトの動作を防ぐ
-    closeAllPopups();
-
     // アクティブなナビゲーションアイテムを確認してタブを判定
     const activeNavItem = document.querySelector('.nav-item.active');
     console.log('アクティブなナビゲーションアイテム:', activeNavItem);
     if (!activeNavItem) {
-      // アクティブなタブが見つからない場合はドロップダウンを表示
-      console.log('アクティブなタブが見つからないため、ドロップダウンを表示します');
-      toggleNewButtonDropdown(event);
       return;
     }
 
     const navItemId = activeNavItem.id;
-    console.log('ナビゲーションアイテムID:', navItemId);
 
-    if (navItemId === 'creatives-nav') {
-      console.log('制作物モーダルを開きます');
-      openNewCreativeModal();
-    } else if (navItemId === 'plans-nav') {
-      console.log('制作物モーダルを開きます（企画タブ）');
-      openNewCreativeModal();
-    } else if (navItemId === 'members-nav') {
-      console.log('メンバーモーダルを開きます');
-      openNewMemberModal();
-    } else if (navItemId === 'knowledges-nav') {
-      console.log('ナレッジモーダルを開きます');
-      openNewKnowledgeModal();
-    } else {
-      // それ以外のタブ（ホーム、統計など）ではドロップダウンを表示
-      console.log('その他のタブのため、ドロップダウンを表示します');
-      toggleNewButtonDropdown(event);
+    switch (navItemId) {
+      case 'creatives-nav': App.modals.new_creative.open(); break;
+      case 'plans-nav': openNewPlanModal(); break;
+      case 'members-nav': openNewMemberModal(); break;
+      case 'knowledges-nav': openNewKnowledgeModal(); break;
+      default: toggleNewButtonDropdown(event);
     }
   }
 
@@ -734,41 +654,13 @@
     }
   }
 
-  // ... (rest of the file)
-
   // ============================================
   // データ読み込み & 描画
   // ============================================
 
 
 
-  function openKnowledgeDetailModal(knowledgeId) {
-    showLoading();
-    callGAS('getItems', SHEET_NAMES.KNOWLEDGES).then(knowledgeList => {
-      const knowledge = knowledgeList.find(k => k.knowledge_id === knowledgeId);
-      if (!knowledge) {
-        alert('ナレッジが見つかりません');
-        hideLoading();
-        return;
-      }
-
-      const container = document.getElementById('knowledge-detail-content');
-      container.innerHTML = `
-        <div style="margin-bottom: 24px;">
-          <div style="margin-bottom: 12px;">
-            <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(knowledge.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span>
-          </div>
-          <p style="margin: 0; color: #6b7280; font-size: 0.875rem;">${formatDate(knowledge.created_at)} - ${escapeHtml(knowledge.creator_name)}</p>
-        </div>
-        <div style="margin-bottom: 24px;">
-          <h4 style="margin: 0 0 12px 0; font-size: 1rem; font-weight: 600;">内容</h4>
-          <div style="line-height: 1.6; color: var(--md-sys-color-on-surface);">${knowledge.knowledge_content || ''}</div>
-        </div>
-      `;
-      hideLoading();
-      openModal('modal-knowledge-detail');
-    }).catch(handleError);
-  }
+  // function openKnowledgeDetailModal moved to detail_knowledge.html
 
 
 
@@ -844,8 +736,8 @@
           App.overlays.creativeDetail.open(item.id);
         } else if (name === SHEET_NAMES.PLANS && App.overlays.planDetail) {
           App.overlays.planDetail.open(item.id);
-        } else if (name === SHEET_NAMES.MEMBERS && App.overlays.memberDetail) {
-          App.overlays.memberDetail.open(item.id);
+        } else if (name === SHEET_NAMES.MEMBERS && App.modals.detail_member) {
+          App.modals.detail_member.open(item.id);
         } else if (name === SHEET_NAMES.TASKS && App.overlays.taskDetail) {
           App.overlays.taskDetail.open(item.id);
         }
@@ -899,7 +791,7 @@
             }
             break;
           case 'detail':
-            content = `<button class="btn-link" onclick="event.stopPropagation(); openMemberDetail('${item.id}')">詳細</button>`;
+            content = `<button class="btn-link" onclick="event.stopPropagation(); App.modals.detail_member.open('${item.id}')">詳細</button>`;
             break;
           case 'assignees':
             content = renderAssignees(item.assignees);
@@ -936,295 +828,11 @@
     });
   }
 
-
-
-
-
-
-
-
-
-  function openMemberDetail(memberEmail) {
-    // JavaScript関数呼び出しを記録（HTTP 429エラー時の再試行用）
-    recordJSInvocation('openMemberDetail', memberEmail);
-
-    showLoading();
-    callGAS('getItemById', SHEET_NAMES.MEMBERS, memberEmail).then(member => {
-      if (!member) {
-        alert('メンバーが見つかりません');
-        hideLoading();
-        return;
-      }
-
-      // 担当しているCreativesを取得
-      const assignedCreatives = (creativesData || []).filter(creative => {
-        return creative.assignees && creative.assignees.some(a => a.member_email === memberEmail);
-      });
-
-      const content = document.getElementById('member-detail-content');
-      content.innerHTML = `
-        <div style="margin-bottom: 24px;">
-          <img src="${escapeHtml(member.member_icon || 'https://via.placeholder.com/64')}" class="avatar" style="width: 64px; height: 64px; margin-bottom: 16px;" alt="">
-          <h3 style="margin: 0 0 8px 0;">${escapeHtml(member.member_name)}</h3>
-          <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>メール:</strong> ${escapeHtml(member.member_email)}</p>
-          <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>チーム:</strong> ${escapeHtml(getConfigLabel(member.member_team_key, 'TEAM'))}</p>
-          <p style="margin: 0 0 4px 0; color: #6b7280;"><strong>権限:</strong> ${escapeHtml(getConfigLabel(member.role_key, 'ROLE'))}</p>
-          ${member.slack_member_id ? `<p style="margin: 0 0 4px 0; color: #6b7280;"><strong>Slack ID:</strong> ${escapeHtml(member.slack_member_id)}</p>` : ''}
-        </div>
-        <div class="detail-section">
-          <h3>備考</h3>
-          <div class="rich-text-editor-wrapper">
-            <div class="rich-text-toolbar" data-editor="member-notes-editor">
-              <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h1" title="見出し1">H1</button>
-              <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h2" title="見出し2">H2</button>
-              <button type="button" class="toolbar-btn" data-command="formatBlock" data-value="h3" title="見出し3">H3</button>
-              <span class="toolbar-separator"></span>
-              <button type="button" class="toolbar-btn" data-command="bold" title="太字"><b>B</b></button>
-              <button type="button" class="toolbar-btn" data-command="italic" title="斜体"><i>I</i></button>
-              <button type="button" class="toolbar-btn" data-command="strikeThrough" title="打ち消し線"><s>S</s></button>
-              <button type="button" class="toolbar-btn" data-command="underline" title="下線"><u>U</u></button>
-              <span class="toolbar-separator"></span>
-              <button type="button" class="toolbar-btn color-btn" data-color="#000000" title="黒" style="background: #000000;"></button>
-              <button type="button" class="toolbar-btn color-btn" data-color="#FF0000" title="赤" style="background: #FF0000;"></button>
-              <button type="button" class="toolbar-btn color-btn" data-color="#0000FF" title="青" style="background: #0000FF;"></button>
-              <button type="button" class="toolbar-btn color-btn" data-color="#008000" title="緑" style="background: #008000;"></button>
-            </div>
-            <div id="member-notes-editor" class="rich-text-editor" contenteditable="true" data-field="member_notes" data-member-email="${memberEmail}"></div>
-          </div>
-        </div>
-        <div class="detail-section">
-          <h3>担当している制作物</h3>
-          ${assignedcreatives.length === 0 ? '<p style="color: #6b7280;">担当している制作物はありません</p>' : `
-            <table class="table-full" style="margin-top: 12px;">
-              <thead>
-                <tr>
-                  <th>案件</th>
-                  <th>制作物</th>
-                  <th>ステータス</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${assignedcreatives.map(creative => `
-                  <tr>
-                    <td>${escapeHtml(creative.project_title)}</td>
-                    <td><button class="btn-link" onclick="App.pages.creativeDetail.openDetailModal('${creative.creative_id}'); closeModal('modal-member-detail');">${escapeHtml(creative.creative_title)}</button></td>
-                    <td>${escapeHtml(getConfigLabel(creative.creative_status_key, 'CREATIVE_STATUS'))}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          `}
-        </div>
-      `;
-
-      // リッチテキストエディタにデータを設定
-      const notesEditor = document.getElementById('member-notes-editor');
-      if (notesEditor) {
-        notesEditor.innerHTML = member.member_notes || '';
-        // リッチテキストエディタの初期化
-        initRichTextEditors();
-
-        // エディタの変更を監視して自動保存
-        let saveTimeout = null;
-        notesEditor.addEventListener('input', () => {
-          clearTimeout(saveTimeout);
-          saveTimeout = setTimeout(() => {
-            saveMemberNotes(memberEmail, notesEditor.innerHTML);
-          }, 2000);
-        });
-      }
-
-      hideLoading();
-      openModal('modal-member-detail');
-    }).catch(handleError);
-  }
-
-  function saveMemberNotes(memberEmail, content) {
-    callGAS('updateItem', SHEET_NAMES.MEMBERS, memberEmail, { member_notes: content })
-      .then(() => {
-        // 保存成功
-      })
-      .catch(error => {
-        console.error('メンバー備考保存エラー:', error);
-      });
-  }
+  // function openMemberDetail moved to detail_member.html
 
   // project詳細画面は廃止（テーブルに全カラムを表示）
 
-  function openNewCreativeModal() {
-    const promises = [];
-    if (!plansData || plansData.length === 0) {
-      promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
-    } else {
-      promises.push(Promise.resolve(plansData));
-    }
-    if (!directoriesData || directoriesData.length === 0) {
-      promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES));
-    } else {
-      promises.push(Promise.resolve(directoriesData));
-    }
-
-    if (promises.length > 0) {
-      showLoading();
-      Promise.all(promises).then(([plans, directories]) => {
-        if (!plansData || plansData.length === 0) plansData = plans;
-        if (!directoriesData || directoriesData.length === 0) directoriesData = directories;
-        hideLoading();
-        buildNewCreativeForm();
-        openModal('modal-new-creative');
-      }).catch(handleError);
-    } else {
-      buildNewCreativeForm();
-      openModal('modal-new-creative');
-    }
-  }
-
-  function buildNewCreativeForm() {
-    const formContainer = document.getElementById('new-creative-form');
-    const creativeTypes = configData['CREATIVE_TYPE'] || [];
-    const creativeTypeOptions = creativeTypes.map(wt => `<option value="${wt.config_key}">${wt.config_value}</option>`).join('');
-
-    // ディレクトリ（依頼元組織）の選択肢を作成
-    const directoryOptions = (directoriesData || [])
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-      .map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`)
-      .join('');
-
-    formContainer.innerHTML = `<form id="new-creative-form-element" onsubmit="submitNewCreative(event)">
-      <div class="field label border">
-        <input type="text" name="plan_title" required placeholder=" " oninput="searchPlans(this.value)" autocomplete="off">
-        <label>企画タイトル</label>
-        <input type="hidden" name="plan_id">
-        <div id="plan-suggestions" class="menu"></div>
-      </div>
-      <div class="field label border">
-        <input type="text" name="title" required>
-        <label>制作タイトル</label>
-      </div>
-      <div class="field label border">
-        <select name="client_directory_id">
-          <option value="">選択してください</option>
-          ${directoryOptions}
-        </select>
-        <label>依頼元組織</label>
-        <i>arrow_drop_down</i>
-      </div>
-      <div class="field label border">
-        <select name="creative_type_key" onchange="updateRegulationPreset(this.value)">
-          <option value="">選択してください</option>
-          ${creativeTypeOptions}
-        </select>
-        <label>制作種別</label>
-        <i>arrow_drop_down</i>
-      </div>
-      <div class="field label border">
-        <input type="datetime-local" name="deadline_at" id="new-creative-deadline-at">
-        <label>納品期限</label>
-      </div>
-      <div class="field textarea border">
-        <textarea name="description" rows="4"></textarea>
-        <label>制作物の概要</label>
-      </div>
-      <nav class="right-align">
-        <button class="border" type="button" onclick="closeModal('modal-new-creative')">キャンセル</button>
-        <button type="submit">作成</button>
-      </nav>
-    </form>`;
-
-    // IME変換確定時のEnterキーを無視する処理を追加
-    const form = document.getElementById('new-creative-form-element');
-    if (form) {
-      const textInputs = form.querySelectorAll('input[type="text"], textarea');
-      textInputs.forEach(input => {
-        input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && e.isComposing) {
-            e.stopPropagation();
-          }
-        });
-      });
-
-    }
-  }
-
-  function updateRegulationPreset(creativeTypeKey) {
-    if (!creativeTypeKey) return;
-    const creativeType = (configData['CREATIVE_TYPE'] || []).find(wt => wt.config_key === creativeTypeKey);
-    if (creativeType && creativeType.config_preset_value) {
-      document.querySelector('textarea[name="creative_detail_regulation"]').value = creativeType.config_preset_value;
-    }
-  }
-
-  function searchPlans(query) {
-    const suggestionsContainer = document.getElementById('plan-suggestions');
-    const planIdInput = document.querySelector('#new-creative-form-element input[name="plan_id"]');
-    if (!query) {
-      suggestionsContainer.style.display = 'none';
-      return;
-    }
-    const lowerCaseQuery = query.toLowerCase();
-    const filteredPlans = plansData.filter(p => p.title.toLowerCase().includes(lowerCaseQuery));
-    suggestionsContainer.innerHTML = '';
-    filteredPlans.forEach(p => {
-      const item = document.createElement('div');
-      item.className = 'combobox-item';
-      item.textContent = p.title;
-      item.onclick = () => {
-        document.querySelector('#new-creative-form-element input[name="plan_title"]').value = p.title;
-        planIdInput.value = p.id;
-        suggestionsContainer.style.display = 'none';
-      };
-      suggestionsContainer.appendChild(item);
-    });
-    const newItem = document.createElement('div');
-    newItem.className = 'combobox-item';
-    newItem.innerHTML = `+ 新規作成: <strong>${escapeHtml(query)}</strong>`;
-    newItem.onclick = () => {
-      document.querySelector('#new-creative-form-element input[name="plan_title"]').value = query;
-      planIdInput.value = '';
-      suggestionsContainer.style.display = 'none';
-    };
-    suggestionsContainer.appendChild(newItem);
-    suggestionsContainer.style.display = 'block';
-  }
-
-  document.addEventListener('click', function (event) {
-    const container = document.getElementById('plan-combobox');
-    if (container && !container.contains(event.target)) {
-      const suggestions = document.getElementById('plan-suggestions');
-      if (suggestions) {
-        suggestions.style.display = 'none';
-      }
-    }
-  });
-
-  function submitNewCreative(event) {
-    event.preventDefault();
-    const form = event.target;
-
-    // カスタム日時入力フィールドの値を確実に更新
-    const datetimeContainer = document.getElementById('new-creative-datetime-container');
-    const hiddenInput = document.getElementById('new-creative-deadline-at');
-    if (datetimeContainer && hiddenInput) {
-      const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
-      updateNewCreativeDateTimeValue(inputs, hiddenInput);
-    }
-
-    const formData = new FormData(form);
-    const creativeData = Object.fromEntries(formData.entries());
-    showModalLoading('modal-new-creative', `新規制作物を作成しています`);
-    callGAS('createItem', SHEET_NAMES.CREATIVES, creativeData)
-      .then(id => {
-        showModalSuccess('modal-new-creative', '新規制作物を作成しました', () => {
-          if (document.getElementById('tab-creatives').style.display === 'block') {
-            loadTabData(SHEET_NAMES.CREATIVES);
-          }
-        });
-      })
-      .catch(error => {
-        handleError(error);
-        resetModalState('modal-new-creative');
-      });
-  }
+  // function openNewCreativeModal and related functions moved to new_creative.html
 
   function openNewPlanModal() {
     const form = document.getElementById('new-plan-form');
@@ -1240,173 +848,7 @@
     });
     openModal('modal-new-plan');
   }
-  function openNewTaskModal(creativeId) {
-    const form = document.getElementById('new-task-form');
-    form.elements.creative_id.value = creativeId;
-
-    // IME変換確定時のEnterキーを無視する処理を追加
-    const textInputs = form.querySelectorAll('input[type="text"], textarea');
-    textInputs.forEach(input => {
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && e.isComposing) {
-          e.stopPropagation();
-        }
-      });
-    });
-
-    // datetime-localをカスタム日時入力フィールドに置き換え
-    const datetimeInput = form.querySelector('input[name="planned_end_datetime"]');
-    if (datetimeInput && datetimeInput.type === 'datetime-local') {
-      const formGroup = datetimeInput.closest('.form-group');
-      if (formGroup) {
-        const label = formGroup.querySelector('label');
-        const labelText = label ? label.textContent : '終了予定日';
-
-        // 既存のdatetime-localを非表示にして、カスタム日時入力フィールドを作成
-        datetimeInput.style.display = 'none';
-        datetimeInput.setAttribute('data-original-type', 'datetime-local');
-
-        // カスタム日時入力フィールドのコンテナを作成
-        let datetimeContainer = formGroup.querySelector('#new-task-datetime-container');
-        if (!datetimeContainer) {
-          datetimeContainer = document.createElement('div');
-          datetimeContainer.id = 'new-task-datetime-container';
-          datetimeContainer.className = 'datetime-custom-editor';
-          datetimeContainer.style.cssText = 'display: flex; align-items: center; gap: 4px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; background-color: white;';
-          datetimeContainer.innerHTML = `
-            <input type="text" class="datetime-segment" data-segment="yyyy" maxlength="4" value="" placeholder="yyyy" style="width: 60px; text-align: center; border: none; outline: none; background: transparent;">
-            <span class="datetime-separator">/</span>
-            <input type="text" class="datetime-segment" data-segment="mm" maxlength="2" value="" placeholder="mm" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;">
-            <span class="datetime-separator">/</span>
-            <input type="text" class="datetime-segment" data-segment="dd" maxlength="2" value="" placeholder="dd" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;">
-            <span class="datetime-separator"> </span>
-            <input type="text" class="datetime-segment" data-segment="hh" maxlength="2" value="" placeholder="hh" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;">
-            <span class="datetime-separator">:</span>
-            <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="" placeholder="mm" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;">
-          `;
-          datetimeInput.parentNode.insertBefore(datetimeContainer, datetimeInput);
-        }
-
-        // カスタム日時入力フィールドの設定
-        const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
-
-        inputs.forEach((input, index) => {
-          // 数字のみ入力可能
-          input.addEventListener('input', (e) => {
-            let value = e.target.value.replace(/[^0-9]/g, '');
-            const maxLength = parseInt(e.target.getAttribute('maxlength'));
-
-            if (value.length > maxLength) {
-              value = value.substring(0, maxLength);
-            }
-
-            e.target.value = value;
-
-            // 最大桁数に達したら次のフィールドへ
-            if (value.length >= maxLength && index < inputs.length - 1) {
-              inputs[index + 1].focus();
-              inputs[index + 1].select();
-            }
-
-            // 隠しフィールドに値を更新
-            updateNewTaskDateTimeValue(inputs, datetimeInput);
-          });
-
-          // キーボード操作
-          input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.isComposing) {
-              e.preventDefault();
-              // Enterキーで日時を確定（最後のフィールドの場合、またはすべてのフィールドが入力されている場合）
-              if (index === inputs.length - 1) {
-                // 最後のフィールドでEnterキーを押した場合、フォーカスを外して確定
-                input.blur();
-              } else {
-                // 次のフィールドに移動
-                if (index < inputs.length - 1) {
-                  inputs[index + 1].focus();
-                  inputs[index + 1].select();
-                }
-              }
-            } else if (e.key === 'ArrowRight' && e.target.selectionStart === e.target.value.length) {
-              // カーソルが末尾にある場合は次のフィールドへ
-              if (index < inputs.length - 1) {
-                e.preventDefault();
-                inputs[index + 1].focus();
-                inputs[index + 1].setSelectionRange(0, 0);
-              }
-            } else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) {
-              // カーソルが先頭にある場合は前のフィールドへ
-              if (index > 0) {
-                e.preventDefault();
-                const prevInput = inputs[index - 1];
-                prevInput.focus();
-                prevInput.setSelectionRange(prevInput.value.length, prevInput.value.length);
-              }
-            }
-          });
-        });
-      }
-    }
-
-    // メンバー選択肢を設定
-    const assignToSelect = form.elements.assign_to;
-    assignToSelect.innerHTML = '<option value="">選択してください</option>';
-    if (membersData && membersData.length > 0) {
-      membersData.forEach(member => {
-        const option = document.createElement('option');
-        option.value = member.member_email;
-        option.textContent = member.member_name;
-        assignToSelect.appendChild(option);
-      });
-    }
-
-    // ステータス選択肢を設定
-    const statusSelect = form.elements.status_key;
-    statusSelect.innerHTML = '<option value="">選択してください</option>';
-    const taskStatuses = configData['TASK_STATUS'] || [];
-    taskStatuses.forEach(status => {
-      const option = document.createElement('option');
-      option.value = status.config_key;
-      option.textContent = status.config_value;
-      if (status.config_key === 'TODO') {
-        option.selected = true;
-      }
-      statusSelect.appendChild(option);
-    });
-
-    // 優先度選択肢を設定
-    const prioritySelect = form.elements.priority_key;
-    prioritySelect.innerHTML = '<option value="">選択してください</option>';
-    const priorities = configData['TASK_PRIORITY'] || [];
-    priorities.forEach(priority => {
-      const option = document.createElement('option');
-      option.value = priority.config_key;
-      option.textContent = priority.config_value;
-      if (priority.config_key === 'MEDIUM') {
-        option.selected = true;
-      }
-      prioritySelect.appendChild(option);
-    });
-
-    openModal('modal-new-task');
-  }
-
-  function updateNewTaskDateTimeValue(inputs, hiddenInput) {
-    const values = Array.from(inputs).map(input => input.value);
-    const [yyyy, mm, dd, hh, min] = values;
-
-    // すべての値が入力されている場合のみ、隠しフィールドに値を設定
-    if (yyyy && yyyy.length === 4 && mm && mm.length === 2 && dd && dd.length === 2 && hh && hh.length === 2 && min && min.length === 2) {
-      const paddedYyyy = yyyy.padStart(4, '0');
-      const paddedMm = mm.padStart(2, '0');
-      const paddedDd = dd.padStart(2, '0');
-      const paddedHh = hh.padStart(2, '0');
-      const paddedMin = min.padStart(2, '0');
-      hiddenInput.value = `${paddedYyyy}-${paddedMm}-${paddedDd}T${paddedHh}:${paddedMin}:00`;
-    } else {
-      hiddenInput.value = '';
-    }
-  }
+  // function openNewTaskModal, submitNewTask, and updateNewTaskDateTimeValue moved to new_task.html
 
   let reviewRequestFiles = [];
   let currentReviewRequestCreativeId = null;
@@ -1540,44 +982,6 @@
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.style.borderColor = '#ccc';
-  }
-
-
-
-  function submitNewTask(event) {
-    event.preventDefault();
-    const form = event.target;
-
-    // カスタム日時入力フィールドの値を確実に更新
-    const datetimeContainer = document.getElementById('new-task-datetime-container');
-    const datetimeInput = form.querySelector('input[name="planned_end_datetime"]');
-    if (datetimeContainer && datetimeInput) {
-      const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
-      updateNewTaskDateTimeValue(inputs, datetimeInput);
-    }
-
-    const formData = new FormData(form);
-    const taskData = Object.fromEntries(formData.entries());
-
-    showModalLoading('modal-new-task', '新規タスクを作成しています');
-    callGAS('createItem', SHEET_NAMES.TASKS, taskData)
-      .then(taskId => {
-        showModalSuccess('modal-new-task', '新規タスクを作成しました', () => {
-          // Creative詳細を再読み込み
-          showModalSuccess('modal-new-task', '新規タスクを作成しました', () => {
-            // Creative詳細を再読み込み
-            if (currentReviewRequestCreativeId) { // Note: variable name was currentCreativeId in snippet but check logic
-              App.overlays.creativeDetail.open(currentReviewRequestCreativeId);
-            } else if (typeof currentCreativeId !== 'undefined') {
-              App.overlays.creativeDetail.open(currentCreativeId);
-            }
-          });
-        });
-      })
-      .catch(error => {
-        handleError(error);
-        resetModalState('modal-new-task');
-      });
   }
 
   function openNewMemberModal() {

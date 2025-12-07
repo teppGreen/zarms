@@ -5,3 +5,37 @@
         <button class="border" onclick="closeModal('modal-knowledge-detail')">閉じる</button>
     </nav>
 </dialog>
+
+<script>
+    (function () {
+        window.App.modals.detail_knowledge = window.App.modals.detail_knowledge || {};
+
+        window.App.modals.detail_knowledge.open = function (knowledgeId) {
+            showLoading();
+            callGAS('getItems', SHEET_NAMES.KNOWLEDGES).then(knowledgeList => {
+                const knowledge = knowledgeList.find(k => k.knowledge_id === knowledgeId);
+                if (!knowledge) {
+                    alert('ナレッジが見つかりません');
+                    hideLoading();
+                    return;
+                }
+
+                const container = document.getElementById('knowledge-detail-content');
+                container.innerHTML = `
+        <div style="margin-bottom: 24px;">
+          <div style="margin-bottom: 12px;">
+            <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(knowledge.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span>
+          </div>
+          <p style="margin: 0; color: #6b7280; font-size: 0.875rem;">${formatDate(knowledge.created_at)} - ${escapeHtml(knowledge.creator_name)}</p>
+        </div>
+        <div style="margin-bottom: 24px;">
+          <h4 style="margin: 0 0 12px 0; font-size: 1rem; font-weight: 600;">内容</h4>
+          <div style="line-height: 1.6; color: var(--md-sys-color-on-surface);">${knowledge.knowledge_content || ''}</div>
+        </div>
+      `;
+                hideLoading();
+                openModal('modal-knowledge-detail');
+            }).catch(handleError);
+        };
+    })();
+</script>
