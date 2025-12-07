@@ -1,0 +1,169 @@
+<dialog id="modal-select-members" class="modal">
+    <div class="row no-space align-center">
+        <div class="max">
+            <h5 class="bold mb-0">メンバーを選択</h5>
+        </div>
+        <button class="circle transparent" onclick="ui('#modal-select-members')">
+            <i>close</i>
+        </button>
+    </div>
+
+    <div class="padding">
+        <!-- 検索バー -->
+        <div class="field round border prefix">
+            <i>search</i>
+            <input type="text" id="member-search-input" placeholder="名前またはメールで検索..."
+                oninput="App.modals.selectMembers.filterResults()">
+        </div>
+
+        <!-- フィルタ -->
+        <div class="row">
+            <div class="field label border s12 m6">
+                <select id="member-role-filter" onchange="App.modals.selectMembers.filterResults()">
+                    <option value="">すべて</option>
+                    <!-- ENUMから動的に生成 -->
+                </select>
+                <label>システム権限</label>
+            </div>
+            <div class="field label border s12 m6">
+                <label class="checkbox">
+                    <input type="checkbox" id="member-active-filter" checked
+                        onchange="App.modals.selectMembers.filterResults()">
+                    <span>有効なメンバーのみ</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="space"></div>
+
+        <!-- 結果リスト -->
+        <div id="member-results-container" style="max-height: 400px; overflow-y: auto;">
+            <!-- 動的に生成 -->
+        </div>
+    </div>
+
+    <nav class="right-align">
+        <button class="border" onclick="ui('#modal-select-members')">キャンセル</button>
+        <button onclick="App.modals.selectMembers.confirm()">選択</button>
+    </nav>
+</dialog>
+
+<script>
+    App.modals.selectMembers = {
+        callback: null,
+        selectedIds: [],
+        allMembers: [],
+        multiSelect: false,
+
+        open: function (options = {}) {
+            this.callback = options.callback || null;
+            this.multiSelect = options.multiSelect || false;
+            this.selectedIds = options.preSelected || [];
+
+            // membersDataをロード
+            if (!membersData || membersData.length === 0) {
+                showLoading();
+                callGAS('getItems', SHEET_NAMES.MEMBERS)
+                    .then(members => {
+                        membersData = members;
+                        this.allMembers = members;
+                        this.render();
+                        hideLoading();
+                        ui('#modal-select-members');
+                    })
+                    .catch(handleError);
+            } else {
+                this.allMembers = membersData;
+                this.render();
+                ui('#modal-select-members');
+            }
+        },
+
+        render: function () {
+            // ロールフィルタのオプションを生成
+            const roleFilter = document.getElementById('member-role-filter');
+            if (roleFilter && configData['SYSTEM_ROLE']) {
+                const options = configData['SYSTEM_ROLE'].map(opt =>
+                    `<option value="${escapeHtml(opt.config_key)}">${escapeHtml(opt.config_value)}</option>`
+                ).join('');
+                roleFilter.innerHTML = '<option value="">すべて</option>' + options;
+            }
+
+            this.filterResults();
+        },
+
+        filterResults: function () {
+            const searchInput = document.getElementById('member-search-input');
+            const roleFilter = document.getElementById('member-role-filter');
+            const activeFilter = document.getElementById('member-active-filter');
+            const container = document.getElementById('member-results-container');
+
+            if (!container) return;
+
+            const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+            const selectedRole = roleFilter ? roleFilter.value : '';
+            const activeOnly = activeFilter ? activeFilter.checked : true;
+
+            // フィルタリング
+            let filtered = this.allMembers.filter(member => {
+                const matchesSearch = !searchTerm ||
+                    (member.nickname && member.nickname.toLowerCase().includes(searchTerm)) ||
+                    (member.email && member.email.toLowerCase().includes(searchTerm)) ||
+                    (member.first_name && member.first_name.toLowerCase().includes(searchTerm)) ||
+                    (member.last_name && member.last_name.toLowerCase().includes(searchTerm));
+
+                const matchesRole = !selectedRole || member.system_role_key === selectedRole;
+                const matchesActive = !activeOnly || member.is_active === true || member.is_active === 'TRUE' || member.is_active === 'true';
+
+                return matchesSearch && matchesRole && matchesActive;
+            });
+
+            // 表示
+            if (filtered.length === 0) {
+                container.innerHTML = '<p class="padding">該当するメンバーが見つかりません</p>';
+                return;
+            }
+
+            container.innerHTML = filtered.map(member => {
+                const isSelected = this.selectedIds.includes(member.id);
+                const iconUrl = member.icon_gfile_id ?
+                    `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}&sz=w32` :
+                    '';
+
+                return `
+          <label class="checkbox row middle-align no-space">
+            <input type="${this.multiSelect ? 'checkbox' : 'radio'}" 
+                   name="member-select" 
+                   value="${escapeHtml(member.id)}" 
+                   ${isSelected ? 'checked' : ''}
+                   onchange="App.modals.selectMembers.toggleSelection('${member.id}', this.checked)">
+            ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar" alt="">` : ''}
+            <span class="max">
+              <strong>${escapeHtml(member.nickname || member.email)}</strong>
+              ${member.email ? `<br><span class="small-text">${escapeHtml(member.email)}</span>` : ''}
+            </span>
+          </label>
+        `;
+            }).join('');
+        },
+
+        toggleSelection: function (id, checked) {
+            if (this.multiSelect) {
+                if (checked && !this.selectedIds.includes(id)) {
+                    this.selectedIds.push(id);
+                } else if (!checked) {
+                    this.selectedIds = this.selectedIds.filter(sid => sid !== id);
+                }
+            } else {
+                this.selectedIds = checked ? [id] : [];
+            }
+        },
+
+        confirm: function () {
+            if (this.callback) {
+                this.callback(this.selectedIds);
+            }
+            ui('#modal-select-members');
+        }
+    };
+</script>

@@ -1,27 +1,22 @@
-<dialog id="modal-creative-detail" class="modal large">
-    <div class="row no-space align-center">
-        <div class="max">
-            <h5 class="bold mb-0">制作物詳細</h5>
-        </div>
-        <button class="circle transparent" onclick="ui('#modal-creative-detail')">
-            <i>close</i>
+<!-- フルスクリーン詳細画面: mainタグ内に表示 -->
+<article id="page-creative-detail" class="page" style="display: none;">
+    <nav class="padding">
+        <button class="circle transparent" onclick="App.overlays.creativeDetail.close()">
+            <i>arrow_back</i>
         </button>
-    </div>
+        <h5 class="bold" id="creative-detail-title">制作物詳細</h5>
+    </nav>
 
     <div id="creative-detail-content" class="padding">
         <!-- Dynamic Content: 4分割グリッドレイアウト -->
     </div>
-
-    <nav class="right-align">
-        <button class="border" onclick="ui('#modal-creative-detail')">閉じる</button>
-    </nav>
-</dialog>
+</article>
 
 <script>
     App.overlays.creativeDetail = {
         currentId: null,
         isLoading: false,
-        currentItem: null, // Optimistic UI用にデータを保持
+        currentItem: null,
 
         open: function (id) {
             if (!id || typeof id !== 'string') {
@@ -38,6 +33,10 @@
             this.currentId = id;
             this.isLoading = true;
             showLoading();
+
+            // ページを切り替え
+            document.querySelectorAll('main > .page').forEach(p => p.style.display = 'none');
+            document.getElementById('page-creative-detail').style.display = 'block';
 
             const promises = [
                 callGAS('getItemById', SHEET_NAMES.CREATIVES, id)
@@ -61,13 +60,22 @@
                 promises.push(Promise.resolve(null));
             }
 
-            Promise.all(promises).then(([creative, dirs, plans, members]) => {
+            // ENUMSデータの取得
+            if (typeof configData === 'undefined' || Object.keys(configData).length === 0) {
+                promises.push(callGAS('getItems', SHEET_NAMES.CONFIG));
+            } else {
+                promises.push(Promise.resolve(null));
+            }
+
+            Promise.all(promises).then(([creative, dirs, plans, members, configs]) => {
                 if (dirs) directoriesData = dirs;
                 if (plans) plansData = plans;
                 if (members) membersData = members;
+                if (configs) configData = groupConfigByType(configs);
 
                 if (!creative) {
                     alert('制作物が見つかりません');
+                    this.close();
                     this.isLoading = false;
                     hideLoading();
                     return;
@@ -75,50 +83,38 @@
 
                 this.currentItem = creative;
                 this.render(creative);
-                ui('#modal-creative-detail');
                 this.isLoading = false;
                 hideLoading();
             }).catch(error => {
                 this.isLoading = false;
+                this.close();
                 handleError(error);
             });
+        },
+
+        close: function () {
+            document.getElementById('page-creative-detail').style.display = 'none';
+            // Homeに戻る
+            switchTab('home');
         },
 
         render: function (creative) {
             const container = document.getElementById('creative-detail-content');
             if (!container) return;
 
-            const getPlanName = (id) => {
-                if (!id) return '';
-                const plan = plansData.find(p => p.id === id);
-                return plan ? plan.title : '';
-            };
-
-            const getDirectoryName = (id) => {
-                if (!id) return '';
-                const dir = directoriesData.find(d => d.id === id);
-                return dir ? dir.name : '';
-            };
-
-            const statusLabel = getConfigLabel(creative.creative_status_key, 'CREATIVE_STATUS');
-            const typeLabel = getConfigLabel(creative.creative_type_key, 'CREATIVE_TYPE');
-            const priorityLabel = getConfigLabel(creative.priority_key, 'PRIORITY');
-            const planTitle = getPlanName(creative.plan_id);
-            const clientName = creative.client_directory_id ? getDirectoryName(creative.client_directory_id) : '-';
-            const contractorName = creative.contractor_directory_id ? getDirectoryName(creative.contractor_directory_id) : '-';
-            const displayId = creative.display_id || creative.id;
+            const titleEl = document.getElementById('creative-detail-title');
+            if (titleEl) {
+                titleEl.textContent = `制作物 ${creative.display_id || creative.id}`;
+            }
 
             // 4分割グリッドレイアウト
             container.innerHTML = `
         <div class="grid">
           <!-- 左カラム (s12 m3): 基本情報 -->
           <div class="s12 m3">
-            <h6>基本情報</h6>
-            <div class="space"></div>
-            
-            <!-- タイト le -->
+            <!-- タイトル -->
             <div class="field label border">
-              <input type="text" id="creative-title-input" value="${escapeHtml(creative.title)}" onchange="App.overlays.creativeDetail.updateField('title', this.value)">
+              <input type="text" id="creative-title-input" value="${escapeHtml(creative.title || '')}" onchange="App.overlays.creativeDetail.updateField('title', this.value)">
               <label>タイトル</label>
             </div>
 
@@ -153,93 +149,106 @@
             </div>
 
             <!-- 依頼元 -->
-            <div class="field label border">
-              <input type="text" id="creative-client-input" value="${escapeHtml(clientName)}" readonly>
+            <div class="field label border suffix">
+              <input type="text" id="creative-client-display" value="${escapeHtml(this.getDirectoryFullName(creative.client_directory_id))}" readonly>
               <label>依頼元</label>
+              <i onclick="App.overlays.creativeDetail.selectDirectory('client_directory_id')">edit</i>
             </div>
 
             <!-- 依頼先 -->
-            <div class="field label border">
-              <input type="text" id="creative-contractor-input" value="${escapeHtml(contractorName)}" readonly>
+            <div class="field label border suffix">
+              <input type="text" id="creative-contractor-display" value="${escapeHtml(this.getDirectoryFullName(creative.contractor_directory_id))}" readonly>
               <label>依頼先</label>
+              <i onclick="App.overlays.creativeDetail.selectDirectory('contractor_directory_id')">edit</i>
             </div>
 
             <div class="space"></div>
 
             <!-- メンバー管理 -->
-            <h6>担当者</h6>
-            <div id="creative-members-container">
+            <div class="row">
+              <button class="small" onclick="App.overlays.creativeDetail.addMembers()">
+                <i>add</i>
+                <span>担当者を追加</span>
+              </button>
+            </div>
+            <div id="creative-members-container" class="chips">
               <!-- Chips UI for members -->
               読み込み中...
             </div>
           </div>
 
           <!-- 中央カラム (s12 m6): コンテンツ -->
-          <div class="s12 m6">
-            <!-- タブボタン -->
-            <div class="tabs">
-              <a class="active" data-ui="#tab-documents-${creative.id}">ドキュメント</a>
-              <a data-ui="#tab-relations-${creative.id}">リレーション</a>
-              <a data-ui="#tab-tasks-${creative.id}">タスク</a>
-            </div>
-
-            <!-- ドキュメントタブ -->
-            <div id="tab-documents-${creative.id}" class="page active">
-              <article class="no-padding">
-                ${creative.document_gfile_id ?
-                    `<iframe src="https://docs.google.com/document/d/${creative.document_gfile_id}/preview" width="100%" height="600px"></iframe>` :
-                    '<p class="padding">ドキュメントが設定されていません</p>'
+          <div class="s12 m6" style="position: relative;">
+            <!-- メインコンテンツエリア -->
+            <div id="creative-main-content-area">
+              ${creative.document_gfile_id ?
+                    `<iframe src="https://docs.google.com/document/d/${creative.document_gfile_id}/preview" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
+                    '<article class="border round"><div class="padding"><p>ドキュメントが設定されていません</p></div></article>'
                 }
-              </article>
             </div>
 
-            <!-- リレーションタブ -->
-            <div id="tab-relations-${creative.id}" class="page">
-              <article>
-                <h6>関連付けられたアイテム</h6>
-                <div id="creative-relations-container">
-                  読み込み中...
-                </div>
-                <button class="border" onclick="App.overlays.creativeDetail.addRelation()">+ 関連付けを追加</button>
-              </article>
-            </div>
-
-            <!-- タスクタブ -->
-            <div id="tab-tasks-${creative.id}" class="page">
-              <article>
-                <h6>タスク一覧</h6>
-                <div id="creative-tasks-container">
-                  読み込み中...
-                </div>
-                <button class="border" onclick="App.overlays.creativeDetail.addTask()">+ タスクを追加</button>
-              </article>
+            <!-- 下部タブ（オーバーレイ） -->
+            <div style="position: absolute; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--outline);">
+              <div class="tabs">
+                <a class="active" onclick="App.overlays.creativeDetail.switchTab('documents', '${creative.id}')">ドキュメント</a>
+                <a onclick="App.overlays.creativeDetail.switchTab('folder', '${creative.id}')">フォルダ</a>
+                <a onclick="App.overlays.creativeDetail.switchTab('relations', '${creative.id}')">リレーション</a>
+                <a onclick="App.overlays.creativeDetail.switchTab('tasks', '${creative.id}')">タスク</a>
+              </div>
             </div>
           </div>
 
           <!-- 右カラム (s12 m3): ノート -->
           <div class="s12 m3">
-            <h6>ノート</h6>
             <div id="creative-notes-container" class="notes-container">
               <!-- コメント表示エリア -->
-              <div id="creative-notes-list" class="notes-list">
+              <div id="creative-notes-list" class="notes-list" style="max-height: 500px; overflow-y: auto; margin-bottom: 16px;">
                 読み込み中...
               </div>
               <!-- コメント入力 -->
-              <div class="field label border">
-                <textarea id="creative-note-input" rows="3"></textarea>
+              <div class="field textarea label border suffix">
+                <textarea id="creative-note-input" rows="2"></textarea>
                 <label>コメントを追加...</label>
+                <i onclick="App.overlays.creativeDetail.postNote()">send</i>
               </div>
-              <button class="small" onclick="App.overlays.creativeDetail.postNote()">投稿</button>
             </div>
           </div>
         </div>
       `;
 
-            // メンバー、リレーション、タスク、ノートの読み込み
+            // メンバー、ノートの読み込み
             this.loadMembers(creative.id);
-            this.loadRelations(creative.id);
-            this.loadTasks(creative.id);
             this.loadNotes(creative.id);
+        },
+
+        switchTab: function (tab, creativeId) {
+            const contentArea = document.getElementById('creative-main-content-area');
+            if (!contentArea) return;
+
+            const creative = this.currentItem;
+
+            switch (tab) {
+                case 'documents':
+                    contentArea.innerHTML = creative.document_gfile_id ?
+                        `<iframe src="https://docs.google.com/document/d/${creative.document_gfile_id}/preview" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
+                        '<article class="border round"><div class="padding"><p>ドキュメントが設定されていません</p></div></article>';
+                    break;
+                case 'folder':
+                    contentArea.innerHTML = creative.gfolder_id ?
+                        `<iframe src="https://drive.google.com/embeddedfolderview?id=${creative.gfolder_id}#grid" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
+                        '<article class="border round"><div class="padding"><p>フォルダが設定されていません</p></div></article>';
+                    break;
+                case 'relations':
+                    contentArea.innerHTML = '<article class="border round"><div class="padding"><h6>関連アイテム</h6><p>リレーション機能は実装予定です</p></div></article>';
+                    break;
+                case 'tasks':
+                    contentArea.innerHTML = '<article class="border round"><div class="padding"><h6>タスク一覧</h6><p>タスク機能は実装予定です</p></div></article>';
+                    break;
+            }
+
+            // タブのアクティブ状態を更新
+            document.querySelectorAll('#page-creative-detail .tabs a').forEach(a => a.classList.remove('active'));
+            event.currentTarget.classList.add('active');
         },
 
         renderEnumOptions: function (enumType, selectedValue) {
@@ -249,9 +258,69 @@
             ).join('');
         },
 
-        /**
-         * Optimistic UI: フィールド更新
-         */
+        getDirectoryFullName: function (directoryId) {
+            if (!directoryId || !directoriesData) return '';
+
+            const dir = directoriesData.find(d => d.id === directoryId);
+            if (!dir) return '';
+
+            if (!dir.parent_directory_id) {
+                return dir.name || '';
+            }
+
+            const parent = directoriesData.find(d => d.id === dir.parent_directory_id);
+            if (!parent) {
+                return dir.name || '';
+            }
+
+            return this.getDirectoryFullName(dir.parent_directory_id) + ' / ' + (dir.name || '');
+        },
+
+        selectDirectory: function (field) {
+            App.modals.selectDirectories.open({
+                multiSelect: false,
+                preSelected: this.currentItem[field] ? [this.currentItem[field]] : [],
+                callback: (selectedIds) => {
+                    if (selectedIds.length > 0) {
+                        this.updateField(field, selectedIds[0]);
+                        // UIを即座に更新
+                        const displayField = field === 'client_directory_id' ?
+                            'creative-client-display' : 'creative-contractor-display';
+                        const input = document.getElementById(displayField);
+                        if (input) {
+                            input.value = this.getDirectoryFullName(selectedIds[0]);
+                        }
+                    }
+                }
+            });
+        },
+
+        addMembers: function () {
+            App.modals.selectMembers.open({
+                multiSelect: true,
+                preSelected: [], // 既存の担当者はここでは考慮しない
+                callback: (selectedIds) => {
+                    if (selectedIds.length > 0) {
+                        // member_assignmentsに追加
+                        selectedIds.forEach(memberId => {
+                            const assignmentData = {
+                                related_table: SHEET_NAMES.CREATIVES,
+                                related_id: this.currentId,
+                                member_id: memberId,
+                                role_key: 'MEMBER' // デフォルト
+                            };
+
+                            callGAS('createItem', 'member_assignments', assignmentData)
+                                .then(() => {
+                                    this.loadMembers(this.currentId);
+                                })
+                                .catch(handleError);
+                        });
+                    }
+                }
+            });
+        },
+
         updateField: function (field, value) {
             const id = this.currentId;
             if (!id) return;
@@ -289,7 +358,6 @@
         },
 
         loadMembers: function (creativeId) {
-            // member_assignmentsから担当者を取得
             callGAS('getItems', 'member_assignments')
                 .then(assignments => {
                     const creativeAssignments = assignments.filter(a => a.related_table === SHEET_NAMES.CREATIVES && a.related_id === creativeId);
@@ -304,28 +372,24 @@
                     container.innerHTML = creativeAssignments.map(assignment => {
                         const member = membersData.find(m => m.id === assignment.member_id);
                         if (!member) return '';
-                        return `<span class="chip">${escapeHtml(member.nickname || '')}<i onclick="App.overlays.creativeDetail.removeMember('${assignment.id}')">close</i></span>`;
+
+                        const iconUrl = member.icon_gfile_id ?
+                            `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}&sz=w32` :
+                            '';
+
+                        return `
+              <div class="chip">
+                ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" alt="">` : ''}
+                <span>${escapeHtml(member.nickname || member.email || '不明')}</span>
+                <i onclick="App.overlays.creativeDetail.removeMember('${assignment.id}')">close</i>
+              </div>
+            `;
                     }).join('');
                 })
                 .catch(handleError);
         },
 
-        loadRelations: function (creativeId) {
-            // assignmentsテーブルから関連を取得
-            const container = document.getElementById('creative-relations-container');
-            if (!container) return;
-            container.innerHTML = '<p class="small-text">リレーション機能は実装予定です</p>';
-        },
-
-        loadTasks: function (creativeId) {
-            // tasksテーブルから関連タスクを取得
-            const container = document.getElementById('creative-tasks-container');
-            if (!container) return;
-            container.innerHTML = '<p class="small-text">タスク機能は実装予定です</p>';
-        },
-
         loadNotes: function (creativeId) {
-            // notesテーブルからコメントを取得
             callGAS('getItems', 'notes')
                 .then(allNotes => {
                     const notes = allNotes.filter(n => n.related_table === SHEET_NAMES.CREATIVES && n.related_id === creativeId && !n.is_deleted);
@@ -343,13 +407,20 @@
                     container.innerHTML = notes.map(note => {
                         const author = membersData.find(m => m.id === note.created_by);
                         const authorName = author ? (author.nickname || author.email) : '不明';
+                        const iconUrl = author && author.icon_gfile_id ?
+                            `https:/\/drive.google.com/thumbnail?id=${author.icon_gfile_id}&sz=w32` :
+                            '';
+
                         return `
-              <div class="note-item">
-                <div class="note-header">
-                  <strong>${escapeHtml(authorName)}</strong>
-                  <span class="small-text">${formatDate(note.created_at)}</span>
+              <div class="row no-space" style="margin-bottom: 12px;">
+                ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar small" alt="">` : ''}
+                <div class="max">
+                  <div class="row no-space">
+                    <strong class="small-text">${escapeHtml(authorName)}</strong>
+                    <span class="small-text" style="margin-left: 8px; color: var(--on-surface-variant);">${formatDate(note.created_at)}</span>
+                  </div>
+                  <div class="small-text">${escapeHtml(note.content)}</div>
                 </div>
-                <div class="note-content">${escapeHtml(note.content)}</div>
               </div>
             `;
                     }).join('');
@@ -364,6 +435,34 @@
             const content = input.value.trim();
             const creativeId = this.currentId;
 
+            // Optimistic UI: すぐにUIに反映
+            const tempNote = {
+                content: content,
+                created_by: null, // 現在のユーザーID（仮）
+                created_at: new Date().toISOString(),
+                related_table: SHEET_NAMES.CREATIVES,
+                related_id: creativeId
+            };
+
+            const container = document.getElementById('creative-notes-list');
+            if (container) {
+                const tempHtml = `
+          <div class="row no-space" style="margin-bottom: 12px; opacity: 0.6;">
+            <div class="max">
+              <div class="row no-space">
+                <strong class="small-text">送信中...</strong>
+              </div>
+              <div class="small-text">${escapeHtml(content)}</div>
+            </div>
+          </div>
+        `;
+                container.innerHTML += tempHtml;
+                container.scrollTop = container.scrollHeight;
+            }
+
+            input.value = '';
+
+            // バックグラウンドで保存
             const noteData = {
                 content: content,
                 related_table: SHEET_NAMES.CREATIVES,
@@ -372,18 +471,12 @@
 
             callGAS('createItem', 'notes', noteData)
                 .then(() => {
-                    input.value = '';
                     this.loadNotes(creativeId);
                 })
-                .catch(handleError);
-        },
-
-        addRelation: function () {
-            alert('リレーション追加機能は実装予定です');
-        },
-
-        addTask: function () {
-            alert('タスク追加機能は実装予定です');
+                .catch(error => {
+                    handleError(error);
+                    this.loadNotes(creativeId);
+                });
         },
 
         removeMember: function (assignmentId) {
