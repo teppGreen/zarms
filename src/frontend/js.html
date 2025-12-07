@@ -311,6 +311,59 @@
     } catch (error) {
       console.error('loadInitialData でエラーが発生しました:', error);
     }
+
+    // グローバルショートカットキーの設定
+    setupGlobalShortcuts();
+  }
+
+  /**
+   * グローバルショートカットキーの設定
+   */
+  function setupGlobalShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // Cmd/Ctrl + K: 検索フォーカス
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+
+      // Cmd/Ctrl + N: 新規作成メニュー
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+        e.preventDefault();
+        const newButton = document.getElementById('main-button');
+        if (newButton && typeof handleMainButtonClick === 'function') {
+          handleMainButtonClick({ target: newButton });
+        }
+      }
+
+      // Esc: モーダルを閉じる
+      if (e.key === 'Escape') {
+        // detail_creativeのオーバーレイを閉じる
+        const creativeDetailOverlay = document.getElementById('overlay-creative-detail');
+        if (creativeDetailOverlay && creativeDetailOverlay.style.display !== 'none') {
+          if (App.overlays.creativeDetail && typeof App.overlays.creativeDetail.close === 'function') {
+            App.overlays.creativeDetail.close();
+          }
+          return;
+        }
+
+        // その他の開いているモーダルを閉じる
+        const openModals = document.querySelectorAll('dialog[open]');
+        if (openModals.length > 0) {
+          openModals.forEach(modal => {
+            if (typeof ui === 'function') {
+              ui(`#${modal.id}`);
+            } else {
+              modal.close();
+            }
+          });
+        }
+      }
+    });
   }
 
   // 複数の方法で初期化を試みる
@@ -669,20 +722,8 @@
     showLoading();
     let loader = null;
 
-    if (tabName === 'home') {
-      if (App.pages.home && App.pages.home.loadData) loader = App.pages.home.loadData;
-    } else if (tabName === SHEET_NAMES.CREATIVES) {
-      if (App.pages.creatives && App.pages.creatives.loadData) loader = App.pages.creatives.loadData;
-    } else if (tabName === SHEET_NAMES.PLANS) {
-      if (App.pages.plans && App.pages.plans.loadData) loader = App.pages.plans.loadData;
-    } else if (tabName === SHEET_NAMES.TASKS) {
-      if (App.pages.tasks && App.pages.tasks.loadData) loader = App.pages.tasks.loadData;
-    } else if (tabName === SHEET_NAMES.MEMBERS) {
-      if (App.pages.members && App.pages.members.loadData) loader = App.pages.members.loadData;
-    } else if (tabName === SHEET_NAMES.KNOWLEDGES) {
-      if (App.pages.knowledges && App.pages.knowledges.loadData) loader = App.pages.knowledges.loadData;
-    } else if (tabName === 'summary') {
-      if (App.pages.summary && App.pages.summary.loadData) loader = App.pages.summary.loadData;
+    if (App.pages[tabName] && App.pages[tabName].loadData) {
+      loader = App.pages[tabName].loadData;
     }
 
     if (loader) {
@@ -2486,6 +2527,100 @@
     } else {
       console.log('Unknown table for search result:', tableName);
       alert('このテーブルの詳細は表示できません: ' + tableName);
+    }
+  }
+
+  // ============================================
+  // ヘッダー: 勤怠とユーザーメニュー
+  // ============================================
+
+  /**
+   * 勤怠ボタンクリック（打刻）
+   */
+  function handleTimetrackClick() {
+    showLoading();
+
+    // 現在のユーザーの最新の勤怠レコードを取得
+    callGAS('getItems', 'timetracks')
+      .then(timetracks => {
+        const currentUserEmail = templateVariables?.email;
+        const currentUser = membersData.find(m => m.email === currentUserEmail);
+
+        if (!currentUser) {
+          alert('ユーザー情報が見つかりません');
+          hideLoading();
+          return;
+        }
+
+        // 最新の勤怠レコード（ended_atがnullのもの）を探す
+        const activeTimetracks = timetracks.filter(t =>
+          t.member_id === currentUser.id && !t.ended_at
+        );
+
+        if (activeTimetracks.length > 0) {
+          // 終了打刻
+          const activeRecord = activeTimetracks[0];
+          const now = new Date().toISOString();
+
+          callGAS('updateItem', 'timetracks', activeRecord.id, { ended_at: now })
+            .then(() => {
+              hideLoading();
+              alert('退勤を記録しました');
+            })
+            .catch(error => {
+              hideLoading();
+              handleError(error);
+            });
+        } else {
+          // 開始打刻
+          const now = new Date().toISOString();
+          const timetackData = {
+            member_id: currentUser.id,
+            started_at: now
+          };
+
+          callGAS('createItem', 'timetracks', timetackData)
+            .then(() => {
+              hideLoading();
+              alert('出勤を記録しました');
+            })
+            .catch(error => {
+              hideLoading();
+              handleError(error);
+            });
+        }
+      })
+      .catch(error => {
+        hideLoading();
+        handleError(error);
+      });
+  }
+
+  /**
+   * プロフィール表示
+   */
+  function handleUserProfile() {
+    const currentUserEmail = templateVariables?.email;
+    if (!currentUserEmail) {
+      alert('ユーザー情報が見つかりません');
+      return;
+    }
+
+    const currentUser = membersData.find(m => m.email === currentUserEmail);
+    if (currentUser && App.overlays.memberDetail) {
+      App.overlays.memberDetail.open(currentUser.id);
+    } else {
+      alert('プロフィールを開けません');
+    }
+  }
+
+  /**
+   * ログアウト
+   */
+  function handleLogout() {
+    if (confirm('ログアウトしますか？')) {
+      // Google Apps Scriptの場合、ページをリロードしてセッションをクリア
+      window.location.reload();
     }
   }
 
