@@ -1,50 +1,53 @@
-<header class="fixed">
-    <nav>
-        <h1 class="max" style="font-family: 'Google Sans Flex', sans-serif; font-weight: 600; font-size: 2rem;" id="header-title-default">ZARMS 2026</h1>
+<nav class="top surface" style="z-index: 2005;">
+    <button id="new-button" class="square extra">
+        <i>add</i>
+    </button>
 
-        <!-- 強化された検索バー -->
-        <div class="field round border prefix" id="search-container" style="min-width: 300px;">
-            <select id="search-target" style="border: none; background: transparent; padding: 4px;">
-                <option value="all">すべて</option>
-                <option value="id">ID</option>
-                <option value="title">タイトル</option>
-            </select>
-            <input type="text" id="search-input" placeholder="検索..." onkeydown="handleSearchKeydown(event)"
-                oninput="handleSearchInput(event)" onfocus="handleSearchFocus(event)" onblur="handleSearchBlur(event)">
+    <h1 class="" style="font-family: 'Google Sans Flex', sans-serif; font-weight: 600; font-size: 2rem;"
+        id="header-title-default">ZARMS 2026</h1>
 
-            <!-- 検索結果ドロップダウン -->
-            <menu id="search-results-menu" class="min"
-                style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--surface); border: 1px solid var(--outline); border-radius: 8px; max-height: 300px; overflow-y: auto; z-index: 1000;">
+    <div class="max"></div>
+
+    <!-- 強化された検索バー -->
+    <div class="max">
+        <div class="max field suffix no-margin m l large round border prefix active" id="search-container">
+            <i class="front">search</i>
+            <input placeholder="IDまたはタイトルで検索">
+            <menu id="search-results-menu" class="min">
+                <li>
+                    <div class="field large prefix">
+                        <i class="front">arrow_back/i>
+                            <input type="text" id="search-input" placeholder="何を検索しますか？"
+                                onkeydown="handleSearchKeydown(event)" oninput="handleSearchInput(event)"
+                                onfocus="handleSearchFocus(event)" onblur="handleSearchBlur(event)">
+                    </div>
+                </li>
             </menu>
-
-            <button class="transparent circle" onclick="handleSearchClick()">
-                <i>search</i>
-            </button>
         </div>
+    </div>
 
 
-        <button id="tasks-nav" class="circle" onclick="App.utils.navigation.switchTab('tasks')">
-            <i>check_circle</i>
-        </button>
+    <button id="tasks-nav" class="circle" onclick="App.utils.navigation.switchTab('tasks')">
+        <i>check_circle</i>
+    </button>
 
-        <!-- 勤怠ボタン -->
-        <button class="circle" id="timetrack-button" onclick="handleTimetrackClick()" title="打刻">
-            <i>schedule</i>
-        </button>
+    <!-- 勤怠ボタン -->
+    <button class="circle" id="timetrack-button" onclick="handleTimetrackClick()" title="打刻">
+        <i>schedule</i>
+    </button>
 
-        <!-- ユーザーアイコンメニュー -->
-        <button class="circle">
-            <i>account_circle</i>
-            <menu class="right">
-                <a onclick="handleUserProfile()">
-                    <i>person</i>
-                    <span>プロフィール</span>
-                </a>
-                <div class="divider"></div>
-            </menu>
-        </button>
-    </nav>
-</header>
+    <!-- ユーザーアイコンメニュー -->
+    <button class="circle">
+        <i>account_circle</i>
+        <menu class="right">
+            <a onclick="handleUserProfile()">
+                <i>person</i>
+                <span>プロフィール</span>
+            </a>
+            <div class="divider"></div>
+        </menu>
+    </button>
+</nav>
 
 <script>
     (function () {
@@ -502,18 +505,28 @@
             const resultsMenu = document.getElementById('search-results-menu');
             if (!resultsMenu) return;
 
+            // 既存の結果（入力項目以外）を削除
+            // 最初のliは入力フィールドなので残す
+            const listItems = resultsMenu.querySelectorAll('li');
+            for (let i = 1; i < listItems.length; i++) {
+                resultsMenu.removeChild(listItems[i]);
+            }
+
             if (results.length === 0) {
-                resultsMenu.style.display = 'none';
+                resultsMenu.style.display = 'block';
                 return;
             }
 
-            resultsMenu.innerHTML = results.map(result => {
+            // 新しい結果を追加
+            const newResultsHtml = results.map(result => {
                 return `
-          <a class="row" style="padding: 8px 16px; cursor: pointer;" onclick='App.utils.search.openDetailModalFromSearch(${JSON.stringify(result).replace(/'/g, "\\'")}); event.stopPropagation();'>
+          <li><i>open_in_new</i><a style="cursor: pointer;" onclick='App.utils.search.openDetailModalFromSearch(${JSON.stringify(result).replace(/'/g, "\\'")}); event.stopPropagation();'>
             <span class="small-text">${escapeHtml(result.displayText)}</span>
-          </a>
+          </a></li>
         `;
             }).join('');
+
+            resultsMenu.insertAdjacentHTML('beforeend', newResultsHtml);
 
             resultsMenu.style.display = 'block';
         };

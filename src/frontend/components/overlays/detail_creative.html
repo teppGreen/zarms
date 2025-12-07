@@ -90,8 +90,8 @@
                 hideLoading();
             }).catch(error => {
                 this.isLoading = false;
-                this.close();
-                App.popups.error.handleError(error);
+                console.error('CreativeDetail loading error:', error);
+                App.utils.error.handleError(error);
             });
         },
 
@@ -186,7 +186,7 @@
             <!-- メインコンテンツエリア -->
             <div id="creative-main-content-area">
               ${creative.document_gfile_id ?
-                    `<iframe src="https://docs.google.com/document/d/${creative.document_gfile_id}/preview" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
+                    `<iframe src="https://docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
                     '<article class="border round"><div class="padding"><p>ドキュメントが設定されていません</p></div></article>'
                 }
             </div>
@@ -318,7 +318,7 @@
                                 .then(() => {
                                     this.loadMembers(this.currentId);
                                 })
-                                .catch(App.popups.error.handleError);
+                                .catch(App.utils.error.handleError);
                         });
                     }
                 }
@@ -353,7 +353,7 @@
                     }
                 })
                 .catch(error => {
-                    App.popups.error.handleError(error);
+                    App.utils.error.handleError(error);
                     // ロールバック
                     this.currentItem[field] = oldItem[field];
                     rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
@@ -390,7 +390,7 @@
             `;
                     }).join('');
                 })
-                .catch(App.popups.error.handleError);
+                .catch(App.utils.error.handleError);
         },
 
         loadNotes: function (creativeId) {
@@ -429,7 +429,7 @@
             `;
                     }).join('');
                 })
-                .catch(App.popups.error.handleError);
+                .catch(App.utils.error.handleError);
         },
 
         postNote: function () {
@@ -470,7 +470,7 @@
                     this.loadNotes(creativeId);
                 })
                 .catch(error => {
-                    App.popups.error.handleError(error);
+                    App.utils.error.handleError(error);
                     this.loadNotes(creativeId);
                 });
         },
@@ -482,7 +482,7 @@
                 .then(() => {
                     this.loadMembers(this.currentId);
                 })
-                .catch(App.popups.error.handleError);
+                .catch(App.utils.error.handleError);
         }
     };
 </script>
