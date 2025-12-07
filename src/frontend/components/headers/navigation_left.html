@@ -1,14 +1,6 @@
-<nav id="nav-grid" class="m l left no-wrap min">
+<nav id="nav-grid" class="m l left no-wrap min" style="z-index: 2005;">
     <header>
-        <button id="new-button">
-            <i>add</i>
-            <menu id="new-button-dropdown" class="no-wrap">
-                <a onclick="App.modals.new_creative.open();">制作物</a>
-                <a onclick="App.modals.new_plan.open();">企画</a>
-                <a id="new-member-dropdown-item" style="display: none;" onclick="App.modals.new_member.open();">メンバー</a>
-                <a onclick="App.modals.new_knowledge.open();">ナレッジ</a>
-            </menu>
-        </button>
+
     </header>
 
     <a id="home-nav" class="active" onclick="App.utils.navigation.switchTab('home')">
@@ -113,6 +105,16 @@
                 document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
                 const oldLink = document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`);
                 if (oldLink) oldLink.classList.add('active');
+            }
+
+            // tasks-navのactiveクラス制御
+            const tasksNav = document.getElementById('tasks-nav');
+            if (tasksNav) {
+                if (tabName === 'tasks') {
+                    tasksNav.classList.add('active');
+                } else {
+                    tasksNav.classList.remove('active');
+                }
             }
             document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
             document.getElementById('tab-' + tabName).style.display = 'block';
