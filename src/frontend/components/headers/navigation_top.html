@@ -10,21 +10,19 @@
         <div class="max"></div>
 
         <!-- 強化された検索バー -->
-        <div class="max">
-            <div class="max field suffix no-margin m l large round border prefix active" id="search-container">
-                <i class="front">search</i>
-                <input placeholder="IDまたはタイトルで検索">
-                <menu id="search-results-menu" class="min">
-                    <li>
-                        <div class="field large prefix">
-                            <i class="front">arrow_back/i>
-                                <input type="text" id="search-input" placeholder="何を検索しますか？"
-                                    onkeydown="handleSearchKeydown(event)" oninput="handleSearchInput(event)"
-                                    onfocus="handleSearchFocus(event)" onblur="handleSearchBlur(event)">
-                        </div>
-                    </li>
-                </menu>
-            </div>
+        <div class="max field round border prefix" id="search-container">
+            <i class="front">search</i>
+            <input placeholder="IDまたはタイトルで検索">
+            <menu id="search-results-menu" class="min">
+                <li>
+                    <div class="field large prefix">
+                        <i class="front">arrow_back</i>
+                        <input type="text" id="search-input" placeholder="何を検索しますか？"
+                            onkeydown="handleSearchKeydown(event)" oninput="handleSearchInput(event)"
+                            onfocus="handleSearchFocus(event)" onblur="handleSearchBlur(event)">
+                    </div>
+                </li>
+            </menu>
         </div>
 
 
@@ -515,16 +513,16 @@
             }
 
             if (results.length === 0) {
-                resultsMenu.style.display = 'block';
+                resultsMenu.classList.add('active');
                 return;
             }
 
             // 新しい結果を追加
             const newResultsHtml = results.map(result => {
                 return `
-          <li><i>open_in_new</i><a style="cursor: pointer;" onclick='App.utils.search.openDetailModalFromSearch(${JSON.stringify(result).replace(/'/g, "\\'")}); event.stopPropagation();'>
-            <span class="small-text">${escapeHtml(result.displayText)}</span>
-          </a></li>
+                    <li><i>open_in_new</i><a style="cursor: pointer;" onclick='App.utils.search.openDetailModalFromSearch(${JSON.stringify(result).replace(/'/g, "\\'")}); event.stopPropagation();'>
+                        <span class="small-text">${escapeHtml(result.displayText)}</span>
+                    </a></li>
         `;
             }).join('');
 
