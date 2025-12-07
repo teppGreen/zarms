@@ -594,9 +594,9 @@
 
     switch (navItemId) {
       case 'creatives-nav': App.modals.new_creative.open(); break;
-      case 'plans-nav': openNewPlanModal(); break;
-      case 'members-nav': openNewMemberModal(); break;
-      case 'knowledges-nav': openNewKnowledgeModal(); break;
+      case 'plans-nav': App.modals.new_plan.open(); break;
+      case 'members-nav': App.modals.new_member.open(); break;
+      case 'knowledges-nav': App.modals.new_knowledge.open(); break;
       default: toggleNewButtonDropdown(event);
     }
   }
@@ -653,22 +653,6 @@
       hideLoading();
     }
   }
-
-  // ============================================
-  // データ読み込み & 描画
-  // ============================================
-
-
-
-  // function openKnowledgeDetailModal moved to detail_knowledge.html
-
-
-
-
-
-
-
-
 
   function renderTable(name, data, headers) {
     const table = document.getElementById(`${name}-table`);
@@ -834,370 +818,9 @@
 
   // function openNewCreativeModal and related functions moved to new_creative.html
 
-  function openNewPlanModal() {
-    const form = document.getElementById('new-plan-form');
-    form.reset();
-    // IME変換確定時のEnterキーを無視する処理を追加
-    const textInputs = form.querySelectorAll('input[type="text"], textarea');
-    textInputs.forEach(input => {
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && e.isComposing) {
-          e.stopPropagation();
-        }
-      });
-    });
-    openModal('modal-new-plan');
-  }
-  // function openNewTaskModal, submitNewTask, and updateNewTaskDateTimeValue moved to new_task.html
-
-  let reviewRequestFiles = [];
-  let currentReviewRequestCreativeId = null;
-
-  function openNewReviewRequestModal(creativeId) {
-    currentReviewRequestCreativeId = creativeId;
-    reviewRequestFiles = [];
-    const form = document.getElementById('new-review-request-form');
-    form.reset();
-    form.elements.creative_id.value = creativeId;
-
-    // IME変換確定時のEnterキーを無視する処理を追加
-    const textInputs = form.querySelectorAll('input[type="text"], textarea');
-    textInputs.forEach(input => {
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && e.isComposing) {
-          e.stopPropagation();
-        }
-      });
-    });
-
-    updateReviewRequestFilesList();
-    openModal('modal-new-review-request');
-  }
-
-  function updateReviewRequestFilesList() {
-    const container = document.getElementById('review-request-files-list');
-    container.innerHTML = '';
-    if (reviewRequestFiles.length === 0) {
-      return;
-    }
-    reviewRequestFiles.forEach((file, index) => {
-      const fileDiv = document.createElement('div');
-      fileDiv.style.display = 'flex';
-      fileDiv.style.alignItems = 'center';
-      fileDiv.style.justifyContent = 'space-between';
-      fileDiv.style.padding = '8px';
-      fileDiv.style.marginBottom = '4px';
-      fileDiv.style.backgroundColor = '#f3f4f6';
-      fileDiv.style.borderRadius = '4px';
-      const fileNameSpan = document.createElement('span');
-      fileNameSpan.style.fontSize = '0.75rem';
-      fileNameSpan.textContent = file.name || file.file_name || 'ファイル';
-
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.style.background = 'none';
-      removeBtn.style.border = 'none';
-      removeBtn.style.color = '#ef4444';
-      removeBtn.style.cursor = 'pointer';
-      removeBtn.style.fontSize = '1.125rem';
-      removeBtn.textContent = '×';
-      removeBtn.onclick = () => removeReviewRequestFile(index);
-      fileDiv.appendChild(fileNameSpan);
-      fileDiv.appendChild(removeBtn);
-      container.appendChild(fileDiv);
-    });
-  }
-
-  function removeReviewRequestFile(index) {
-    reviewRequestFiles.splice(index, 1);
-    updateReviewRequestFilesList();
-  }
-
-  function openGoogleDrivePicker() {
-    // OAuthトークンを取得
-    callGAS('getOAuthToken')
-      .then(token => {
-        // Google Picker APIを読み込む
-        gapi.load('picker', {
-          callback: () => {
-            // Pickerを構築
-            const picker = new google.picker.PickerBuilder()
-              .setOAuthToken(token)
-              .addView(google.picker.ViewId.DOCS)
-              .setCallback(pickerCallback)
-              .setOrigin('https://script.google.com')
-              .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-              .build();
-
-            // Pickerを表示
-            picker.setVisible(true);
-          },
-          onerror: (error) => {
-            console.error('Picker APIの読み込みに失敗しました:', error);
-            alert('Google Picker APIの読み込みに失敗しました。');
-          }
-        });
-      })
-      .catch(error => {
-        console.error('OAuthトークンの取得に失敗しました:', error);
-        alert('OAuthトークンの取得に失敗しました: ' + error.message);
-      });
-  }
-
-  function pickerCallback(data) {
-    if (data[google.picker.Response.ACTION] === google.picker.Action.PICKED) {
-      const docs = data[google.picker.Response.DOCUMENTS];
-
-      // 選択されたファイルごとに処理
-      docs.forEach(doc => {
-        const fileId = doc[google.picker.Document.ID];
-
-        // ファイル情報を取得
-        callGAS('getDriveFileInfo', fileId)
-          .then(fileInfo => {
-            reviewRequestFiles.push({
-              file_id: fileInfo.file_id,
-              file_name: fileInfo.file_name,
-              file_url: fileInfo.file_url || ''
-            });
-            updateReviewRequestFilesList();
-          })
-          .catch(error => {
-            console.error('ファイル情報の取得に失敗しました:', error);
-            alert('ファイルの取得に失敗しました: ' + error.message);
-          });
-      });
-    } else if (data[google.picker.Response.ACTION] === google.picker.Action.CANCEL) {
-      // ユーザーがキャンセルした場合、何もしない
-    }
-  }
-
-  function handleDragOver(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    event.currentTarget.style.borderColor = '#3b82f6';
-  }
-
-  function handleDragLeave(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    event.currentTarget.style.borderColor = '#ccc';
-  }
-
-  function openNewMemberModal() {
-    const form = document.getElementById('new-member-form');
-    form.reset();
-
-    // チーム選択肢を設定
-    const teamSelect = form.elements.member_team_key;
-    teamSelect.innerHTML = '<option value="">選択してください</option>';
-    const teams = configData['TEAM'] || [];
-    teams.forEach(team => {
-      const option = document.createElement('option');
-      option.value = team.config_key;
-      option.textContent = team.config_value;
-      teamSelect.appendChild(option);
-    });
-
-    // 権限選択肢を設定
-    const roleSelect = form.elements.role_key;
-    roleSelect.innerHTML = '<option value="">選択してください</option>';
-    const roles = configData['ROLE'] || [];
-    roles.forEach(role => {
-      const option = document.createElement('option');
-      option.value = role.config_key;
-      option.textContent = role.config_value;
-      if (role.config_key === 'VIEWER') {
-        option.selected = true;
-      }
-      roleSelect.appendChild(option);
-    });
-
-    openModal('modal-new-member');
-  }
-
-  function submitNewMember(event) {
-    event.preventDefault();
-    const form = event.target;
-    const formData = new FormData(form);
-    const memberData = Object.fromEntries(formData.entries());
-
-    showModalLoading('modal-new-member', '新規メンバーを登録しています');
-    callGAS('createItem', SHEET_NAMES.MEMBERS, memberData)
-      .then(() => {
-        showModalSuccess('modal-new-member', '新規メンバーを登録しました', () => {
-          if (document.getElementById('tab-members').style.display === 'block') {
-            loadTabData(SHEET_NAMES.MEMBERS);
-          }
-        });
-      })
-      .catch(error => {
-        handleError(error);
-        resetModalState('modal-new-member');
-      });
-  }
-  function openNewKnowledgeModal() {
-    const form = document.getElementById('new-knowledge-form');
-    form.reset();
-    document.getElementById('knowledge-content-editor').innerHTML = '';
-
-    // ナレッジタイプ選択肢を設定
-    const typeSelect = form.elements.knowledge_type_key;
-    typeSelect.innerHTML = '<option value="">選択してください</option>';
-    const knowledgeTypes = configData['KNOWLEDGE_TYPE'] || [];
-    knowledgeTypes.forEach(type => {
-      const option = document.createElement('option');
-      option.value = type.config_key;
-      option.textContent = type.config_value;
-      typeSelect.appendChild(option);
-    });
-
-    // Creativesデータを取得（まだ取得していない場合）
-    if (!creativesData || creativesData.length === 0) {
-      showLoading();
-      callGAS('getItems', SHEET_NAMES.CREATIVES).then(data => {
-        creativesData = data;
-        hideLoading();
-        openModal('modal-new-knowledge');
-        initRichTextEditors();
-      }).catch(handleError);
-    } else {
-      openModal('modal-new-knowledge');
-      initRichTextEditors();
-    }
-  }
-
-  function searchCreativesForKnowledge(query) {
-    const creativeIdInput = document.querySelector('#new-knowledge-form input[name="creative_id"]');
-    const suggestionsContainer = document.getElementById('creative-suggestions-knowledge');
-    if (!query) {
-      suggestionsContainer.style.display = 'none';
-      return;
-    }
-    const lowerCaseQuery = query.toLowerCase();
-    const filteredCreatives = (creativesData || []).filter(w =>
-      w.title.toLowerCase().includes(lowerCaseQuery) ||
-      (w.plan_title && w.plan_title.toLowerCase().includes(lowerCaseQuery))
-    );
-    suggestionsContainer.innerHTML = '';
-    filteredCreatives.forEach(creative => {
-      const item = document.createElement('div');
-      item.className = 'combobox-item';
-      item.textContent = `${creative.plan_title} - ${creative.title}`;
-      item.onclick = () => {
-        document.querySelector('#new-knowledge-form input[name="creative_search"]').value = `${creative.plan_title} - ${creative.title}`;
-        creativeIdInput.value = creative.id;
-        suggestionsContainer.style.display = 'none';
-      };
-      suggestionsContainer.appendChild(item);
-    });
-    suggestionsContainer.style.display = filteredCreatives.length > 0 ? 'block' : 'none';
-  }
-
-  function submitNewKnowledge(event) {
-    event.preventDefault();
-    const form = event.target;
-    const creativeId = form.elements.creative_id.value;
-    const knowledgeTypeKey = form.elements.knowledge_type_key.value;
-    const knowledgeContent = document.getElementById('knowledge-content-editor').innerHTML;
-
-    if (!creativeId) {
-      alert('制作物を選択してください');
-      return;
-    }
-
-    const knowledgeData = {
-      creative_id: creativeId,
-      knowledge_type_key: knowledgeTypeKey,
-      knowledge_content: knowledgeContent
-    };
-
-    showModalLoading('modal-new-knowledge', '新規ナレッジを作成しています');
-    callGAS('createItem', SHEET_NAMES.KNOWLEDGES, knowledgeData)
-      .then(() => {
-        showModalSuccess('modal-new-knowledge', '新規ナレッジを作成しました', () => {
-          if (document.getElementById('tab-knowledges').style.display === 'block') {
-            loadTabData(SHEET_NAMES.KNOWLEDGES);
-          }
-        });
-      })
-      .catch(error => {
-        handleError(error);
-        resetModalState('modal-new-knowledge');
-      });
-  }
-
-  function openModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal && !modal.open) {
-      ui(`#${modalId}`);
-    }
-  }
-
-  function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal && modal.open) {
-      ui(`#${modalId}`);
-    }
-  }
-
-  function closeAllPopups() {
-    // Close all dialogs that are open
-    document.querySelectorAll('dialog.modal[open]').forEach(dialog => {
-      ui(`#${dialog.id}`);
-    });
-    // Close all menus/dropdowns
-    document.querySelectorAll('menu.active').forEach(menu => {
-      ui(`#${menu.id}`);
-    });
-  }
-  function showModalLoading(modalId, message) {
-    const modal = document.getElementById(modalId);
-    if (!modal) return;
-    modal.querySelector('.modal-form-content').style.display = 'none';
-    const resultContent = modal.querySelector('.modal-result-content');
-    resultContent.style.display = 'flex';
-    resultContent.innerHTML = `<div class="modal-spinner"></div><p class="modal-result-message">${message}</p>`;
-  }
-  function showModalSuccess(modalId, message, callback) {
-    const modal = document.getElementById(modalId);
-    if (!modal) return;
-    const resultContent = modal.querySelector('.modal-result-content');
-    resultContent.innerHTML = `<div class="modal-checkmark">✓</div><p class="modal-result-message">${message}</p>`;
-    setTimeout(() => {
-      closeModal(modalId);
-      if (callback) callback();
-    }, 1500);
-  }
-  function resetModalState(modalId) {
-    const modal = document.getElementById(modalId);
-    if (!modal) return;
-    const formContent = modal.querySelector('.modal-form-content');
-    if (formContent) formContent.style.display = 'block';
-    const resultContent = modal.querySelector('.modal-result-content');
-    if (resultContent) {
-      resultContent.style.display = 'none';
-      resultContent.innerHTML = '';
-    }
-  }
-  function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('active');
-    setTimeout(() => resetModalState(modalId), 300);
-  }
-
-  function submitNewPlan(event) {
-    event.preventDefault();
-    const title = event.target.elements.title.value;
-    showModalLoading('modal-new-plan');
-    callGAS('createItem', SHEET_NAMES.PLANS, { title: title }).then(() => {
-      showModalSuccess('modal-new-plan', '企画を作成しました', () => {
-        loadTabData(SHEET_NAMES.PLANS);
-      });
-    }).catch(error => {
-      handleError(error);
-      resetModalState('modal-new-plan');
-    });
-  }
+  // function openNewPlanModal and submitNewPlan moved to new_plan.html
+  // function openNewMemberModal and submitNewMember moved to new_member.html
+  // function openNewKnowledgeModal and submitNewKnowledge moved to new_knowledge.html
 
   function sortTable(tableName, columnKey) {
     const state = tableState[tableName];
@@ -2097,11 +1720,7 @@
   /**
    * グローバル変数内の該当オブジェクトを直接更新します (Optimistic UI)
    * @param {string} tableName - テーブル名
-   * @param {string} id - レコードID
-   * @param {Object} updates - 更新する値のオブジェクト
-   * @returns {Object|null} 更新されたアイテム、または見つからない場合はnull
-   */
-  function updateLocalData(tableName, id, updates) {
+  function getDataArray(tableName) {
     const dataArrayMap = {
       [SHEET_NAMES.ADVERTISEMENTS]: advertisementsData,
       [SHEET_NAMES.BUDGETS]: budgetsData,
@@ -2126,8 +1745,42 @@
       [SHEET_NAMES.TASKS]: tasksData,
       [SHEET_NAMES.WIKIS]: wikisData
     };
+    return dataArrayMap[tableName];
+  }
 
-    const dataArray = dataArrayMap[tableName];
+  function getTableHeaders(tableName) {
+    const headersMap = {
+      [SHEET_NAMES.ADVERTISEMENTS]: advertisementsTableHeaders,
+      [SHEET_NAMES.BUDGETS]: budgetsTableHeaders,
+      [SHEET_NAMES.CREATIVES]: creativesTableHeaders,
+      [SHEET_NAMES.DIRECTORIES]: directoriesTableHeaders,
+      [SHEET_NAMES.EVENTS]: eventsTableHeaders,
+      [SHEET_NAMES.EXPENSES]: expensesTableHeader,
+      [SHEET_NAMES.HARDWARES]: hardwaresTableHeaders,
+      [SHEET_NAMES.KNOWLEDGES]: knowledgesTableHeaders, // Ensure this exists globally
+      [SHEET_NAMES.LICENSES]: licensesTableHeaders,
+      [SHEET_NAMES.MEDIUMS]: mediumsTableHeaders,
+      [SHEET_NAMES.MEMBERS]: membersTableHeaders,
+      [SHEET_NAMES.MERCHANDISES]: marchandisesTableHeaders,
+      [SHEET_NAMES.MUSICS]: musicsTableHeaders,
+      [SHEET_NAMES.PLANS]: plansTableHeaders,
+      [SHEET_NAMES.QUESTIONS]: questionsTableHeaders,
+      [SHEET_NAMES.RESOURCES]: resourcesTableHeaders,
+      [SHEET_NAMES.TASKS]: tasksTableHeaders,
+      [SHEET_NAMES.WIKIS]: wikisTableHeaders
+    };
+    return headersMap[tableName];
+  }
+
+  /**
+   * グローバル変数内の該当オブジェクトを直接更新します (Optimistic UI)
+   * @param {string} tableName - テーブル名
+   * @param {string} id - レコードID
+   * @param {Object} updates - 更新する値のオブジェクト
+   * @returns {Object|null} 更新されたアイテム、または見つからない場合はnull
+   */
+  function updateLocalData(tableName, id, updates) {
+    const dataArray = getDataArray(tableName);
     if (!dataArray) {
       console.warn(`updateLocalData: テーブル ${tableName} が見つかりません`);
       return null;
@@ -2153,54 +1806,8 @@
    * @param {string} id - レコードID
    */
   function reRenderTableRow(tableName, id) {
-    const dataArrayMap = {
-      [SHEET_NAMES.ADVERTISEMENTS]: advertisementsData,
-      [SHEET_NAMES.BUDGETS]: budgetsData,
-      [SHEET_NAMES.CREATIVES]: creativesData,
-      [SHEET_NAMES.DIRECTORIES]: directoriesData,
-      [SHEET_NAMES.EVENTS]: eventsData,
-      [SHEET_NAMES.EXPENSES]: expensesData,
-      [SHEET_NAMES.FORMS]: formsData,
-      [SHEET_NAMES.HARDWARES]: hardwaresData,
-      [SHEET_NAMES.JOBS]: jobsData,
-      [SHEET_NAMES.KNOWLEDGES]: knowledgesData,
-      [SHEET_NAMES.LICENSES]: licensesData,
-      [SHEET_NAMES.MEDIUMS]: mediumsData,
-      [SHEET_NAMES.MEMBERS]: membersData,
-      [SHEET_NAMES.MERCHANDISES]: merchandisesData,
-      [SHEET_NAMES.MUSICS]: musicsData,
-      [SHEET_NAMES.PLANS]: plansData,
-      [SHEET_NAMES.QUESTIONS]: questionsData,
-      [SHEET_NAMES.RESOURCES]: resourcesData,
-      [SHEET_NAMES.SHIFTS]: shiftsData,
-      [SHEET_NAMES.SKILLS]: skillsData,
-      [SHEET_NAMES.TASKS]: tasksData,
-      [SHEET_NAMES.WIKIS]: wikisData
-    };
-
-    const headersMap = {
-      [SHEET_NAMES.ADVERTISEMENTS]: advertisementsTableHeaders,
-      [SHEET_NAMES.BUDGETS]: budgetsTableHeaders,
-      [SHEET_NAMES.CREATIVES]: creativesTableHeaders,
-      [SHEET_NAMES.DIRECTORIES]: directoriesTableHeaders,
-      [SHEET_NAMES.EVENTS]: eventsTableHeaders,
-      [SHEET_NAMES.EXPENSES]: expensesTableHeader,
-      [SHEET_NAMES.HARDWARES]: hardwaresTableHeaders,
-      [SHEET_NAMES.KNOWLEDGES]: knowledgesTableHeaders,
-      [SHEET_NAMES.LICENSES]: licensesTableHeaders,
-      [SHEET_NAMES.MEDIUMS]: mediumsTableHeaders,
-      [SHEET_NAMES.MEMBERS]: membersTableHeaders,
-      [SHEET_NAMES.MERCHANDISES]: marchandisesTableHeaders,
-      [SHEET_NAMES.MUSICS]: musicsTableHeaders,
-      [SHEET_NAMES.PLANS]: plansTableHeaders,
-      [SHEET_NAMES.QUESTIONS]: questionsTableHeaders,
-      [SHEET_NAMES.RESOURCES]: resourcesTableHeaders,
-      [SHEET_NAMES.TASKS]: tasksTableHeaders,
-      [SHEET_NAMES.WIKIS]: wikisTableHeaders
-    };
-
-    const dataArray = dataArrayMap[tableName];
-    const headers = headersMap[tableName];
+    const dataArray = getDataArray(tableName);
+    const headers = getTableHeaders(tableName);
 
     if (!dataArray || !headers) {
       console.warn(`reRenderTableRow: テーブル ${tableName} が見つかりません`);
@@ -2330,32 +1937,7 @@
    * @param {Object} oldData - 以前のデータ
    */
   function rollbackLocalData(tableName, id, oldData) {
-    const dataArrayMap = {
-      [SHEET_NAMES.ADVERTISEMENTS]: advertisementsData,
-      [SHEET_NAMES.BUDGETS]: budgetsData,
-      [SHEET_NAMES.CREATIVES]: creativesData,
-      [SHEET_NAMES.DIRECTORIES]: directoriesData,
-      [SHEET_NAMES.EVENTS]: eventsData,
-      [SHEET_NAMES.EXPENSES]: expensesData,
-      [SHEET_NAMES.FORMS]: formsData,
-      [SHEET_NAMES.HARDWARES]: hardwaresData,
-      [SHEET_NAMES.JOBS]: jobsData,
-      [SHEET_NAMES.KNOWLEDGES]: knowledgesData,
-      [SHEET_NAMES.LICENSES]: licensesData,
-      [SHEET_NAMES.MEDIUMS]: mediumsData,
-      [SHEET_NAMES.MEMBERS]: membersData,
-      [SHEET_NAMES.MERCHANDISES]: merchandisesData,
-      [SHEET_NAMES.MUSICS]: musicsData,
-      [SHEET_NAMES.PLANS]: plansData,
-      [SHEET_NAMES.QUESTIONS]: questionsData,
-      [SHEET_NAMES.RESOURCES]: resourcesData,
-      [SHEET_NAMES.SHIFTS]: shiftsData,
-      [SHEET_NAMES.SKILLS]: skillsData,
-      [SHEET_NAMES.TASKS]: tasksData,
-      [SHEET_NAMES.WIKIS]: wikisData
-    };
-
-    const dataArray = dataArrayMap[tableName];
+    const dataArray = getDataArray(tableName);
     if (!dataArray) {
       console.warn(`rollbackLocalData: テーブル ${tableName} が見つかりません`);
       return;
