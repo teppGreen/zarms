@@ -1,6 +1,6 @@
 <header class="fixed">
     <nav>
-        <h1 class="max" style="font: Google Sans Flex; font-weight: 600;" id="header-title-default">ZARMS 2026</h1>
+        <h1 class="max" style="font-family: 'Google Sans Flex', sans-serif; font-weight: 600; font-size: 2rem;" id="header-title-default">ZARMS 2026</h1>
 
         <!-- 強化された検索バー -->
         <div class="field round border prefix" id="search-container" style="min-width: 300px;">
@@ -22,6 +22,11 @@
             </button>
         </div>
 
+
+        <button id="tasks-nav" class="circle" onclick="App.utils.navigation.switchTab('tasks')">
+            <i>check_circle</i>
+        </button>
+
         <!-- 勤怠ボタン -->
         <button class="circle" id="timetrack-button" onclick="handleTimetrackClick()" title="打刻">
             <i>schedule</i>
@@ -36,10 +41,6 @@
                     <span>プロフィール</span>
                 </a>
                 <div class="divider"></div>
-                <a onclick="handleLogout()">
-                    <i>logout</i>
-                    <span>ログアウト</span>
-                </a>
             </menu>
         </button>
     </nav>
@@ -134,7 +135,7 @@
                             })
                             .catch(error => {
                                 hideLoading();
-                                handleError(error);
+                                App.utils.error.handleError(error);
                             });
                     } else {
                         // 開始打刻
@@ -151,13 +152,13 @@
                             })
                             .catch(error => {
                                 hideLoading();
-                                handleError(error);
+                                App.utils.error.handleError(error);
                             });
                     }
                 })
                 .catch(error => {
                     hideLoading();
-                    handleError(error);
+                    App.utils.error.handleError(error);
                 });
         };
 
@@ -269,7 +270,7 @@
                 })
                 .catch(error => {
                     App.utils.search.hideIdSearchLoading();
-                    handleError(error);
+                    App.utils.error.handleError(error);
                 });
         };
 
