@@ -1,5 +1,6 @@
 <script>
   const SHEET_NAMES = templateVariables.SHEET_NAMES;
+  const activeUser = templateVariables.activeUser;
 
   // グローバル変数
   let configData = {};
@@ -305,32 +306,30 @@
     });
   }
 
-  // 複数の方法で初期化を試みる
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeApp);
-  } else {
-    console.log('DOMContentLoaded は既に発火済み。即座に実行します');
-    // DOMContentLoaded が既に発火している場合
-    initializeApp();
-  }
+  // // 複数の方法で初期化を試みる
+  // if (document.readyState === 'loading') {
+  //   document.addEventListener('DOMContentLoaded', initializeApp);
+  // } else {
+  //   console.log('DOMContentLoaded は既に発火済み。即座に実行します');
+  //   // DOMContentLoaded が既に発火している場合
+  //   initializeApp();
+  // }
 
-  // window.onload も念のため設定
+  // // window.onload も念のため設定
   window.onload = initializeApp;
 
   function loadInitialData(shouldSwitchTab = true) {
     showLoading();
 
-    return Promise.all([
-      callGAS('getActiveUser'),
+    return Promise.all(
       callGAS('getConfig', null),
-    ]).then(([user, config]) => {
+    ).then((config) => {
       configData = groupConfigByType(config);
 
       hideLoading();
       if (shouldSwitchTab) {
         switchTab('home');
       }
-      return { user, config };
     }).catch(handleError);
   }
 
@@ -811,16 +810,6 @@
       });
     });
   }
-
-  // function openMemberDetail moved to detail_member.html
-
-  // project詳細画面は廃止（テーブルに全カラムを表示）
-
-  // function openNewCreativeModal and related functions moved to new_creative.html
-
-  // function openNewPlanModal and submitNewPlan moved to new_plan.html
-  // function openNewMemberModal and submitNewMember moved to new_member.html
-  // function openNewKnowledgeModal and submitNewKnowledge moved to new_knowledge.html
 
   function sortTable(tableName, columnKey) {
     const state = tableState[tableName];
@@ -1627,27 +1616,10 @@
    * プロフィール表示
    */
   function handleUserProfile() {
-    const currentUserEmail = templateVariables?.email;
-    if (!currentUserEmail) {
-      alert('ユーザー情報が見つかりません');
-      return;
-    }
-
-    const currentUser = membersData.find(m => m.email === currentUserEmail);
-    if (currentUser && App.overlays.memberDetail) {
-      App.overlays.memberDetail.open(currentUser.id);
+    if (templateVariables?.activeUser && App.overlays.memberDetail) {
+      App.overlays.memberDetail.open(templateVariables.activeUser.email);
     } else {
       alert('プロフィールを開けません');
-    }
-  }
-
-  /**
-   * ログアウト
-   */
-  function handleLogout() {
-    if (confirm('ログアウトしますか？')) {
-      // Google Apps Scriptの場合、ページをリロードしてセッションをクリア
-      window.location.reload();
     }
   }
 

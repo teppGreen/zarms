@@ -1,6 +1,6 @@
 <!-- フルスクリーンオーバーレイ詳細画面 -->
 <div id="overlay-creative-detail"
-    style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--surface); overflow-y: auto;">
+    style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--surface); overflow: hidden;">
     <nav class="padding row no-space align-center">
         <button class="circle transparent" onclick="App.overlays.creativeDetail.close()">
             <i>arrow_back</i>
@@ -91,7 +91,7 @@
             }).catch(error => {
                 this.isLoading = false;
                 this.close();
-                handleError(error);
+                App.popups.error.handleError(error);
             });
         },
 
@@ -318,7 +318,7 @@
                                 .then(() => {
                                     this.loadMembers(this.currentId);
                                 })
-                                .catch(handleError);
+                                .catch(App.popups.error.handleError);
                         });
                     }
                 }
@@ -353,7 +353,7 @@
                     }
                 })
                 .catch(error => {
-                    handleError(error);
+                    App.popups.error.handleError(error);
                     // ロールバック
                     this.currentItem[field] = oldItem[field];
                     rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
@@ -390,7 +390,7 @@
             `;
                     }).join('');
                 })
-                .catch(handleError);
+                .catch(App.popups.error.handleError);
         },
 
         loadNotes: function (creativeId) {
@@ -429,7 +429,7 @@
             `;
                     }).join('');
                 })
-                .catch(handleError);
+                .catch(App.popups.error.handleError);
         },
 
         postNote: function () {
@@ -470,7 +470,7 @@
                     this.loadNotes(creativeId);
                 })
                 .catch(error => {
-                    handleError(error);
+                    App.popups.error.handleError(error);
                     this.loadNotes(creativeId);
                 });
         },
@@ -482,7 +482,7 @@
                 .then(() => {
                     this.loadMembers(this.currentId);
                 })
-                .catch(handleError);
+                .catch(App.popups.error.handleError);
         }
     };
 </script>

@@ -5,10 +5,10 @@
         <div class="scroll">
             <table id="advertisements-table" class="stripes">
                 <thead>
-                    <!-- ヘッダーは renderTable() で動的生成 -->
+                    <!-- ヘッダーは App.renderTables.render() で動的生成 -->
                 </thead>
                 <tbody>
-                    <!-- ボディは renderTable() で動的生成 -->
+                    <!-- ボディは App.renderTables.render() で動的生成 -->
                 </tbody>
             </table>
         </div>
@@ -34,8 +34,8 @@
             if (results[1]) plansData = results[1];
 
             // ReadOnlyテーブルをレンダリング
-            renderTable(SHEET_NAMES.ADVERTISEMENTS, applyFiltersAndSort(SHEET_NAMES.ADVERTISEMENTS, advertisementsData), advertisementsTableHeaders);
+            App.renderTables.render(SHEET_NAMES.ADVERTISEMENTS, App.renderTables.applyFiltersAndSort(SHEET_NAMES.ADVERTISEMENTS, advertisementsData), advertisementsTableHeaders);
             hideLoading();
-        }).catch(handleError);
+        }).catch(App.popups.error.handle);
     };
 </script>

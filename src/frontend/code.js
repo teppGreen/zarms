@@ -24,7 +24,8 @@ function doGet(e) {
 function loadMainApplication(params) {
   // 認証チェック
   const userEmail = Session.getActiveUser().getEmail();
-  if (!checkPermission()) {
+  const activeUser = getActiveUser();
+  if (!checkPermission(activeUser, 'view')) {
     const template = HtmlService.createTemplate(
       `<h1>アクセス権限がありません</h1>` +
       `<p>ZARMSへのアクセスが許可されていません。間違いだと思われる場合は、総務ユニットまでお問い合わせください。</p>` +
@@ -37,7 +38,8 @@ function loadMainApplication(params) {
   const template = HtmlService.createTemplateFromFile("index");
   template.templateVariables = {
     urlParam: params || {},
-    SHEET_NAMES: SHEET_NAMES
+    SHEET_NAMES: SHEET_NAMES,
+    activeUser: activeUser
   };
 
   return template.evaluate().getContent();
@@ -68,8 +70,7 @@ function getRoleLevel(roleKey) {
 }
 
 // 特定の操作が許可されているかチェック
-function checkPermission(operation) {
-  const member = getActiveUser();
+function checkPermission(member, operation) {
 
   const permissions = {
     'view': 1,           // VIEWER以上

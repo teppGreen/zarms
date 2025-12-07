@@ -5,10 +5,10 @@
         <div class="scroll">
             <table id="members-table" class="stripes">
                 <thead>
-                    <!-- ヘッダーは renderTable() で動的生成 -->
+                    <!-- ヘッダーは App.renderTables.render() で動的生成 -->
                 </thead>
                 <tbody>
-                    <!-- ボディは renderTable() で動的生成 -->
+                    <!-- ボディは App.renderTables.render() で動的生成 -->
                 </tbody>
             </table>
         </div>
@@ -25,9 +25,9 @@
                 membersData = data;
 
                 // ReadOnlyテーブルをレンダリング（行クリックで詳細モーダルを開く）
-                renderTable(SHEET_NAMES.MEMBERS, applyFiltersAndSort(SHEET_NAMES.MEMBERS, membersData), membersTableHeaders);
+                App.renderTables.render(SHEET_NAMES.MEMBERS, App.renderTables.applyFiltersAndSort(SHEET_NAMES.MEMBERS, membersData), membersTableHeaders);
                 hideLoading();
             })
-            .catch(handleError);
+            .catch(App.popups.error.handle);
     };
 </script>

@@ -5,10 +5,10 @@
         <div class="scroll">
             <table id="mediums-table" class="stripes">
                 <thead>
-                    <!-- ヘッダーは renderTable() で動的生成 -->
+                    <!-- ヘッダーは App.renderTables.render() で動的生成 -->
                 </thead>
                 <tbody>
-                    <!-- ボディは renderTable() で動的生成 -->
+                    <!-- ボディは App.renderTables.render() で動的生成 -->
                 </tbody>
             </table>
         </div>
@@ -25,9 +25,9 @@
                 mediumsData = data;
 
                 // ReadOnlyテーブルをレンダリング
-                renderTable(SHEET_NAMES.MEDIUMS, applyFiltersAndSort(SHEET_NAMES.MEDIUMS, mediumsData), mediumsTableHeaders);
+                App.renderTables.render(SHEET_NAMES.MEDIUMS, App.renderTables.applyFiltersAndSort(SHEET_NAMES.MEDIUMS, mediumsData), mediumsTableHeaders);
                 hideLoading();
             })
-            .catch(handleError);
+            .catch(App.popups.error.handle);
     };
 </script>
