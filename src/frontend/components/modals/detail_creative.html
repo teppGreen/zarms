@@ -1,16 +1,17 @@
-<!-- フルスクリーン詳細画面: mainタグ内に表示 -->
-<article id="page-creative-detail" class="page" style="display: none;">
-    <nav class="padding">
+<!-- フルスクリーンオーバーレイ詳細画面 -->
+<div id="overlay-creative-detail"
+    style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--surface); overflow-y: auto;">
+    <nav class="padding row no-space align-center">
         <button class="circle transparent" onclick="App.overlays.creativeDetail.close()">
             <i>arrow_back</i>
         </button>
-        <h5 class="bold" id="creative-detail-title">制作物詳細</h5>
+        <h5 class="bold max" id="creative-detail-title">制作物詳細</h5>
     </nav>
 
     <div id="creative-detail-content" class="padding">
         <!-- Dynamic Content: 4分割グリッドレイアウト -->
     </div>
-</article>
+</div>
 
 <script>
     App.overlays.creativeDetail = {
@@ -34,9 +35,11 @@
             this.isLoading = true;
             showLoading();
 
-            // ページを切り替え
-            document.querySelectorAll('main > .page').forEach(p => p.style.display = 'none');
-            document.getElementById('page-creative-detail').style.display = 'block';
+            // オーバーレイを表示
+            const overlay = document.getElementById('overlay-creative-detail');
+            if (overlay) {
+                overlay.style.display = 'block';
+            }
 
             const promises = [
                 callGAS('getItemById', SHEET_NAMES.CREATIVES, id)
@@ -93,9 +96,10 @@
         },
 
         close: function () {
-            document.getElementById('page-creative-detail').style.display = 'none';
-            // Homeに戻る
-            switchTab('home');
+            const overlay = document.getElementById('overlay-creative-detail');
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
         },
 
         render: function (creative) {
@@ -178,7 +182,7 @@
           </div>
 
           <!-- 中央カラム (s12 m6): コンテンツ -->
-          <div class="s12 m6" style="position: relative;">
+          <div class="s12 m6" style="position: relative; min-height: 600px;">
             <!-- メインコンテンツエリア -->
             <div id="creative-main-content-area">
               ${creative.document_gfile_id ?
@@ -188,7 +192,7 @@
             </div>
 
             <!-- 下部タブ（オーバーレイ） -->
-            <div style="position: absolute; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--outline);">
+            <div style="position: absolute; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--outline); z-index: 10;">
               <div class="tabs">
                 <a class="active" onclick="App.overlays.creativeDetail.switchTab('documents', '${creative.id}')">ドキュメント</a>
                 <a onclick="App.overlays.creativeDetail.switchTab('folder', '${creative.id}')">フォルダ</a>
@@ -247,7 +251,7 @@
             }
 
             // タブのアクティブ状態を更新
-            document.querySelectorAll('#page-creative-detail .tabs a').forEach(a => a.classList.remove('active'));
+            document.querySelectorAll('#overlay-creative-detail .tabs a').forEach(a => a.classList.remove('active'));
             event.currentTarget.classList.add('active');
         },
 
@@ -298,7 +302,7 @@
         addMembers: function () {
             App.modals.selectMembers.open({
                 multiSelect: true,
-                preSelected: [], // 既存の担当者はここでは考慮しない
+                preSelected: [],
                 callback: (selectedIds) => {
                     if (selectedIds.length > 0) {
                         // member_assignmentsに追加
@@ -307,7 +311,7 @@
                                 related_table: SHEET_NAMES.CREATIVES,
                                 related_id: this.currentId,
                                 member_id: memberId,
-                                role_key: 'MEMBER' // デフォルト
+                                role_key: 'MEMBER'
                             };
 
                             callGAS('createItem', 'member_assignments', assignmentData)
@@ -436,14 +440,6 @@
             const creativeId = this.currentId;
 
             // Optimistic UI: すぐにUIに反映
-            const tempNote = {
-                content: content,
-                created_by: null, // 現在のユーザーID（仮）
-                created_at: new Date().toISOString(),
-                related_table: SHEET_NAMES.CREATIVES,
-                related_id: creativeId
-            };
-
             const container = document.getElementById('creative-notes-list');
             if (container) {
                 const tempHtml = `

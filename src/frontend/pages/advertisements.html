@@ -1,1 +1,41 @@
 <!-- advertisementsテーブルを表示するページ -->
+
+<div id="tab-advertisements" class="tab-content" style="display: none;">
+    <article class="no-padding">
+        <div class="scroll">
+            <table id="advertisements-table" class="stripes">
+                <thead>
+                    <!-- ヘッダーは renderTable() で動的生成 -->
+                </thead>
+                <tbody>
+                    <!-- ボディは renderTable() で動的生成 -->
+                </tbody>
+            </table>
+        </div>
+    </article>
+</div>
+
+<script>
+    // Namespace initialization
+    App.pages.advertisements = {};
+
+    App.pages.advertisements.loadData = function () {
+        const promises = [callGAS('getItems', SHEET_NAMES.ADVERTISEMENTS)];
+
+        // 必要に応じて関連データも取得
+        if (!plansData || plansData.length === 0) {
+            promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
+        } else {
+            promises.push(Promise.resolve(null));
+        }
+
+        Promise.all(promises).then(results => {
+            advertisementsData = results[0];
+            if (results[1]) plansData = results[1];
+
+            // ReadOnlyテーブルをレンダリング
+            renderTable(SHEET_NAMES.ADVERTISEMENTS, applyFiltersAndSort(SHEET_NAMES.ADVERTISEMENTS, advertisementsData), advertisementsTableHeaders);
+            hideLoading();
+        }).catch(handleError);
+    };
+</script>

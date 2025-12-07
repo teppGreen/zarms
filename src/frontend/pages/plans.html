@@ -1,19 +1,14 @@
-<!-- plansテーブルとmerchandisesテーブルを表示するページ -->
+<!-- plansテーブルを表示するページ -->
 
 <div id="tab-plans" class="tab-content" style="display: none;">
     <article class="no-padding">
         <div class="scroll">
             <table id="plans-table" class="stripes">
                 <thead>
-                    <tr>
-                        <th>企画タイトル</th>
-                        <th>作成日</th>
-                        <th>作成者</th>
-                        <th>関連制作物</th>
-                        <th></th>
-                    </tr>
+                    <!-- ヘッダーは renderTable() で動的生成 -->
                 </thead>
-                <tbody id="plans-table-body">
+                <tbody>
+                    <!-- ボディは renderTable() で動的生成 -->
                 </tbody>
             </table>
         </div>
@@ -25,6 +20,22 @@
     App.pages.plans = {};
 
     App.pages.plans.loadData = function () {
-        callGAS('getAllData', SHEET_NAMES.PLANS).then(data => { plansData = data; renderTable(SHEET_NAMES.PLANS, applyFiltersAndSort(SHEET_NAMES.PLANS, plansData), plansTableHeaders); hideLoading(); }).catch(handleError);
+        const promises = [callGAS('getItems', SHEET_NAMES.PLANS)];
+
+        // 必要に応じて関連データも取得
+        if (!membersData || membersData.length === 0) {
+            promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
+        } else {
+            promises.push(Promise.resolve(null));
+        }
+
+        Promise.all(promises).then(results => {
+            plansData = results[0];
+            if (results[1]) membersData = results[1];
+
+            // ReadOnlyテーブルをレンダリング（行クリックで詳細モーダルを開く）
+            renderTable(SHEET_NAMES.PLANS, applyFiltersAndSort(SHEET_NAMES.PLANS, plansData), plansTableHeaders);
+            hideLoading();
+        }).catch(handleError);
     };
 </script>
