@@ -5,10 +5,10 @@
         <div class="scroll">
             <table id="resources-table" class="stripes">
                 <thead>
-                    <!-- ヘッダーは renderTable() で動的生成 -->
+                    <!-- ヘッダーは App.renderTables.render() で動的生成 -->
                 </thead>
                 <tbody>
-                    <!-- ボディは renderTable() で動的生成 -->
+                    <!-- ボディは App.renderTables.render() で動的生成 -->
                 </tbody>
             </table>
         </div>
@@ -25,9 +25,9 @@
                 resourcesData = data;
 
                 // ReadOnlyテーブルをレンダリング
-                renderTable(SHEET_NAMES.RESOURCES, applyFiltersAndSort(SHEET_NAMES.RESOURCES, resourcesData), resourcesTableHeaders);
+                App.renderTables.render(SHEET_NAMES.RESOURCES, App.renderTables.applyFiltersAndSort(SHEET_NAMES.RESOURCES, resourcesData), resourcesTableHeaders);
                 hideLoading();
             })
-            .catch(handleError);
+            .catch(App.popups.error.handle);
     };
 </script>

@@ -3,10 +3,10 @@
         <div class="scroll">
             <table id="creatives-table" class="stripes">
                 <thead>
-                    <!-- ヘッダーは renderTable() で動的生成 -->
+                    <!-- ヘッダーは App.renderTables.render() で動的生成 -->
                 </thead>
                 <tbody>
-                    <!-- ボディは renderTable() で動的生成 -->
+                    <!-- ボディは App.renderTables.render() で動的生成 -->
                 </tbody>
             </table>
         </div>
@@ -30,8 +30,8 @@
             directoriesData = results[3] || [];
 
             // ReadOnlyテーブルをレンダリング（行クリックで詳細モーダルを開く）
-            renderTable(SHEET_NAMES.CREATIVES, applyFiltersAndSort(SHEET_NAMES.CREATIVES, creativesData), creativesTableHeaders);
+            App.renderTables.render(SHEET_NAMES.CREATIVES, App.renderTables.applyFiltersAndSort(SHEET_NAMES.CREATIVES, creativesData), creativesTableHeaders);
             hideLoading();
-        }).catch(handleError);
+        }).catch(App.popups.error.handle);
     };
 </script>

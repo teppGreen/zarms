@@ -3,10 +3,10 @@
         <div class="scroll">
             <table id="tasks-table" class="stripes">
                 <thead>
-                    <!-- ヘッダーは renderTable() で動的生成 -->
+                    <!-- ヘッダーは App.renderTables.render() で動的生成 -->
                 </thead>
                 <tbody>
-                    <!-- ボディは renderTable() で動的生成 -->
+                    <!-- ボディは App.renderTables.render() で動的生成 -->
                 </tbody>
             </table>
         </div>
@@ -28,8 +28,8 @@
             membersData = results[2] || [];
 
             // ReadOnlyテーブルをレンダリング（行クリックで詳細モーダルを開く）
-            renderTable(SHEET_NAMES.TASKS, applyFiltersAndSort(SHEET_NAMES.TASKS, tasksData), tasksTableHeaders);
+            App.renderTables.render(SHEET_NAMES.TASKS, App.renderTables.applyFiltersAndSort(SHEET_NAMES.TASKS, tasksData), tasksTableHeaders);
             hideLoading();
-        }).catch(handleError);
+        }).catch(App.popups.error.handle);
     };
 </script>
