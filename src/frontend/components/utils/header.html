@@ -1,0 +1,145 @@
+<script>
+    (function () {
+        // ヘッダー機能用の名前空間を初期化
+        if (!window.App.utils) window.App.utils = {};
+        if (!window.App.utils.header) window.App.utils.header = {};
+
+        // ============================================
+        // 新規作成ボタン
+        // ============================================
+
+        window.App.utils.header.closeNewButtonDropdown = function () {
+            const dropdown = document.getElementById('new-button-dropdown');
+            if (dropdown) {
+                dropdown.classList.remove('show');
+            }
+        };
+
+        /**
+         * 「+ 新規作成」ボタンのドロップダウンの表示/非表示を切り替えます。
+         */
+        window.App.utils.header.toggleNewButtonDropdown = function (event) {
+            event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
+            const dropdown = document.getElementById('new-button-dropdown');
+            if (dropdown) {
+                dropdown.classList.toggle('show');
+            }
+        };
+
+        /**
+         * メインの「+ 新規作成」ボタンがクリックされたときの処理
+         */
+        window.App.utils.header.handleMainButtonClick = function (event) {
+            // アクティブなナビゲーションアイテムを確認してタブを判定
+            const activeNavItem = document.querySelector('.nav-item.active');
+            console.log('アクティブなナビゲーションアイテム:', activeNavItem);
+            if (!activeNavItem) {
+                return;
+            }
+
+            const navItemId = activeNavItem.id;
+
+            switch (navItemId) {
+                case 'creatives-nav': App.modals.new_creative.open(); break;
+                case 'plans-nav': App.modals.new_plan.open(); break;
+                case 'members-nav': App.modals.new_member.open(); break;
+                case 'knowledges-nav': App.modals.new_knowledge.open(); break;
+                default: window.App.utils.header.toggleNewButtonDropdown(event);
+            }
+        };
+
+        // ============================================
+        // ヘッダー: 勤怠とユーザーメニュー
+        // ============================================
+
+        /**
+         * 勤怠ボタンクリック（打刻）
+         */
+        window.App.utils.header.handleTimetrackClick = function () {
+            showLoading();
+
+            // 現在のユーザーの最新の勤怠レコードを取得
+            callGAS('getItems', 'timetracks')
+                .then(timetracks => {
+                    const currentUserEmail = templateVariables?.email;
+                    const currentUser = membersData.find(m => m.email === currentUserEmail);
+
+                    if (!currentUser) {
+                        alert('ユーザー情報が見つかりません');
+                        hideLoading();
+                        return;
+                    }
+
+                    // 最新の勤怠レコード（ended_atがnullのもの）を探す
+                    const activeTimetracks = timetracks.filter(t =>
+                        t.member_id === currentUser.id && !t.ended_at
+                    );
+
+                    if (activeTimetracks.length > 0) {
+                        // 終了打刻
+                        const activeRecord = activeTimetracks[0];
+                        const now = new Date().toISOString();
+
+                        callGAS('updateItem', 'timetracks', activeRecord.id, { ended_at: now })
+                            .then(() => {
+                                hideLoading();
+                                alert('退勤を記録しました');
+                            })
+                            .catch(error => {
+                                hideLoading();
+                                handleError(error);
+                            });
+                    } else {
+                        // 開始打刻
+                        const now = new Date().toISOString();
+                        const timetackData = {
+                            member_id: currentUser.id,
+                            started_at: now
+                        };
+
+                        callGAS('createItem', 'timetracks', timetackData)
+                            .then(() => {
+                                hideLoading();
+                                alert('出勤を記録しました');
+                            })
+                            .catch(error => {
+                                hideLoading();
+                                handleError(error);
+                            });
+                    }
+                })
+                .catch(error => {
+                    hideLoading();
+                    handleError(error);
+                });
+        };
+
+        /**
+         * プロフィール表示
+         */
+        window.App.utils.header.handleUserProfile = function () {
+            if (templateVariables?.activeUser && App.overlays.memberDetail) {
+                App.overlays.memberDetail.open(templateVariables.activeUser.email);
+            } else {
+                alert('プロフィールを開けません');
+            }
+        };
+
+        /**
+         * ヘッダークローズボタンクリック
+         */
+        window.App.utils.header.handleHeaderCloseClick = function () {
+            // 詳細画面を閉じる処理
+            if (typeof closeAllPopups === 'function') {
+                closeAllPopups();
+            }
+            if (window.App.utils.navigation && window.App.utils.navigation.switchTab) {
+                window.App.utils.navigation.switchTab('home');
+            }
+        };
+
+        // 下位互換性のための関数エイリアス
+        window.handleHeaderCloseClick = window.App.utils.header.handleHeaderCloseClick;
+
+    })();
+</script>
