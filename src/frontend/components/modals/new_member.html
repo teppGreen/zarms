@@ -1,6 +1,6 @@
 <dialog id="modal-new-member" class="modal">
     <h5 class="bold">新規メンバー登録</h5>
-    <form id="new-member-form" onsubmit="submitNewMember(event)">
+    <form id="new-member-form" onsubmit="window.App.modals.new_member.submit(event)">
         <div class="modal-content">
             <div class="field label border">
                 <input type="email" name="member_email" required>
@@ -40,3 +40,62 @@
         <div class="modal-result-content" style="display: none;"></div>
     </form>
 </dialog>
+
+<script>
+    (function () {
+        window.App.modals.new_member = window.App.modals.new_member || {};
+
+        window.App.modals.new_member.open = function () {
+            const form = document.getElementById('new-member-form');
+            form.reset();
+
+            // チーム選択肢を設定
+            const teamSelect = form.elements.member_team_key;
+            teamSelect.innerHTML = '<option value="">選択してください</option>';
+            const teams = configData['TEAM'] || [];
+            teams.forEach(team => {
+                const option = document.createElement('option');
+                option.value = team.config_key;
+                option.textContent = team.config_value;
+                teamSelect.appendChild(option);
+            });
+
+            // 権限選択肢を設定
+            const roleSelect = form.elements.role_key;
+            roleSelect.innerHTML = '<option value="">選択してください</option>';
+            const roles = configData['ROLE'] || [];
+            roles.forEach(role => {
+                const option = document.createElement('option');
+                option.value = role.config_key;
+                option.textContent = role.config_value;
+                if (role.config_key === 'VIEWER') {
+                    option.selected = true;
+                }
+                roleSelect.appendChild(option);
+            });
+
+            openModal('modal-new-member');
+        };
+
+        window.App.modals.new_member.submit = function (event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            const memberData = Object.fromEntries(formData.entries());
+
+            showModalLoading('modal-new-member', '新規メンバーを登録しています');
+            callGAS('createItem', SHEET_NAMES.MEMBERS, memberData)
+                .then(() => {
+                    showModalSuccess('modal-new-member', '新規メンバーを登録しました', () => {
+                        if (document.getElementById('tab-members').style.display === 'block') {
+                            loadTabData(SHEET_NAMES.MEMBERS);
+                        }
+                    });
+                })
+                .catch(error => {
+                    handleError(error);
+                    resetModalState('modal-new-member');
+                });
+        };
+    })();
+</script>

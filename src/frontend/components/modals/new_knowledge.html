@@ -1,6 +1,6 @@
 <dialog id="modal-new-knowledge" class="modal large">
     <h5 class="bold">新規ナレッジ作成</h5>
-    <form id="new-knowledge-form" onsubmit="submitNewKnowledge(event)">
+    <form id="new-knowledge-form" onsubmit="window.App.modals.new_knowledge.submit(event)">
         <div class="modal-content">
             <div class="field label border">
                 <select name="knowledge_type_key" required></select>
@@ -8,21 +8,14 @@
                 <i>arrow_drop_down</i>
             </div>
             <div class="field label border">
-                <!-- combobox logic needs custom handling or beer css autocomplete. 
-                      BeerCSS has details > summary > input for autocomplete. 
-                      For now, keep custom structure inside field but style it. -->
                 <input type="text" name="creative_search" placeholder=" "
-                    oninput="searchCreativesForKnowledge(this.value)" autocomplete="off">
+                    oninput="window.App.modals.new_knowledge.searchCreatives(this.value)" autocomplete="off">
                 <label>紐づける制作物 <span class="error-text">*</span></label>
-                <!-- Suggestions container needs absolute positioning usually -->
                 <input type="hidden" name="creative_id">
                 <div id="creative-suggestions-knowledge" class="menu"></div>
             </div>
             <div class="field textarea border">
-                <!-- Rich text editor wrapper. BeerCSS textarea field expects textarea but we have div. 
-                     We can just use a div with custom styling or put the rich editor below a label. -->
                 <div class="rich-text-editor-wrapper">
-                    <!-- Toolbar and Editor -->
                     <div class="rich-text-toolbar" data-editor="knowledge-content-editor">
                         <button type="button" class="circle small" data-command="formatBlock" data-value="h1"
                             title="見出し1">H1</button>
@@ -39,7 +32,6 @@
                             title="打ち消し線"><i>format_strikethrough</i></button>
                         <button type="button" class="circle small" data-command="underline"
                             title="下線"><i>format_underlined</i></button>
-                        <!-- Colors might need custom buttons still -->
                     </div>
                     <div id="knowledge-content-editor" class="rich-text-editor" contenteditable="true"
                         style="min-height: 200px; padding: 10px; border: 1px solid var(--outline);"></div>
@@ -53,3 +45,100 @@
         <div class="modal-result-content" style="display: none;"></div>
     </form>
 </dialog>
+
+<script>
+    (function () {
+        window.App.modals.new_knowledge = window.App.modals.new_knowledge || {};
+
+        window.App.modals.new_knowledge.open = function () {
+            const form = document.getElementById('new-knowledge-form');
+            form.reset();
+            document.getElementById('knowledge-content-editor').innerHTML = '';
+
+            // ナレッジタイプ選択肢を設定
+            const typeSelect = form.elements.knowledge_type_key;
+            typeSelect.innerHTML = '<option value="">選択してください</option>';
+            const knowledgeTypes = configData['KNOWLEDGE_TYPE'] || [];
+            knowledgeTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.config_key;
+                option.textContent = type.config_value;
+                typeSelect.appendChild(option);
+            });
+
+            // Creativesデータを取得（まだ取得していない場合）
+            if (!creativesData || creativesData.length === 0) {
+                showLoading();
+                callGAS('getItems', SHEET_NAMES.CREATIVES).then(data => {
+                    creativesData = data;
+                    hideLoading();
+                    openModal('modal-new-knowledge');
+                    initRichTextEditors();
+                }).catch(handleError);
+            } else {
+                openModal('modal-new-knowledge');
+                initRichTextEditors();
+            }
+        };
+
+        window.App.modals.new_knowledge.searchCreatives = function (query) {
+            const creativeIdInput = document.querySelector('#new-knowledge-form input[name="creative_id"]');
+            const suggestionsContainer = document.getElementById('creative-suggestions-knowledge');
+            if (!query) {
+                suggestionsContainer.style.display = 'none';
+                return;
+            }
+            const lowerCaseQuery = query.toLowerCase();
+            const filteredCreatives = (creativesData || []).filter(w =>
+                w.title.toLowerCase().includes(lowerCaseQuery) ||
+                (w.plan_title && w.plan_title.toLowerCase().includes(lowerCaseQuery))
+            );
+            suggestionsContainer.innerHTML = '';
+            filteredCreatives.forEach(creative => {
+                const item = document.createElement('div');
+                item.className = 'combobox-item';
+                item.textContent = `${creative.plan_title} - ${creative.title}`;
+                item.onclick = () => {
+                    document.querySelector('#new-knowledge-form input[name="creative_search"]').value = `${creative.plan_title} - ${creative.title}`;
+                    creativeIdInput.value = creative.id;
+                    suggestionsContainer.style.display = 'none';
+                };
+                suggestionsContainer.appendChild(item);
+            });
+            suggestionsContainer.style.display = filteredCreatives.length > 0 ? 'block' : 'none';
+        };
+
+        window.App.modals.new_knowledge.submit = function (event) {
+            event.preventDefault();
+            const form = event.target;
+            const creativeId = form.elements.creative_id.value;
+            const knowledgeTypeKey = form.elements.knowledge_type_key.value;
+            const knowledgeContent = document.getElementById('knowledge-content-editor').innerHTML;
+
+            if (!creativeId) {
+                alert('制作物を選択してください');
+                return;
+            }
+
+            const knowledgeData = {
+                creative_id: creativeId,
+                knowledge_type_key: knowledgeTypeKey,
+                knowledge_content: knowledgeContent
+            };
+
+            showModalLoading('modal-new-knowledge', '新規ナレッジを作成しています');
+            callGAS('createItem', SHEET_NAMES.KNOWLEDGES, knowledgeData)
+                .then(() => {
+                    showModalSuccess('modal-new-knowledge', '新規ナレッジを作成しました', () => {
+                        if (document.getElementById('tab-knowledges').style.display === 'block') {
+                            loadTabData(SHEET_NAMES.KNOWLEDGES);
+                        }
+                    });
+                })
+                .catch(error => {
+                    handleError(error);
+                    resetModalState('modal-new-knowledge');
+                });
+        };
+    })();
+</script>
