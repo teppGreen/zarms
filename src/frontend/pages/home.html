@@ -1,10 +1,11 @@
 <div id="tab-home">
     <!-- ヘッダー（挨拶）-->
+    <!-- 「ユーザーさん」の部分にニックネームが入る。 -->
     <article>
         <div class="row">
             <div class="max">
-                <h4 id="home-greeting">こんにちは</h4>
-                <p>今日も良い一日を！</p>
+                <h4 id="home-greeting" class="bold"></h4>
+                <p id="home-greeting-sub"></p>
             </div>
         </div>
     </article>
@@ -91,8 +92,25 @@
                 let greeting = 'こんにちは';
                 if (hour < 12) greeting = 'おはようございます';
                 else if (hour >= 18) greeting = 'こんばんは';
+                greeting += '、' + activeUser.nickname + 'さん。';
 
                 greetingEl.textContent = greeting;
+            }
+
+            const greetingSubEl = document.getElementById('home-greeting-sub');
+            if (greetingSubEl) {
+                const messages = [
+                    'ステータスは最新ですか？随時更新しましょう。',
+                    '右上のボタンから打刻して、今日のタスクを始めましょう。',
+                    '新着依頼が来ていたら、早めに処理しましょう。',
+                    'リレーション（担当企画など）の状態を、こまめにチェックしましょう。',
+                    'ZARMSで管理できない情報がありますか？総務に機能追加をリクエストしましょう。',
+                    'フロー情報はSlackで共有し、ストック情報はZARMSで管理しましょう。',
+                    'ZARMSにある情報が最新、と言い切れるようにしましょう。',
+                    '独自のスプレッドシートなどを作ることは、最新の情報がわからなくなる原因になります。避けましょう。',
+                ];
+                const num = Math.floor(Math.random() * (messages.length));
+                greetingSubEl.textContent = messages[num];
             }
 
             // Column 1: 新規依頼（未着手のcreatives, forms, questions）
