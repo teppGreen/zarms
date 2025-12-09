@@ -66,6 +66,13 @@
             //         stopRemainingTimeUpdates();
             //     }
             // }
+
+            // 右navから開いているページを閉じる
+            if (App.utils.navigation.closeRightNavOverlay) {
+                App.utils.navigation.closeRightNavOverlay();
+            }
+
+            // 左navのアクティブ状態管理
             const sidebarLinks = document.querySelectorAll('nav.left a');
             if (sidebarLinks.length > 0) {
                 sidebarLinks.forEach(item => item.classList.remove('active'));
@@ -78,15 +85,16 @@
                 if (oldLink) oldLink.classList.add('active');
             }
 
-            // tasks-navのactiveクラス制御
-            const tasksNav = document.getElementById('tasks-nav');
-            if (tasksNav) {
-                if (tabName === 'tasks') {
-                    tasksNav.classList.add('active');
+            // homeボタンのアクティブ状態管理
+            const homeNav = document.getElementById('home-nav');
+            if (homeNav) {
+                if (tabName === 'home') {
+                    homeNav.classList.add('active');
                 } else {
-                    tasksNav.classList.remove('active');
+                    homeNav.classList.remove('active');
                 }
             }
+
             document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
             document.getElementById('tab-' + tabName).style.display = 'block';
             App.utils.navigation.loadTabData(tabName);
