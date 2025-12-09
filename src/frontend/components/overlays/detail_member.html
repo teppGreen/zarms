@@ -1,36 +1,47 @@
-<dialog id="modal-member-detail" class="modal large">
-    <h5 class="bold">メンバー詳細</h5>
-    <div id="member-detail-content"></div>
-    <nav class="right-align">
-        <button class="border" onclick="closeModal('modal-member-detail')">閉じる</button>
-    </nav>
-</dialog>
+<!-- 詳細画面: メンバー -->
+<div id="detail-member" class="page-content detail-view" style="display: none;">
+  <nav class="padding row no-space align-center">
+    <button class="circle transparent" onclick="App.utils.navigation.switchTab('members')">
+      <i>arrow_back</i>
+    </button>
+    <h5 class="bold max">メンバー詳細</h5>
+  </nav>
+  <div id="member-detail-content" class="padding"></div>
+</div>
 
 <script>
-    (function () {
-        window.App.modals.detail_member = window.App.modals.detail_member || {};
+  (function () {
+    window.App.pages.memberDetail = { // Updated from modals
+      openDetailModal: function (id) {
+        this.open(id);
+      },
+      open: function (memberEmail) {
+        // JavaScript関数呼び出しを記録
+        if (typeof recordJSInvocation === 'function') {
+          recordJSInvocation('window.App.pages.memberDetail.open', memberEmail);
+        }
 
-        window.App.modals.detail_member.open = function (memberEmail) {
-            // JavaScript関数呼び出しを記録
-            if (typeof recordJSInvocation === 'function') {
-                recordJSInvocation('window.App.modals.detail_member.open', memberEmail);
-            }
+        showLoading();
+        // 画面切り替え
+        document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
+        const view = document.getElementById('detail-member');
+        if (view) view.style.display = 'block';
 
-            showLoading();
-            callGAS('getItemById', SHEET_NAMES.MEMBERS, memberEmail).then(member => {
-                if (!member) {
-                    alert('メンバーが見つかりません');
-                    hideLoading();
-                    return;
-                }
+        callGAS('getItemById', SHEET_NAMES.MEMBERS, memberEmail).then(member => {
+          if (!member) {
+            alert('メンバーが見つかりません');
+            App.utils.navigation.switchTab('members');
+            hideLoading();
+            return;
+          }
 
-                // 担当しているCreativesを取得
-                const assignedCreatives = (creativesData || []).filter(creative => {
-                    return creative.assignees && creative.assignees.some(a => a.member_email === memberEmail);
-                });
+          // 担当しているCreativesを取得
+          const assignedCreatives = (creativesData || []).filter(creative => {
+            return creative.assignees && creative.assignees.some(a => a.member_email === memberEmail);
+          });
 
-                const content = document.getElementById('member-detail-content');
-                content.innerHTML = `
+          const content = document.getElementById('member-detail-content');
+          content.innerHTML = `
         <div style="margin-bottom: 24px;">
           <img src="${escapeHtml(member.member_icon || 'https://via.placeholder.com/64')}" class="avatar" style="width: 64px; height: 64px; margin-bottom: 16px;" alt="">
           <h3 style="margin: 0 0 8px 0;">${escapeHtml(member.member_name)}</h3>
@@ -75,7 +86,7 @@
                 ${assignedCreatives.map(creative => `
                   <tr>
                     <td>${escapeHtml(creative.project_title)}</td>
-                    <td><button class="btn-link" onclick="App.overlays.creativeDetail.open('${creative.id}'); closeModal('modal-member-detail');">${escapeHtml(creative.title)}</button></td>
+                    <td><button class="btn-link" onclick="App.pages.creativeDetail.open('${creative.id}');">${escapeHtml(creative.title)}</button></td>
                     <td>${escapeHtml(getConfigLabel(creative.creative_status_key, 'CREATIVE_STATUS'))}</td>
                   </tr>
                 `).join('')}
@@ -85,36 +96,43 @@
         </div>
       `;
 
-                // リッチテキストエディタにデータを設定
-                const notesEditor = document.getElementById('member-notes-editor');
-                if (notesEditor) {
-                    notesEditor.innerHTML = member.member_notes || '';
-                    // リッチテキストエディタの初期化
-                    initRichTextEditors();
+          // リッチテキストエディタにデータを設定
+          const notesEditor = document.getElementById('member-notes-editor');
+          if (notesEditor) {
+            notesEditor.innerHTML = member.member_notes || '';
+            // リッチテキストエディタの初期化
+            initRichTextEditors();
 
-                    // エディタの変更を監視して自動保存
-                    let saveTimeout = null;
-                    notesEditor.addEventListener('input', () => {
-                        clearTimeout(saveTimeout);
-                        saveTimeout = setTimeout(() => {
-                            saveMemberNotes(memberEmail, notesEditor.innerHTML);
-                        }, 2000);
-                    });
-                }
+            // エディタの変更を監視して自動保存
+            let saveTimeout = null;
+            notesEditor.addEventListener('input', () => {
+              clearTimeout(saveTimeout);
+              saveTimeout = setTimeout(() => {
+                saveMemberNotes(memberEmail, notesEditor.innerHTML);
+              }, 2000);
+            });
+          }
 
-                hideLoading();
-                openModal('modal-member-detail');
-            }).catch(App.error.handleError);
-        };
+          hideLoading();
+        }).catch(error => {
+          App.utils.error.handleError(error);
+          App.utils.navigation.switchTab('members');
+        });
+      }
+    };
 
-        function saveMemberNotes(memberEmail, content) {
-            callGAS('updateItem', SHEET_NAMES.MEMBERS, memberEmail, { member_notes: content })
-                .then(() => {
-                    // 保存成功
-                })
-                .catch(error => {
-                    console.error('メンバー備考保存エラー:', error);
-                });
-        }
-    })();
+    function saveMemberNotes(memberEmail, content) {
+      callGAS('updateItem', SHEET_NAMES.MEMBERS, memberEmail, { member_notes: content })
+        .then(() => {
+          // 保存成功
+        })
+        .catch(error => {
+          console.error('メンバー備考保存エラー:', error);
+        });
+    }
+
+    // Alias
+    window.App.modals.detail_member = window.App.pages.memberDetail;
+    window.App.overlays.memberDetail = window.App.pages.memberDetail;
+  })();
 </script>

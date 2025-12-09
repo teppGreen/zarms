@@ -1,4 +1,220 @@
 <script>
+
+    // テーブルの状態管理（ソート、フィルター）
+    let tableState = {
+        budgets: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
+        creatives: { sortKey: 'deadline_at', sortOrder: 'asc', filters: {} },
+        directories: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+        events: { sortKey: 'start_date', sortOrder: 'asc', filters: {} },
+        expenses: { sortKey: 'paid_on', sortOrder: 'asc', filters: {} },
+        forms: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
+        hardwares: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+        jobs: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+        knowledges: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
+        licenses: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+        mediums: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+        members: { sortKey: 'nickname', sortOrder: 'asc', filters: {} },
+        merchandises: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+        musics: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
+        plans: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+        questions: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
+        resources: { sortKey: 'created_at', sortOrder: 'asc', filters: {} },
+        shifts: { sortKey: 'starts_at', sortOrder: 'asc', filters: {} },
+        skills: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
+        tasks: { sortKey: 'ends_at', sortOrder: 'asc', filters: {} },
+        wikis: { sortKey: 'created_at', sortOrder: 'desc', filters: {} }
+    };
+
+    // テーブルヘッダーの定義
+    const advertisementsTableHeaders = [
+        { key: 'display_id', label: '広報ID', sortable: true },
+        { key: 'advertisement_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'ADVERTISEMENT_STATUS' },
+        { key: 'title', label: 'タイトル', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'gfolder_url', label: 'フォルダ', sortable: true, filterable: false, editable: true, editType: 'gfolder' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
+    ];
+
+    const budgetsTableHeaders = [
+        { key: 'display_id', label: '予算ID', sortable: true },
+        { key: 'plan_id', label: '企画ID', sortable: true, filterable: true, editable: true, editType: 'plan' },
+        { key: 'budget_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'BUDGET_STATUS' },
+        { key: 'budget_type_value', label: 'ジャンル', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'BUDGET_TYPE' },
+        { key: 'amount', label: '金額', sortable: true, filterable: false, editable: true, editType: 'int' },
+        { key: 'requesting_directory_name', label: '申請元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+        { key: 'managing_directory_name', label: '管理元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
+    ];
+
+    const creativesTableHeaders = [
+        { key: 'display_id', label: '制作物ID', sortable: true },
+        { key: 'title', label: 'タイトル', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'creative_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', enumType: 'CREATIVE_STATUS' },
+        { key: 'creative_type_value', label: 'ジャンル', sortable: true, filterable: true, editable: true, editType: 'select', enumType: 'CREATIVE_TYPE' },
+        { key: 'deadline_at', label: '納品期限', sortable: true, editable: true, editType: 'datetime' },
+        { key: 'client_directory_name', label: '依頼元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+        { key: 'contractor_directory_name', label: '依頼先', sortable: true, filterable: true, editable: true, editType: 'directory' },
+        { key: 'gfolder_url', label: 'フォルダ', sortable: true, filterable: false, editable: true, editType: 'gfolder' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
+    ];
+
+    const directoriesTableHeaders = [
+        { key: 'display_id', label: '組織ID', sortable: true },
+        { key: 'name', label: '名称', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'directory_type_value', label: 'ジャンル', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'DIRECTORY_TYPE' },
+        { key: 'summary', label: '概要', sortable: false, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'slack_channel_url', label: 'Slackチャンネル', sortable: false, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'gfolder_url', label: 'フォルダ', sortable: true, filterable: false, editable: true, editType: 'gfolder' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+    ];
+
+    const eventsTableHeaders = [
+        { key: 'display_id', label: 'ID', sortable: true },
+        { key: 'event_type_value', label: 'ジャンル', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'EVENT_TYPE' },
+        { key: 'title', label: 'タイトル', sortable: true, filterable: true, editable: true, editType: 'varchar' },
+        { key: 'description', label: '説明', sortable: false, filterable: false, editable: true, editType: 'text' },
+        { key: 'location', label: '場所', sortable: false, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'owner_directory_name', label: '主催元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+        { key: 'starts_at', label: '開始', sortable: true, filterable: false, editable: true, editType: 'datetime' },
+        { key: 'ends_at', label: '終了', sortable: true, filterable: false, editable: true, editType: 'datetime' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+    ];
+
+    const expensesTableHeader = [
+        { key: 'display_id', label: '支出ID', sortable: true },
+        { key: 'budget_id', label: '予算ID', sortable: true },
+        { key: 'expense_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'EXPENSE_STATUS' },
+        { key: 'expense_type_value', label: '支出勘定科目', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'EXPENSE_TYPE' },
+        { key: 'title', label: 'タイトル', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'amount', label: '金額', sortable: true, filterable: false, editable: true, editType: 'int' },
+        { key: 'receipt_gfile_id', label: '領収書', sortable: false, filterable: false, editable: true, editType: 'gfile' },
+        { key: 'invoice_gfile_id', label: '請求書', sortable: false, filterable: false, editable: true, editType: 'gfile' },
+        { key: 'paid_on', label: '支払日', sortable: true, filterable: false, editable: true, editType: 'date' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+    ]
+
+    const forms = [
+        { key: 'display_id', label: 'ID', sortable: true },
+        { key: 'owner_directory_name', label: '管理元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+        { key: 'title', label: 'タイトル', sortable: true, filterable: false, editable: false },
+        { key: 'edit_url', label: '編集URL', sortable: false, editable: false },
+        { key: 'shorten_url', label: '回答URL', sortable: false, editable: false },
+        { key: 'destination_gfile_url', label: 'シートURL', sortable: false, editable: false },
+        { key: 'is_email_collected', label: 'メアド収集', sortable: true, editable: false },
+        { key: 'response_count', label: '回答数', sortable: true, editable: false },
+        { key: 'limit_response_per_form', label: '回答制限(全体)', sortable: true, editable: false, editType: 'int' },
+        { key: 'limit_response_per_user', label: '回答制限(ユーザー)', sortable: true, editable: false, editType: 'int' },
+        { key: 'starts_accepting_response_at', label: '回答受付開始', sortable: true, editable: false, editType: 'datetime' },
+        { key: 'ends_accepting_response_at', label: '回答受付終了', sortable: true, editable: false, editType: 'datetime' },
+    ];
+
+    const hardwaresTableHeaders = [
+        { key: 'display_id', label: '備品ID', sortable: true },
+        { key: 'hardware_type_value', label: 'ジャンル', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'HARDWARE_TYPE' },
+        { key: 'name', label: '名称', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'quantity', label: '数量', sortable: true, filterable: false, editable: true, editType: 'int' },
+        { key: 'managing_directory_name', label: '管理元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+    ];
+
+    const licensesTableHeaders = [
+        { key: 'display_id', label: 'ライセンスID', sortable: true },
+        { key: 'license_type', label: 'タイプ', sortable: true, filterable: true, editable: true, editType: 'varchar' },
+        { key: 'site_url', label: 'サイトURL', sortable: true, filterable: true, editable: true, editType: 'varchar' },
+        { key: 'terms_url', label: '規約URL', sortable: true, filterable: true, editable: true, editType: 'varchar' },
+        { key: 'managing_directory_name', label: '管理元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+    ];
+
+    const mediumsTableHeaders = [
+        { key: 'display_id', label: 'メディアID', sortable: true },
+        { key: 'medium_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'MEDIUM_STATUS' },
+        { key: 'name', label: '名称', sortable: true, filterable: true, editable: true, editType: 'varchar' },
+        { key: 'site_url', label: 'サイトURL', sortable: true, filterable: true, editable: true, editType: 'varchar' },
+        { key: 'managing_directory_name', label: '管理元', sortable: true, filterable: true, editable: true, editType: 'directory' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+    ];
+
+    const membersTableHeaders = [
+        { key: 'icon_gfile_id', label: '', sortable: false },
+        { key: 'nickname', label: '名前', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'email', label: 'メールアドレス', sortable: true, editable: false },
+        { key: 'phone_number', label: '電話番号', sortable: true, editable: true, editType: 'varchar' },
+        { key: 'profile', label: 'プロフィール', sortable: true, editable: true, editType: 'varchar' },
+        { key: 'portfolio', label: 'ポートフォリオ', sortable: true, editable: true, editType: 'varchar' },
+        { key: 'system_role_key', label: 'システム権限', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'SYSTEM_ROLE' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+    ];
+
+    const marchandisesTableHeaders = [
+        { key: 'display_id', label: '商品ID', sortable: true },
+        { key: 'marchandise_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'MARCHANDISE_STATUS' },
+        { key: 'name', label: '商品名', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'model_number', label: 'モデル番号', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'deliverable_count', label: '納品数', sortable: true, filterable: false, editable: true, editType: 'int' },
+        { key: 'price', label: '価格', sortable: true, filterable: false, editable: true, editType: 'int' },
+        { key: 'price_tax_rate', label: '税率', sortable: true, filterable: true, editable: true, editType: 'int' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+    ];
+
+    const musicsTableHeaders = [
+        { key: 'display_id', label: '楽曲ID', sortable: true },
+        { key: 'plan_id', label: '企画ID', sortable: true, filterable: true, editable: true, editType: 'plan' },
+        { key: 'music_type_value', label: 'タイプ', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'MUSIC_TYPE' },
+        { key: 'music_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'MUSIC_STATUS' },
+        { key: 'title', label: '曲名', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'artist_name', label: 'アーティスト', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'jasrac_code', label: 'JASRAC作品コード', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'nextone_code', label: 'NexTone作品コード', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'audio_url', label: '原盤URL', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'is_used', label: '使用', sortable: true, filterable: true, editable: true, editType: 'boolean' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false },
+    ];
+
+    const plansTableHeaders = [
+        { key: 'thumbnail_file_id', label: '', sortable: false, editable: true, editType: 'gfile' },
+        { key: 'display_id', label: 'ID', sortable: true },
+        { key: 'plan_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'PLAN_STATUS' },
+        { key: 'title', label: 'タイトル', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'dur_minutes', label: '所要分数', sortable: true, filterable: false, editable: true, editType: 'int' },
+        { key: 'dur_days', label: '所要日数', sortable: true, filterable: false, editable: true, editType: 'int' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
+    ];
+
+    const questionsTableHeaders = [
+        { key: 'display_id', label: '質問ID', sortable: true },
+        { key: 'question_content', label: '質問', sortable: true, filterable: false, editable: false, editType: 'text' },
+        { key: 'questioned_directory_name', label: '問い合わせ元', sortable: true, filterable: false, editable: true, editType: 'directory' },
+        { key: 'answered_directory_name', label: '回答元', sortable: true, filterable: false, editable: true, editType: 'directory' },
+        { key: 'opened_at', label: '開始日', sortable: true, editable: false },
+        { key: 'closed_at', label: '終了日', sortable: true, editable: false },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
+    ];
+
+    const resourcesTableHeaders = [
+        { key: 'display_id', label: 'リソースID', sortable: true },
+        { key: 'resource_type_value', label: 'タイプ', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'RESOURCE_TYPE' },
+        { key: 'name', label: '名称', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'url', label: 'URL', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
+    ];
+
+    const tasksTableHeaders = [
+        { key: 'display_id', label: 'タスクID', sortable: true },
+        { key: 'parent_task_id', label: '親タスクID', sortable: true, filterable: true, editable: false },
+        { key: 'title', label: 'タスクタイトル', sortable: true, filterable: true, editable: true, editType: 'text' },
+        { key: 'task_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'TASK_STATUS' },
+        { key: 'priority_value', label: '優先度', sortable: true, filterable: true, editable: true, editType: 'enum', enumType: 'PRIORITY' },
+        { key: 'assign_to_name', label: '担当者', sortable: true, filterable: true, editable: false },
+        { key: 'starts_at', label: '開始日時', sortable: true, editable: true, editType: 'datetime' },
+        { key: 'ends_at', label: '終了日時', sortable: true, editable: true, editType: 'datetime' }
+    ];
+
+    const wikisTableHeaders = [
+        { key: 'display_id', label: 'WikiID', sortable: true },
+        { key: 'title', label: 'タイトル', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'updated_at', label: '最終更新', sortable: true, editable: false }
+    ];
+
     (function () {
         // テーブルレンダリング用の名前空間を初期化
         if (!App.utils) App.utils = {};
@@ -134,7 +350,7 @@
                             content = App.utils.tables.renderAssignees(item.assignees);
                             break;
                         case 'icon_gfile_id':
-                            content = `<img src="${escapeHtml(item.icon_gfile_id ? 'https://drive.google.com/thumbnail?id=' + item.icon_gfile_id : '')}" class="avatar" alt="">`;
+                            content = `<img src="${escapeHtml(item.icon_gfile_id ? 'https:/\/drive.google.com/thumbnail?id=' + item.icon_gfile_id : '')}" class="avatar" alt="">`;
                             break;
                         case 'deadline_at':
                             content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDateTimeForDisplay(currentValue, true))} </span>`;

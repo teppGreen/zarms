@@ -1,53 +1,87 @@
-<header class="fixed">
-    <nav>
-        <button id="new-button" class="square extra">
-            <i>add</i>
-        </button>
+<!-- <header class="fixed"> -->
+<nav class="top surface right-margin">
 
-        <h1 class="" style="font-family: 'Google Sans Flex', sans-serif; font-weight: 600; font-size: 2rem;"
-            id="header-title-default">ZARMS 2026</h1>
+    <button id="new-button" class="square extra primary"
+        onclick="App.utils.header.toggleNewButtonDropdown(event)">
+        <i>add</i>
+    </button>
+    <!-- ドロップダウンの項目は、表示中のページに応じて動的に変更 -->
+    <menu id="new-button-dropdown" class="bottom transparent no-wrap">
+        <li>
+            <button class="fill large-elevate" onclick="App.modals.new_task.open()">
+                <i>check_circle</i>
+                <span>タスク</span>
+            </button>
+        </li>
+        <li>
+            <button class="fill large-elevate" onclick="App.modals.new_creative.open()">
+                <i>palette</i>
+                <span>制作物</span>
+            </button>
+        </li>
+        <li>
+            <button class="fill large-elevate" onclick="App.modals.new_plan.open()">
+                <i>folder</i>
+                <span>企画</span>
+            </button>
+        </li>
+        <li>
+            <button class="fill large-elevate" onclick="App.modals.new_member.open()">
+                <i>person_add</i>
+                <span>メンバー</span>
+            </button>
+        </li>
+        <li>
+            <button class="fill large-elevate" onclick="App.modals.new_knowledge.open()">
+                <i>lightbulb</i>
+                <span>ナレッジ</span>
+            </button>
+        </li>
+    </menu>
 
-        <div class="max"></div>
 
-        <!-- 強化された検索バー -->
-        <div class="max field round border prefix" id="search-container">
-            <i class="front">search</i>
-            <input placeholder="IDまたはタイトルで検索">
-            <menu id="search-results-menu" class="min">
-                <li>
-                    <div class="field large prefix">
-                        <i class="front">arrow_back</i>
-                        <input type="text" id="search-input" placeholder="何を検索しますか？"
-                            onkeydown="handleSearchKeydown(event)" oninput="handleSearchInput(event)"
-                            onfocus="handleSearchFocus(event)" onblur="handleSearchBlur(event)">
-                    </div>
-                </li>
-            </menu>
-        </div>
+    <h1 class="medium" style="font-family: 'Google Sans Flex', sans-serif; font-weight: 600; font-size: 2rem;"
+        id="header-title-default">ZARMS 2026</h1>
+
+    <div class="medium"></div>
+
+    <!-- 強化された検索バー -->
+    <div class="max field round border prefix" id="search-container">
+        <i class="front">search</i>
+        <input placeholder="IDまたはタイトルで検索" id="search-input" onkeydown="handleSearchKeydown(event)"
+            oninput="handleSearchInput(event)" onfocus="handleSearchFocus(event)" onblur="handleSearchBlur(event)">
+        <!-- 検索ターゲット (hidden for now, default to 'all') -->
+        <input type="hidden" id="search-target" value="all">
+        <menu id="search-results-menu" class="min">
+            <!-- Results will be injected here -->
+        </menu>
+    </div>
+
+    <div class="medium"></div>
 
 
-        <button id="tasks-nav" class="circle" onclick="App.utils.navigation.switchTab('tasks')">
-            <i>check_circle</i>
-        </button>
+    <button id="tasks-nav" class="circle" onclick="App.utils.navigation.switchTab('tasks')">
+        <i>check_circle</i>
+    </button>
 
-        <!-- 勤怠ボタン -->
-        <button class="circle" id="timetrack-button" onclick="handleTimetrackClick()" title="打刻">
-            <i>schedule</i>
-        </button>
+    <!-- 勤怠ボタン -->
+    <button class="circle" id="timetrack-button" onclick="handleTimetrackClick()" title="打刻">
+        <i>schedule</i>
+    </button>
 
-        <!-- ユーザーアイコンメニュー -->
-        <button class="circle">
-            <i>account_circle</i>
-            <menu class="right">
-                <a onclick="handleUserProfile()">
-                    <i>person</i>
-                    <span>プロフィール</span>
-                </a>
-                <div class="divider"></div>
-            </menu>
-        </button>
-    </nav>
-</header>
+    <!-- ユーザーアイコンメニュー -->
+    <button class="circle">
+        <i>account_circle</i>
+        <menu class="right">
+            <a onclick="handleUserProfile()">
+                <i>person</i>
+                <span>プロフィール</span>
+            </a>
+            <div class="divider"></div>
+        </menu>
+    </button>
+</nav>
+<!-- </header> -->
 
 <script>
     (function () {
