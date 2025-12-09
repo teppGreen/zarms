@@ -1,7 +1,7 @@
 <div id="tab-home">
     <!-- ヘッダー（挨拶）-->
     <!-- 「ユーザーさん」の部分にニックネームが入る。 -->
-    <article>
+    <article class="no-elevate">
         <div class="row">
             <div class="max">
                 <h4 id="home-greeting" class="bold"></h4>
@@ -47,7 +47,7 @@
 
         <!-- Column 4: Reserved (s12 m6 l3) -->
         <div class="s12 m6 l3">
-            <h6>その他</h6>
+            <h6>アクティビティ</h6>
             <div id="home-reserved-container">
                 <!-- 将来の拡張用 -->
                 <article class="transparent">
@@ -149,7 +149,7 @@
             const priorityLabel = getConfigLabel(creative.priority_key, 'PRIORITY');
 
             return `
-                <article class="no-padding small-padding border" style="cursor: pointer; margin-bottom: 8px;" onclick="App.overlays.creativeDetail.open('${creative.id}')">
+                <article class="small-padding bottom-margin" style="cursor: pointer;" onclick="App.overlays.creativeDetail.open('${creative.id}')">
                     <div class="small-text"><strong>${escapeHtml(creative.display_id || creative.id)}</strong></div>
                     <div class="small-text">${escapeHtml(creative.title || '')}</div>
                     <div class="row no-space" style="margin-top: 4px;">
@@ -194,8 +194,8 @@
             const priorityLabel = getConfigLabel(task.priority_key, 'PRIORITY');
 
             return `
-                <article class="no-padding small-padding border" style="cursor: pointer; margin-bottom: 8px;" onclick="if(App.overlays.taskDetail) App.overlays.taskDetail.open('${task.id}')">
-                    <div class="small-text"><strong>${escapeHtml(task.display_id || task.id)}</strong></div>
+                <article class="small-padding bottom-margin" style="cursor: pointer;" onclick="if(App.overlays.taskDetail) App.overlays.taskDetail.open('${task.id}')">
+                    <div class="small-text"><strong>${escapeHtml(task.display_id)}</strong></div>
                     <div class="small-text">${escapeHtml(task.title || '')}</div>
                     <div class="row no-space" style="margin-top: 4px;">
                         <span class="chip small">${escapeHtml(statusLabel)}</span>
@@ -244,7 +244,7 @@
             const title = item.title || item.name || '';
 
             return `
-                <article class="no-padding small-padding border" style="cursor: pointer; margin-bottom: 8px;" onclick="if(App.overlays.${selectedType === 'creatives' ? 'creativeDetail' : selectedType === 'plans' ? 'planDetail' : 'advertisementDetail'}) App.overlays.${selectedType === 'creatives' ? 'creativeDetail' : selectedType === 'plans' ? 'planDetail' : 'advertisementDetail'}.open('${item.id}')">
+                <article class="small-padding bottom-margin" style="cursor: pointer;" onclick="if(App.overlays.${selectedType === 'creatives' ? 'creativeDetail' : selectedType === 'plans' ? 'planDetail' : 'advertisementDetail'}) App.overlays.${selectedType === 'creatives' ? 'creativeDetail' : selectedType === 'plans' ? 'planDetail' : 'advertisementDetail'}.open('${item.id}')">
                     <div class="small-text"><strong>${escapeHtml(displayId)}</strong></div>
                     <div class="small-text">${escapeHtml(title)}</div>
                 </article>
