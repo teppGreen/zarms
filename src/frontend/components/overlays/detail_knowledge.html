@@ -1,27 +1,38 @@
-<dialog id="modal-knowledge-detail" class="modal large">
-    <h5 class="bold">ナレッジ詳細</h5>
-    <div id="knowledge-detail-content"></div>
-    <nav class="right-align">
-        <button class="border" onclick="closeModal('modal-knowledge-detail')">閉じる</button>
-    </nav>
-</dialog>
+<!-- 詳細画面: ナレッジ -->
+<div id="detail-knowledge" class="page-content detail-view" style="display: none;">
+  <nav class="padding row no-space align-center">
+    <button class="circle transparent" onclick="App.utils.navigation.switchTab('knowledges')">
+      <i>arrow_back</i>
+    </button>
+    <h5 class="bold max">ナレッジ詳細</h5>
+  </nav>
+  <div id="knowledge-detail-content" class="padding"></div>
+</div>
 
 <script>
-    (function () {
-        App.modals.detail_knowledge = App.modals.detail_knowledge || {};
+  (function () {
+    App.pages.knowledgeDetail = {
+      openDetailModal: function (id) {
+        this.open(id);
+      },
+      open: function (knowledgeId) {
+        showLoading();
+        // 画面切り替え
+        document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
+        const view = document.getElementById('detail-knowledge');
+        if (view) view.style.display = 'block';
 
-        App.modals.detail_knowledge.open = function (knowledgeId) {
-            showLoading();
-            callGAS('getItems', SHEET_NAMES.KNOWLEDGES).then(knowledgeList => {
-                const knowledge = knowledgeList.find(k => k.knowledge_id === knowledgeId);
-                if (!knowledge) {
-                    alert('ナレッジが見つかりません');
-                    hideLoading();
-                    return;
-                }
+        callGAS('getItems', SHEET_NAMES.KNOWLEDGES).then(knowledgeList => {
+          const knowledge = knowledgeList.find(k => k.knowledge_id === knowledgeId);
+          if (!knowledge) {
+            alert('ナレッジが見つかりません');
+            App.utils.navigation.switchTab('knowledges');
+            hideLoading();
+            return;
+          }
 
-                const container = document.getElementById('knowledge-detail-content');
-                container.innerHTML = `
+          const container = document.getElementById('knowledge-detail-content');
+          container.innerHTML = `
         <div style="margin-bottom: 24px;">
           <div style="margin-bottom: 12px;">
             <span class="badge" style="background: #fef3c7; color: #92400e;">${escapeHtml(getConfigLabel(knowledge.knowledge_type_key, 'KNOWLEDGE_TYPE'))}</span>
@@ -33,9 +44,14 @@
           <div style="line-height: 1.6; color: var(--md-sys-color-on-surface);">${knowledge.knowledge_content || ''}</div>
         </div>
       `;
-                hideLoading();
-                openModal('modal-knowledge-detail');
-            }).catch(App.error.handleError);
-        };
-    })();
+          hideLoading();
+        }).catch(error => {
+          App.utils.error.handleError(error);
+          App.utils.navigation.switchTab('knowledges');
+        });
+      }
+    };
+    // Compatibility
+    App.modals.detail_knowledge = App.pages.knowledgeDetail;
+  })();
 </script>

@@ -1,19 +1,14 @@
-<nav id="nav-grid" class="m l left no-wrap min">
+<nav id="nav-grid" class="m l left no-wrap min surface">
     <header>
-
+        <button id="home-nav" class="square extra primary-container" onclick="App.utils.navigation.switchTab('home')">
+            <i>home</i>
+            <span>ホーム</span>
+        </button>
     </header>
 
-    <a id="home-nav" class="active" onclick="App.utils.navigation.switchTab('home')">
-        <i>home</i>
-        <span>ホーム</span>
-    </a>
     <a id="plans-nav" onclick="App.utils.navigation.switchTab('plans')">
         <i>folder</i>
         <span>企画</span>
-    </a>
-    <a id="merchandises-nav" onclick="App.utils.navigation.switchTab('merchandises')">
-        <i>storefront</i>
-        <span>物販</span>
     </a>
     <a id="advertisements-nav" onclick="App.utils.navigation.switchTab('advertisements')">
         <i>campaign</i>
@@ -24,12 +19,8 @@
         <span>制作物</span>
     </a>
     <a id="budgets-nav" onclick="App.utils.navigation.switchTab('budgets')">
-        <i>monetization_on</i>
-        <span>予算・収支</span>
-    </a>
-    <a id="events-nav" onclick="App.utils.navigation.switchTab('events')">
-        <i>event</i>
-        <span>カレンダー</span>
+        <i>currency_yen</i>
+        <span>お金</span>
     </a>
     <a id="forms-nav" onclick="App.utils.navigation.switchTab('forms')">
         <i>description</i>
@@ -40,40 +31,20 @@
         <span>当日業務</span>
     </a>
     <a id="directories-nav" onclick="App.utils.navigation.switchTab('directories')">
-        <i>corporate_fare</i>
-        <span>組織</span>
-    </a>
-    <a id="members-nav" onclick="App.utils.navigation.switchTab('members')">
         <i>groups</i>
         <span>メンバー</span>
     </a>
-    <a id="mediums-nav" onclick="App.utils.navigation.switchTab('mediums')">
-        <i>devices</i>
-        <span>媒体</span>
-    </a>
     <a id="licenses-nav" onclick="App.utils.navigation.switchTab('licenses')">
-        <i>key</i>
-        <span>ライセンス・楽曲</span>
-    </a>
-    <a id="hardwares-nav" onclick="App.utils.navigation.switchTab('hardwares')">
-        <i>straighten</i>
-        <span>備品</span>
+        <i>license</i>
+        <span>権利</span>
     </a>
     <a id="resources-nav" onclick="App.utils.navigation.switchTab('resources')">
-        <i>link</i>
-        <span>リンク集</span>
-    </a>
-    <a id="knowledges-nav" onclick="App.utils.navigation.switchTab('knowledges')">
-        <i>lightbulb</i>
-        <span>ナレッジ</span>
-    </a>
-    <a id="analytics-nav" onclick="App.utils.navigation.switchTab('analytics')">
-        <i>analytics</i>
-        <span>アナリティクス</span>
+        <i>shelves</i>
+        <span>リソース</span>
     </a>
     <a id="questions-nav" onclick="App.utils.navigation.switchTab('questions')">
         <i>help</i>
-        <span>問い合わせ</span>
+        <span>問合せ</span>
     </a>
 </nav>
 
@@ -88,13 +59,13 @@
          */
         App.utils.navigation.switchTab = function (tabName) {
             // 他のタブに切り替える前にhomeタブの処理を停止
-            const currentTab = document.querySelector('.tab-content:not([style*="display: none"])');
-            if (currentTab && currentTab.id === 'tab-home') {
-                // stopRemainingTimeUpdatesが存在する場合のみ呼び出し
-                if (typeof stopRemainingTimeUpdates === 'function') {
-                    stopRemainingTimeUpdates();
-                }
-            }
+            const currentTab = Array.from(document.querySelectorAll('main > div')).find(el => el.style.display !== 'none');
+            // if (currentTab && currentTab.id === 'tab-home') {
+            //     // stopRemainingTimeUpdatesが存在する場合のみ呼び出し
+            //     if (typeof stopRemainingTimeUpdates === 'function') {
+            //         stopRemainingTimeUpdates();
+            //     }
+            // }
             const sidebarLinks = document.querySelectorAll('nav.left a');
             if (sidebarLinks.length > 0) {
                 sidebarLinks.forEach(item => item.classList.remove('active'));
@@ -116,7 +87,7 @@
                     tasksNav.classList.remove('active');
                 }
             }
-            document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+            document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
             document.getElementById('tab-' + tabName).style.display = 'block';
             App.utils.navigation.loadTabData(tabName);
         };

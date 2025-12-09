@@ -1,130 +1,113 @@
-<!-- フルスクリーンオーバーレイ詳細画面 -->
-<div id="overlay-creative-detail"
-    style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--surface); overflow: hidden;">
-    <nav class="padding row no-space align-center">
-        <button class="circle transparent" onclick="App.overlays.creativeDetail.close()">
-            <i>arrow_back</i>
-        </button>
-        <h5 class="bold max" id="creative-detail-title">制作物詳細</h5>
-    </nav>
+<!-- 詳細画面: 制作物 -->
+<div id="detail-creative" class="page-content detail-view" style="display: none;">
+  <nav class="padding row no-space align-center">
+    <button class="circle transparent" onclick="App.utils.navigation.switchTab('creatives')">
+      <i>arrow_back</i>
+    </button>
+    <h5 class="bold max" id="creative-detail-title">制作物詳細</h5>
+  </nav>
 
-    <div id="creative-detail-content" class="padding">
-        <!-- Dynamic Content: 4分割グリッドレイアウト -->
-    </div>
+  <div id="creative-detail-content" class="padding">
+    <!-- Dynamic Content -->
+  </div>
 </div>
 
 <script>
-    App.overlays.creativeDetail = {
-        currentId: null,
-        isLoading: false,
-        currentItem: null,
+  App.pages.creativeDetail = { // Renamed from overlays to pages for consistency, though kept structure similar
+    currentId: null,
+    isLoading: false,
+    currentItem: null,
 
-        open: function (id) {
-            if (!id || typeof id !== 'string') {
-                console.warn('App.overlays.creativeDetail.open called with invalid ID:', id);
-                return;
-            }
+    openDetailModal: function (id) { // Alias for compatibility with search
+      this.open(id);
+    },
 
-            if (this.isLoading) {
-                console.log('App.overlays.creativeDetail is already loading. Ignoring request.');
-                return;
-            }
+    open: function (id) {
+      if (!id || typeof id !== 'string') {
+        console.warn('App.pages.creativeDetail.open called with invalid ID:', id);
+        return;
+      }
 
-            console.log('App.overlays.creativeDetail.open called with:', id);
-            this.currentId = id;
-            this.isLoading = true;
-            showLoading();
+      console.log('App.pages.creativeDetail.open called with:', id);
+      this.currentId = id;
+      this.isLoading = true;
+      showLoading();
 
-            // オーバーレイを表示
-            const overlay = document.getElementById('overlay-creative-detail');
-            if (overlay) {
-                overlay.style.display = 'block';
-            }
+      // 画面切り替え: すべてのタブと詳細ビューを非表示にする
+      document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
 
-            const promises = [
-                callGAS('getItemById', SHEET_NAMES.CREATIVES, id)
-            ];
+      // 自分だけ表示
+      const view = document.getElementById('detail-creative');
+      if (view) {
+        view.style.display = 'block';
+      }
 
-            if (typeof directoriesData === 'undefined' || directoriesData.length === 0) {
-                promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES));
-            } else {
-                promises.push(Promise.resolve(null));
-            }
+      const promises = [
+        callGAS('getItemById', SHEET_NAMES.CREATIVES, id)
+      ];
 
-            if (typeof plansData === 'undefined' || plansData.length === 0) {
-                promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
-            } else {
-                promises.push(Promise.resolve(null));
-            }
+      // 必要なマスターデータの読み込み (まだなければ)
+      if (typeof directoriesData === 'undefined' || directoriesData.length === 0) promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES));
+      else promises.push(Promise.resolve(null));
 
-            if (typeof membersData === 'undefined' || membersData.length === 0) {
-                promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
-            } else {
-                promises.push(Promise.resolve(null));
-            }
+      if (typeof plansData === 'undefined' || plansData.length === 0) promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
+      else promises.push(Promise.resolve(null));
 
-            // ENUMSデータの取得
-            if (typeof configData === 'undefined' || Object.keys(configData).length === 0) {
-                promises.push(callGAS('getItems', SHEET_NAMES.CONFIG));
-            } else {
-                promises.push(Promise.resolve(null));
-            }
+      if (typeof membersData === 'undefined' || membersData.length === 0) promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
+      else promises.push(Promise.resolve(null));
 
-            Promise.all(promises).then(([creative, dirs, plans, members, configs]) => {
-                if (dirs) directoriesData = dirs;
-                if (plans) plansData = plans;
-                if (members) membersData = members;
-                if (configs) configData = groupConfigByType(configs);
+      if (typeof configData === 'undefined' || Object.keys(configData).length === 0) promises.push(callGAS('getItems', SHEET_NAMES.CONFIG));
+      else promises.push(Promise.resolve(null));
 
-                if (!creative) {
-                    alert('制作物が見つかりません');
-                    this.close();
-                    this.isLoading = false;
-                    hideLoading();
-                    return;
-                }
+      Promise.all(promises).then(([creative, dirs, plans, members, configs]) => {
+        if (dirs) directoriesData = dirs;
+        if (plans) plansData = plans;
+        if (members) membersData = members;
+        if (configs) configData = groupConfigByType(configs);
 
-                this.currentItem = creative;
-                this.render(creative);
-                this.isLoading = false;
-                hideLoading();
-            }).catch(error => {
-                this.isLoading = false;
-                console.error('CreativeDetail loading error:', error);
-                App.utils.error.handleError(error);
-            });
-        },
+        if (!creative) {
+          alert('制作物が見つかりません');
+          App.utils.navigation.switchTab('creatives');
+          this.isLoading = false;
+          hideLoading();
+          return;
+        }
 
-        close: function () {
-            const overlay = document.getElementById('overlay-creative-detail');
-            if (overlay) {
-                overlay.style.display = 'none';
-            }
-        },
+        this.currentItem = creative;
+        this.render(creative);
+        this.isLoading = false;
+        hideLoading();
+      }).catch(error => {
+        this.isLoading = false;
+        console.error('CreativeDetail loading error:', error);
+        App.utils.error.handleError(error);
+        App.utils.navigation.switchTab('creatives'); // Error case, go back
+      });
+    },
 
-        render: function (creative) {
-            const container = document.getElementById('creative-detail-content');
-            if (!container) return;
+    render: function (creative) {
+      const container = document.getElementById('creative-detail-content');
+      if (!container) return;
 
-            const titleEl = document.getElementById('creative-detail-title');
-            if (titleEl) {
-                titleEl.textContent = `制作物 ${creative.display_id || creative.id}`;
-            }
+      const titleEl = document.getElementById('creative-detail-title');
+      if (titleEl) {
+        titleEl.textContent = `制作物 ${creative.display_id || creative.id}`;
+      }
 
-            // 4分割グリッドレイアウト
-            container.innerHTML = `
+      // 4分割グリッドレイアウト
+      container.innerHTML = `
         <div class="grid">
           <!-- 左カラム (s12 m3): 基本情報 -->
           <div class="s12 m3">
             <!-- タイトル -->
             <div class="field label border">
-              <input type="text" id="creative-title-input" value="${escapeHtml(creative.title || '')}" onchange="App.overlays.creativeDetail.updateField('title', this.value)">
+              <input type="text" id="creative-title-input" value="${escapeHtml(creative.title || '')}" onchange="App.pages.creativeDetail.updateField('title', this.value)">
               <label>タイトル</label>
             </div>
 
             <!-- ステータス -->
             <div class="field label border">
-              <select id="creative-status-select" onchange="App.overlays.creativeDetail.updateField('creative_status_key', this.value)">
+              <select id="creative-status-select" onchange="App.pages.creativeDetail.updateField('creative_status_key', this.value)">
                 ${this.renderEnumOptions('CREATIVE_STATUS', creative.creative_status_key)}
               </select>
               <label>ステータス</label>
@@ -132,7 +115,7 @@
 
             <!-- タイプ -->
             <div class="field label border">
-              <select id="creative-type-select" onchange="App.overlays.creativeDetail.updateField('creative_type_key', this.value)">
+              <select id="creative-type-select" onchange="App.pages.creativeDetail.updateField('creative_type_key', this.value)">
                 ${this.renderEnumOptions('CREATIVE_TYPE', creative.creative_type_key)}
               </select>
               <label>タイプ</label>
@@ -140,7 +123,7 @@
 
             <!-- 優先度 -->
             <div class="field label border">
-              <select id="creative-priority-select" onchange="App.overlays.creativeDetail.updateField('priority_key', this.value)">
+              <select id="creative-priority-select" onchange="App.pages.creativeDetail.updateField('priority_key', this.value)">
                 ${this.renderEnumOptions('PRIORITY', creative.priority_key)}
               </select>
               <label>優先度</label>
@@ -148,7 +131,7 @@
 
             <!-- 納品期限 -->
             <div class="field label border">
-              <input type="datetime-local" id="creative-deadline-input" value="${formatDateTimeForInput(creative.deadline_at)}" onchange="App.overlays.creativeDetail.updateField('deadline_at', this.value)">
+              <input type="datetime-local" id="creative-deadline-input" value="${formatDateTimeForInput(creative.deadline_at)}" onchange="App.pages.creativeDetail.updateField('deadline_at', this.value)">
               <label>納品期限</label>
             </div>
 
@@ -156,21 +139,21 @@
             <div class="field label border suffix">
               <input type="text" id="creative-client-display" value="${escapeHtml(this.getDirectoryFullName(creative.client_directory_id))}" readonly>
               <label>依頼元</label>
-              <i onclick="App.overlays.creativeDetail.selectDirectory('client_directory_id')">edit</i>
+              <i onclick="App.pages.creativeDetail.selectDirectory('client_directory_id')">edit</i>
             </div>
 
             <!-- 依頼先 -->
             <div class="field label border suffix">
               <input type="text" id="creative-contractor-display" value="${escapeHtml(this.getDirectoryFullName(creative.contractor_directory_id))}" readonly>
               <label>依頼先</label>
-              <i onclick="App.overlays.creativeDetail.selectDirectory('contractor_directory_id')">edit</i>
+              <i onclick="App.pages.creativeDetail.selectDirectory('contractor_directory_id')">edit</i>
             </div>
 
             <div class="space"></div>
 
             <!-- メンバー管理 -->
             <div class="row">
-              <button class="small" onclick="App.overlays.creativeDetail.addMembers()">
+              <button class="small" onclick="App.pages.creativeDetail.addMembers()">
                 <i>add</i>
                 <span>担当者を追加</span>
               </button>
@@ -186,18 +169,18 @@
             <!-- メインコンテンツエリア -->
             <div id="creative-main-content-area">
               ${creative.document_gfile_id ?
-                    `<iframe src="https://docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
-                    '<article class="border round"><div class="padding"><p>ドキュメントが設定されていません</p></div></article>'
-                }
+          `<iframe src="https://docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
+          '<article class="border round"><div class="padding"><p>ドキュメントが設定されていません</p></div></article>'
+        }
             </div>
 
-            <!-- 下部タブ（オーバーレイ） -->
+            <!-- 下部タブ -->
             <div style="position: absolute; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--outline); z-index: 10;">
               <div class="tabs">
-                <a class="active" onclick="App.overlays.creativeDetail.switchTab('documents', '${creative.id}')">ドキュメント</a>
-                <a onclick="App.overlays.creativeDetail.switchTab('folder', '${creative.id}')">フォルダ</a>
-                <a onclick="App.overlays.creativeDetail.switchTab('relations', '${creative.id}')">リレーション</a>
-                <a onclick="App.overlays.creativeDetail.switchTab('tasks', '${creative.id}')">タスク</a>
+                <a class="active" onclick="App.pages.creativeDetail.switchTab('documents', '${creative.id}')">ドキュメント</a>
+                <a onclick="App.pages.creativeDetail.switchTab('folder', '${creative.id}')">フォルダ</a>
+                <a onclick="App.pages.creativeDetail.switchTab('relations', '${creative.id}')">リレーション</a>
+                <a onclick="App.pages.creativeDetail.switchTab('tasks', '${creative.id}')">タスク</a>
               </div>
             </div>
           </div>
@@ -213,209 +196,179 @@
               <div class="field textarea label border suffix">
                 <textarea id="creative-note-input" rows="2"></textarea>
                 <label>コメントを追加...</label>
-                <i onclick="App.overlays.creativeDetail.postNote()">send</i>
+                <i onclick="App.pages.creativeDetail.postNote()">send</i>
               </div>
             </div>
           </div>
         </div>
       `;
 
-            // メンバー、ノートの読み込み
-            this.loadMembers(creative.id);
-            this.loadNotes(creative.id);
-        },
+      this.loadMembers(creative.id);
+      this.loadNotes(creative.id);
+    },
 
-        switchTab: function (tab, creativeId) {
-            const contentArea = document.getElementById('creative-main-content-area');
-            if (!contentArea) return;
+    switchTab: function (tab, creativeId) {
+      const contentArea = document.getElementById('creative-main-content-area');
+      if (!contentArea) return;
 
-            const creative = this.currentItem;
+      const creative = this.currentItem;
 
-            switch (tab) {
-                case 'documents':
-                    contentArea.innerHTML = creative.document_gfile_id ?
-                        `<iframe src="https://docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
-                        '<article class="border round"><div class="padding"><p>ドキュメントが設定されていません</p></div></article>';
-                    break;
-                case 'folder':
-                    contentArea.innerHTML = creative.gfolder_id ?
-                        `<iframe src="https://drive.google.com/embeddedfolderview?id=${creative.gfolder_id}#list" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
-                        '<article class="border round"><div class="padding"><p>フォルダが設定されていません</p></div></article>';
-                    break;
-                case 'relations':
-                    contentArea.innerHTML = '<article class="border round"><div class="padding"><h6>関連アイテム</h6><p>リレーション機能は実装予定です</p></div></article>';
-                    break;
-                case 'tasks':
-                    contentArea.innerHTML = '<article class="border round"><div class="padding"><h6>タスク一覧</h6><p>タスク機能は実装予定です</p></div></article>';
-                    break;
-            }
+      switch (tab) {
+        case 'documents':
+          contentArea.innerHTML = creative.document_gfile_id ?
+            `<iframe src="https://docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
+            '<article class="border round"><div class="padding"><p>ドキュメントが設定されていません</p></div></article>';
+          break;
+        case 'folder':
+          contentArea.innerHTML = creative.gfolder_id ?
+            `<iframe src="https://drive.google.com/embeddedfolderview?id=${creative.gfolder_id}#list" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
+            '<article class="border round"><div class="padding"><p>フォルダが設定されていません</p></div></article>';
+          break;
+        case 'relations':
+          contentArea.innerHTML = '<article class="border round"><div class="padding"><h6>関連アイテム</h6><p>リレーション機能は実装予定です</p></div></article>';
+          break;
+        case 'tasks':
+          contentArea.innerHTML = '<article class="border round"><div class="padding"><h6>タスク一覧</h6><p>タスク機能は実装予定です</p></div></article>';
+          break;
+      }
 
-            // タブのアクティブ状態を更新
-            document.querySelectorAll('#overlay-creative-detail .tabs a').forEach(a => a.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-        },
+      // Remove active class from all tabs in this container
+      const container = document.getElementById('creative-detail-content');
+      if (container) {
+        container.querySelectorAll('.tabs a').forEach(a => a.classList.remove('active'));
+        // Add active class to clicked tab (need to pass event or find it)
+        // Optimized: searching by text content or adding a data attribute would be better, but for now assumption:
+        // The caller logic in HTML template uses `event.currentTarget`? No it doesn't passed.
+        // Let's use `event.currentTarget` if available dynamically.
+        if (event && event.currentTarget) event.currentTarget.classList.add('active');
+      }
+    },
 
-        renderEnumOptions: function (enumType, selectedValue) {
-            const options = configData[enumType] || [];
-            return options.map(opt =>
-                `<option value="${escapeHtml(opt.config_key)}" ${opt.config_key === selectedValue ? 'selected' : ''}>${escapeHtml(opt.config_value)}</option>`
-            ).join('');
-        },
+    renderEnumOptions: function (enumType, selectedValue) {
+      const options = configData[enumType] || [];
+      return options.map(opt =>
+        `<option value="${escapeHtml(opt.config_key)}" ${opt.config_key === selectedValue ? 'selected' : ''}>${escapeHtml(opt.config_value)}</option>`
+      ).join('');
+    },
 
-        getDirectoryFullName: function (directoryId) {
-            if (!directoryId || !directoriesData) return '';
+    getDirectoryFullName: function (directoryId) {
+      if (!directoryId || !directoriesData) return '';
+      const dir = directoriesData.find(d => d.id === directoryId);
+      if (!dir) return '';
+      if (!dir.parent_directory_id) return dir.name || '';
+      const parent = directoriesData.find(d => d.id === dir.parent_directory_id);
+      if (!parent) return dir.name || '';
+      return this.getDirectoryFullName(dir.parent_directory_id) + ' / ' + (dir.name || '');
+    },
 
-            const dir = directoriesData.find(d => d.id === directoryId);
-            if (!dir) return '';
+    selectDirectory: function (field) {
+      App.modals.selectDirectories.open({
+        multiSelect: false,
+        preSelected: this.currentItem[field] ? [this.currentItem[field]] : [],
+        callback: (selectedIds) => {
+          if (selectedIds.length > 0) {
+            this.updateField(field, selectedIds[0]);
+            const displayField = field === 'client_directory_id' ? 'creative-client-display' : 'creative-contractor-display';
+            const input = document.getElementById(displayField);
+            if (input) input.value = this.getDirectoryFullName(selectedIds[0]);
+          }
+        }
+      });
+    },
 
-            if (!dir.parent_directory_id) {
-                return dir.name || '';
-            }
-
-            const parent = directoriesData.find(d => d.id === dir.parent_directory_id);
-            if (!parent) {
-                return dir.name || '';
-            }
-
-            return this.getDirectoryFullName(dir.parent_directory_id) + ' / ' + (dir.name || '');
-        },
-
-        selectDirectory: function (field) {
-            App.modals.selectDirectories.open({
-                multiSelect: false,
-                preSelected: this.currentItem[field] ? [this.currentItem[field]] : [],
-                callback: (selectedIds) => {
-                    if (selectedIds.length > 0) {
-                        this.updateField(field, selectedIds[0]);
-                        // UIを即座に更新
-                        const displayField = field === 'client_directory_id' ?
-                            'creative-client-display' : 'creative-contractor-display';
-                        const input = document.getElementById(displayField);
-                        if (input) {
-                            input.value = this.getDirectoryFullName(selectedIds[0]);
-                        }
-                    }
-                }
+    addMembers: function () {
+      App.modals.selectMembers.open({
+        multiSelect: true,
+        preSelected: [],
+        callback: (selectedIds) => {
+          if (selectedIds.length > 0) {
+            selectedIds.forEach(memberId => {
+              const assignmentData = {
+                related_table: SHEET_NAMES.CREATIVES,
+                related_id: this.currentId,
+                member_id: memberId,
+                role_key: 'MEMBER'
+              };
+              callGAS('createItem', 'member_assignments', assignmentData)
+                .then(() => this.loadMembers(this.currentId))
+                .catch(App.utils.error.handleError);
             });
-        },
+          }
+        }
+      });
+    },
 
-        addMembers: function () {
-            App.modals.selectMembers.open({
-                multiSelect: true,
-                preSelected: [],
-                callback: (selectedIds) => {
-                    if (selectedIds.length > 0) {
-                        // member_assignmentsに追加
-                        selectedIds.forEach(memberId => {
-                            const assignmentData = {
-                                related_table: SHEET_NAMES.CREATIVES,
-                                related_id: this.currentId,
-                                member_id: memberId,
-                                role_key: 'MEMBER'
-                            };
+    updateField: function (field, value) {
+      const id = this.currentId;
+      if (!id) return;
+      let finalValue = value;
+      if (field === 'deadline_at' && value) {
+        const d = new Date(value);
+        finalValue = d.toISOString();
+      }
+      const oldItem = { ...this.currentItem };
+      this.currentItem[field] = finalValue;
+      updateLocalData(SHEET_NAMES.CREATIVES, id, { [field]: finalValue });
 
-                            callGAS('createItem', 'member_assignments', assignmentData)
-                                .then(() => {
-                                    this.loadMembers(this.currentId);
-                                })
-                                .catch(App.utils.error.handleError);
-                        });
-                    }
-                }
-            });
-        },
+      callGAS('updateItem', SHEET_NAMES.CREATIVES, id, { [field]: finalValue })
+        .then(success => {
+          if (!success) {
+            alert('更新に失敗しました');
+            this.currentItem[field] = oldItem[field];
+            rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
+            this.render(this.currentItem);
+          }
+        })
+        .catch(error => {
+          App.utils.error.handleError(error);
+          this.currentItem[field] = oldItem[field];
+          rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
+          this.render(this.currentItem);
+        });
+    },
 
-        updateField: function (field, value) {
-            const id = this.currentId;
-            if (!id) return;
-
-            // フィールドの値を変換（datetime-localの場合）
-            let finalValue = value;
-            if (field === 'deadline_at' && value) {
-                const d = new Date(value);
-                finalValue = d.toISOString();
-            }
-
-            // Optimistic UI: グローバル変数を即座に更新
-            const oldItem = { ...this.currentItem };
-            this.currentItem[field] = finalValue;
-            updateLocalData(SHEET_NAMES.CREATIVES, id, { [field]: finalValue });
-
-            // バックグラウンドで保存
-            callGAS('updateItem', SHEET_NAMES.CREATIVES, id, { [field]: finalValue })
-                .then(success => {
-                    if (!success) {
-                        alert('更新に失敗しました');
-                        // ロールバック
-                        this.currentItem[field] = oldItem[field];
-                        rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
-                        this.render(this.currentItem);
-                    }
-                })
-                .catch(error => {
-                    App.utils.error.handleError(error);
-                    // ロールバック
-                    this.currentItem[field] = oldItem[field];
-                    rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
-                    this.render(this.currentItem);
-                });
-        },
-
-        loadMembers: function (creativeId) {
-            callGAS('getItems', 'member_assignments')
-                .then(assignments => {
-                    const creativeAssignments = assignments.filter(a => a.related_table === SHEET_NAMES.CREATIVES && a.related_id === creativeId);
-                    const container = document.getElementById('creative-members-container');
-                    if (!container) return;
-
-                    if (creativeAssignments.length === 0) {
-                        container.innerHTML = '<p class="small-text">担当者が割り当てられていません</p>';
-                        return;
-                    }
-
-                    container.innerHTML = creativeAssignments.map(assignment => {
-                        const member = membersData.find(m => m.id === assignment.member_id);
-                        if (!member) return '';
-
-                        const iconUrl = member.icon_gfile_id ?
-                            `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}&sz=w32` :
-                            '';
-
-                        return `
+    loadMembers: function (creativeId) {
+      callGAS('getItems', 'member_assignments')
+        .then(assignments => {
+          const creativeAssignments = assignments.filter(a => a.related_table === SHEET_NAMES.CREATIVES && a.related_id === creativeId);
+          const container = document.getElementById('creative-members-container');
+          if (!container) return;
+          if (creativeAssignments.length === 0) {
+            container.innerHTML = '<p class="small-text">担当者が割り当てられていません</p>';
+            return;
+          }
+          container.innerHTML = creativeAssignments.map(assignment => {
+            const member = membersData.find(m => m.id === assignment.member_id);
+            if (!member) return '';
+            const iconUrl = member.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}&sz=w32` : '';
+            return `
               <div class="chip">
                 ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" alt="">` : ''}
                 <span>${escapeHtml(member.nickname || member.email || '不明')}</span>
-                <i onclick="App.overlays.creativeDetail.removeMember('${assignment.id}')">close</i>
+                <i onclick="App.pages.creativeDetail.removeMember('${assignment.id}')">close</i>
               </div>
             `;
-                    }).join('');
-                })
-                .catch(App.utils.error.handleError);
-        },
+          }).join('');
+        })
+        .catch(App.utils.error.handleError);
+    },
 
-        loadNotes: function (creativeId) {
-            callGAS('getItems', 'notes')
-                .then(allNotes => {
-                    const notes = allNotes.filter(n => n.related_table === SHEET_NAMES.CREATIVES && n.related_id === creativeId && !n.is_deleted);
-                    const container = document.getElementById('creative-notes-list');
-                    if (!container) return;
-
-                    if (notes.length === 0) {
-                        container.innerHTML = '<p class="small-text">コメントはありません</p>';
-                        return;
-                    }
-
-                    // 時系列順（新しいものが下）
-                    notes.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-
-                    container.innerHTML = notes.map(note => {
-                        const author = membersData.find(m => m.id === note.created_by);
-                        const authorName = author ? (author.nickname || author.email) : '不明';
-                        const iconUrl = author && author.icon_gfile_id ?
-                            `https:/\/drive.google.com/thumbnail?id=${author.icon_gfile_id}&sz=w32` :
-                            '';
-
-                        return `
+    loadNotes: function (creativeId) {
+      callGAS('getItems', 'notes')
+        .then(allNotes => {
+          const notes = allNotes.filter(n => n.related_table === SHEET_NAMES.CREATIVES && n.related_id === creativeId && !n.is_deleted);
+          const container = document.getElementById('creative-notes-list');
+          if (!container) return;
+          if (notes.length === 0) {
+            container.innerHTML = '<p class="small-text">コメントはありません</p>';
+            return;
+          }
+          notes.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+          container.innerHTML = notes.map(note => {
+            const author = membersData.find(m => m.id === note.created_by);
+            const authorName = author ? (author.nickname || author.email) : '不明';
+            const iconUrl = author && author.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${author.icon_gfile_id}&sz=w32` : '';
+            return `
               <div class="row no-space" style="margin-bottom: 12px;">
                 ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar small" alt="">` : ''}
                 <div class="max">
@@ -427,22 +380,19 @@
                 </div>
               </div>
             `;
-                    }).join('');
-                })
-                .catch(App.utils.error.handleError);
-        },
+          }).join('');
+        })
+        .catch(App.utils.error.handleError);
+    },
 
-        postNote: function () {
-            const input = document.getElementById('creative-note-input');
-            if (!input || !input.value.trim()) return;
-
-            const content = input.value.trim();
-            const creativeId = this.currentId;
-
-            // Optimistic UI: すぐにUIに反映
-            const container = document.getElementById('creative-notes-list');
-            if (container) {
-                const tempHtml = `
+    postNote: function () {
+      const input = document.getElementById('creative-note-input');
+      if (!input || !input.value.trim()) return;
+      const content = input.value.trim();
+      const creativeId = this.currentId;
+      const container = document.getElementById('creative-notes-list');
+      if (container) {
+        const tempHtml = `
           <div class="row no-space" style="margin-bottom: 12px; opacity: 0.6;">
             <div class="max">
               <div class="row no-space">
@@ -452,37 +402,27 @@
             </div>
           </div>
         `;
-                container.innerHTML += tempHtml;
-                container.scrollTop = container.scrollHeight;
-            }
+        container.innerHTML += tempHtml;
+        container.scrollTop = container.scrollHeight;
+      }
+      input.value = '';
+      const noteData = { content: content, related_table: SHEET_NAMES.CREATIVES, related_id: creativeId };
+      callGAS('createItem', 'notes', noteData)
+        .then(() => this.loadNotes(creativeId))
+        .catch(error => {
+          App.utils.error.handleError(error);
+          this.loadNotes(creativeId);
+        });
+    },
 
-            input.value = '';
+    removeMember: function (assignmentId) {
+      if (!confirm('この担当者を削除しますか？')) return;
+      callGAS('deleteItem', 'member_assignments', { id: assignmentId })
+        .then(() => this.loadMembers(this.currentId))
+        .catch(App.utils.error.handleError);
+    }
+  };
 
-            // バックグラウンドで保存
-            const noteData = {
-                content: content,
-                related_table: SHEET_NAMES.CREATIVES,
-                related_id: creativeId
-            };
-
-            callGAS('createItem', 'notes', noteData)
-                .then(() => {
-                    this.loadNotes(creativeId);
-                })
-                .catch(error => {
-                    App.utils.error.handleError(error);
-                    this.loadNotes(creativeId);
-                });
-        },
-
-        removeMember: function (assignmentId) {
-            if (!confirm('この担当者を削除しますか？')) return;
-
-            callGAS('deleteItem', 'member_assignments', { id: assignmentId })
-                .then(() => {
-                    this.loadMembers(this.currentId);
-                })
-                .catch(App.utils.error.handleError);
-        }
-    };
+  // Maintain alias for other components if they use App.overlays.creativeDetail
+  App.overlays.creativeDetail = App.pages.creativeDetail;
 </script>

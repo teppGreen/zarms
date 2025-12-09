@@ -1,56 +1,60 @@
-<dialog id="modal-plan-detail" class="modal large">
-    <div class="row no-space align-center">
-        <div class="max">
-            <h5 class="bold mb-0">企画詳細</h5>
-        </div>
-        <button class="circle transparent" onclick="ui('#modal-plan-detail')">
-            <i>close</i>
+<!-- 詳細画面: 企画 -->
+<div id="detail-plan" class="page-content detail-view" style="display: none;">
+    <nav class="padding row no-space align-center">
+        <button class="circle transparent" onclick="App.utils.navigation.switchTab('plans')">
+            <i>arrow_back</i>
         </button>
-    </div>
-
+        <h5 class="bold max">企画詳細</h5>
+    </nav>
     <div id="plan-detail-content" class="padding">
         <!-- Dynamic Content -->
     </div>
-
-    <nav class="right-align">
-        <button class="border" onclick="ui('#modal-plan-detail')">閉じる</button>
-    </nav>
-</dialog>
+</div>
 
 <script>
-    App.overlays.planDetail = {
+    App.pages.planDetail = {
         currentId: null,
         isLoading: false,
 
+        openDetailModal: function (id) {
+            this.open(id);
+        },
+
         open: function (id) {
             if (!id || typeof id !== 'string') {
-                console.warn('App.overlays.planDetail.open called with invalid ID:', id);
+                console.warn('App.pages.planDetail.open called with invalid ID:', id);
                 return;
             }
             if (this.isLoading) return;
 
-            console.log('App.overlays.planDetail.open called with:', id);
+            console.log('App.pages.planDetail.open called with:', id);
             this.currentId = id;
             this.isLoading = true;
             showLoading();
+
+            // 画面切り替え
+            document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
+            const view = document.getElementById('detail-plan');
+            if (view) view.style.display = 'block';
 
             callGAS('getItemById', SHEET_NAMES.PLANS, id)
                 .then(plan => {
                     if (!plan) {
                         alert('企画が見つかりません');
+                        App.utils.navigation.switchTab('plans');
                         this.isLoading = false;
                         hideLoading();
                         return;
                     }
 
                     this.render(plan);
-                    ui('#modal-plan-detail');
                     this.isLoading = false;
                     hideLoading();
                 })
                 .catch(error => {
                     this.isLoading = false;
-                    App.error.handleError(error);
+                    App.utils.error.handleError(error);
+                    App.utils.navigation.switchTab('plans');
                 });
         },
 
@@ -80,4 +84,6 @@
             `;
         }
     };
+
+    App.overlays.planDetail = App.pages.planDetail;
 </script>
