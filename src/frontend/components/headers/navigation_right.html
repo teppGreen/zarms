@@ -34,16 +34,118 @@
         </button>
     </header>
 
-    <button id="events-nav" class="right-round transparent" onclick="App.utils.navigation.switchTab('events')">
+    <button id="events-nav-right" class="right-round transparent"
+        onclick="App.utils.navigation.openRightNavPage('events')">
         <i>calendar_month</i>
     </button>
-    <button id="knowledges-nav" class="right-round transparent" onclick="App.utils.navigation.switchTab('knowledges')">
+    <button id="knowledges-nav-right" class="right-round transparent"
+        onclick="App.utils.navigation.openRightNavPage('knowledges')">
         <i>lightbulb</i>
     </button>
-    <button id="tasks-nav" class="right-round transparent" onclick="App.utils.navigation.switchTab('tasks')">
+    <button id="tasks-nav-right" class="right-round transparent"
+        onclick="App.utils.navigation.openRightNavPage('tasks')">
         <i>task_alt</i>
     </button>
-    <button id="members-nav" class="right-round transparent" onclick="App.utils.navigation.switchTab('plans')">
+    <button id="members-nav-right" class="right-round transparent"
+        onclick="App.utils.navigation.openRightNavPage('members')">
         <i>groups</i>
     </button>
 </nav>
+
+<script>
+    (function () {
+        // ナビゲーション用の名前空間を初期化
+        if (!App.utils) App.utils = {};
+        if (!App.utils.navigation) App.utils.navigation = {};
+
+        // 現在開いている右navページを追跡
+        let currentRightNavPage = null;
+
+        /**
+         * 右navからページをオーバーレイ表示する（BeerCSS Dialog使用）
+         */
+        App.utils.navigation.openRightNavPage = function (pageName) {
+            // 既に同じページが開いている場合は何もしない
+            if (currentRightNavPage === pageName) {
+                return;
+            }
+
+            // 既に別のページが開いている場合は先に閉じる
+            if (currentRightNavPage) {
+                App.utils.navigation.closeRightNavOverlay();
+            }
+
+            // dialog要素を取得
+            const dialogElement = document.getElementById('overlay-tab-' + pageName);
+            if (!dialogElement) {
+                console.error('Dialog not found:', pageName);
+                return;
+            }
+
+            // overlay要素を取得
+            const overlay = document.getElementById('overlay');
+            if (!overlay) {
+                console.error('Overlay element not found');
+                return;
+            }
+
+            // overlayにactiveクラスを追加
+            overlay.classList.add('active');
+
+            // dialogにactiveクラスを追加
+            dialogElement.classList.add('active');
+
+            // データを読み込み
+            if (App.utils.navigation.loadTabData) {
+                App.utils.navigation.loadTabData(pageName);
+            }
+
+            // 右navのアクティブ状態を更新
+            document.querySelectorAll('nav.right button[id$="-nav-right"]').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const activeButton = document.getElementById(pageName + '-nav-right');
+            if (activeButton) {
+                activeButton.classList.add('active');
+            }
+
+            // overlayをクリックした際に閉じる処理
+            overlay.onclick = function () {
+                App.utils.navigation.closeRightNavOverlay();
+            };
+
+            // 現在のページを記録
+            currentRightNavPage = pageName;
+        };
+
+        /**
+         * 右navオーバーレイを閉じる（BeerCSS Dialog使用）
+         */
+        App.utils.navigation.closeRightNavOverlay = function () {
+            if (!currentRightNavPage) {
+                return;
+            }
+
+            // dialog要素を取得
+            const dialogElement = document.getElementById('overlay-tab-' + currentRightNavPage);
+            if (dialogElement) {
+                // dialogからactiveクラスを削除
+                dialogElement.classList.remove('active');
+            }
+
+            // overlay要素を取得して閉じる
+            const overlay = document.getElementById('overlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+                overlay.onclick = null;
+            }
+
+            // 右navのアクティブ状態を解除
+            document.querySelectorAll('nav.right button[id$="-nav-right"]').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            currentRightNavPage = null;
+        };
+    })();
+</script>

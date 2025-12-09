@@ -1,1 +1,33 @@
-<!-- eventsテーブルを表示するページ. -->
+<!-- eventsテーブルを表示するページ -->
+
+<dialog class="right extra" id="overlay-tab-events">
+    <article class="no-padding">
+        <div class="scroll">
+            <table id="events-table" class="stripes">
+                <thead>
+                    <!-- ヘッダーは App.utils.tables.render() で動的生成 -->
+                </thead>
+                <tbody>
+                    <!-- ボディは App.utils.tables.render() で動的生成 -->
+                </tbody>
+            </table>
+        </div>
+    </article>
+</dialog>
+
+<script>
+    // Namespace initialization
+    App.pages.events = {};
+
+    App.pages.events.loadData = function () {
+        callGAS('getItems', SHEET_NAMES.EVENTS)
+            .then(data => {
+                eventsData = data;
+
+                // ReadOnlyテーブルをレンダリング
+                App.utils.tables.render(SHEET_NAMES.EVENTS, App.utils.tables.applyFiltersAndSort(SHEET_NAMES.EVENTS, eventsData), eventsTableHeaders);
+                hideLoading();
+            })
+            .catch(App.error.handle);
+    };
+</script>
