@@ -75,25 +75,27 @@
                 App.utils.navigation.closeRightNavOverlay();
             }
 
+            console.log(`currentRightNavPage1: ${currentRightNavPage}`);
+
             // dialog要素を取得
-            const dialogElement = document.getElementById('overlay-tab-' + pageName);
-            if (!dialogElement) {
-                console.error('Dialog not found:', pageName);
-                return;
-            }
+            const dialogElement = document.getElementById('overlay-contents');
 
             // overlay要素を取得
             const overlay = document.getElementById('overlay');
-            if (!overlay) {
-                console.error('Overlay element not found');
-                return;
-            }
+
+            // overlay-contentを取得
+            const overlayContent = document.getElementById('overlay-contents-' + pageName);
 
             // overlayにactiveクラスを追加
             overlay.classList.add('active');
 
+            // overlay-contentを表示
+            overlayContent.style.display = 'block';
+
             // dialogにactiveクラスを追加
             dialogElement.classList.add('active');
+
+            console.log(`currentRightNavPage2: ${currentRightNavPage}`);
 
             // データを読み込み
             if (App.utils.navigation.loadTabData) {
@@ -109,25 +111,31 @@
                 activeButton.classList.add('active');
             }
 
+            console.log(`currentRightNavPage3: ${currentRightNavPage}`);
+
             // overlayをクリックした際に閉じる処理
             overlay.onclick = function () {
                 App.utils.navigation.closeRightNavOverlay();
             };
 
+            console.log(`currentRightNavPage4: ${currentRightNavPage}`);
+
             // 現在のページを記録
             currentRightNavPage = pageName;
+            console.log(`currentRightNavPage5: ${currentRightNavPage}`);
         };
 
         /**
          * 右navオーバーレイを閉じる（BeerCSS Dialog使用）
          */
         App.utils.navigation.closeRightNavOverlay = function () {
+            console.log(`currentRightNavPage B: ${currentRightNavPage}`);
             if (!currentRightNavPage) {
                 return;
             }
 
             // dialog要素を取得
-            const dialogElement = document.getElementById('overlay-tab-' + currentRightNavPage);
+            const dialogElement = document.getElementById('overlay-contents');
             if (dialogElement) {
                 // dialogからactiveクラスを削除
                 dialogElement.classList.remove('active');
@@ -138,6 +146,12 @@
             if (overlay) {
                 overlay.classList.remove('active');
                 overlay.onclick = null;
+            }
+
+            // overlay-contentを閉じる
+            const overlayContent = document.getElementById('overlay-contents-' + currentRightNavPage);
+            if (overlayContent) {
+                overlayContent.style.display = 'none';
             }
 
             // 右navのアクティブ状態を解除

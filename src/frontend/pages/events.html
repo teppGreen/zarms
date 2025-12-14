@@ -1,19 +1,17 @@
 <!-- eventsテーブルを表示するページ -->
 
-<dialog class="right extra" id="overlay-tab-events">
-    <article class="no-padding">
-        <div class="scroll">
-            <table id="events-table" class="stripes">
-                <thead>
-                    <!-- ヘッダーは App.utils.tables.render() で動的生成 -->
-                </thead>
-                <tbody>
-                    <!-- ボディは App.utils.tables.render() で動的生成 -->
-                </tbody>
-            </table>
-        </div>
-    </article>
-</dialog>
+<article id="overlay-contents-events" class="no-padding" style="display: none;">
+    <div class="scroll">
+        <table id="events-table" class="stripes">
+            <thead>
+                <!-- ヘッダーは App.utils.tables.render() で動的生成 -->
+            </thead>
+            <tbody>
+                <!-- ボディは App.utils.tables.render() で動的生成 -->
+            </tbody>
+        </table>
+    </div>
+</article>
 
 <script>
     // Namespace initialization
@@ -28,6 +26,6 @@
                 App.utils.tables.render(SHEET_NAMES.EVENTS, App.utils.tables.applyFiltersAndSort(SHEET_NAMES.EVENTS, eventsData), eventsTableHeaders);
                 hideLoading();
             })
-            .catch(App.error.handle);
+            .catch(App.utils.error.handle);
     };
 </script>
