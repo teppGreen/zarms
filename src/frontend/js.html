@@ -115,7 +115,7 @@
       if (shouldSwitchTab) {
         App.utils.navigation.switchTab('home');
       }
-    }).catch(App.utils.error.handleError);
+    }).catch(App.utils.error.handle);
   }
 
   // 直前のcallGAS呼び出しを記録（HTTP 429エラー時の再試行用）
@@ -322,7 +322,7 @@
       .then(success => {
         hideLoading();
         if (!success) {
-          App.utils.error.handleError({ message: '更新に失敗しました。' });
+          App.utils.error.handle({ message: '更新に失敗しました。' });
           // 失敗時はデータを再読み込み
           if (tableName) {
             loadTabData(tableName);
@@ -330,7 +330,7 @@
         }
       })
       .catch(err => {
-        App.utils.error.handleError(err);
+        App.utils.error.handle(err);
         // エラー時はデータを再読み込み
         if (tableName) {
           loadTabData(tableName);

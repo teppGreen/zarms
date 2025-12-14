@@ -48,12 +48,23 @@
       <?!= include('pages/resources'); ?>
 
       <!-- BeerCSS Overlay for right nav dialogs -->
-      <div class="overlay" id="overlay"></div>
-      <?!= include('pages/events'); ?>
-      <?!= include('pages/knowledges'); ?>
-      <?!= include('pages/tasks'); ?>
-      <?!= include('pages/members'); ?>
-      <?!= include('pages/directories'); ?>
+      <div class="overlay" id="overlay" style="position: absolute;"></div>
+      <dialog class="right max transparent" id="overlay-contents" style="position: absolute;">
+        <div class="grid">
+          <div class="l1">
+            <button id="close-overlay" class="transparent circle large" onclick="App.utils.navigation.closeRightNavOverlay()">
+              <i>close</i>
+            </button>
+          </div>
+          <div class="l11">
+            <?!= include('pages/events'); ?>
+            <?!= include('pages/knowledges'); ?>
+            <?!= include('pages/tasks'); ?>
+            <?!= include('pages/members'); ?>
+            <?!= include('pages/directories'); ?>            
+          </div>
+        </div>
+      </dialog>
 
       <!-- Details (Moved from Overlays to Main Area) -->
       <?!= include('components/overlays/detail_creative'); ?>

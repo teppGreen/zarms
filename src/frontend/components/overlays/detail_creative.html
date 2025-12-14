@@ -80,7 +80,7 @@
       }).catch(error => {
         this.isLoading = false;
         console.error('CreativeDetail loading error:', error);
-        App.utils.error.handleError(error);
+        App.utils.error.handle(error);
         App.utils.navigation.switchTab('creatives'); // Error case, go back
       });
     },
@@ -291,7 +291,7 @@
               };
               callGAS('createItem', 'member_assignments', assignmentData)
                 .then(() => this.loadMembers(this.currentId))
-                .catch(App.utils.error.handleError);
+                .catch(App.utils.error.handle);
             });
           }
         }
@@ -320,7 +320,7 @@
           }
         })
         .catch(error => {
-          App.utils.error.handleError(error);
+          App.utils.error.handle(error);
           this.currentItem[field] = oldItem[field];
           rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
           this.render(this.currentItem);
@@ -350,7 +350,7 @@
             `;
           }).join('');
         })
-        .catch(App.utils.error.handleError);
+        .catch(App.utils.error.handle);
     },
 
     loadNotes: function (creativeId) {
@@ -382,7 +382,7 @@
             `;
           }).join('');
         })
-        .catch(App.utils.error.handleError);
+        .catch(App.utils.error.handle);
     },
 
     postNote: function () {
@@ -410,7 +410,7 @@
       callGAS('createItem', 'notes', noteData)
         .then(() => this.loadNotes(creativeId))
         .catch(error => {
-          App.utils.error.handleError(error);
+          App.utils.error.handle(error);
           this.loadNotes(creativeId);
         });
     },
@@ -419,7 +419,7 @@
       if (!confirm('この担当者を削除しますか？')) return;
       callGAS('deleteItem', 'member_assignments', { id: assignmentId })
         .then(() => this.loadMembers(this.currentId))
-        .catch(App.utils.error.handleError);
+        .catch(App.utils.error.handle);
     }
   };
 
