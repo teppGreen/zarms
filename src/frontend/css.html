@@ -92,3 +92,25 @@
         background-color: var(--surface-container) !important;
     }
 </style>
+
+<script>
+    (function () {
+        function applyTheme() {
+            var theme = 'light'; // Default
+            // 端末の設定状況を取得できるか確認し、ダークモードが有効かチェック
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                theme = 'dark';
+            }
+            document.body.classList.remove('light', 'dark');
+            document.body.classList.add(theme);
+        }
+
+        // 初回適用
+        applyTheme();
+
+        // 設定変更を監視
+        if (window.matchMedia) {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+        }
+    })();
+</script>
