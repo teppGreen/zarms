@@ -96,6 +96,7 @@
 <script>
     (function () {
         function applyTheme() {
+            if (!document.body) return; // bodyがまだ存在しない場合はスキップ
             var theme = 'light'; // Default
             // 端末の設定状況を取得できるか確認し、ダークモードが有効かチェック
             if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -106,7 +107,11 @@
         }
 
         // 初回適用
-        applyTheme();
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', applyTheme);
+        } else {
+            applyTheme();
+        }
 
         // 設定変更を監視
         if (window.matchMedia) {
