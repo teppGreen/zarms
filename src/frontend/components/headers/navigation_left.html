@@ -60,12 +60,12 @@
         App.utils.navigation.switchTab = function (tabName) {
             // 他のタブに切り替える前にhomeタブの処理を停止
             const currentTab = Array.from(document.querySelectorAll('main > div')).find(el => el.style.display !== 'none');
-            // if (currentTab && currentTab.id === 'tab-home') {
-            //     // stopRemainingTimeUpdatesが存在する場合のみ呼び出し
-            //     if (typeof stopRemainingTimeUpdates === 'function') {
-            //         stopRemainingTimeUpdates();
-            //     }
-            // }
+            if (currentTab && currentTab.id === 'tab-home') {
+                // stopRemainingTimeUpdatesが存在する場合のみ呼び出し
+                if (typeof stopRemainingTimeUpdates === 'function') {
+                    stopRemainingTimeUpdates();
+                }
+            }
 
             // 右navから開いているページを閉じる
             if (App.utils.navigation.closeRightNavOverlay) {
