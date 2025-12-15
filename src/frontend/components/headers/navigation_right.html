@@ -34,20 +34,17 @@
         </button>
     </header>
 
-    <button id="events-nav-right" class="right-round transparent"
-        onclick="App.utils.navigation.openRightNavPage('events')">
+    <button id="events-nav-right" class="round transparent" onclick="App.utils.navigation.openRightNavPage('events')">
         <i>calendar_month</i>
     </button>
-    <button id="knowledges-nav-right" class="right-round transparent"
+    <button id="knowledges-nav-right" class="round transparent"
         onclick="App.utils.navigation.openRightNavPage('knowledges')">
         <i>lightbulb</i>
     </button>
-    <button id="tasks-nav-right" class="right-round transparent"
-        onclick="App.utils.navigation.openRightNavPage('tasks')">
+    <button id="tasks-nav-right" class="round transparent" onclick="App.utils.navigation.openRightNavPage('tasks')">
         <i>task_alt</i>
     </button>
-    <button id="members-nav-right" class="right-round transparent"
-        onclick="App.utils.navigation.openRightNavPage('members')">
+    <button id="members-nav-right" class="round transparent" onclick="App.utils.navigation.openRightNavPage('members')">
         <i>groups</i>
     </button>
 </nav>
@@ -65,99 +62,74 @@
          * 右navからページをオーバーレイ表示する（BeerCSS Dialog使用）
          */
         App.utils.navigation.openRightNavPage = function (pageName) {
-            // 既に同じページが開いている場合は何もしない
-            if (currentRightNavPage === pageName) {
-                return;
-            }
-
+            console.log(`currentRightNavPage: ${currentRightNavPage}`);
             // 既に別のページが開いている場合は先に閉じる
-            if (currentRightNavPage) {
+            if (currentRightNavPage === pageName) {
+                App.utils.navigation.closeRightNavOverlay();
+                return;
+            } else if (currentRightNavPage) {
                 App.utils.navigation.closeRightNavOverlay();
             }
-
-            console.log(`currentRightNavPage1: ${currentRightNavPage}`);
 
             // dialog要素を取得
             const dialogElement = document.getElementById('overlay-contents');
 
-            // overlay要素を取得
-            const overlay = document.getElementById('overlay');
-
             // overlay-contentを取得
             const overlayContent = document.getElementById('overlay-contents-' + pageName);
 
-            // overlayにactiveクラスを追加
-            overlay.classList.add('active');
+            // overlayを取得
+            const overlay = document.getElementById('overlay');
 
             // overlay-contentを表示
-            overlayContent.style.display = 'block';
+            overlayContent.style.removeProperty('display');
 
-            // dialogにactiveクラスを追加
-            dialogElement.classList.add('active');
-
-            console.log(`currentRightNavPage2: ${currentRightNavPage}`);
+            // overlayを表示
+            overlay.classList.add('active');
 
             // データを読み込み
             if (App.utils.navigation.loadTabData) {
                 App.utils.navigation.loadTabData(pageName);
             }
 
+            // dialogにactiveクラスを追加
+            dialogElement.classList.add('active');
+
             // 右navのアクティブ状態を更新
-            document.querySelectorAll('nav.right button[id$="-nav-right"]').forEach(btn => {
-                btn.classList.remove('active');
-            });
             const activeButton = document.getElementById(pageName + '-nav-right');
             if (activeButton) {
-                activeButton.classList.add('active');
+                activeButton.classList.add('right-round');
+                activeButton.classList.add('secondary');
             }
-
-            console.log(`currentRightNavPage3: ${currentRightNavPage}`);
-
-            // overlayをクリックした際に閉じる処理
-            overlay.onclick = function () {
-                App.utils.navigation.closeRightNavOverlay();
-            };
-
-            console.log(`currentRightNavPage4: ${currentRightNavPage}`);
 
             // 現在のページを記録
             currentRightNavPage = pageName;
-            console.log(`currentRightNavPage5: ${currentRightNavPage}`);
         };
 
         /**
          * 右navオーバーレイを閉じる（BeerCSS Dialog使用）
          */
         App.utils.navigation.closeRightNavOverlay = function () {
-            console.log(`currentRightNavPage B: ${currentRightNavPage}`);
+            console.log(`currentRightNavPage: ${currentRightNavPage}`);
             if (!currentRightNavPage) {
                 return;
             }
 
             // dialog要素を取得
             const dialogElement = document.getElementById('overlay-contents');
-            if (dialogElement) {
-                // dialogからactiveクラスを削除
-                dialogElement.classList.remove('active');
-            }
-
-            // overlay要素を取得して閉じる
-            const overlay = document.getElementById('overlay');
-            if (overlay) {
-                overlay.classList.remove('active');
-                overlay.onclick = null;
-            }
+            dialogElement.classList.remove('active');
 
             // overlay-contentを閉じる
             const overlayContent = document.getElementById('overlay-contents-' + currentRightNavPage);
-            if (overlayContent) {
-                overlayContent.style.display = 'none';
-            }
+            overlayContent.style.display = 'none';
 
             // 右navのアクティブ状態を解除
             document.querySelectorAll('nav.right button[id$="-nav-right"]').forEach(btn => {
-                btn.classList.remove('active');
+                btn.classList.remove('right-round');
+                btn.classList.remove('secondary');
             });
+
+            // overlayを非表示
+            overlay.classList.remove('active');
 
             currentRightNavPage = null;
         };
