@@ -1,202 +1,234 @@
 <!-- 詳細画面: 制作物 -->
 <div id="detail-creative" style="display: none;">
-  <nav class="padding row no-space align-center">
-    <button class="circle transparent" onclick="App.utils.navigation.switchTab('creatives')">
-      <i>arrow_back</i>
-    </button>
-    <h5 class="bold max" id="creative-detail-title">制作物詳細</h5>
-  </nav>
-
-  <div id="creative-detail-content" class="padding">
-    <!-- Dynamic Content -->
-  </div>
 </div>
 
 <script>
-  App.pages.creativeDetail = { // Renamed from overlays to pages for consistency, though kept structure similar
+  App.pages.creativeDetail = {
     currentId: null,
     isLoading: false,
     currentItem: null,
 
-    openDetailModal: function (id) { // Alias for compatibility with search
+    openDetailModal: function (id) {
       this.open(id);
     },
 
     open: function (id) {
+      console.log(`[CreativeDetail] open called with id: ${id}`);
+
       if (!id || typeof id !== 'string') {
-        console.warn('App.pages.creativeDetail.open called with invalid ID:', id);
+        console.error('[CreativeDetail] Invalid ID provided:', id);
+        App.utils.error.handle({ message: '無効なIDが指定されました: ' + id });
         return;
       }
 
-      console.log('App.pages.creativeDetail.open called with:', id);
+      if (typeof SHEET_NAMES === 'undefined') {
+        console.error('[CreativeDetail] SHEET_NAMES is not defined');
+        App.utils.error.handle({ message: 'システムエラー: テーブル定義が見つかりません' });
+        return;
+      }
+
       this.currentId = id;
       this.isLoading = true;
       showLoading();
 
-      // 画面切り替え: すべてのタブと詳細ビューを非表示にする
+      // View switching
       document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
-
-      // 自分だけ表示
       const view = document.getElementById('detail-creative');
       if (view) {
         view.style.display = 'block';
+      } else {
+        console.error('[CreativeDetail] View element #detail-creative not found');
+        return;
       }
 
+      // Prepare promises for data loading
       const promises = [
         callGAS('getItemById', SHEET_NAMES.CREATIVES, id)
+          .catch(err => {
+            console.error('[CreativeDetail] Failed to load creative:', err);
+            throw new Error(`制作物データの取得に失敗しました: ${err.message}`);
+          })
       ];
 
-      // 必要なマスターデータの読み込み (まだなければ)
-      if (typeof directoriesData === 'undefined' || directoriesData.length === 0) promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES));
-      else promises.push(Promise.resolve(null));
+      // Defensively load master data if missing
+      if (typeof directoriesData === 'undefined' || directoriesData.length === 0) {
+        promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES).then(d => { directoriesData = d; return d; }));
+      } else {
+        promises.push(Promise.resolve(directoriesData));
+      }
 
-      if (typeof plansData === 'undefined' || plansData.length === 0) promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
-      else promises.push(Promise.resolve(null));
+      if (typeof plansData === 'undefined' || plansData.length === 0) {
+        promises.push(callGAS('getItems', SHEET_NAMES.PLANS).then(d => { plansData = d; return d; }));
+      } else {
+        promises.push(Promise.resolve(plansData));
+      }
 
-      if (typeof membersData === 'undefined' || membersData.length === 0) promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
-      else promises.push(Promise.resolve(null));
+      if (typeof membersData === 'undefined' || membersData.length === 0) {
+        promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS).then(d => { membersData = d; return d; }));
+      } else {
+        promises.push(Promise.resolve(membersData));
+      }
 
-      if (typeof configData === 'undefined' || Object.keys(configData).length === 0) promises.push(callGAS('getItems', SHEET_NAMES.CONFIG));
-      else promises.push(Promise.resolve(null));
+      if (typeof configData === 'undefined' || Object.keys(configData).length === 0) {
+        promises.push(callGAS('getItems', SHEET_NAMES.CONFIG).then(d => { configData = groupConfigByType(d); return d; }));
+      } else {
+        promises.push(Promise.resolve(configData));
+      }
 
-      Promise.all(promises).then(([creative, dirs, plans, members, configs]) => {
-        if (dirs) directoriesData = dirs;
-        if (plans) plansData = plans;
-        if (members) membersData = members;
-        if (configs) configData = groupConfigByType(configs);
+      Promise.all(promises)
+        .then(([creative]) => {
+          console.log('[CreativeDetail] Data loaded successfully', creative);
 
-        if (!creative) {
-          alert('制作物が見つかりません');
+          if (!creative) {
+            console.warn('[CreativeDetail] Creative not found for id:', id);
+            alert('制作物が見つかりません');
+            App.utils.navigation.switchTab('creatives');
+            return;
+          }
+
+          this.currentItem = creative;
+          this.render(creative);
+        })
+        .catch(error => {
+          console.error('[CreativeDetail] Fatal error during loading:', error);
+          App.utils.error.handle(error);
           App.utils.navigation.switchTab('creatives');
+        })
+        .finally(() => {
           this.isLoading = false;
           hideLoading();
-          return;
-        }
-
-        this.currentItem = creative;
-        this.render(creative);
-        this.isLoading = false;
-        hideLoading();
-      }).catch(error => {
-        this.isLoading = false;
-        console.error('CreativeDetail loading error:', error);
-        App.utils.error.handle(error);
-        App.utils.navigation.switchTab('creatives'); // Error case, go back
-      });
+        });
     },
 
     render: function (creative) {
-      const container = document.getElementById('creative-detail-content');
+      console.log('[CreativeDetail] Rendering creative:', creative);
+      const container = document.getElementById('detail-creative');
       if (!container) return;
 
-      const titleEl = document.getElementById('creative-detail-title');
-      if (titleEl) {
-        titleEl.textContent = `制作物 ${creative.display_id || creative.id}`;
-      }
+      const displayIdEl = document.getElementById('display-id');
+      const displayIdStr = creative.display_id ? `C${String(creative.display_id).padStart(4, '0')}` : '-'; // Handle missing display_id
 
-      // 4分割グリッドレイアウト
+      // Update header directly here in case container overwrites nav (it doesn't in current structure but good practice)
+      // Actually the nav is inside the container in the original code, so we rewrite it.
+
       container.innerHTML = `
-        <div class="grid">
-          <!-- 左カラム (s12 m3): 基本情報 -->
-          <div class="s12 m3">
-            <!-- タイトル -->
-            <div class="field label border">
-              <input type="text" id="creative-title-input" value="${escapeHtml(creative.title || '')}" onchange="App.pages.creativeDetail.updateField('title', this.value)">
-              <label>タイトル</label>
+        <nav class="padding row align-center">
+          <button class="circle transparent" onclick="App.pages.creativeDetail.goBack()">
+            <i>arrow_back</i>
+          </button>
+          <h5 class="bold max" id="creative-detail-title">制作物詳細</h5>
+          <div class="max"></div>
+          <button class="fill round">
+            <i>link</i>
+            <span id="display-id" style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${displayIdStr}</span>
+          </button>
+        </nav>
+
+        <div id="creative-detail-content" class="padding">
+          <div class="grid">
+            <!-- Left Column (s12 m3): Basic Info -->
+            <div class="s12 m3">
+              <!-- Title -->
+              <div class="field label border">
+                <input type="text" id="creative-title-input" value="${escapeHtml(creative.title || '')}" onchange="App.pages.creativeDetail.updateField('title', this.value)">
+                <label>タイトル</label>
+              </div>
+
+              <!-- Status -->
+              <div class="field label border">
+                <select id="creative-status-select" onchange="App.pages.creativeDetail.updateField('creative_status_key', this.value)">
+                  ${this.renderEnumOptions('CREATIVE_STATUS', creative.creative_status_key)}
+                </select>
+                <label>ステータス</label>
+              </div>
+
+              <!-- Type -->
+              <div class="field label border">
+                <select id="creative-type-select" onchange="App.pages.creativeDetail.updateField('creative_type_key', this.value)">
+                  ${this.renderEnumOptions('CREATIVE_TYPE', creative.creative_type_key)}
+                </select>
+                <label>タイプ</label>
+              </div>
+
+              <!-- Priority -->
+              <div class="field label border">
+                <select id="creative-priority-select" onchange="App.pages.creativeDetail.updateField('priority_key', this.value)">
+                  ${this.renderEnumOptions('PRIORITY', creative.priority_key)}
+                </select>
+                <label>優先度</label>
+              </div>
+
+              <!-- Deadline -->
+              <div class="field label border">
+                <input type="datetime-local" id="creative-deadline-input" value="${formatDateTimeForInput(creative.deadline_at)}" onchange="App.pages.creativeDetail.updateField('deadline_at', this.value)">
+                <label>納品期限</label>
+              </div>
+              
+              <!-- Remark (Added) -->
+              <div class="field textarea label border">
+                <textarea id="creative-remark-input" rows="3" onchange="App.pages.creativeDetail.updateField('remark', this.value)">${escapeHtml(creative.remark || '')}</textarea>
+                <label>備考</label>
+              </div>
+
+              <!-- Client -->
+              <div class="field label border suffix">
+                <input type="text" id="creative-client-display" value="${escapeHtml(this.getDirectoryFullName(creative.client_directory_id))}" readonly>
+                <label>依頼元</label>
+                <i onclick="App.pages.creativeDetail.selectDirectory('client_directory_id')">edit</i>
+              </div>
+
+              <!-- Contractor -->
+              <div class="field label border suffix">
+                <input type="text" id="creative-contractor-display" value="${escapeHtml(this.getDirectoryFullName(creative.contractor_directory_id))}" readonly>
+                <label>依頼先</label>
+                <i onclick="App.pages.creativeDetail.selectDirectory('contractor_directory_id')">edit</i>
+              </div>
+
+              <div class="space"></div>
+
+              <!-- Members -->
+              <div class="row">
+                <button class="small" onclick="App.pages.creativeDetail.addMembers()">
+                  <i>add</i>
+                  <span>担当者を追加</span>
+                </button>
+              </div>
+              <div id="creative-members-container" class="chips">
+                読み込み中...
+              </div>
             </div>
 
-            <!-- ステータス -->
-            <div class="field label border">
-              <select id="creative-status-select" onchange="App.pages.creativeDetail.updateField('creative_status_key', this.value)">
-                ${this.renderEnumOptions('CREATIVE_STATUS', creative.creative_status_key)}
-              </select>
-              <label>ステータス</label>
-            </div>
-
-            <!-- タイプ -->
-            <div class="field label border">
-              <select id="creative-type-select" onchange="App.pages.creativeDetail.updateField('creative_type_key', this.value)">
-                ${this.renderEnumOptions('CREATIVE_TYPE', creative.creative_type_key)}
-              </select>
-              <label>タイプ</label>
-            </div>
-
-            <!-- 優先度 -->
-            <div class="field label border">
-              <select id="creative-priority-select" onchange="App.pages.creativeDetail.updateField('priority_key', this.value)">
-                ${this.renderEnumOptions('PRIORITY', creative.priority_key)}
-              </select>
-              <label>優先度</label>
-            </div>
-
-            <!-- 納品期限 -->
-            <div class="field label border">
-              <input type="datetime-local" id="creative-deadline-input" value="${formatDateTimeForInput(creative.deadline_at)}" onchange="App.pages.creativeDetail.updateField('deadline_at', this.value)">
-              <label>納品期限</label>
-            </div>
-
-            <!-- 依頼元 -->
-            <div class="field label border suffix">
-              <input type="text" id="creative-client-display" value="${escapeHtml(this.getDirectoryFullName(creative.client_directory_id))}" readonly>
-              <label>依頼元</label>
-              <i onclick="App.pages.creativeDetail.selectDirectory('client_directory_id')">edit</i>
-            </div>
-
-            <!-- 依頼先 -->
-            <div class="field label border suffix">
-              <input type="text" id="creative-contractor-display" value="${escapeHtml(this.getDirectoryFullName(creative.contractor_directory_id))}" readonly>
-              <label>依頼先</label>
-              <i onclick="App.pages.creativeDetail.selectDirectory('contractor_directory_id')">edit</i>
-            </div>
-
-            <div class="space"></div>
-
-            <!-- メンバー管理 -->
-            <div class="row">
-              <button class="small" onclick="App.pages.creativeDetail.addMembers()">
-                <i>add</i>
-                <span>担当者を追加</span>
-              </button>
-            </div>
-            <div id="creative-members-container" class="chips">
-              <!-- Chips UI for members -->
-              読み込み中...
-            </div>
-          </div>
-
-          <!-- 中央カラム (s12 m6): コンテンツ -->
-          <div class="s12 m6" style="position: relative; min-height: 600px;">
-            <!-- メインコンテンツエリア -->
-            <div id="creative-main-content-area">
-              ${creative.document_gfile_id ?
+            <!-- Center Column (s12 m6): Content -->
+            <div class="s12 m6" style="position: relative; min-height: 600px;">
+              <div id="creative-main-content-area">
+                ${creative.document_gfile_id ?
           `<iframe src="https://docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
           '<article class="border round"><div class="padding"><p>ドキュメントが設定されていません</p></div></article>'
         }
-            </div>
+              </div>
 
-            <!-- 下部タブ -->
-            <div style="position: absolute; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--outline); z-index: 10;">
-              <div class="tabs">
-                <a class="active" onclick="App.pages.creativeDetail.switchTab('documents', '${creative.id}')">ドキュメント</a>
-                <a onclick="App.pages.creativeDetail.switchTab('folder', '${creative.id}')">フォルダ</a>
-                <a onclick="App.pages.creativeDetail.switchTab('relations', '${creative.id}')">リレーション</a>
-                <a onclick="App.pages.creativeDetail.switchTab('tasks', '${creative.id}')">タスク</a>
+              <!-- Tabs -->
+              <div style="position: absolute; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--outline); z-index: 10;">
+                <div class="tabs">
+                  <a class="active" onclick="App.pages.creativeDetail.switchTab(event, 'documents')">ドキュメント</a>
+                  <a onclick="App.pages.creativeDetail.switchTab(event, 'folder')">フォルダ</a>
+                  <a onclick="App.pages.creativeDetail.switchTab(event, 'relations')">リレーション</a>
+                  <a onclick="App.pages.creativeDetail.switchTab(event, 'tasks')">タスク</a>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- 右カラム (s12 m3): ノート -->
-          <div class="s12 m3">
-            <div id="creative-notes-container" class="notes-container">
-              <!-- コメント表示エリア -->
-              <div id="creative-notes-list" class="notes-list" style="max-height: 500px; overflow-y: auto; margin-bottom: 16px;">
-                読み込み中...
-              </div>
-              <!-- コメント入力 -->
-              <div class="field textarea label border suffix">
-                <textarea id="creative-note-input" rows="2"></textarea>
-                <label>コメントを追加...</label>
-                <i onclick="App.pages.creativeDetail.postNote()">send</i>
+            <!-- Right Column (s12 m3): Notes -->
+            <div class="s12 m3">
+              <div id="creative-notes-container" class="notes-container">
+                <div id="creative-notes-list" class="notes-list" style="max-height: 500px; overflow-y: auto; margin-bottom: 16px;">
+                  読み込み中...
+                </div>
+                <div class="field textarea label border suffix">
+                  <textarea id="creative-note-input" rows="2"></textarea>
+                  <label>コメントを追加...</label>
+                  <i onclick="App.pages.creativeDetail.postNote()">send</i>
+                </div>
               </div>
             </div>
           </div>
@@ -207,11 +239,16 @@
       this.loadNotes(creative.id);
     },
 
-    switchTab: function (tab, creativeId) {
+    goBack: function () {
+      App.utils.navigation.switchTab('creatives');
+    },
+
+    switchTab: function (event, tab) {
       const contentArea = document.getElementById('creative-main-content-area');
       if (!contentArea) return;
 
       const creative = this.currentItem;
+      console.log(`[CreativeDetail] Switching tab to ${tab}`);
 
       switch (tab) {
         case 'documents':
@@ -232,19 +269,21 @@
           break;
       }
 
-      // Remove active class from all tabs in this container
+      // Tab activation logic
       const container = document.getElementById('creative-detail-content');
       if (container) {
         container.querySelectorAll('.tabs a').forEach(a => a.classList.remove('active'));
-        // Add active class to clicked tab (need to pass event or find it)
-        // Optimized: searching by text content or adding a data attribute would be better, but for now assumption:
-        // The caller logic in HTML template uses `event.currentTarget`? No it doesn't passed.
-        // Let's use `event.currentTarget` if available dynamically.
-        if (event && event.currentTarget) event.currentTarget.classList.add('active');
+        if (event && event.currentTarget) {
+          event.currentTarget.classList.add('active');
+        }
       }
     },
 
     renderEnumOptions: function (enumType, selectedValue) {
+      if (!configData || !configData[enumType]) {
+        console.warn(`[CreativeDetail] Enum options not found for ${enumType}`);
+        return '';
+      }
       const options = configData[enumType] || [];
       return options.map(opt =>
         `<option value="${escapeHtml(opt.config_key)}" ${opt.config_key === selectedValue ? 'selected' : ''}>${escapeHtml(opt.config_value)}</option>`
@@ -256,8 +295,11 @@
       const dir = directoriesData.find(d => d.id === directoryId);
       if (!dir) return '';
       if (!dir.parent_directory_id) return dir.name || '';
+
       const parent = directoriesData.find(d => d.id === dir.parent_directory_id);
       if (!parent) return dir.name || '';
+
+      // Recursive call with safety check to avoid infinite loops (basic depth check implied by data structure, but beware circular refs)
       return this.getDirectoryFullName(dir.parent_directory_id) + ' / ' + (dir.name || '');
     },
 
@@ -266,11 +308,16 @@
         multiSelect: false,
         preSelected: this.currentItem[field] ? [this.currentItem[field]] : [],
         callback: (selectedIds) => {
-          if (selectedIds.length > 0) {
+          if (selectedIds && selectedIds.length > 0) {
+            console.log(`[CreativeDetail] Validating directory selection for ${field}:`, selectedIds[0]);
             this.updateField(field, selectedIds[0]);
+
+            // Optimistic UI update for the input field
             const displayField = field === 'client_directory_id' ? 'creative-client-display' : 'creative-contractor-display';
             const input = document.getElementById(displayField);
-            if (input) input.value = this.getDirectoryFullName(selectedIds[0]);
+            if (input) {
+              input.value = this.getDirectoryFullName(selectedIds[0]);
+            }
           }
         }
       });
@@ -281,7 +328,7 @@
         multiSelect: true,
         preSelected: [],
         callback: (selectedIds) => {
-          if (selectedIds.length > 0) {
+          if (selectedIds && selectedIds.length > 0) {
             selectedIds.forEach(memberId => {
               const assignmentData = {
                 related_table: SHEET_NAMES.CREATIVES,
@@ -291,7 +338,10 @@
               };
               callGAS('createItem', 'member_assignments', assignmentData)
                 .then(() => this.loadMembers(this.currentId))
-                .catch(App.utils.error.handle);
+                .catch(err => {
+                  console.error('[CreativeDetail] Failed to add member:', err);
+                  App.utils.error.handle(err);
+                });
             });
           }
         }
@@ -300,27 +350,57 @@
 
     updateField: function (field, value) {
       const id = this.currentId;
-      if (!id) return;
-      let finalValue = value;
-      if (field === 'deadline_at' && value) {
-        const d = new Date(value);
-        finalValue = d.toISOString();
+      console.log(`[CreativeDetail] Update requested - Field: ${field}, Value: ${value}, ID: ${id}`);
+
+      if (!id) {
+        console.error('[CreativeDetail] Cannot update: No ID');
+        return;
       }
+
+      let finalValue = value;
+      // Date handling
+      if (field === 'deadline_at') {
+        if (value) {
+          try {
+            const d = new Date(value);
+            // Ensure valid date before conversion
+            if (isNaN(d.getTime())) {
+              throw new Error('Invalid date');
+            }
+            finalValue = d.toISOString();
+          } catch (e) {
+            console.warn('[CreativeDetail] Invalid date format for deadline input', value);
+            // Revert UI? For now let's just not update if invalid.
+            return;
+          }
+        } else {
+          finalValue = null; // Handle clear
+        }
+      }
+
       const oldItem = { ...this.currentItem };
       this.currentItem[field] = finalValue;
+
+      // Optimistic update
       updateLocalData(SHEET_NAMES.CREATIVES, id, { [field]: finalValue });
 
       callGAS('updateItem', SHEET_NAMES.CREATIVES, id, { [field]: finalValue })
         .then(success => {
           if (!success) {
+            console.error('[CreativeDetail] Update returned failure (false)');
             alert('更新に失敗しました');
+            // Rollback
             this.currentItem[field] = oldItem[field];
             rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
             this.render(this.currentItem);
+          } else {
+            console.log('[CreativeDetail] Update successful');
           }
         })
         .catch(error => {
+          console.error('[CreativeDetail] Update exception:', error);
           App.utils.error.handle(error);
+          // Rollback
           this.currentItem[field] = oldItem[field];
           rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
           this.render(this.currentItem);
@@ -333,14 +413,16 @@
           const creativeAssignments = assignments.filter(a => a.related_table === SHEET_NAMES.CREATIVES && a.related_id === creativeId);
           const container = document.getElementById('creative-members-container');
           if (!container) return;
+
           if (creativeAssignments.length === 0) {
             container.innerHTML = '<p class="small-text">担当者が割り当てられていません</p>';
             return;
           }
+
           container.innerHTML = creativeAssignments.map(assignment => {
             const member = membersData.find(m => m.id === assignment.member_id);
             if (!member) return '';
-            const iconUrl = member.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}&sz=w32` : '';
+            const iconUrl = member.icon_gfile_id ? `https://drive.google.com/thumbnail?id=${member.icon_gfile_id}&sz=w32` : '';
             return `
               <div class="chip">
                 ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" alt="">` : ''}
@@ -350,24 +432,31 @@
             `;
           }).join('');
         })
-        .catch(App.utils.error.handle);
+        .catch(err => {
+          console.error('[CreativeDetail] Failed to load members:', err);
+          // Non-critical, just log
+        });
     },
 
     loadNotes: function (creativeId) {
       callGAS('getItems', 'notes')
         .then(allNotes => {
+          if (!allNotes) return;
           const notes = allNotes.filter(n => n.related_table === SHEET_NAMES.CREATIVES && n.related_id === creativeId && !n.is_deleted);
           const container = document.getElementById('creative-notes-list');
           if (!container) return;
+
           if (notes.length === 0) {
             container.innerHTML = '<p class="small-text">コメントはありません</p>';
             return;
           }
+
           notes.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
           container.innerHTML = notes.map(note => {
             const author = membersData.find(m => m.id === note.created_by);
             const authorName = author ? (author.nickname || author.email) : '不明';
-            const iconUrl = author && author.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${author.icon_gfile_id}&sz=w32` : '';
+            const iconUrl = author && author.icon_gfile_id ? `https://drive.google.com/thumbnail?id=${author.icon_gfile_id}&sz=w32` : '';
             return `
               <div class="row no-space" style="margin-bottom: 12px;">
                 ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar small" alt="">` : ''}
@@ -382,7 +471,9 @@
             `;
           }).join('');
         })
-        .catch(App.utils.error.handle);
+        .catch(err => {
+          console.error('[CreativeDetail] Failed to load notes:', err);
+        });
     },
 
     postNote: function () {
@@ -390,8 +481,15 @@
       if (!input || !input.value.trim()) return;
       const content = input.value.trim();
       const creativeId = this.currentId;
+
+      // Optimistic append
       const container = document.getElementById('creative-notes-list');
       if (container) {
+        // Clear "no comments" message if it exists
+        if (container.querySelector('p.small-text')?.textContent === 'コメントはありません') {
+          container.innerHTML = '';
+        }
+
         const tempHtml = `
           <div class="row no-space" style="margin-bottom: 12px; opacity: 0.6;">
             <div class="max">
@@ -405,13 +503,15 @@
         container.innerHTML += tempHtml;
         container.scrollTop = container.scrollHeight;
       }
+
       input.value = '';
+
       const noteData = { content: content, related_table: SHEET_NAMES.CREATIVES, related_id: creativeId };
       callGAS('createItem', 'notes', noteData)
         .then(() => this.loadNotes(creativeId))
         .catch(error => {
           App.utils.error.handle(error);
-          this.loadNotes(creativeId);
+          this.loadNotes(creativeId); // Reload to clear optimistic/error state
         });
     },
 
@@ -423,6 +523,5 @@
     }
   };
 
-  // Maintain alias for other components if they use App.overlays.creativeDetail
   App.overlays.creativeDetail = App.pages.creativeDetail;
 </script>
