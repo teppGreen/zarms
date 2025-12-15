@@ -4,6 +4,7 @@
 
   // グローバル変数
   let configData = {};
+  let enumsData = {};
   let advertisementsData = [];
   let budgetsData = [];
   let creativesData = [];
@@ -108,9 +109,10 @@
 
     return Promise.all([
       callGAS('getConfig', null),
-    ]).then(([config]) => {
+      callGAS('getEnums', null),
+    ]).then(([config, enums]) => {
       configData = groupConfigByType(config);
-
+      enumsData = groupEnumsByType(enums);
       hideLoading();
       if (shouldSwitchTab) {
         App.utils.navigation.switchTab('home');
@@ -151,10 +153,23 @@
     if (!configs || !Array.isArray(configs)) return grouped;
 
     configs.forEach(config => {
-      if (!grouped[config.config_type]) {
-        grouped[config.config_type] = [];
+      if (!grouped[config.type]) {
+        grouped[config.type] = [];
       }
-      grouped[config.config_type].push(config);
+      grouped[config.type].push(config);
+    });
+    return grouped;
+  }
+
+  function groupEnumsByType(enums) {
+    const grouped = {};
+    if (!enums || !Array.isArray(enums)) return grouped;
+
+    enums.forEach(enuma => {
+      if (!grouped[enuma.type]) {
+        grouped[enuma.type] = [];
+      }
+      grouped[enuma.type].push(enuma);
     });
     return grouped;
   }

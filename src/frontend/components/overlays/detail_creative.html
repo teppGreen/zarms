@@ -9,7 +9,7 @@
     currentItem: null,
 
     openDetailModal: function (id) {
-      this.open(id);
+      App.pages.creativeDetail.open(id);
     },
 
     open: function (id) {
@@ -27,8 +27,8 @@
         return;
       }
 
-      this.currentId = id;
-      this.isLoading = true;
+      App.pages.creativeDetail.currentId = id;
+      App.pages.creativeDetail.isLoading = true;
       showLoading();
 
       // View switching
@@ -86,8 +86,8 @@
             return;
           }
 
-          this.currentItem = creative;
-          this.render(creative);
+          App.pages.creativeDetail.currentItem = creative;
+          App.pages.creativeDetail.render(creative);
         })
         .catch(error => {
           console.error('[CreativeDetail] Fatal error during loading:', error);
@@ -95,7 +95,7 @@
           App.utils.navigation.switchTab('creatives');
         })
         .finally(() => {
-          this.isLoading = false;
+          App.pages.creativeDetail.isLoading = false;
           hideLoading();
         });
     },
@@ -118,9 +118,9 @@
           </button>
           <h5 class="bold max" id="creative-detail-title">制作物詳細</h5>
           <div class="max"></div>
-          <button class="fill round">
+          <button class="border round">
             <i>link</i>
-            <span id="display-id" style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${displayIdStr}</span>
+            <span id="display-id" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" class="large-text">${displayIdStr}</span>
           </button>
         </nav>
 
@@ -137,7 +137,7 @@
               <!-- Status -->
               <div class="field label border">
                 <select id="creative-status-select" onchange="App.pages.creativeDetail.updateField('creative_status_key', this.value)">
-                  ${this.renderEnumOptions('CREATIVE_STATUS', creative.creative_status_key)}
+                  ${App.pages.creativeDetail.renderEnumOptions('CREATIVE_STATUS', creative.creative_status_key)}
                 </select>
                 <label>ステータス</label>
               </div>
@@ -145,7 +145,7 @@
               <!-- Type -->
               <div class="field label border">
                 <select id="creative-type-select" onchange="App.pages.creativeDetail.updateField('creative_type_key', this.value)">
-                  ${this.renderEnumOptions('CREATIVE_TYPE', creative.creative_type_key)}
+                  ${App.pages.creativeDetail.renderEnumOptions('CREATIVE_TYPE', creative.creative_type_key)}
                 </select>
                 <label>タイプ</label>
               </div>
@@ -153,7 +153,7 @@
               <!-- Priority -->
               <div class="field label border">
                 <select id="creative-priority-select" onchange="App.pages.creativeDetail.updateField('priority_key', this.value)">
-                  ${this.renderEnumOptions('PRIORITY', creative.priority_key)}
+                  ${App.pages.creativeDetail.renderEnumOptions('PRIORITY', creative.priority_key)}
                 </select>
                 <label>優先度</label>
               </div>
@@ -163,23 +163,17 @@
                 <input type="datetime-local" id="creative-deadline-input" value="${formatDateTimeForInput(creative.deadline_at)}" onchange="App.pages.creativeDetail.updateField('deadline_at', this.value)">
                 <label>納品期限</label>
               </div>
-              
-              <!-- Remark (Added) -->
-              <div class="field textarea label border">
-                <textarea id="creative-remark-input" rows="3" onchange="App.pages.creativeDetail.updateField('remark', this.value)">${escapeHtml(creative.remark || '')}</textarea>
-                <label>備考</label>
-              </div>
 
               <!-- Client -->
               <div class="field label border suffix">
-                <input type="text" id="creative-client-display" value="${escapeHtml(this.getDirectoryFullName(creative.client_directory_id))}" readonly>
+                <input type="text" id="creative-client-display" value="${escapeHtml(App.pages.creativeDetail.getDirectoryFullName(creative.client_directory_id))}" readonly>
                 <label>依頼元</label>
                 <i onclick="App.pages.creativeDetail.selectDirectory('client_directory_id')">edit</i>
               </div>
 
               <!-- Contractor -->
               <div class="field label border suffix">
-                <input type="text" id="creative-contractor-display" value="${escapeHtml(this.getDirectoryFullName(creative.contractor_directory_id))}" readonly>
+                <input type="text" id="creative-contractor-display" value="${escapeHtml(App.pages.creativeDetail.getDirectoryFullName(creative.contractor_directory_id))}" readonly>
                 <label>依頼先</label>
                 <i onclick="App.pages.creativeDetail.selectDirectory('contractor_directory_id')">edit</i>
               </div>
@@ -202,7 +196,7 @@
             <div class="s12 m6" style="position: relative; min-height: 600px;">
               <div id="creative-main-content-area">
                 ${creative.document_gfile_id ?
-          `<iframe src="https://docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
+          `<iframe src="https:/\/docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
           '<article class="border round"><div class="padding"><p>ドキュメントが設定されていません</p></div></article>'
         }
               </div>
@@ -235,8 +229,8 @@
         </div>
       `;
 
-      this.loadMembers(creative.id);
-      this.loadNotes(creative.id);
+      App.pages.creativeDetail.loadMembers(creative.id);
+      App.pages.creativeDetail.loadNotes(creative.id);
     },
 
     goBack: function () {
@@ -247,18 +241,18 @@
       const contentArea = document.getElementById('creative-main-content-area');
       if (!contentArea) return;
 
-      const creative = this.currentItem;
+      const creative = App.pages.creativeDetail.currentItem;
       console.log(`[CreativeDetail] Switching tab to ${tab}`);
 
       switch (tab) {
         case 'documents':
           contentArea.innerHTML = creative.document_gfile_id ?
-            `<iframe src="https://docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
+            `<iframe src="https:/\/docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
             '<article class="border round"><div class="padding"><p>ドキュメントが設定されていません</p></div></article>';
           break;
         case 'folder':
           contentArea.innerHTML = creative.gfolder_id ?
-            `<iframe src="https://drive.google.com/embeddedfolderview?id=${creative.gfolder_id}#list" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
+            `<iframe src="https:/\/drive.google.com/embeddedfolderview?id=${creative.gfolder_id}#list" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
             '<article class="border round"><div class="padding"><p>フォルダが設定されていません</p></div></article>';
           break;
         case 'relations':
@@ -280,13 +274,13 @@
     },
 
     renderEnumOptions: function (enumType, selectedValue) {
-      if (!configData || !configData[enumType]) {
+      if (!enumsData || !enumsData[enumType]) {
         console.warn(`[CreativeDetail] Enum options not found for ${enumType}`);
         return '';
       }
-      const options = configData[enumType] || [];
+      const options = enumsData[enumType] || [];
       return options.map(opt =>
-        `<option value="${escapeHtml(opt.config_key)}" ${opt.config_key === selectedValue ? 'selected' : ''}>${escapeHtml(opt.config_value)}</option>`
+        `<option value="${escapeHtml(opt.key)}" ${opt.key === selectedValue ? 'selected' : ''}>${escapeHtml(opt.value)}</option>`
       ).join('');
     },
 
@@ -300,23 +294,23 @@
       if (!parent) return dir.name || '';
 
       // Recursive call with safety check to avoid infinite loops (basic depth check implied by data structure, but beware circular refs)
-      return this.getDirectoryFullName(dir.parent_directory_id) + ' / ' + (dir.name || '');
+      return App.pages.creativeDetail.getDirectoryFullName(dir.parent_directory_id) + ' / ' + (dir.name || '');
     },
 
     selectDirectory: function (field) {
       App.modals.selectDirectories.open({
         multiSelect: false,
-        preSelected: this.currentItem[field] ? [this.currentItem[field]] : [],
+        preSelected: App.pages.creativeDetail.currentItem[field] ? [App.pages.creativeDetail.currentItem[field]] : [],
         callback: (selectedIds) => {
           if (selectedIds && selectedIds.length > 0) {
             console.log(`[CreativeDetail] Validating directory selection for ${field}:`, selectedIds[0]);
-            this.updateField(field, selectedIds[0]);
+            App.pages.creativeDetail.updateField(field, selectedIds[0]);
 
             // Optimistic UI update for the input field
             const displayField = field === 'client_directory_id' ? 'creative-client-display' : 'creative-contractor-display';
             const input = document.getElementById(displayField);
             if (input) {
-              input.value = this.getDirectoryFullName(selectedIds[0]);
+              input.value = App.pages.creativeDetail.getDirectoryFullName(selectedIds[0]);
             }
           }
         }
@@ -332,12 +326,12 @@
             selectedIds.forEach(memberId => {
               const assignmentData = {
                 related_table: SHEET_NAMES.CREATIVES,
-                related_id: this.currentId,
+                related_id: App.pages.creativeDetail.currentId,
                 member_id: memberId,
                 role_key: 'MEMBER'
               };
               callGAS('createItem', 'member_assignments', assignmentData)
-                .then(() => this.loadMembers(this.currentId))
+                .then(() => App.pages.creativeDetail.loadMembers(App.pages.creativeDetail.currentId))
                 .catch(err => {
                   console.error('[CreativeDetail] Failed to add member:', err);
                   App.utils.error.handle(err);
@@ -349,7 +343,7 @@
     },
 
     updateField: function (field, value) {
-      const id = this.currentId;
+      const id = App.pages.creativeDetail.currentId;
       console.log(`[CreativeDetail] Update requested - Field: ${field}, Value: ${value}, ID: ${id}`);
 
       if (!id) {
@@ -378,8 +372,8 @@
         }
       }
 
-      const oldItem = { ...this.currentItem };
-      this.currentItem[field] = finalValue;
+      const oldItem = { ...App.pages.creativeDetail.currentItem };
+      App.pages.creativeDetail.currentItem[field] = finalValue;
 
       // Optimistic update
       updateLocalData(SHEET_NAMES.CREATIVES, id, { [field]: finalValue });
@@ -390,9 +384,9 @@
             console.error('[CreativeDetail] Update returned failure (false)');
             alert('更新に失敗しました');
             // Rollback
-            this.currentItem[field] = oldItem[field];
+            App.pages.creativeDetail.currentItem[field] = oldItem[field];
             rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
-            this.render(this.currentItem);
+            App.pages.creativeDetail.render(App.pages.creativeDetail.currentItem);
           } else {
             console.log('[CreativeDetail] Update successful');
           }
@@ -401,9 +395,9 @@
           console.error('[CreativeDetail] Update exception:', error);
           App.utils.error.handle(error);
           // Rollback
-          this.currentItem[field] = oldItem[field];
+          App.pages.creativeDetail.currentItem[field] = oldItem[field];
           rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
-          this.render(this.currentItem);
+          App.pages.creativeDetail.render(App.pages.creativeDetail.currentItem);
         });
     },
 
@@ -422,7 +416,7 @@
           container.innerHTML = creativeAssignments.map(assignment => {
             const member = membersData.find(m => m.id === assignment.member_id);
             if (!member) return '';
-            const iconUrl = member.icon_gfile_id ? `https://drive.google.com/thumbnail?id=${member.icon_gfile_id}&sz=w32` : '';
+            const iconUrl = member.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}&sz=w32` : '';
             return `
               <div class="chip">
                 ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" alt="">` : ''}
@@ -456,7 +450,7 @@
           container.innerHTML = notes.map(note => {
             const author = membersData.find(m => m.id === note.created_by);
             const authorName = author ? (author.nickname || author.email) : '不明';
-            const iconUrl = author && author.icon_gfile_id ? `https://drive.google.com/thumbnail?id=${author.icon_gfile_id}&sz=w32` : '';
+            const iconUrl = author && author.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${author.icon_gfile_id}&sz=w32` : '';
             return `
               <div class="row no-space" style="margin-bottom: 12px;">
                 ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar small" alt="">` : ''}
@@ -480,7 +474,7 @@
       const input = document.getElementById('creative-note-input');
       if (!input || !input.value.trim()) return;
       const content = input.value.trim();
-      const creativeId = this.currentId;
+      const creativeId = App.pages.creativeDetail.currentId;
 
       // Optimistic append
       const container = document.getElementById('creative-notes-list');
@@ -508,20 +502,21 @@
 
       const noteData = { content: content, related_table: SHEET_NAMES.CREATIVES, related_id: creativeId };
       callGAS('createItem', 'notes', noteData)
-        .then(() => this.loadNotes(creativeId))
+        .then(() => App.pages.creativeDetail.loadNotes(creativeId))
         .catch(error => {
           App.utils.error.handle(error);
-          this.loadNotes(creativeId); // Reload to clear optimistic/error state
+          App.pages.creativeDetail.loadNotes(creativeId); // Reload to clear optimistic/error state
         });
     },
 
     removeMember: function (assignmentId) {
       if (!confirm('この担当者を削除しますか？')) return;
       callGAS('deleteItem', 'member_assignments', { id: assignmentId })
-        .then(() => this.loadMembers(this.currentId))
+        .then(() => App.pages.creativeDetail.loadMembers(App.pages.creativeDetail.currentId))
         .catch(App.utils.error.handle);
     }
   };
 
+  // Maintain alias for other components if they use App.overlays.creativeDetail
   App.overlays.creativeDetail = App.pages.creativeDetail;
 </script>

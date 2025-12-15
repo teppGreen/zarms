@@ -375,6 +375,13 @@ function getConfig() {
   return configs;
 }
 
+function getEnums() {
+  let enums = getAllData(SHEET_NAMES.ENUMS);
+  enums = enums.filter(enuma => enuma.is_active === true || enuma.is_active === 'TRUE' || enuma.is_active === 'true');
+  enums.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  return enums;
+}
+
 // --- Assignments ---
 function addMemberAssignment(data) {
   const userEmail = Session.getActiveUser().getEmail();
