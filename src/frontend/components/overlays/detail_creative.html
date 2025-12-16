@@ -251,9 +251,6 @@
       App.pages.creativeDetail.loadMembers(creative.id);
       App.pages.creativeDetail.loadNotes(creative.id);
       App.pages.creativeDetail.switchTab(null, 'documents');
-
-      document.getElementById('creative-notes-list').scrollIntoView(false);
-      document.getElementById('creative-notes-list').scroll();
     },
 
     goBack: function () {
@@ -484,6 +481,7 @@
                   <div class="row tiny-space">
                     <strong class="small-text">${escapeHtml(authorName)}</strong>
                     <span class="small-text">${formatDateTimeForDisplay(note.created_at)}</span>
+                    <div class="badge primary" style="display: none"></div>
                   </div>
                   <div class="small-text no-line" style="white-space: pre-wrap; word-break: break-word;">${escapeHtml(note.content)}</div>
                 </div>
@@ -491,8 +489,7 @@
             `;
           }).join('');
 
-          container.scrollIntoView(false);
-          container.scroll();
+          // container.querySelectorAll('div > div > div > div.badge')[0].removeProperty('display');
         })
         .catch(err => {
           console.error('[CreativeDetail] Failed to load notes:', err);
