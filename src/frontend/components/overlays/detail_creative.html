@@ -1,5 +1,5 @@
 <!-- 詳細画面: 制作物 -->
-<div id="detail-creative" style="display: none; height: 100%;">
+<div id="detail-creative" style="display: none;">
   <nav class="small-margin row align-center">
     <button class="circle transparent" onclick="App.pages.creativeDetail.goBack()">
       <i>arrow_back</i>
@@ -12,12 +12,10 @@
     </button>
   </nav>
 
-  <div class="small-space"></div>
-
-  <div id="creative-detail-content" class="" style="flex: 1;">
-    <div class="grid no-space" style="height: 100%;">
-      <!-- Left Column (s12 m3): Basic Info -->
-      <div class="s12 m3 small-margin" style="height: 100%;">
+  <div id="creative-detail-content" class="grid no-space top-margin">
+    <!-- Left Column (s12 m3): Basic Info -->
+    <div class="s12 m3 small-margin">
+      <article class="no-round no-padding no-margin transparent large-height">
         <!-- Title -->
         <div class="field label border">
           <input type="text" id="creative-title-input"
@@ -56,6 +54,8 @@
           <label>納品期限</label>
         </div>
 
+        <div class="small-space"></div>
+
         <!-- Client -->
         <div class="field label border suffix">
           <input type="text" id="creative-client-display" readonly>
@@ -69,53 +69,51 @@
           <label>依頼先</label>
           <i onclick="App.pages.creativeDetail.selectDirectory('contractor_directory_id')">edit</i>
         </div>
+      </article>
 
-        <div class="small-space"></div>
+      <!-- Members -->
+      <div id="creative-members-container" class="chips"></div>
 
-        <!-- Members -->
-        <div class="row">
-          <button class="small" onclick="App.pages.creativeDetail.addMembers()">
-            <i>add</i>
-            <span>担当者を追加</span>
+      <nav class="center-align top-margin tiny-space">
+        <button class="round primary large max" onclick="App.pages.creativeDetail.addMembers()">
+          <i>add</i>
+          <span>担当者を追加</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Center Column (s12 m6): Content -->
+    <div class="s12 m6 small-margin">
+      <article id="creative-main-content-area" style="background-color: white;"
+        class="small-round no-padding no-elevate large-height scroll"></article>
+      <nav class="center-align max tiny-space top-margin" id="detail-center-column-nav">
+        <nav class="tabbed small surface max" id="detail-center-column-tab">
+          <a onclick="App.pages.creativeDetail.switchTab(event, 'documents')"><span>ドキュメント</span></a>
+          <a onclick="App.pages.creativeDetail.switchTab(event, 'folder')"><span>フォルダ</span></a>
+          <a onclick="App.pages.creativeDetail.switchTab(event, 'relations')"><span>リレーション</span></a>
+          <a onclick="App.pages.creativeDetail.switchTab(event, 'tasks')"><span>タスク</span></a>
+        </nav>
+        <button onclick="App.pages.creativeDetail.switchTab(event, 'settings')" class="circle large surface">
+          <i>settings</i>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Right Column (s12 m3): Notes -->
+    <div class="s12 m3 small-margin">
+      <div>
+        <article id="creative-notes-list" class="small-round large-height no-elevate no-margin surface-container-lowest small-padding scroll"></article>
+      </div>
+      <div class="m l center">
+        <nav class="center-align max top-margin">
+          <button class="round large primary max" onclick="App.modals.new_note.open(App.pages.creativeDetail.currentId)">
+            <i>edit</i>
+            <span>コメントを書く</span>
           </button>
-        </div>
-        <div id="creative-members-container" class="chips">
-          読み込み中...
-        </div>
-      </div>
-
-      <!-- Center Column (s12 m6): Content -->
-      <div class="s12 m6 small-margin" style="position: relative; height: 100%;">
-        <div id="creative-main-content-area" style="width: 100%; height: 100%; background-color: white;"
-          class="small-round no-padding border"></div>
-
-        <!-- Tabs -->
-        <div style="position: absolute; width: 90%; bottom: 0;" class="m l center bottom-margin">
-          <nav class="tabbed small" id="detail-center-column-nav">
-            <a onclick="App.pages.creativeDetail.switchTab(event, 'documents')"><span>ドキュメント</span></a>
-            <a onclick="App.pages.creativeDetail.switchTab(event, 'folder')"><span>フォルダ</span></a>
-            <a onclick="App.pages.creativeDetail.switchTab(event, 'relations')"><span>リレーション</span></a>
-            <a onclick="App.pages.creativeDetail.switchTab(event, 'tasks')"><span>タスク</span></a>
-          </nav>
-        </div>
-      </div>
-
-      <!-- Right Column (s12 m3): Notes -->
-      <div class="s12 m3 small-padding"
-        style="position: relative; height: 100%; display: flex; flex-direction: column;">
-        <div id="creative-notes-list" style="flex: 1; overflow-y: scroll;"></div>
-        <div style="flex: 1; position: absolute; bottom: 0; width: 100%;" class="m l center">
-          <div class="field textarea round fill suffix">
-            <textarea id="creative-note-input" rows="2" placeholder="コメントやメモを入力"
-              onkeydown="if((event.ctrlKey || event.metaKey) && event.key === 'Enter'){ event.preventDefault(); App.pages.creativeDetail.postNote(); }"></textarea>
-            <i onclick="App.pages.creativeDetail.postNote()">send</i>
-          </div>
-          <span class="small-text">Ctrl+Enter または Cmd+Enter で送信</span>
-        </div>
+        </nav>
       </div>
     </div>
   </div>
-  <div class="small-space"></div>
 </div>
 
 <script>
@@ -151,8 +149,7 @@
       document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
       const view = document.getElementById('detail-creative');
       if (view) {
-        view.style.display = 'flex';
-        view.style.flexDirection = 'column';
+        view.style.removeProperty('display'); ''
       } else {
         console.error('[CreativeDetail] View element #detail-creative not found');
         return;
@@ -205,6 +202,9 @@
 
           App.pages.creativeDetail.currentItem = creative;
           App.pages.creativeDetail.render(creative);
+
+          const notesListEl = document.getElementById('creative-notes-list');
+          if (notesListEl) window.scrollTo(0,notesListEl.scrollHeight);
         })
         .catch(error => {
           console.error('[CreativeDetail] Fatal error during loading:', error);
@@ -282,12 +282,15 @@
         case 'tasks':
           contentArea.innerHTML = '<h5>タスク一覧</h5><p>タスク機能は実装予定です</p>';
           break;
+        case 'settings':
+          contentArea.innerHTML = '<h5>設定</h5><p>設定機能は実装予定です</p>';
+          break;
       }
 
       // Tab activation logic
       const container = document.getElementById('detail-center-column-nav');
       if (container) {
-        container.querySelectorAll('a').forEach(a => a.classList.remove('active'));
+        container.querySelectorAll('nav.a, button').forEach(a => a.classList.remove('active'));
         if (event && event.currentTarget) {
           event.currentTarget.classList.add('active');
         }
@@ -491,44 +494,7 @@
         });
     },
 
-    postNote: function () {
-      const input = document.getElementById('creative-note-input');
-      if (!input || !input.value.trim()) return;
-      const content = input.value.trim();
-      const creativeId = App.pages.creativeDetail.currentId;
 
-      // Optimistic append
-      const container = document.getElementById('creative-notes-list');
-      if (container) {
-        // Clear "no comments" message if it exists
-        if (container.querySelector('p.small-text')?.textContent === 'コメントはありません') {
-          container.innerHTML = '';
-        }
-
-        const tempHtml = `
-          <div class="row no-space bottom-margin" style="opacity: 0.6;">
-            <div class="max">
-              <div class="row no-space">
-                <strong class="small-text">送信中...</strong>
-              </div>
-              <div class="small-text" style="white-space: pre-wrap; word-break: break-word;">${escapeHtml(content)}</div>
-            </div>
-          </div>
-        `;
-        container.innerHTML += tempHtml;
-        container.scrollTop = container.scrollHeight;
-      }
-
-      input.value = '';
-
-      const noteData = { content: content, related_table: SHEET_NAMES.CREATIVES, related_id: creativeId };
-      callGAS('createItem', 'notes', noteData)
-        .then(() => App.pages.creativeDetail.loadNotes(creativeId))
-        .catch(error => {
-          App.utils.error.handle(error);
-          App.pages.creativeDetail.loadNotes(creativeId); // Reload to clear optimistic/error state
-        });
-    },
 
     removeMember: function (assignmentId) {
       if (!confirm('この担当者を削除しますか？')) return;
