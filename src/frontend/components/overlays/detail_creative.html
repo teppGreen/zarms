@@ -102,11 +102,13 @@
     <!-- Right Column (s12 m3): Notes -->
     <div class="s12 m3 small-margin">
       <div>
-        <article id="creative-notes-list" class="small-round large-height no-elevate no-margin surface-container-lowest small-padding scroll"></article>
+        <article id="creative-notes-list"
+          class="small-round large-height no-elevate no-margin surface-container-lowest small-padding scroll"></article>
       </div>
       <div class="m l center">
         <nav class="center-align max top-margin">
-          <button class="round large primary max" onclick="App.modals.new_note.open(App.pages.creativeDetail.currentId)">
+          <button class="round large primary max"
+            onclick="App.modals.new_note.open(App.pages.creativeDetail.currentId)">
             <i>edit</i>
             <span>コメントを書く</span>
           </button>
@@ -202,9 +204,6 @@
 
           App.pages.creativeDetail.currentItem = creative;
           App.pages.creativeDetail.render(creative);
-
-          const notesListEl = document.getElementById('creative-notes-list');
-          if (notesListEl) window.scrollTo(0,notesListEl.scrollHeight);
         })
         .catch(error => {
           console.error('[CreativeDetail] Fatal error during loading:', error);
@@ -252,6 +251,9 @@
       App.pages.creativeDetail.loadMembers(creative.id);
       App.pages.creativeDetail.loadNotes(creative.id);
       App.pages.creativeDetail.switchTab(null, 'documents');
+
+      document.getElementById('creative-notes-list').scrollIntoView(false);
+      document.getElementById('creative-notes-list').scroll();
     },
 
     goBack: function () {
@@ -290,7 +292,7 @@
       // Tab activation logic
       const container = document.getElementById('detail-center-column-nav');
       if (container) {
-        container.querySelectorAll('nav.a, button').forEach(a => a.classList.remove('active'));
+        container.querySelectorAll("nav > a, button").forEach(a => a.classList.remove('active'));
         if (event && event.currentTarget) {
           event.currentTarget.classList.add('active');
         }
@@ -465,16 +467,16 @@
           if (!container) return;
 
           if (notes.length === 0) {
-            container.innerHTML = '<p class="small-text">コメントはありません</p>';
+            container.innerHTML = '<p class="small-text middle center-align">コメントはありません</p>';
             return;
           }
 
-          notes.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+          notes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
           container.innerHTML = notes.map(note => {
             const author = membersData.find(m => m.email === note.created_by);
             const authorName = author ? (author.nickname || author.email) : '不明';
-            const iconUrl = author && author.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${author.icon_gfile_id}&sz=w32` : '';
+            const iconUrl = author && author.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${author.icon_gfile_id}` : '';
             return `
               <div class="row bottom-margin top-align tiny-space">
                 ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar small circle" alt="">` : ''}
@@ -488,6 +490,9 @@
               </div>
             `;
           }).join('');
+
+          container.scrollIntoView(false);
+          container.scroll();
         })
         .catch(err => {
           console.error('[CreativeDetail] Failed to load notes:', err);

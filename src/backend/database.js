@@ -189,6 +189,13 @@ function createData(userId, sheetName, idColumnName, dataObject) {
     const headers = getHeaders(sheet);
     const newData = { ...dataObject }; // コピーを作成
 
+    // 監査情報の付与
+    const now = new Date().toISOString();
+    newData['created_by'] = userId;
+    newData['created_at'] = now;
+    newData['updated_by'] = userId;
+    newData['updated_at'] = now;
+
     // ID生成ロジック
     // 1. UUID (PK) の生成
     // CONFIGテーブル以外で、'id'カラムが存在し、かつ値が未設定の場合
@@ -266,6 +273,11 @@ function updateData(userId, sheetName, idColumnName, id, updateDataObject) {
     if (rowIndex === -1) {
         return false;
     }
+
+    // 監査情報の付与
+    const now = new Date().toISOString();
+    updateDataObject['updated_by'] = userId;
+    updateDataObject['updated_at'] = now;
 
     // 更新を実行し、各フィールドごとにログを記録
     Object.keys(updateDataObject).forEach(key => {
@@ -396,7 +408,7 @@ function logOperation(operationType, tableName, recordId, columnId, oldValue, ne
             switch (header) {
                 case 'log_id':
                     return logId;
-                case 'user_id':
+                case 'created_by':
                     return userId;
                 case 'log_type_key':
                     return operationType;
