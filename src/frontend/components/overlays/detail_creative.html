@@ -1,5 +1,121 @@
 <!-- 詳細画面: 制作物 -->
-<div id="detail-creative" style="display: none;">
+<div id="detail-creative" style="display: none; height: 100%;">
+  <nav class="small-margin row align-center">
+    <button class="circle transparent" onclick="App.pages.creativeDetail.goBack()">
+      <i>arrow_back</i>
+    </button>
+    <h5 class="bold max" id="creative-detail-title">制作物詳細</h5>
+    <div class="max"></div>
+    <button class="border round">
+      <i>link</i>
+      <span id="display-id" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" class="large-text"></span>
+    </button>
+  </nav>
+
+  <div class="small-space"></div>
+
+  <div id="creative-detail-content" class="" style="flex: 1;">
+    <div class="grid no-space" style="height: 100%;">
+      <!-- Left Column (s12 m3): Basic Info -->
+      <div class="s12 m3 small-margin" style="height: 100%;">
+        <!-- Title -->
+        <div class="field label border">
+          <input type="text" id="creative-title-input"
+            onchange="App.pages.creativeDetail.updateField('title', this.value)">
+          <label>タイトル</label>
+        </div>
+
+        <!-- Status -->
+        <div class="field label border">
+          <select id="creative-status-select"
+            onchange="App.pages.creativeDetail.updateField('creative_status_key', this.value)">
+          </select>
+          <label>ステータス</label>
+        </div>
+
+        <!-- Type -->
+        <div class="field label border">
+          <select id="creative-type-select"
+            onchange="App.pages.creativeDetail.updateField('creative_type_key', this.value)">
+          </select>
+          <label>タイプ</label>
+        </div>
+
+        <!-- Priority -->
+        <div class="field label border">
+          <select id="creative-priority-select"
+            onchange="App.pages.creativeDetail.updateField('priority_key', this.value)">
+          </select>
+          <label>優先度</label>
+        </div>
+
+        <!-- Deadline -->
+        <div class="field label border">
+          <input type="datetime-local" id="creative-deadline-input"
+            onchange="App.pages.creativeDetail.updateField('deadline_at', this.value)">
+          <label>納品期限</label>
+        </div>
+
+        <!-- Client -->
+        <div class="field label border suffix">
+          <input type="text" id="creative-client-display" readonly>
+          <label>依頼元</label>
+          <i onclick="App.pages.creativeDetail.selectDirectory('client_directory_id')">edit</i>
+        </div>
+
+        <!-- Contractor -->
+        <div class="field label border suffix">
+          <input type="text" id="creative-contractor-display" readonly>
+          <label>依頼先</label>
+          <i onclick="App.pages.creativeDetail.selectDirectory('contractor_directory_id')">edit</i>
+        </div>
+
+        <div class="small-space"></div>
+
+        <!-- Members -->
+        <div class="row">
+          <button class="small" onclick="App.pages.creativeDetail.addMembers()">
+            <i>add</i>
+            <span>担当者を追加</span>
+          </button>
+        </div>
+        <div id="creative-members-container" class="chips">
+          読み込み中...
+        </div>
+      </div>
+
+      <!-- Center Column (s12 m6): Content -->
+      <div class="s12 m6 small-margin" style="position: relative; height: 100%;">
+        <div id="creative-main-content-area" style="width: 100%; height: 100%; background-color: white;"
+          class="small-round no-padding border"></div>
+
+        <!-- Tabs -->
+        <div style="position: absolute; width: 90%; bottom: 0;" class="m l center bottom-margin">
+          <nav class="tabbed small" id="detail-center-column-nav">
+            <a onclick="App.pages.creativeDetail.switchTab(event, 'documents')"><span>ドキュメント</span></a>
+            <a onclick="App.pages.creativeDetail.switchTab(event, 'folder')"><span>フォルダ</span></a>
+            <a onclick="App.pages.creativeDetail.switchTab(event, 'relations')"><span>リレーション</span></a>
+            <a onclick="App.pages.creativeDetail.switchTab(event, 'tasks')"><span>タスク</span></a>
+          </nav>
+        </div>
+      </div>
+
+      <!-- Right Column (s12 m3): Notes -->
+      <div class="s12 m3 small-padding"
+        style="position: relative; height: 100%; display: flex; flex-direction: column;">
+        <div id="creative-notes-list" style="flex: 1; overflow-y: scroll;"></div>
+        <div style="flex: 1; position: absolute; bottom: 0; width: 100%;" class="m l center">
+          <div class="field textarea round fill suffix">
+            <textarea id="creative-note-input" rows="2" placeholder="コメントやメモを入力"
+              onkeydown="if((event.ctrlKey || event.metaKey) && event.key === 'Enter'){ event.preventDefault(); App.pages.creativeDetail.postNote(); }"></textarea>
+            <i onclick="App.pages.creativeDetail.postNote()">send</i>
+          </div>
+          <span class="small-text">Ctrl+Enter または Cmd+Enter で送信</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="small-space"></div>
 </div>
 
 <script>
@@ -35,7 +151,8 @@
       document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
       const view = document.getElementById('detail-creative');
       if (view) {
-        view.style.display = 'block';
+        view.style.display = 'flex';
+        view.style.flexDirection = 'column';
       } else {
         console.error('[CreativeDetail] View element #detail-creative not found');
         return;
@@ -108,129 +225,33 @@
       const displayIdEl = document.getElementById('display-id');
       const displayIdStr = creative.display_id ? `C${String(creative.display_id).padStart(4, '0')}` : '-'; // Handle missing display_id
 
-      // Update header directly here in case container overwrites nav (it doesn't in current structure but good practice)
-      // Actually the nav is inside the container in the original code, so we rewrite it.
+      if (displayIdEl) displayIdEl.textContent = displayIdStr;
 
-      container.innerHTML = `
-        <nav class="padding row align-center">
-          <button class="circle transparent" onclick="App.pages.creativeDetail.goBack()">
-            <i>arrow_back</i>
-          </button>
-          <h5 class="bold max" id="creative-detail-title">制作物詳細</h5>
-          <div class="max"></div>
-          <button class="border round">
-            <i>link</i>
-            <span id="display-id" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" class="large-text">${displayIdStr}</span>
-          </button>
-        </nav>
+      const titleInput = document.getElementById('creative-title-input');
+      if (titleInput) titleInput.value = creative.title || '';
 
-        <div id="creative-detail-content" class="padding">
-          <div class="grid">
-            <!-- Left Column (s12 m3): Basic Info -->
-            <div class="s12 m3">
-              <!-- Title -->
-              <div class="field label border">
-                <input type="text" id="creative-title-input" value="${escapeHtml(creative.title || '')}" onchange="App.pages.creativeDetail.updateField('title', this.value)">
-                <label>タイトル</label>
-              </div>
+      const statusSelect = document.getElementById('creative-status-select');
+      if (statusSelect) statusSelect.innerHTML = App.pages.creativeDetail.renderEnumOptions('CREATIVE_STATUS', creative.creative_status_key);
 
-              <!-- Status -->
-              <div class="field label border">
-                <select id="creative-status-select" onchange="App.pages.creativeDetail.updateField('creative_status_key', this.value)">
-                  ${App.pages.creativeDetail.renderEnumOptions('CREATIVE_STATUS', creative.creative_status_key)}
-                </select>
-                <label>ステータス</label>
-              </div>
+      const typeSelect = document.getElementById('creative-type-select');
+      if (typeSelect) typeSelect.innerHTML = App.pages.creativeDetail.renderEnumOptions('CREATIVE_TYPE', creative.creative_type_key);
 
-              <!-- Type -->
-              <div class="field label border">
-                <select id="creative-type-select" onchange="App.pages.creativeDetail.updateField('creative_type_key', this.value)">
-                  ${App.pages.creativeDetail.renderEnumOptions('CREATIVE_TYPE', creative.creative_type_key)}
-                </select>
-                <label>タイプ</label>
-              </div>
+      const prioritySelect = document.getElementById('creative-priority-select');
+      if (prioritySelect) prioritySelect.innerHTML = App.pages.creativeDetail.renderEnumOptions('PRIORITY', creative.priority_key);
 
-              <!-- Priority -->
-              <div class="field label border">
-                <select id="creative-priority-select" onchange="App.pages.creativeDetail.updateField('priority_key', this.value)">
-                  ${App.pages.creativeDetail.renderEnumOptions('PRIORITY', creative.priority_key)}
-                </select>
-                <label>優先度</label>
-              </div>
+      const deadlineInput = document.getElementById('creative-deadline-input');
+      if (deadlineInput) deadlineInput.value = formatDateTimeForInput(creative.deadline_at);
 
-              <!-- Deadline -->
-              <div class="field label border">
-                <input type="datetime-local" id="creative-deadline-input" value="${formatDateTimeForInput(creative.deadline_at)}" onchange="App.pages.creativeDetail.updateField('deadline_at', this.value)">
-                <label>納品期限</label>
-              </div>
+      const clientInput = document.getElementById('creative-client-display');
+      if (clientInput) clientInput.value = App.pages.creativeDetail.getDirectoryFullName(creative.client_directory_id);
 
-              <!-- Client -->
-              <div class="field label border suffix">
-                <input type="text" id="creative-client-display" value="${escapeHtml(App.pages.creativeDetail.getDirectoryFullName(creative.client_directory_id))}" readonly>
-                <label>依頼元</label>
-                <i onclick="App.pages.creativeDetail.selectDirectory('client_directory_id')">edit</i>
-              </div>
+      const contractorInput = document.getElementById('creative-contractor-display');
+      if (contractorInput) contractorInput.value = App.pages.creativeDetail.getDirectoryFullName(creative.contractor_directory_id);
 
-              <!-- Contractor -->
-              <div class="field label border suffix">
-                <input type="text" id="creative-contractor-display" value="${escapeHtml(App.pages.creativeDetail.getDirectoryFullName(creative.contractor_directory_id))}" readonly>
-                <label>依頼先</label>
-                <i onclick="App.pages.creativeDetail.selectDirectory('contractor_directory_id')">edit</i>
-              </div>
-
-              <div class="space"></div>
-
-              <!-- Members -->
-              <div class="row">
-                <button class="small" onclick="App.pages.creativeDetail.addMembers()">
-                  <i>add</i>
-                  <span>担当者を追加</span>
-                </button>
-              </div>
-              <div id="creative-members-container" class="chips">
-                読み込み中...
-              </div>
-            </div>
-
-            <!-- Center Column (s12 m6): Content -->
-            <div class="s12 m6" style="position: relative; min-height: 600px;">
-              <div id="creative-main-content-area">
-                ${creative.document_gfile_id ?
-          `<iframe src="https:/\/docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
-          '<article class="border round"><div class="padding"><p>ドキュメントが設定されていません</p></div></article>'
-        }
-              </div>
-
-              <!-- Tabs -->
-              <div style="position: absolute; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--outline); z-index: 10;">
-                <div class="tabs">
-                  <a class="active" onclick="App.pages.creativeDetail.switchTab(event, 'documents')">ドキュメント</a>
-                  <a onclick="App.pages.creativeDetail.switchTab(event, 'folder')">フォルダ</a>
-                  <a onclick="App.pages.creativeDetail.switchTab(event, 'relations')">リレーション</a>
-                  <a onclick="App.pages.creativeDetail.switchTab(event, 'tasks')">タスク</a>
-                </div>
-              </div>
-            </div>
-
-            <!-- Right Column (s12 m3): Notes -->
-            <div class="s12 m3">
-              <div id="creative-notes-container" class="notes-container">
-                <div id="creative-notes-list" class="notes-list" style="max-height: 500px; overflow-y: auto; margin-bottom: 16px;">
-                  読み込み中...
-                </div>
-                <div class="field textarea label border suffix">
-                  <textarea id="creative-note-input" rows="2"></textarea>
-                  <label>コメントを追加...</label>
-                  <i onclick="App.pages.creativeDetail.postNote()">send</i>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
 
       App.pages.creativeDetail.loadMembers(creative.id);
       App.pages.creativeDetail.loadNotes(creative.id);
+      App.pages.creativeDetail.switchTab(null, 'documents');
     },
 
     goBack: function () {
@@ -247,26 +268,26 @@
       switch (tab) {
         case 'documents':
           contentArea.innerHTML = creative.document_gfile_id ?
-            `<iframe src="https:/\/docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
-            '<article class="border round"><div class="padding"><p>ドキュメントが設定されていません</p></div></article>';
+            `<iframe src="https:/\/docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" style="width: 100%; height: 100%; border: 0;"></iframe>` :
+            '<p>ドキュメントが設定されていません</p>';
           break;
         case 'folder':
           contentArea.innerHTML = creative.gfolder_id ?
-            `<iframe src="https:/\/drive.google.com/embeddedfolderview?id=${creative.gfolder_id}#list" width="100%" height="600px" style="border: 1px solid var(--outline); border-radius: 8px;"></iframe>` :
-            '<article class="border round"><div class="padding"><p>フォルダが設定されていません</p></div></article>';
+            `<iframe src="https:/\/drive.google.com/embeddedfolderview?id=${creative.gfolder_id}#list" style="width: 100%; height: 100%; border: 0;"></iframe>` :
+            '<p>フォルダが設定されていません</p>';
           break;
         case 'relations':
-          contentArea.innerHTML = '<article class="border round"><div class="padding"><h6>関連アイテム</h6><p>リレーション機能は実装予定です</p></div></article>';
+          contentArea.innerHTML = '<h5>関連アイテム</h5><p>リレーション機能は実装予定です</p>';
           break;
         case 'tasks':
-          contentArea.innerHTML = '<article class="border round"><div class="padding"><h6>タスク一覧</h6><p>タスク機能は実装予定です</p></div></article>';
+          contentArea.innerHTML = '<h5>タスク一覧</h5><p>タスク機能は実装予定です</p>';
           break;
       }
 
       // Tab activation logic
-      const container = document.getElementById('creative-detail-content');
+      const container = document.getElementById('detail-center-column-nav');
       if (container) {
-        container.querySelectorAll('.tabs a').forEach(a => a.classList.remove('active'));
+        container.querySelectorAll('a').forEach(a => a.classList.remove('active'));
         if (event && event.currentTarget) {
           event.currentTarget.classList.add('active');
         }
@@ -448,18 +469,18 @@
           notes.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
           container.innerHTML = notes.map(note => {
-            const author = membersData.find(m => m.id === note.created_by);
+            const author = membersData.find(m => m.email === note.created_by);
             const authorName = author ? (author.nickname || author.email) : '不明';
             const iconUrl = author && author.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${author.icon_gfile_id}&sz=w32` : '';
             return `
-              <div class="row no-space" style="margin-bottom: 12px;">
-                ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar small" alt="">` : ''}
+              <div class="row bottom-margin top-align tiny-space">
+                ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar small circle" alt="">` : ''}
                 <div class="max">
-                  <div class="row no-space">
+                  <div class="row tiny-space">
                     <strong class="small-text">${escapeHtml(authorName)}</strong>
-                    <span class="small-text" style="margin-left: 8px; color: var(--on-surface-variant);">${formatDate(note.created_at)}</span>
+                    <span class="small-text">${formatDateTimeForDisplay(note.created_at)}</span>
                   </div>
-                  <div class="small-text">${escapeHtml(note.content)}</div>
+                  <div class="small-text no-line" style="white-space: pre-wrap; word-break: break-word;">${escapeHtml(note.content)}</div>
                 </div>
               </div>
             `;
@@ -485,12 +506,12 @@
         }
 
         const tempHtml = `
-          <div class="row no-space" style="margin-bottom: 12px; opacity: 0.6;">
+          <div class="row no-space bottom-margin" style="opacity: 0.6;">
             <div class="max">
               <div class="row no-space">
                 <strong class="small-text">送信中...</strong>
               </div>
-              <div class="small-text">${escapeHtml(content)}</div>
+              <div class="small-text" style="white-space: pre-wrap; word-break: break-word;">${escapeHtml(content)}</div>
             </div>
           </div>
         `;
