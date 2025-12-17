@@ -381,7 +381,7 @@ function initializeLogSheet() {
  * @param {any|null} newValue - 変更後の値（追加・更新時のみ。更新時は単一フィールドの値、追加時はレコード全体のJSON）
  * @param {string} userId - 操作ユーザーのID
  */
-function logOperation(operationType, tableName, recordId, columnId, oldValue, newValue, userId) {
+function logOperation(log_type_key, tableName, recordId, columnId, oldValue, newValue, userId) {
     try {
         const logId = Utilities.getUuid();
         const now = new Date();
@@ -411,7 +411,7 @@ function logOperation(operationType, tableName, recordId, columnId, oldValue, ne
                 case 'created_by':
                     return userId;
                 case 'log_type_key':
-                    return operationType;
+                    return log_type_key;
                 case 'table_name':
                     return tableName;
                 case 'record_id':
