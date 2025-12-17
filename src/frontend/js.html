@@ -4,7 +4,7 @@
 
   // グローバル変数
   let configData = {};
-  let enumsData = {};
+  let enumData = {};
   let advertisementsData = [];
   let budgetsData = [];
   let creativesData = [];
@@ -109,10 +109,10 @@
 
     return Promise.all([
       callGAS('getConfig', null),
-      callGAS('getEnums', null),
+      callGAS('getEnum', null),
     ]).then(([config, enums]) => {
       configData = groupConfigByType(config);
-      enumsData = groupEnumsByType(enums);
+      enumData = groupEnumByType(enums);
       hideLoading();
       if (shouldSwitchTab) {
         App.utils.navigation.switchTab('home');
@@ -161,7 +161,7 @@
     return grouped;
   }
 
-  function groupEnumsByType(enums) {
+  function groupEnumByType(enums) {
     const grouped = {};
     if (!enums || !Array.isArray(enums)) return grouped;
 

@@ -60,14 +60,14 @@
         <div class="field label border suffix">
           <input type="text" id="creative-client-display" readonly>
           <label>依頼元</label>
-          <i onclick="App.pages.creativeDetail.selectDirectory('client_directory_id')">edit</i>
+          <i class="front" onclick="App.pages.creativeDetail.selectDirectory('client_directory_id')">edit</i>
         </div>
 
         <!-- Contractor -->
         <div class="field label border suffix">
           <input type="text" id="creative-contractor-display" readonly>
           <label>依頼先</label>
-          <i onclick="App.pages.creativeDetail.selectDirectory('contractor_directory_id')">edit</i>
+          <i class="front" onclick="App.pages.creativeDetail.selectDirectory('contractor_directory_id')">edit</i>
         </div>
       </article>
 
@@ -109,7 +109,7 @@
         <nav class="center-align max top-margin">
           <button class="round large primary max"
             onclick="App.modals.new_note.open(App.pages.creativeDetail.currentId)">
-            <i>edit</i>
+            <i>add_comment</i>
             <span>コメントを書く</span>
           </button>
         </nav>
@@ -297,11 +297,11 @@
     },
 
     renderEnumOptions: function (enumType, selectedValue) {
-      if (!enumsData || !enumsData[enumType]) {
+      if (!enumData || !enumData[enumType]) {
         console.warn(`[CreativeDetail] Enum options not found for ${enumType}`);
         return '';
       }
-      const options = enumsData[enumType] || [];
+      const options = enumData[enumType] || [];
       return options.map(opt =>
         `<option value="${escapeHtml(opt.key)}" ${opt.key === selectedValue ? 'selected' : ''}>${escapeHtml(opt.value)}</option>`
       ).join('');
@@ -476,7 +476,10 @@
             const iconUrl = author && author.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${author.icon_gfile_id}` : '';
             return `
               <div class="row bottom-margin top-align tiny-space">
-                ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar small circle" alt="">` : ''}
+                <div>
+                  ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar small circle" alt="">` : ''}
+                  <i>keyboard_arrow_up</i>
+                </div>
                 <div class="max">
                   <div class="row tiny-space">
                     <strong class="small-text">${escapeHtml(authorName)}</strong>

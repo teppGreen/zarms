@@ -13,7 +13,7 @@ const API_TOKEN = scriptProperties.getProperty('API_TOKEN');
 // シート名（テーブル名）の定義
 const SHEET_NAMES = {
   CONFIG: 'CONFIG',
-  ENUMS: 'ENUMS',
+  ENUM: 'ENUM',
   LOGS: 'logs',
   ASSIGNMENTS: 'assignments',
   ADVERTISEMENTS: 'advertisements',
