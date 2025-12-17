@@ -71,7 +71,7 @@
         </div>
 
         <!-- Asignees -->
-        <div class="row scroll small-space" id="creative-asignees-container"></div>
+        <div class="row scroll tiny-space tiny-padding" id="creative-asignees-container"></div>
       </article>
 
       <!-- Members -->
@@ -246,10 +246,10 @@
       if (deadlineInput) deadlineInput.value = formatDateTimeForInput(creative.deadline_at);
 
       const clientInput = document.getElementById('creative-client-display');
-      if (clientInput) clientInput.value = App.pages.creativeDetail.getDirectoryFullName(creative.client_directory_id);
+      if (clientInput) clientInput.value = App.pages.creativeDetail.getDirectoryDisplayInfo(creative.client_directory_id);
 
       const contractorInput = document.getElementById('creative-contractor-display');
-      if (contractorInput) contractorInput.value = App.pages.creativeDetail.getDirectoryFullName(creative.contractor_directory_id);
+      if (contractorInput) contractorInput.value = App.pages.creativeDetail.getDirectoryDisplayInfo(creative.contractor_directory_id);
 
 
       App.pages.creativeDetail.loadMembers(creative.id);
@@ -259,23 +259,23 @@
     },
 
     loadAssignees: function (creativeId) {
-      callGAS('getItems', 'member_assignments')
+      callGAS('getItems', SHEET_NAMES.MEMBER_ASSIGNMENTS)
         .then(assignments => {
           const creativeAssignments = assignments.filter(a => a.related_table === SHEET_NAMES.CREATIVES && a.related_id === creativeId);
           const container = document.getElementById('creative-asignees-container');
           if (!container) return;
 
           container.innerHTML = creativeAssignments.map(assignment => {
-            const member = membersData.find(m => m.id === assignment.member_id);
+            const member = membersData.find(m => m.email === assignment.member_id);
             if (!member) return '';
             const iconUrl = member.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}` : ''; // fallback or specific logic?
             const nickname = member.nickname || member.email || '不明';
 
             // Using App.pages.memberDetail.open(member.email) as verified in detail_member.html
             return `
-              <button class="circle small" onclick="App.pages.memberDetail.open('${escapeHtml(member.email)}')">
-                <img src="${escapeHtml(iconUrl)}" alt="${escapeHtml(nickname)}">
-                <div class="tooltip right round small-space">${escapeHtml(nickname)}</div>
+              <button class="transparent circle small" onclick="App.pages.memberDetail.open('${escapeHtml(member.email)}')">
+                <img class="responsive" src="${escapeHtml(iconUrl)}" alt="${escapeHtml(nickname)}">
+                <div class="tooltip right round">${escapeHtml(nickname)}</div>
               </button>
             `;
           }).join('');
@@ -339,6 +339,7 @@
       ).join('');
     },
 
+    // 組織名を上層階層のものを含めて取得し、スラッシュでつなぐ。現状使用していないが一応残す。
     getDirectoryFullName: function (directoryId) {
       if (!directoryId || !directoriesData) return '';
       const dir = directoriesData.find(d => d.id === directoryId);
@@ -350,6 +351,27 @@
 
       // Recursive call with safety check to avoid infinite loops (basic depth check implied by data structure, but beware circular refs)
       return App.pages.creativeDetail.getDirectoryFullName(dir.parent_directory_id) + ' / ' + (dir.name || '');
+    },
+
+    getDirectoryDisplayInfo: function (directoryId) {
+      if (!directoryId || !directoriesData) return '';
+      const dir = directoriesData.find(d => d.id === directoryId);
+      if (!dir) return '';
+
+      // display_idをフォーマット
+      const displayIdStr = formatDisplayId(SHEET_NAMES.DIRECTORIES, dir.display_id);
+
+      // directory_type_keyからENUMのvalueを取得
+      let typeValue = dir.directory_type_key || '-';
+      if (enumData && enumData['DIRECTORY_TYPE']) {
+        const enumItem = enumData['DIRECTORY_TYPE'].find(e => e.key === dir.directory_type_key);
+        if (enumItem) {
+          typeValue = enumItem.value;
+        }
+      }
+
+      // display_id / name / directory_type_key の形式で返す
+      return `${displayIdStr} | ${dir.name || ''} | ${typeValue}`;
     },
 
     selectDirectory: function (field) {
@@ -365,7 +387,7 @@
             const displayField = field === 'client_directory_id' ? 'creative-client-display' : 'creative-contractor-display';
             const input = document.getElementById(displayField);
             if (input) {
-              input.value = App.pages.creativeDetail.getDirectoryFullName(selectedIds[0]);
+              input.value = App.pages.creativeDetail.getDirectoryDisplayInfo(selectedIds[0]);
             }
           }
         }
@@ -472,7 +494,7 @@
           container.innerHTML = creativeAssignments.map(assignment => {
             const member = membersData.find(m => m.id === assignment.member_id);
             if (!member) return '';
-            const iconUrl = member.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}&sz=w32` : '';
+            const iconUrl = member.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}` : '';
             return `
               <div class="chip">
                 ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" alt="">` : ''}
