@@ -69,6 +69,9 @@
           <label>依頼先</label>
           <i class="front" onclick="App.pages.creativeDetail.selectDirectory('contractor_directory_id')">edit</i>
         </div>
+
+        <!-- Asignees -->
+        <div class="row scroll small-space" id="creative-asignees-container"></div>
       </article>
 
       <!-- Members -->
@@ -76,8 +79,8 @@
 
       <nav class="center-align top-margin tiny-space">
         <button class="round primary large max" onclick="App.pages.creativeDetail.addMembers()">
-          <i>add</i>
-          <span>担当者を追加</span>
+          <i>person_edit</i>
+          <span>担当者を編集</span>
         </button>
       </nav>
     </div>
@@ -110,7 +113,7 @@
           <button class="round large primary max"
             onclick="App.modals.new_note.open(App.pages.creativeDetail.currentId)">
             <i>add_comment</i>
-            <span>コメントを書く</span>
+            <span>コメントを追加</span>
           </button>
         </nav>
       </div>
@@ -146,6 +149,7 @@
       App.pages.creativeDetail.currentId = id;
       App.pages.creativeDetail.isLoading = true;
       showLoading();
+      console.log(`currentId is ${App.pages.creativeDetail.currentId}`);
 
       // View switching
       document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
@@ -249,8 +253,36 @@
 
 
       App.pages.creativeDetail.loadMembers(creative.id);
+      App.pages.creativeDetail.loadAssignees(creative.id);
       App.pages.creativeDetail.loadNotes(creative.id);
       App.pages.creativeDetail.switchTab(null, 'documents');
+    },
+
+    loadAssignees: function (creativeId) {
+      callGAS('getItems', 'member_assignments')
+        .then(assignments => {
+          const creativeAssignments = assignments.filter(a => a.related_table === SHEET_NAMES.CREATIVES && a.related_id === creativeId);
+          const container = document.getElementById('creative-asignees-container');
+          if (!container) return;
+
+          container.innerHTML = creativeAssignments.map(assignment => {
+            const member = membersData.find(m => m.id === assignment.member_id);
+            if (!member) return '';
+            const iconUrl = member.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}` : ''; // fallback or specific logic?
+            const nickname = member.nickname || member.email || '不明';
+
+            // Using App.pages.memberDetail.open(member.email) as verified in detail_member.html
+            return `
+              <button class="circle small" onclick="App.pages.memberDetail.open('${escapeHtml(member.email)}')">
+                <img src="${escapeHtml(iconUrl)}" alt="${escapeHtml(nickname)}">
+                <div class="tooltip right round small-space">${escapeHtml(nickname)}</div>
+              </button>
+            `;
+          }).join('');
+        })
+        .catch(err => {
+          console.error('[CreativeDetail] Failed to load assignees:', err);
+        });
     },
 
     goBack: function () {
@@ -346,12 +378,13 @@
         preSelected: [],
         callback: (selectedIds) => {
           if (selectedIds && selectedIds.length > 0) {
+            console.log(`currentId is ${App.pages.creativeDetail.currentId}`);
             selectedIds.forEach(memberId => {
               const assignmentData = {
                 related_table: SHEET_NAMES.CREATIVES,
                 related_id: App.pages.creativeDetail.currentId,
                 member_id: memberId,
-                role_key: 'MEMBER'
+                member_assignment_role_key: 'MEMBER'
               };
               callGAS('createItem', 'member_assignments', assignmentData)
                 .then(() => App.pages.creativeDetail.loadMembers(App.pages.creativeDetail.currentId))
@@ -477,7 +510,7 @@
             const isLast = index === notes.length - 1;
             return `
               <div class="row no-margin top-align tiny-space">
-                  ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar small circle" alt="">` : ''}
+                  ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="small circle" alt="">` : ''}
                 <div class="max">
                   <div class="row secondary-text tiny-space">
                     <strong class="small-text">${escapeHtml(authorName)}</strong>
