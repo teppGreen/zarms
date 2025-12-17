@@ -301,12 +301,13 @@
                     // editableプロパティは無視
                     switch (header.key) {
                         case 'display_id':
+                            const formattedId = formatDisplayId(name, item.display_id);
                             if (name === SHEET_NAMES.CREATIVES) {
-                                content = `<button class="chip transparent circle" onclick="event.stopPropagation(); App.overlays.creativeDetail.open('${item.id}')">${escapeHtml(item.display_id || item.id)}</button>`;
+                                content = `<button class="chip transparent circle" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="event.stopPropagation(); App.overlays.creativeDetail.open('${item.id}')">${escapeHtml(formattedId)}</button>`;
                             } else if (name === SHEET_NAMES.PLANS) {
-                                content = `<button class="chip transparent circle" onclick="event.stopPropagation(); App.overlays.planDetail.open('${item.id}')">${escapeHtml(item.display_id || item.id)}</button>`;
+                                content = `<button class="chip transparent circle" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="event.stopPropagation(); App.overlays.planDetail.open('${item.id}')">${escapeHtml(formattedId)}</button>`;
                             } else {
-                                content = `<span>${escapeHtml(item.display_id || item.id)}</span>`;
+                                content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formattedId)}</span>`;
                             }
                             break;
                         case 'plan_title':
@@ -597,14 +598,14 @@
 
                 switch (header.key) {
                     case 'display_id':
+                        const formattedRowId = formatDisplayId(tableName, item.display_id);
                         if (tableName === SHEET_NAMES.CREATIVES) {
-                            content = `<button class="chip transparent circle" onclick="App.overlays.creativeDetail.open('${item.id}')">${escapeHtml(item.display_id || item.id)}</button>`;
+                            content = `<button class="chip transparent circle" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="App.overlays.creativeDetail.open('${item.id}')">${escapeHtml(formattedRowId)}</button>`;
                         } else if (tableName === SHEET_NAMES.PLANS) {
-                            content = `<button class="chip transparent circle" onclick="App.overlays.planDetail.open('${item.id}')">${escapeHtml(item.display_id || item.id)}</button>`;
+                            content = `<button class="chip transparent circle" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" onclick="App.overlays.planDetail.open('${item.id}')">${escapeHtml(formattedRowId)}</button>`;
                         } else {
-                            content = `<span>${escapeHtml(item.display_id || item.id)}</span>`;
-                        }
-                        break;
+                            content = `<span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formattedRowId)}</span>`;
+                        } break;
                     case 'plan_title':
                         if (item.plan_title) content = escapeHtml(item.plan_title);
                         else if (item.plan_id && plansData) {

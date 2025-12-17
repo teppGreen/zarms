@@ -222,7 +222,7 @@
       if (!container) return;
 
       const displayIdEl = document.getElementById('display-id');
-      const displayIdStr = creative.display_id ? `C${String(creative.display_id).padStart(4, '0')}` : '-'; // Handle missing display_id
+      const displayIdStr = formatDisplayId(SHEET_NAMES.CREATIVES, creative.display_id);
 
       if (displayIdEl) displayIdEl.textContent = displayIdStr;
 
@@ -475,11 +475,8 @@
             const authorName = author ? (author.nickname || author.email) : '不明';
             const iconUrl = author && author.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${author.icon_gfile_id}` : '';
             return `
-              <div class="row bottom-margin top-align tiny-space">
-                <div>
+              <div class="row top-align tiny-space">
                   ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar small circle" alt="">` : ''}
-                  <i>keyboard_arrow_up</i>
-                </div>
                 <div class="max">
                   <div class="row tiny-space">
                     <strong class="small-text">${escapeHtml(authorName)}</strong>
@@ -489,6 +486,7 @@
                   <div class="small-text no-line" style="white-space: pre-wrap; word-break: break-word;">${escapeHtml(note.content)}</div>
                 </div>
               </div>
+              <div class="left-align margin"><i>keyboard_arrow_up</i></div>
             `;
           }).join('');
 

@@ -4,6 +4,7 @@
 
   // グローバル変数
   let configData = {};
+  let prefixData = {};
   let enumData = {};
   let advertisementsData = [];
   let budgetsData = [];
@@ -108,11 +109,13 @@
     showLoading();
 
     return Promise.all([
-      callGAS('getConfig', null),
-      callGAS('getEnum', null),
-    ]).then(([config, enums]) => {
-      configData = groupConfigByType(config);
+      callGAS('getItems', SHEET_NAMES.CONFIG),
+      callGAS('getItems', SHEET_NAMES.ENUM),
+      callGAS('getItems', SHEET_NAMES.PREFIX),
+    ]).then(([configs, enums, prefixes]) => {
+      configData = groupConfigByType(configs);
       enumData = groupEnumByType(enums);
+      prefixData = groupPrefix(prefixes);
       hideLoading();
       if (shouldSwitchTab) {
         App.utils.navigation.switchTab('home');
@@ -152,7 +155,16 @@
     const grouped = {};
     if (!configs || !Array.isArray(configs)) return grouped;
 
-    configs.forEach(config => {
+    // is_active でフィルタリング
+    const activeConfigs = configs.filter(config =>
+      config.is_active === true || config.is_active === 'TRUE' || config.is_active === 'true'
+    );
+
+    // sort_order でソート
+    activeConfigs.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+    // type ごとにグループ化
+    activeConfigs.forEach(config => {
       if (!grouped[config.type]) {
         grouped[config.type] = [];
       }
@@ -165,13 +177,34 @@
     const grouped = {};
     if (!enums || !Array.isArray(enums)) return grouped;
 
-    enums.forEach(enuma => {
+    // is_active でフィルタリング
+    const activeEnums = enums.filter(enuma =>
+      enuma.is_active === true || enuma.is_active === 'TRUE' || enuma.is_active === 'true'
+    );
+
+    // sort_order でソート
+    activeEnums.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+    // type ごとにグループ化
+    activeEnums.forEach(enuma => {
       if (!grouped[enuma.type]) {
         grouped[enuma.type] = [];
       }
       grouped[enuma.type].push(enuma);
     });
     return grouped;
+  }
+
+  function groupPrefix(prefixes) {
+    // PREFIX データを table_name をキー、prefix_value を値として格納
+    if (prefixes && Array.isArray(prefixes)) {
+      prefixes.forEach(prefix => {
+        if (prefix.table_name && prefix.prefix_value) {
+          prefixData[prefix.table_name] = prefix.prefix_value;
+        }
+      });
+    }
+    return prefixData;
   }
 
   let loadingTimeout = null;
@@ -291,6 +324,26 @@
     if (text === null || typeof text === 'undefined') return '';
     return String(text).replace(/[&<>"']/g, match => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[match]);
   }
+
+  /**
+   * display_id をフォーマットして返す
+   * @param {string} table_name - テーブル名
+   * @param {number|string} display_id - display_id
+   * @returns {string} フォーマットされた display_id
+   */
+  function formatDisplayId(table_name, display_id) {
+    if (!display_id) return '-';
+
+    // prefixData から prefix_value を取得
+    const prefix_value = prefixData[table_name] || '';
+
+    // display_id を4桁固定で0パディング
+    const paddedId = String(display_id).padStart(4, '0');
+
+    // prefix_value と display_id を結合
+    return prefix_value + paddedId;
+  }
+
 
   // ============================================
   // インライン編集 & ポップアップ

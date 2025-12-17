@@ -1,6 +1,6 @@
 <!-- ホーム画面。最初にページを読み込んだときにどのタブを表示するかはURLのパラメータで決定-->
 
-<div id="tab-home" style="display: none;"> 
+<div id="tab-home" style="display: none;">
     <!-- ヘッダー（挨拶）-->
     <article class="no-elevate">
         <div class="row">
@@ -151,7 +151,7 @@
 
             return `
                 <article class="small-padding bottom-margin" style="cursor: pointer;" onclick="App.overlays.creativeDetail.open('${creative.id}')">
-                    <div class="small-text"><strong>${escapeHtml(creative.display_id || creative.id)}</strong></div>
+                    <div class="small-text" style="font-family: 'Roboto Mono', monospace; font-weight: 500;"><strong>${escapeHtml(formatDisplayId(SHEET_NAMES.CREATIVES, creative.display_id))}</strong></div>
                     <div class="small-text">${escapeHtml(creative.title || '')}</div>
                     <div class="row no-space" style="margin-top: 4px;">
                         <span class="chip small">${escapeHtml(statusLabel)}</span>
@@ -196,7 +196,7 @@
 
             return `
                 <article class="small-padding bottom-margin" style="cursor: pointer;" onclick="if(App.overlays.taskDetail) App.overlays.taskDetail.open('${task.id}')">
-                    <div class="small-text"><strong>${escapeHtml(task.display_id)}</strong></div>
+                    <div class="small-text" style="font-family: 'Roboto Mono', monospace; font-weight: 500;"><strong>${escapeHtml(formatDisplayId(SHEET_NAMES.TASKS, task.display_id))}</strong></div>
                     <div class="small-text">${escapeHtml(task.title || '')}</div>
                     <div class="row no-space" style="margin-top: 4px;">
                         <span class="chip small">${escapeHtml(statusLabel)}</span>
@@ -241,12 +241,16 @@
         }
 
         container.innerHTML = items.map(item => {
-            const displayId = item.display_id || item.id;
             const title = item.title || item.name || '';
+            // selectedType に応じて適切なテーブル名を決定
+            const tableName = selectedType === 'creatives' ? SHEET_NAMES.CREATIVES :
+                selectedType === 'plans' ? SHEET_NAMES.PLANS :
+                    SHEET_NAMES.ADVERTISEMENTS;
+            const displayId = formatDisplayId(tableName, item.display_id);
 
             return `
                 <article class="small-padding bottom-margin" style="cursor: pointer;" onclick="if(App.overlays.${selectedType === 'creatives' ? 'creativeDetail' : selectedType === 'plans' ? 'planDetail' : 'advertisementDetail'}) App.overlays.${selectedType === 'creatives' ? 'creativeDetail' : selectedType === 'plans' ? 'planDetail' : 'advertisementDetail'}.open('${item.id}')">
-                    <div class="small-text"><strong>${escapeHtml(displayId)}</strong></div>
+                    <div class="small-text" style="font-family: 'Roboto Mono', monospace; font-weight: 500;"><strong>${escapeHtml(displayId)}</strong></div>
                     <div class="small-text">${escapeHtml(title)}</div>
                 </article>
             `;
