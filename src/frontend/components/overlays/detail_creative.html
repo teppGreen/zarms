@@ -470,15 +470,16 @@
 
           notes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-          container.innerHTML = notes.map(note => {
+          container.innerHTML = notes.map((note, index) => {
             const author = membersData.find(m => m.email === note.created_by);
             const authorName = author ? (author.nickname || author.email) : '不明';
             const iconUrl = author && author.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${author.icon_gfile_id}` : '';
+            const isLast = index === notes.length - 1;
             return `
-              <div class="row top-align tiny-space">
+              <div class="row no-margin top-align tiny-space">
                   ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar small circle" alt="">` : ''}
                 <div class="max">
-                  <div class="row tiny-space">
+                  <div class="row secondary-text tiny-space">
                     <strong class="small-text">${escapeHtml(authorName)}</strong>
                     <span class="small-text">${formatDateTimeForDisplay(note.created_at)}</span>
                     <div class="badge primary" style="display: none"></div>
@@ -486,7 +487,7 @@
                   <div class="small-text no-line" style="white-space: pre-wrap; word-break: break-word;">${escapeHtml(note.content)}</div>
                 </div>
               </div>
-              <div class="left-align margin"><i>keyboard_arrow_up</i></div>
+              ${!isLast ? '<div class=""><i class="small-margin medium secondary-text">keyboard_arrow_up</i></div>' : ''}
             `;
           }).join('');
 
