@@ -344,6 +344,39 @@
     return prefix_value + paddedId;
   }
 
+  /**
+   * メンバーアイコンのHTMLを生成する
+   * @param {string|Object} memberOrId - メンバーIDまたはメンバーオブジェクト
+   * @returns {string} 生成されたHTML
+   */
+  function renderMemberIcon(memberOrId) {
+    let member = memberOrId;
+    if (typeof memberOrId === 'string') {
+      member = membersData.find(m => m.id === memberOrId) || membersData.find(m => m.email === memberOrId);
+    }
+
+    if (!member) return '';
+
+    const iconUrl = member.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}` : '';
+    const nickname = member.nickname || member.email || '不明';
+
+    // User requested specific format:
+    // const iconContent = iconUrl
+    //   ? `<img class="responsive" src="${escapeHtml(iconUrl)}" alt="${escapeHtml(nickname)}" title="${escapeHtml(nickname)}">`
+    //   : `<i>account_circle</i>`;
+
+    // However, the user's snippet had some syntax errors. I will generate valid HTML that matches the intent.
+    const iconContent = iconUrl
+      ? `<img class="responsive" src="${escapeHtml(iconUrl)}" alt="${escapeHtml(nickname)}" title="${escapeHtml(nickname)}">`
+      : `<i>account_circle</i>`;
+
+    return `
+      <button class="transparent circle small" onclick="event.stopPropagation(); App.pages.memberDetail.open('${escapeHtml(member.id)}')">
+        ${iconContent}
+      </button>
+    `;
+  }
+
 
   // ============================================
   // インライン編集 & ポップアップ
