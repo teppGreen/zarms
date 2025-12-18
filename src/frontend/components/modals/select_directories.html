@@ -1,48 +1,49 @@
 <dialog id="modal-select-directories" class="modal">
-    <div class="row no-space align-center">
-        <div class="max">
-            <h5 class="bold mb-0">組織を選択</h5>
-        </div>
-        <button class="circle transparent" onclick="ui('#modal-select-directories')">
-            <i>close</i>
-        </button>
-    </div>
-
-    <div class="padding">
-        <!-- 検索バー -->
-        <div class="field round border prefix">
-            <i>search</i>
-            <input type="text" id="directory-search-input" placeholder="IDまたは名前で検索..."
-                oninput="App.modals.selectDirectories.filterResults()">
-        </div>
-
-        <!-- フィルタ -->
+    <header class="fixed">
         <div class="row">
-            <div class="field label border s12 m6">
+            <h5 class="max">組織を選択</h5>
+            <button class="circle transparent" onclick="ui('#modal-select-directories')">
+                <i>close</i>
+            </button>
+        </div>
+
+        <div class="row grid">
+            <!-- 検索バー -->
+            <div class="field border prefix max s6 m10">
+                <i>search</i>
+                <input type="text" id="directory-search-input" placeholder="IDまたは名前で検索..."
+                    oninput="App.modals.selectDirectories.filterResults()">
+            </div>
+
+            <!-- フィルタ -->
+            <div class="field label border s6 m2">
                 <select id="directory-type-filter" onchange="App.modals.selectDirectories.filterResults()">
                     <option value="">すべて</option>
                     <!-- ENUMから動的に生成 -->
                 </select>
-                <label>組織タイプ</label>
+                    <label>組織タイプ</label>
+                </div>
             </div>
         </div>
+    </header>
 
-        <div class="space"></div>
-
+    <article class="padding large scroll">
         <!-- 結果リスト（ツリー構造） -->
-        <div id="directory-results-container" style="max-height: 400px; overflow-y: auto;">
+        <div id="directory-results-container">
             <table id="directory-tree-table" class="">
                 <tbody id="directory-tree-body">
                     <!-- ツリー行は動的生成 -->
                 </tbody>
             </table>
         </div>
-    </div>
+    </article>
 
-    <nav class="right-align">
-        <button class="border" onclick="ui('#modal-select-directories')">キャンセル</button>
-        <button onclick="App.modals.selectDirectories.confirm()">選択</button>
-    </nav>
+    <footer class="fixed">
+        <nav class="right-align">
+            <button class="border" onclick="ui('#modal-select-directories')">キャンセル</button>
+            <button onclick="App.modals.selectDirectories.confirm()">選択</button>
+        </nav>
+    </footer>
 </dialog>
 
 <script>
@@ -89,9 +90,9 @@
         render: function () {
             // タイプフィルタのオプションを生成
             const typeFilter = document.getElementById('directory-type-filter');
-            if (typeFilter && configData['DIRECTORY_TYPE']) {
-                const options = configData['DIRECTORY_TYPE'].map(opt =>
-                    `<option value="${escapeHtml(opt.config_key)}">${escapeHtml(opt.config_value)}</option>`
+            if (typeFilter && enumData && enumData['DIRECTORY_TYPE']) {
+                const options = enumData['DIRECTORY_TYPE'].map(opt =>
+                    `<option value="${escapeHtml(opt.key)}">${escapeHtml(opt.value)}</option>`
                 ).join('');
                 typeFilter.innerHTML = '<option value="">すべて</option>' + options;
             }
@@ -207,7 +208,7 @@
                 html += `
                     <tr data-id="${escapeHtml(node.id)}" data-level="${level}">
                         <td>
-                            <div class="row no-space" style="padding-left: ${indent}px;">
+                            <div class="row tiny-space" style="padding-left: ${indent}px;">
                                 <button class="circle transparent small" 
                                         onclick="App.modals.selectDirectories.toggleNode('${node.id}')"
                                         ${hasChildren ? '' : 'disabled'}>
