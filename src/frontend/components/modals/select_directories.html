@@ -1,5 +1,5 @@
-<dialog id="modal-select-directories" class="modal">
-    <header class="fixed">
+<dialog id="modal-select-directories" class="modal large-width">
+    <header class="">
         <div class="row">
             <h5 class="max">組織を選択</h5>
             <button class="circle transparent" onclick="ui('#modal-select-directories')">
@@ -7,38 +7,39 @@
             </button>
         </div>
 
-        <div class="row grid">
+        <div class="row">
             <!-- 検索バー -->
-            <div class="field border prefix max s6 m10">
+            <div class="field border prefix max">
                 <i>search</i>
                 <input type="text" id="directory-search-input" placeholder="IDまたは名前で検索..."
                     oninput="App.modals.selectDirectories.filterResults()">
             </div>
 
             <!-- フィルタ -->
-            <div class="field label border s6 m2">
+            <div class="field label border">
                 <select id="directory-type-filter" onchange="App.modals.selectDirectories.filterResults()">
                     <option value="">すべて</option>
                     <!-- ENUMから動的に生成 -->
                 </select>
-                    <label>組織タイプ</label>
-                </div>
+                <label>組織タイプ</label>
             </div>
         </div>
     </header>
 
-    <article class="padding large scroll">
-        <!-- 結果リスト（ツリー構造） -->
-        <div id="directory-results-container">
-            <table id="directory-tree-table" class="">
-                <tbody id="directory-tree-body">
-                    <!-- ツリー行は動的生成 -->
-                </tbody>
-            </table>
-        </div>
-    </article>
+    <div>
+        <article class="padding medium no-elevate scroll">
+            <!-- 結果リスト（ツリー構造） -->
+            <div id="directory-results-container">
+                <table id="directory-tree-table" class="">
+                    <tbody id="directory-tree-body">
+                        <!-- ツリー行は動的生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </article>
+    </div>
 
-    <footer class="fixed">
+    <footer class="">
         <nav class="right-align">
             <button class="border" onclick="ui('#modal-select-directories')">キャンセル</button>
             <button onclick="App.modals.selectDirectories.confirm()">選択</button>

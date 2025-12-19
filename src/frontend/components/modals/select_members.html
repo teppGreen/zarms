@@ -126,6 +126,10 @@
 
             container.innerHTML = filtered.map(member => {
                 const isSelected = this.selectedIds.includes(member.id);
+                const iconUrl = member.icon_gfile_id ?
+                    `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}&sz=w32` :
+                    '';
+
                 return `
           <label class="checkbox row middle-align no-space">
             <input type="${this.multiSelect ? 'checkbox' : 'radio'}" 
@@ -133,7 +137,7 @@
                    value="${escapeHtml(member.email)}" 
                    ${isSelected ? 'checked' : ''}
                    onchange="App.modals.selectMembers.toggleSelection('${member.id}', this.checked)">
-            ${renderMemberIcon(member)}
+            ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar" alt="">` : ''}
             <span class="max">
               <strong>${escapeHtml(member.nickname || member.email)}</strong>
               ${member.email ? `<br><span class="small-text">${escapeHtml(member.id)}</span>` : ''}
