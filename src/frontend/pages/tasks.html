@@ -21,18 +21,53 @@
     App.pages.tasks = {};
 
     App.pages.tasks.loadData = function () {
-        const promises = [callGAS('getItems', SHEET_NAMES.TASKS)];
-        promises.push(callGAS('getItems', SHEET_NAMES.CREATIVES));
-        promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
+        showLoading();
 
-        Promise.all(promises).then(results => {
-            tasksData = results[0];
-            creativesData = results[1] || [];
-            membersData = results[2] || [];
+        // Phase 1: メインテーブル（tasks）を取得・即時描画
+        callGAS('getItems', SHEET_NAMES.TASKS)
+            .then(tasks => {
+                tasksData = tasks;
 
-            // ReadOnlyテーブルをレンダリング（行クリックで詳細モーダルを開く）
-            App.utils.tables.render(SHEET_NAMES.TASKS, App.utils.tables.applyFiltersAndSort(SHEET_NAMES.TASKS, tasksData), tasksTableHeaders);
-            hideLoading();
-        }).catch(App.error.handle);
+                // 外部キー情報なしでまず描画
+                App.utils.tables.render(
+                    SHEET_NAMES.TASKS,
+                    App.utils.tables.applyFiltersAndSort(SHEET_NAMES.TASKS, tasksData),
+                    tasksTableHeaders
+                );
+
+                // Phase 2: 外部テーブルを順次取得
+                return App.pages.tasks.loadRelatedData();
+            })
+            .then(() => {
+                // 外部キー情報を含めて再描画
+                App.utils.tables.render(
+                    SHEET_NAMES.TASKS,
+                    App.utils.tables.applyFiltersAndSort(SHEET_NAMES.TASKS, tasksData),
+                    tasksTableHeaders
+                );
+                hideLoading();
+            })
+            .catch(App.utils.error.handle);
+    };
+
+    /**
+     * 関連データを順次取得
+     */
+    App.pages.tasks.loadRelatedData = function () {
+        const loadPromises = [];
+
+        if (!creativesData || creativesData.length === 0) {
+            loadPromises.push(
+                callGAS('getItems', SHEET_NAMES.CREATIVES).then(data => { creativesData = data || []; })
+            );
+        }
+
+        if (!membersData || membersData.length === 0) {
+            loadPromises.push(
+                callGAS('getItems', SHEET_NAMES.MEMBERS).then(data => { membersData = data || []; })
+            );
+        }
+
+        return Promise.all(loadPromises);
     };
 </script>

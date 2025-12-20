@@ -65,66 +65,77 @@
     App.pages.home = {};
 
     App.pages.home.loadData = function () {
-        const promises = [callGAS('getItems', SHEET_NAMES.CREATIVES)];
-        promises.push(callGAS('getItems', SHEET_NAMES.TASKS));
+        showLoading();
 
-        if (!membersData || membersData.length === 0) {
-            promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS));
-        } else {
-            promises.push(Promise.resolve(null));
+        // Phase 1: バックエンドでフィルタリング済みのホームデータを取得
+        callGAS('getHomeData')
+            .then(homeData => {
+                // 挨拶を更新
+                App.pages.home.renderGreeting(homeData);
+
+                // Column 1: 新規依頼（バックエンドでフィルタリング済み）
+                App.pages.home.renderNewRequests(homeData.new_requests || []);
+
+                // Column 2: マイタスク（バックエンドでフィルタリング済み）
+                App.pages.home.renderMyTasks(homeData.assigned_creatives || []);
+
+                // Phase 2: 追加データの取得（リレーション用）
+                return App.pages.home.loadRelatedData();
+            })
+            .then(() => {
+                // Column 3: リレーション
+                App.pages.home.loadRelations();
+                hideLoading();
+            })
+            .catch(App.utils.error.handle);
+    };
+
+    /**
+     * 挨拶を描画
+     */
+    App.pages.home.renderGreeting = function (homeData) {
+        const greetingEl = document.getElementById('home-greeting');
+        if (greetingEl) {
+            const greeting = (homeData.greeting || 'こんにちは') + '、' + (homeData.memberName || 'ゲスト') + 'さん。';
+            greetingEl.textContent = greeting;
+        }
+
+        const greetingSubEl = document.getElementById('home-greeting-sub');
+        if (greetingSubEl) {
+            const messages = [
+                'ステータスは最新ですか？随時更新しましょう。',
+                '右上のボタンから打刻して、今日のタスクを始めましょう。',
+                '新着依頼が来ていたら、早めに処理しましょう。',
+                'リレーション（担当企画など）の状態を、こまめにチェックしましょう。',
+                'ZARMSで管理できない情報がありますか？総務に機能追加をリクエストしましょう。',
+                'フロー情報はSlackで共有し、ストック情報はZARMSで管理しましょう。',
+                'ZARMSにある情報が最新、と言い切れるようにしましょう。',
+                '独自のスプレッドシートなどを作ることは、最新の情報がわからなくなる原因になります。避けましょう。',
+            ];
+            const num = Math.floor(Math.random() * (messages.length));
+            greetingSubEl.textContent = messages[num];
+        }
+    };
+
+    /**
+     * 関連データを順次取得（リレーション表示用）
+     */
+    App.pages.home.loadRelatedData = function () {
+        const loadPromises = [];
+
+        if (!creativesData || creativesData.length === 0) {
+            loadPromises.push(
+                callGAS('getItems', SHEET_NAMES.CREATIVES).then(data => { creativesData = data || []; })
+            );
         }
 
         if (!plansData || plansData.length === 0) {
-            promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
-        } else {
-            promises.push(Promise.resolve(null));
+            loadPromises.push(
+                callGAS('getItems', SHEET_NAMES.PLANS).then(data => { plansData = data || []; })
+            );
         }
 
-        Promise.all(promises).then(([creatives, tasks, members, plans]) => {
-            if (members) membersData = members;
-            if (plans) plansData = plans;
-            creativesData = creatives;
-            tasksData = tasks;
-
-            // 挨拶を更新
-            const greetingEl = document.getElementById('home-greeting');
-            if (greetingEl) {
-                const hour = new Date().getHours();
-                let greeting = 'こんにちは';
-                if (hour < 12) greeting = 'おはようございます';
-                else if (hour >= 18) greeting = 'こんばんは';
-                greeting += '、' + activeUser.nickname + 'さん。';
-
-                greetingEl.textContent = greeting;
-            }
-
-            const greetingSubEl = document.getElementById('home-greeting-sub');
-            if (greetingSubEl) {
-                const messages = [
-                    'ステータスは最新ですか？随時更新しましょう。',
-                    '右上のボタンから打刻して、今日のタスクを始めましょう。',
-                    '新着依頼が来ていたら、早めに処理しましょう。',
-                    'リレーション（担当企画など）の状態を、こまめにチェックしましょう。',
-                    'ZARMSで管理できない情報がありますか？総務に機能追加をリクエストしましょう。',
-                    'フロー情報はSlackで共有し、ストック情報はZARMSで管理しましょう。',
-                    'ZARMSにある情報が最新、と言い切れるようにしましょう。',
-                    '独自のスプレッドシートなどを作ることは、最新の情報がわからなくなる原因になります。避けましょう。',
-                ];
-                const num = Math.floor(Math.random() * (messages.length));
-                greetingSubEl.textContent = messages[num];
-            }
-
-            // Column 1: 新規依頼（未着手のcreatives, forms, questions）
-            App.pages.home.renderNewRequests(creatives);
-
-            // Column 2: マイタスク（自分が担当で未完了）
-            App.pages.home.renderMyTasks(tasks);
-
-            // Column 3: リレーション（初期表示は制作物）
-            App.pages.home.loadRelations();
-
-            hideLoading();
-        }).catch(App.utils.error.handle);
+        return Promise.all(loadPromises);
     };
 
     /**

@@ -1,5 +1,6 @@
 // ============================================
 // database.gs - データベース操作の抽象化 (Backend)
+// SSSQLライブラリを使用したCRUD操作
 // ============================================
 
 /**
@@ -33,21 +34,9 @@ function getHeaders(sheet) {
     return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 }
 
-/**
- * 2次元配列のデータをオブジェクトの配列に変換します。
- * @param {string[]} headers - ヘッダーの配列
- * @param {any[][]} datas - データの2次元配列
- * @returns {Object[]} オブジェクトの配列
- */
-function mapData(headers, datas) {
-    return datas.map(row => {
-        const obj = {};
-        headers.forEach((header, index) => {
-            obj[header] = row[index];
-        });
-        return obj;
-    });
-}
+// ============================================
+// SSSQL を使用した CRUD 操作
+// ============================================
 
 /**
  * シートからすべてのデータを取得します。
@@ -56,45 +45,27 @@ function mapData(headers, datas) {
  */
 function getAllData(sheetName) {
     const sheet = getSheet(sheetName);
-    const datas = sheet.getDataRange().getValues();
-
-    if (datas.length <= 1) return [];
-
-    const headers = datas.shift();
-    return mapData(headers, datas);
+    return SSSQL.select(sheet, {});
 }
 
 /**
  * IDに基づいてシートから単一のデータを取得します。
  * @param {string} sheetName - シート名
+ * @param {string} idColumnName - ID列名
  * @param {any} id - 検索するID
  * @returns {Object|null} 見つかったデータオブジェクト、またはnull
  */
 function getDataById(sheetName, idColumnName, id) {
-    const idColumn = idColumnName;
-    if (!idColumn) {
+    if (!idColumnName) {
         throw new Error(`ID列が定義されていません: ${sheetName}`);
     }
 
     const sheet = getSheet(sheetName);
-    const datas = sheet.getDataRange().getValues();
-    if (datas.length <= 1) return null;
+    const result = SSSQL.select(sheet, {
+        where: { [idColumnName]: ["=", id] }
+    });
 
-    const headers = datas[0];
-    const idIndex = headers.indexOf(idColumn);
-
-    for (let i = 1; i < datas.length; i++) {
-        if (datas[i][idIndex] === id) {
-            const row = datas[i];
-            const obj = {};
-            headers.forEach((header, index) => {
-                obj[header] = row[index];
-            });
-            return obj;
-        }
-    }
-
-    return null;
+    return result.length > 0 ? result[0] : null;
 }
 
 /**
@@ -105,37 +76,35 @@ function getDataById(sheetName, idColumnName, id) {
  */
 function findData(sheetName, condition) {
     const sheet = getSheet(sheetName);
-    const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) return [];
 
-    const headers = data[0];
-    const results = [];
+    // 条件オブジェクトをSSSQLのwhere形式に変換
+    const whereClause = {};
+    Object.keys(condition).forEach(key => {
+        whereClause[key] = ["=", condition[key]];
+    });
 
-    const conditionKeys = Object.keys(condition);
-    const conditionIndexes = conditionKeys.map(key => headers.indexOf(key));
-
-    for (let i = 1; i < data.length; i++) {
-        const row = data[i];
-        let match = true;
-        for (let j = 0; j < conditionKeys.length; j++) {
-            const keyIndex = conditionIndexes[j];
-            if (keyIndex === -1 || row[keyIndex] !== condition[conditionKeys[j]]) {
-                match = false;
-                break;
-            }
-        }
-        if (match) {
-            const obj = {};
-            headers.forEach((header, index) => {
-                obj[header] = row[index];
-            });
-            results.push(obj);
-        }
-    }
-
-    return results;
+    return SSSQL.select(sheet, { where: whereClause });
 }
 
+/**
+ * 高度な条件でデータを検索します（SSSQLのwhere句を直接使用）。
+ * @param {string} sheetName - シート名
+ * @param {Object} whereConditions - SSSQL形式の検索条件
+ * @param {Object} options - 追加オプション（orderBy, columns など）
+ * @returns {Object[]} 条件に一致したデータのオブジェクト配列
+ */
+function findDataAdvanced(sheetName, whereConditions, options = {}) {
+    const sheet = getSheet(sheetName);
+
+    const query = { where: whereConditions };
+
+    // オプションをマージ
+    if (options.orderBy) query.orderBy = options.orderBy;
+    if (options.columns) query.columns = options.columns;
+    if (options.groupBy) query.groupBy = options.groupBy;
+
+    return SSSQL.select(sheet, query);
+}
 
 /**
  * UUIDを生成します。
@@ -152,42 +121,33 @@ function generateUuid() {
  * @returns {number} 次のシリアル番号
  */
 function getNextSerial(sheet, columnName) {
-    const headers = getHeaders(sheet);
-    const colIndex = headers.indexOf(columnName);
+    // SSSQLを使用して最大値を取得
+    const result = SSSQL.select(sheet, {
+        groupBy: [
+            [],
+            { maxSerial: [columnName, "MAX"] }
+        ]
+    });
 
-    if (colIndex === -1) {
-        throw new Error(`Column not found: ${columnName}`);
+    if (result.length > 0 && result[0].maxSerial !== null && result[0].maxSerial !== undefined) {
+        const maxVal = Number(result[0].maxSerial);
+        return isNaN(maxVal) ? 1 : maxVal + 1;
     }
 
-    const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) return 1;
-
-    let maxVal = 0;
-    // 1行目はヘッダーなのでスキップ
-    for (let i = 1; i < data.length; i++) {
-        const val = data[i][colIndex];
-        if (typeof val === 'number' && !isNaN(val)) {
-            if (val > maxVal) {
-                maxVal = val;
-            }
-        }
-    }
-
-    return maxVal + 1;
+    return 1;
 }
 
 /**
- * シートに新しいデータを追加します。
+ * 新しいデータを追加する前の準備処理（ID生成、監査情報付与）
+ * @param {string} userId - 操作ユーザーのID
  * @param {string} sheetName - シート名
  * @param {Object} dataObject - 追加するデータオブジェクト
- * @param {string} userId - 操作ユーザーのID
- * @param {string} idColumnName - IDカラム名 (Optional)
- * @returns {Object} 作成されたデータオブジェクト
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - シートオブジェクト
+ * @returns {Object} 準備されたデータオブジェクト
  */
-function createData(userId, sheetName, idColumnName, dataObject) {
-    const sheet = getSheet(sheetName);
+function prepareNewData(userId, sheetName, dataObject, sheet) {
     const headers = getHeaders(sheet);
-    const newData = { ...dataObject }; // コピーを作成
+    const newData = { ...dataObject };
 
     // 監査情報の付与
     const now = new Date().toISOString();
@@ -217,12 +177,26 @@ function createData(userId, sheetName, idColumnName, dataObject) {
         newData['id'] = getNextSerial(sheet, 'id');
     }
 
-    const newRow = headers.map(header => {
-        const val = newData[header];
-        return (val === undefined || val === null) ? '' : val;
-    });
+    return newData;
+}
 
-    sheet.appendRow(newRow);
+/**
+ * シートに新しいデータを追加します。
+ * @param {string} userId - 操作ユーザーのID
+ * @param {string} sheetName - シート名
+ * @param {string} idColumnName - IDカラム名 (Optional)
+ * @param {Object} dataObject - 追加するデータオブジェクト
+ * @returns {Object} 作成されたデータオブジェクト
+ */
+function createData(userId, sheetName, idColumnName, dataObject) {
+    const sheet = getSheet(sheetName);
+    const headers = getHeaders(sheet);
+
+    // データの準備（ID生成、監査情報付与）
+    const newData = prepareNewData(userId, sheetName, dataObject, sheet);
+
+    // SSSQLを使用してデータを挿入
+    const result = SSSQL.insert(sheet, newData);
 
     // ログ記録
     const idColumn = idColumnName || (headers.includes('id') ? 'id' : null);
@@ -232,128 +206,120 @@ function createData(userId, sheetName, idColumnName, dataObject) {
         logOperation('ADD', sheetName, recordId, null, null, newData, userId);
     }
 
-    return newData;
+    return result;
+}
+
+/**
+ * 複数のデータを一括で追加します。
+ * @param {string} userId - 操作ユーザーのID
+ * @param {string} sheetName - シート名
+ * @param {string} idColumnName - IDカラム名 (Optional)
+ * @param {Object[]} dataObjects - 追加するデータオブジェクトの配列
+ * @returns {Object[]} 作成されたデータオブジェクトの配列
+ */
+function bulkCreateData(userId, sheetName, idColumnName, dataObjects) {
+    const sheet = getSheet(sheetName);
+    const headers = getHeaders(sheet);
+
+    // 各データの準備（ID生成、監査情報付与）
+    const preparedData = dataObjects.map(dataObject =>
+        prepareNewData(userId, sheetName, dataObject, sheet)
+    );
+
+    // SSSQLを使用してデータを一括挿入
+    const result = SSSQL.bulkInsert(sheet, preparedData);
+
+    // ログ記録
+    const idColumn = idColumnName || (headers.includes('id') ? 'id' : null);
+    preparedData.forEach(newData => {
+        const recordId = idColumn ? newData[idColumn] : '';
+        if (recordId) {
+            logOperation('ADD', sheetName, recordId, null, null, newData, userId);
+        }
+    });
+
+    return result;
 }
 
 /**
  * IDに基づいてシートのデータを更新します。
+ * @param {string} userId - 操作ユーザーのID
  * @param {string} sheetName - シート名
+ * @param {string} idColumnName - ID列名
  * @param {any} id - 更新するデータのID
  * @param {Object} updateDataObject - 更新するデータを含むオブジェクト
- * @param {string} userEmail - 操作ユーザーのEmail
  * @returns {boolean} 成功したかどうか
  */
 function updateData(userId, sheetName, idColumnName, id, updateDataObject) {
-    const idColumn = idColumnName;
-    if (!idColumn) {
+    if (!idColumnName) {
         throw new Error(`ID列が定義されていません: ${sheetName}`);
     }
 
     const sheet = getSheet(sheetName);
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    const idIndex = headers.indexOf(idColumn);
 
     // 更新前のデータを取得
-    let oldRecord = null;
-    let rowIndex = -1;
+    const oldRecords = SSSQL.select(sheet, {
+        where: { [idColumnName]: ["=", id] }
+    });
 
-    for (let i = 1; i < data.length; i++) {
-        if (data[i][idIndex] === id) {
-            rowIndex = i;
-            // 更新前のレコード全体を保存
-            oldRecord = {};
-            headers.forEach((header, index) => {
-                oldRecord[header] = data[i][index];
-            });
-            break;
-        }
-    }
-
-    if (rowIndex === -1) {
+    if (oldRecords.length === 0) {
         return false;
     }
 
+    const oldRecord = oldRecords[0];
+
     // 監査情報の付与
     const now = new Date().toISOString();
-    updateDataObject['updated_by'] = userId;
-    updateDataObject['updated_at'] = now;
+    const updateData = { ...updateDataObject };
+    updateData['updated_by'] = userId;
+    updateData['updated_at'] = now;
 
-    // 更新を実行し、各フィールドごとにログを記録
-    Object.keys(updateDataObject).forEach(key => {
-        const colIndex = headers.indexOf(key);
-        if (colIndex !== -1) {
-            // 更新前の値を取得
-            const oldValue = oldRecord[key];
-
-            // 更新を実行
-            sheet.getRange(rowIndex + 1, colIndex + 1).setValue(updateDataObject[key]);
-
-            // 更新後の値を取得
-            const newValue = updateDataObject[key];
-
-            // 各フィールドごとに個別のログを記録
-            logOperation('MODIFIED', sheetName, id, key, oldValue, newValue, userId);
-        }
+    // SSSQLを使用してデータを更新
+    const result = SSSQL.update(sheet, {
+        set: updateData,
+        where: { [idColumnName]: ["=", id] }
     });
 
-    return true;
+    // 各フィールドごとにログを記録
+    Object.keys(updateDataObject).forEach(key => {
+        const oldValue = oldRecord[key];
+        const newValue = updateDataObject[key];
+        logOperation('MODIFIED', sheetName, id, key, oldValue, newValue, userId);
+    });
+
+    return result.length > 0;
 }
 
 /**
  * 条件に一致する行を削除します。
- * @param {string} sheetName - シート名
- * @param {Object} condition - 削除する行の条件 (例: { work_id: '...', member_email: '...' })
  * @param {string} userId - 操作ユーザーのID
+ * @param {string} sheetName - シート名
+ * @param {string} idColumnName - ID列名
+ * @param {Object} condition - 削除する行の条件 (例: { work_id: '...', member_email: '...' })
  * @returns {boolean} 少なくとも1行削除されたかどうか
  */
 function deleteData(userId, sheetName, idColumnName, condition) {
     const sheet = getSheet(sheetName);
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
 
-    const conditionKeys = Object.keys(condition);
-    const conditionIndexes = conditionKeys.map(key => headers.indexOf(key));
+    // 条件オブジェクトをSSSQLのwhere形式に変換
+    const whereClause = {};
+    Object.keys(condition).forEach(key => {
+        whereClause[key] = ["=", condition[key]];
+    });
 
-    let deleted = false;
-    const deletedRecords = []; // 削除されたレコードを保存
-
-    // 下からループして行のインデックスのずれを防ぐ
-    for (let i = data.length - 1; i >= 1; i--) {
-        const row = data[i];
-        let match = true;
-        for (let j = 0; j < conditionKeys.length; j++) {
-            const keyIndex = conditionIndexes[j];
-            if (keyIndex === -1 || row[keyIndex] !== condition[conditionKeys[j]]) {
-                match = false;
-                break;
-            }
-        }
-        if (match) {
-            // 削除前にレコードを保存
-            const record = {};
-            headers.forEach((header, index) => {
-                record[header] = row[index];
-            });
-            deletedRecords.push(record);
-
-            sheet.deleteRow(i + 1);
-            deleted = true;
-        }
-    }
+    // SSSQLを使用してデータを削除
+    const deletedRecords = SSSQL.remove(sheet, { where: whereClause });
 
     // ログ記録（削除された各レコードに対して）
-    if (deleted && deletedRecords.length > 0) {
-        const idColumn = idColumnName;
+    if (deletedRecords.length > 0) {
         deletedRecords.forEach(record => {
-            const recordId = idColumn ? record[idColumn] : JSON.stringify(condition);
+            const recordId = idColumnName ? record[idColumnName] : JSON.stringify(condition);
             logOperation('DELETE', sheetName, recordId, null, record, null, userId);
         });
     }
 
-    return deleted;
+    return deletedRecords.length > 0;
 }
-
 
 
 // ============================================
@@ -373,12 +339,12 @@ function initializeLogSheet() {
 
 /**
  * 操作ログを記録します。
- * @param {string} operationType - 操作種別（'add', 'modified', 'delete'）
+ * @param {string} log_type_key - 操作種別（'ADD', 'MODIFIED', 'DELETE'）
  * @param {string} tableName - テーブル名（シート名）
  * @param {any} recordId - レコードID（主キー値）
  * @param {string|null} columnId - カラムID（更新時のみ、変更されたカラム名）
- * @param {any|null} oldValue - 変更前の値（更新・削除時のみ。更新時は単一フィールドの値、削除時はレコード全体のJSON）
- * @param {any|null} newValue - 変更後の値（追加・更新時のみ。更新時は単一フィールドの値、追加時はレコード全体のJSON）
+ * @param {any|null} oldValue - 変更前の値
+ * @param {any|null} newValue - 変更後の値
  * @param {string} userId - 操作ユーザーのID
  */
 function logOperation(log_type_key, tableName, recordId, columnId, oldValue, newValue, userId) {
@@ -387,10 +353,14 @@ function logOperation(log_type_key, tableName, recordId, columnId, oldValue, new
         const now = new Date();
 
         const logSheet = initializeLogSheet();
+        if (!logSheet) {
+            Logger.log('ログシートが見つかりません');
+            return;
+        }
+
         const headers = getHeaders(logSheet);
 
         // 値をJSON形式に変換（Dateオブジェクトも含む）
-        // modifiedの場合は単一フィールドの値、add/deleteの場合はレコード全体
         let oldValueJson = '';
         let newValueJson = '';
 
@@ -399,34 +369,28 @@ function logOperation(log_type_key, tableName, recordId, columnId, oldValue, new
             oldValueJson = oldValue !== null && oldValue !== undefined ? JSON.stringify(sanitizeForClient(oldValue)) : '';
             newValueJson = newValue !== null && newValue !== undefined ? JSON.stringify(sanitizeForClient(newValue)) : '';
         } else {
-            // add/delete時はレコード全体を保存
+            // ADD/DELETE時はレコード全体を保存
             oldValueJson = oldValue ? JSON.stringify(sanitizeForClient(oldValue)) : '';
             newValueJson = newValue ? JSON.stringify(sanitizeForClient(newValue)) : '';
         }
 
+        // ログデータを作成
+        const logData = {
+            log_id: logId,
+            created_by: userId,
+            log_type_key: log_type_key,
+            table_name: tableName,
+            record_id: recordId,
+            column_id: columnId || '',
+            old_value: oldValueJson,
+            new_value: newValueJson,
+            created_at: now
+        };
+
+        // SSSQLを使用してログを挿入（ログテーブル自体は直接appendRowを使用して循環を避ける）
         const logRow = headers.map(header => {
-            switch (header) {
-                case 'log_id':
-                    return logId;
-                case 'created_by':
-                    return userId;
-                case 'log_type_key':
-                    return log_type_key;
-                case 'table_name':
-                    return tableName;
-                case 'record_id':
-                    return recordId;
-                case 'column_id':
-                    return columnId || '';
-                case 'old_value':
-                    return oldValueJson;
-                case 'new_value':
-                    return newValueJson;
-                case 'created_at':
-                    return now;
-                default:
-                    return '';
-            }
+            const val = logData[header];
+            return (val === undefined || val === null) ? '' : val;
         });
 
         logSheet.appendRow(logRow);
