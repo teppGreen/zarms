@@ -161,44 +161,12 @@
         return;
       }
 
-      // Prepare promises for data loading
-      const promises = [
-        callGAS('getItemById', SHEET_NAMES.CREATIVES, id)
-          .catch(err => {
-            console.error('[CreativeDetail] Failed to load creative:', err);
-            throw new Error(`制作物データの取得に失敗しました: ${err.message}`);
-          })
-      ];
-
-      // Defensively load master data if missing
-      if (typeof directoriesData === 'undefined' || directoriesData.length === 0) {
-        promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES).then(d => { directoriesData = d; return d; }));
-      } else {
-        promises.push(Promise.resolve(directoriesData));
-      }
-
-      if (typeof plansData === 'undefined' || plansData.length === 0) {
-        promises.push(callGAS('getItems', SHEET_NAMES.PLANS).then(d => { plansData = d; return d; }));
-      } else {
-        promises.push(Promise.resolve(plansData));
-      }
-
-      if (typeof membersData === 'undefined' || membersData.length === 0) {
-        promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS).then(d => { membersData = d; return d; }));
-      } else {
-        promises.push(Promise.resolve(membersData));
-      }
-
-      if (typeof configData === 'undefined' || Object.keys(configData).length === 0) {
-        promises.push(callGAS('getItems', SHEET_NAMES.CONFIG).then(d => { configData = groupConfigByType(d); return d; }));
-      } else {
-        promises.push(Promise.resolve(configData));
-      }
-
-      Promise.all(promises)
-        .then(([creative]) => {
-          console.log('[CreativeDetail] Data loaded successfully', creative);
-
+      // ====================================
+      // Phase 1: メインデータ（creative）のみ取得して即座に描画
+      // タイトル・ステータス・タイプ・優先度はenumData（グローバル変数）ですぐに表示可能
+      // ====================================
+      callGAS('getItemById', SHEET_NAMES.CREATIVES, id)
+        .then(creative => {
           if (!creative) {
             console.warn('[CreativeDetail] Creative not found for id:', id);
             alert('制作物が見つかりません');
@@ -207,7 +175,14 @@
           }
 
           App.pages.creativeDetail.currentItem = creative;
-          App.pages.creativeDetail.render(creative);
+
+          // Phase 1 描画: 即座に表示可能な項目
+          App.pages.creativeDetail.renderPhase1(creative);
+
+          // ====================================
+          // Phase 2: 外部データ（directories, plans, members, config）を非同期で取得
+          // ====================================
+          return App.pages.creativeDetail.loadRelatedDataAndRenderPhase2(creative);
         })
         .catch(error => {
           console.error('[CreativeDetail] Fatal error during loading:', error);
@@ -218,6 +193,105 @@
           App.pages.creativeDetail.isLoading = false;
           hideLoading();
         });
+    },
+
+    /**
+     * Phase 1: 即座に表示可能な項目を描画
+     * creative データ + グローバル変数（enumData）のみで表示
+     */
+    renderPhase1: function (creative) {
+      console.log('[CreativeDetail] renderPhase1 - rendering basic info');
+
+      const displayIdEl = document.getElementById('display-id');
+      const displayIdStr = formatDisplayId(SHEET_NAMES.CREATIVES, creative.display_id);
+      if (displayIdEl) displayIdEl.textContent = displayIdStr;
+
+      const titleInput = document.getElementById('creative-title-input');
+      if (titleInput) titleInput.value = creative.title || '';
+
+      // enumData はグローバル変数として存在（js.html で初期読み込み済み）
+      const statusSelect = document.getElementById('creative-status-select');
+      if (statusSelect) statusSelect.innerHTML = App.pages.creativeDetail.renderEnumOptions('CREATIVE_STATUS', creative.creative_status_key);
+
+      const typeSelect = document.getElementById('creative-type-select');
+      if (typeSelect) typeSelect.innerHTML = App.pages.creativeDetail.renderEnumOptions('CREATIVE_TYPE', creative.creative_type_key);
+
+      const prioritySelect = document.getElementById('creative-priority-select');
+      if (prioritySelect) prioritySelect.innerHTML = App.pages.creativeDetail.renderEnumOptions('PRIORITY', creative.priority_key);
+
+      const deadlineInput = document.getElementById('creative-deadline-input');
+      if (deadlineInput) deadlineInput.value = formatDateTimeForInput(creative.deadline_at);
+
+      // 依頼元・依頼先は「読み込み中...」を表示
+      const clientInput = document.getElementById('creative-client-display');
+      if (clientInput) clientInput.value = '読み込み中...';
+
+      const contractorInput = document.getElementById('creative-contractor-display');
+      if (contractorInput) contractorInput.value = '読み込み中...';
+
+      // 初期タブを表示
+      App.pages.creativeDetail.switchTab(null, 'documents');
+    },
+
+    /**
+     * Phase 2: 外部データを取得して追加項目を描画
+     */
+    loadRelatedDataAndRenderPhase2: function (creative) {
+      const loadPromises = [];
+
+      // directories がまだ読み込まれていない場合のみ取得
+      if (typeof directoriesData === 'undefined' || directoriesData.length === 0) {
+        loadPromises.push(
+          callGAS('getItems', SHEET_NAMES.DIRECTORIES).then(d => { directoriesData = d; return d; })
+        );
+      } else {
+        loadPromises.push(Promise.resolve(directoriesData));
+      }
+
+      // plans がまだ読み込まれていない場合のみ取得
+      if (typeof plansData === 'undefined' || plansData.length === 0) {
+        loadPromises.push(
+          callGAS('getItems', SHEET_NAMES.PLANS).then(d => { plansData = d; return d; })
+        );
+      } else {
+        loadPromises.push(Promise.resolve(plansData));
+      }
+
+      // members がまだ読み込まれていない場合のみ取得
+      if (typeof membersData === 'undefined' || membersData.length === 0) {
+        loadPromises.push(
+          callGAS('getItems', SHEET_NAMES.MEMBERS).then(d => { membersData = d; return d; })
+        );
+      } else {
+        loadPromises.push(Promise.resolve(membersData));
+      }
+
+      return Promise.all(loadPromises)
+        .then(() => {
+          // Phase 2 描画: 外部データに依存する項目
+          App.pages.creativeDetail.renderPhase2(creative);
+
+          // ====================================
+          // Phase 3: 更に独立した非同期データ（担当者、ノート）を取得
+          // これらはメイン描画をブロックしない
+          // ====================================
+          App.pages.creativeDetail.loadMembers(creative.id);
+          App.pages.creativeDetail.loadAssignees(creative.id);
+          App.pages.creativeDetail.loadNotes(creative.id);
+        });
+    },
+
+    /**
+     * Phase 2: 外部データに依存する項目を描画
+     */
+    renderPhase2: function (creative) {
+      console.log('[CreativeDetail] renderPhase2 - rendering external data dependent info');
+
+      const clientInput = document.getElementById('creative-client-display');
+      if (clientInput) clientInput.value = App.pages.creativeDetail.getDirectoryDisplayInfo(creative.client_directory_id);
+
+      const contractorInput = document.getElementById('creative-contractor-display');
+      if (contractorInput) contractorInput.value = App.pages.creativeDetail.getDirectoryDisplayInfo(creative.contractor_directory_id);
     },
 
     render: function (creative) {
