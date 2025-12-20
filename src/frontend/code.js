@@ -132,11 +132,33 @@ function getItems(tableName) {
       return getTasks();
     case SHEET_NAMES.KNOWLEDGES:
       return getKnowledges();
-    case SHEET_NAMES.CONFIG:
-      return getConfig();
     default:
       return getAllData(tableName);
   }
+}
+
+/**
+ * データを取得します（キャッシュ付きSWR対応）
+ * @param {string} tableName - テーブル名
+ * @param {boolean} forceRefresh - キャッシュを無視するかどうか
+ * @returns {Object} { data: Object, isCached: boolean }
+ */
+function getItemsCached(tableName, forceRefresh = false) {
+  const cacheKey = `user_items_${tableName}`;
+
+  if (!forceRefresh) {
+    const cached = CacheManager.get(cacheKey, false); // false = Private Cache
+    if (cached) {
+      return { data: cached, isCached: true };
+    }
+  }
+
+  const data = getItems(tableName);
+
+  // Cache the result
+  CacheManager.put(cacheKey, data, false); // false = Private Cache
+
+  return { data: data, isCached: false };
 }
 
 /**
@@ -409,21 +431,6 @@ function createKnowledge(knowledgeData) {
   return created;
 }
 
-// --- Config ---
-function getConfig() {
-  let configs = getAllData(SHEET_NAMES.CONFIG);
-  configs = configs.filter(config => config.is_active === true || config.is_active === 'TRUE' || config.is_active === 'true');
-  configs.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-  return configs;
-}
-
-function getEnum() {
-  let enums = getAllData(SHEET_NAMES.ENUM);
-  enums = enums.filter(enuma => enuma.is_active === true || enuma.is_active === 'TRUE' || enuma.is_active === 'true');
-  enums.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-  return enums;
-}
-
 // --- Skills (Assignments) ---
 function addMemberSkill(memberId, skillId) {
   const userEmail = Session.getActiveUser().getEmail();
@@ -460,7 +467,7 @@ function getPlanTitle(id) {
 function getMemberName(id) {
   if (!id) return '';
   const member = getDataById(SHEET_NAMES.MEMBERS, id);
-  return member ? (member.nickname || member.member_name) : '';
+  return member ? (member.display_name || member.member_name) : '';
 }
 
 function getCreativeTitle(id) {
@@ -486,13 +493,6 @@ function getTasksByCreativeId(creativeId) {
     task.assignee_name = getMemberName(task.assign_to);
     return task;
   });
-}
-
-function getConfigValue(key, type) {
-  // Simplified config lookup
-  const configs = getItems(SHEET_NAMES.CONFIG);
-  const config = configs.find(c => c.config_key === key && c.config_type === type);
-  return config ? config.config_value : key;
 }
 
 function isProjectTitleDuplicate(projectTitle) {
@@ -568,7 +568,7 @@ function getHomeData(forceRefresh = false) {
 
   const result = {
     greeting: greeting,
-    memberName: member.nickname || member.member_name,
+    memberName: member.display_name || member.member_name,
     new_requests: newRequests || [],
     assigned_creatives: assignedCreatives || []
   };

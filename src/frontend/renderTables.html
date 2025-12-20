@@ -13,7 +13,7 @@
         knowledges: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
         licenses: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
         mediums: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
-        members: { sortKey: 'nickname', sortOrder: 'asc', filters: {} },
+        members: { sortKey: 'display_name', sortOrder: 'asc', filters: {} },
         merchandises: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
         musics: { sortKey: 'created_at', sortOrder: 'desc', filters: {} },
         plans: { sortKey: 'display_id', sortOrder: 'asc', filters: {} },
@@ -120,7 +120,7 @@
 
     const mediumsTableHeaders = [
         { key: 'display_id', label: 'メディアID', sortable: true },
-        { key: 'medium_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', configType: 'MEDIUM_STATUS' },
+        { key: 'medium_status_value', label: 'ステータス', sortable: true, filterable: true, editable: true, editType: 'select', enumType: 'MEDIUM_STATUS' },
         { key: 'name', label: '名称', sortable: true, filterable: true, editable: true, editType: 'varchar' },
         { key: 'site_url', label: 'サイトURL', sortable: true, filterable: true, editable: true, editType: 'varchar' },
         { key: 'managing_directory_name', label: '管理元', sortable: true, filterable: true, editable: true, editType: 'directory' },
@@ -129,7 +129,7 @@
 
     const membersTableHeaders = [
         { key: 'icon_gfile_id', label: '', sortable: false },
-        { key: 'nickname', label: '名前', sortable: true, filterable: false, editable: true, editType: 'varchar' },
+        { key: 'display_name', label: '名前', sortable: true, filterable: false, editable: true, editType: 'varchar' },
         { key: 'email', label: 'メールアドレス', sortable: true, editable: false },
         { key: 'phone_number', label: '電話番号', sortable: true, editable: true, editType: 'varchar' },
         { key: 'profile', label: 'プロフィール', sortable: true, editable: true, editType: 'varchar' },
@@ -312,30 +312,30 @@
                             break;
                         case 'plan_title':
                             if (item.plan_title) content = escapeHtml(item.plan_title);
-                            else if (item.plan_id && plansData) {
-                                const plan = plansData.find(p => p.id === item.plan_id);
+                            else if (item.plan_id && App.state.data.plans) {
+                                const plan = App.state.data.plans.find(p => p.id === item.plan_id);
                                 content = plan ? escapeHtml(plan.title) : '';
                             }
                             break;
                         case 'client_name':
                             if (item.client_name) content = escapeHtml(item.client_name);
-                            else if (item.client_directory_id && directoriesData) {
-                                const dir = directoriesData.find(d => d.id === item.client_directory_id);
+                            else if (item.client_directory_id && App.state.data.directories) {
+                                const dir = App.state.data.directories.find(d => d.id === item.client_directory_id);
                                 content = dir ? escapeHtml(dir.name) : '';
                             }
                             break;
                         case 'assign_to_name':
                             if (item.assign_to_name) content = escapeHtml(item.assign_to_name);
-                            else if (item.assign_to && membersData) {
-                                const member = membersData.find(m => m.id === item.assign_to);
-                                content = member ? escapeHtml(member.nickname || member.member_name) : '';
+                            else if (item.assign_to && App.state.data.members) {
+                                const member = App.state.data.members.find(m => m.id === item.assign_to);
+                                content = member ? escapeHtml(member.display_name || member.member_name) : '';
                             }
                             break;
                         case 'created_by_name':
                             if (item.created_by_name) content = escapeHtml(item.created_by_name);
-                            else if (item.created_by && membersData) {
-                                const member = membersData.find(m => m.id === item.created_by);
-                                content = member ? escapeHtml(member.nickname || member.member_name) : '';
+                            else if (item.created_by && App.state.data.members) {
+                                const member = App.state.data.members.find(m => m.id === item.created_by);
+                                content = member ? escapeHtml(member.display_name || member.member_name) : '';
                             }
                             break;
                         case 'detail':
@@ -359,11 +359,11 @@
                             content = escapeHtml(formatDate(currentValue));
                             break;
                         default:
-                            // enum/config値の場合
+                            // enum/enum値の場合
                             if (header.enumType) {
-                                content = escapeHtml(getConfigLabel(currentValue, header.enumType));
-                            } else if (header.configType) {
-                                content = escapeHtml(getConfigLabel(currentValue, header.configType));
+                                content = escapeHtml(getEnumLabel(currentValue, header.enumType));
+                            } else if (header.enumType) {
+                                content = escapeHtml(getEnumLabel(currentValue, header.enumType));
                             } else if (typeof currentValue === 'string' && currentValue.length > 10) {
                                 content = escapeHtml(currentValue.substring(0, 10)) + '...';
                             } else {
@@ -399,7 +399,7 @@
             event.stopPropagation();
             App.utils.tables.closeFilterMenu();
             const state = tableState[tableName];
-            const data = tableName === SHEET_NAMES.CREATIVES ? creativesData : tableName === SHEET_NAMES.PLANS ? plansData : tableName === SHEET_NAMES.TASKS ? tasksData : membersData;
+            const data = tableName === SHEET_NAMES.CREATIVES ? App.state.data.creatives : tableName === SHEET_NAMES.PLANS ? App.state.data.plans : tableName === SHEET_NAMES.TASKS ? App.state.data.tasks : App.state.data.members;
             const uniqueValues = [...new Set(data.map(item => item[columnKey]))].filter(v => v);
             const popup = document.createElement('div');
             popup.id = 'filter-popup';
@@ -416,7 +416,7 @@
                 let labelText = value;
                 if (columnKey.endsWith('_key')) {
                     const type = columnKey.replace('_key', '').toUpperCase();
-                    labelText = getConfigLabel(value, type) || value;
+                    labelText = getEnumLabel(value, type) || value;
                 }
                 label.appendChild(checkbox);
                 label.append(` ${labelText}`);
@@ -608,30 +608,30 @@
                         } break;
                     case 'plan_title':
                         if (item.plan_title) content = escapeHtml(item.plan_title);
-                        else if (item.plan_id && plansData) {
-                            const plan = plansData.find(p => p.id === item.plan_id);
+                        else if (item.plan_id && App.state.data.plans) {
+                            const plan = App.state.data.plans.find(p => p.id === item.plan_id);
                             content = plan ? escapeHtml(plan.title) : '';
                         }
                         break;
                     case 'client_name':
                         if (item.client_name) content = escapeHtml(item.client_name);
-                        else if (item.client_directory_id && directoriesData) {
-                            const dir = directoriesData.find(d => d.id === item.client_directory_id);
+                        else if (item.client_directory_id && App.state.data.directories) {
+                            const dir = App.state.data.directories.find(d => d.id === item.client_directory_id);
                             content = dir ? escapeHtml(dir.name) : '';
                         }
                         break;
                     case 'assign_to_name':
                         if (item.assign_to_name) content = escapeHtml(item.assign_to_name);
-                        else if (item.assign_to && membersData) {
-                            const member = membersData.find(m => m.id === item.assign_to);
-                            content = member ? escapeHtml(member.nickname || member.member_name) : '';
+                        else if (item.assign_to && App.state.data.members) {
+                            const member = App.state.data.members.find(m => m.id === item.assign_to);
+                            content = member ? escapeHtml(member.display_name || member.member_name) : '';
                         }
                         break;
                     case 'created_by_name':
                         if (item.created_by_name) content = escapeHtml(item.created_by_name);
-                        else if (item.created_by && membersData) {
-                            const member = membersData.find(m => m.id === item.created_by);
-                            content = member ? escapeHtml(member.nickname || member.member_name) : '';
+                        else if (item.created_by && App.state.data.members) {
+                            const member = App.state.data.members.find(m => m.id === item.created_by);
+                            content = member ? escapeHtml(member.display_name || member.member_name) : '';
                         }
                         break;
                     case 'icon_gfile_id':
@@ -649,9 +649,8 @@
                         content = escapeHtml(formatDate(currentValue));
                         break;
                     default:
-                        // enum/configの場合はgetConfigLabelで表示
                         if (header.enumType) {
-                            content = escapeHtml(getConfigLabel(currentValue, header.enumType));
+                            content = escapeHtml(getEnumLabel(currentValue, header.enumType));
                         } else if (typeof currentValue === 'string' && currentValue.length > 10) {
                             content = escapeHtml(currentValue.substring(0, 10)) + '...';
                         } else {

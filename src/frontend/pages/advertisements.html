@@ -23,19 +23,19 @@
         const promises = [callGAS('getItems', SHEET_NAMES.ADVERTISEMENTS)];
 
         // 必要に応じて関連データも取得
-        if (!plansData || plansData.length === 0) {
+        if (!App.state.data.plans || App.state.data.plans.length === 0) {
             promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
         } else {
             promises.push(Promise.resolve(null));
         }
 
         Promise.all(promises).then(results => {
-            advertisementsData = results[0];
-            if (results[1]) plansData = results[1];
+            App.state.data.advertisements = results[0];
+            if (results[1]) App.state.data.plans = results[1];
 
             // ReadOnlyテーブルをレンダリング
-            App.utils.tables.render(SHEET_NAMES.ADVERTISEMENTS, App.utils.tables.applyFiltersAndSort(SHEET_NAMES.ADVERTISEMENTS, advertisementsData), advertisementsTableHeaders);
+            App.utils.tables.render(SHEET_NAMES.ADVERTISEMENTS, App.utils.tables.applyFiltersAndSort(SHEET_NAMES.ADVERTISEMENTS, App.state.data.advertisements), advertisementsTableHeaders);
             hideLoading();
-        }).catch(App.error.handle);
+        }).catch(App.utils.error.handle);
     };
 </script>

@@ -2,33 +2,55 @@
   const SHEET_NAMES = templateVariables.SHEET_NAMES;
   const activeUser = templateVariables.activeUser;
 
-  // グローバル変数
-  let configData = {};
-  let prefixData = {};
-  let enumData = {};
-  let advertisementsData = [];
-  let budgetsData = [];
-  let creativesData = [];
-  let directoriesData = [];
-  let eventsData = [];
-  let expensesData = [];
-  let formsData = [];
-  let hardwaresData = [];
-  let jobsData = [];
-  let knowledgesData = [];
-  let licensesData = [];
-  let mediumsData = [];
-  let membersData = [];
-  let merchandisesData = [];
-  let musicsData = [];
-  let plansData = [];
-  let questionsData = [];
-  let resourcesData = [];
-  let shiftsData = [];
-  let skillsData = [];
-  let tasksData = [];
-  // let timetracksData = [];
-  let wikisData = [];
+  // App.state の初期化とデータ管理用関数の定義
+  (function () {
+    // 従来のグローバル変数を App.state.data に集約
+    App.state.data = {
+      config: {},
+      prefix: {},
+      enum: {},
+      advertisements: [],
+      budgets: [],
+      creatives: [],
+      directories: [],
+      events: [],
+      expenses: [],
+      forms: [],
+      hardwares: [],
+      jobs: [],
+      knowledges: [],
+      licenses: [],
+      mediums: [],
+      members: [],
+      merchandises: [],
+      musics: [],
+      plans: [],
+      questions: [],
+      resources: [],
+      shifts: [],
+      skills: [],
+      tasks: [],
+      wikis: []
+    };
+
+    /**
+     * 指定したテーブルのデータを取得します
+     * @param {string} tableName - テーブル名
+     * @returns {Array|Object} データ
+     */
+    App.state.get = function (tableName) {
+      return App.state.data[tableName];
+    };
+
+    /**
+     * 指定したテーブルにデータをセットします
+     * @param {string} tableName - テーブル名
+     * @param {Array|Object} data - データ
+     */
+    App.state.set = function (tableName, data) {
+      App.state.data[tableName] = data;
+    };
+  })();
 
   // 初期化
   async function initializeApp() {
@@ -113,9 +135,9 @@
       callGAS('getItems', SHEET_NAMES.ENUM),
       callGAS('getItems', SHEET_NAMES.PREFIX),
     ]).then(([configs, enums, prefixes]) => {
-      configData = groupConfigByType(configs);
-      enumData = groupEnumByType(enums);
-      prefixData = groupPrefix(prefixes);
+      App.state.data.config = mapConfig(configs);
+      App.state.data.enum = groupEnumByType(enums);
+      App.state.data.prefix = mapPrefix(prefixes);
       hideLoading();
       if (shouldSwitchTab) {
         App.utils.navigation.switchTab('home');
@@ -151,26 +173,16 @@
     });
   }
 
-  function groupConfigByType(configs) {
-    const grouped = {};
-    if (!configs || !Array.isArray(configs)) return grouped;
-
-    // is_active でフィルタリング
-    const activeConfigs = configs.filter(config =>
-      config.is_active === true || config.is_active === 'TRUE' || config.is_active === 'true'
-    );
-
-    // sort_order でソート
-    activeConfigs.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-
-    // type ごとにグループ化
-    activeConfigs.forEach(config => {
-      if (!grouped[config.type]) {
-        grouped[config.type] = [];
-      }
-      grouped[config.type].push(config);
-    });
-    return grouped;
+  function mapConfig(configs) {
+    // CONFIG データを key をキー、value を値として格納
+    if (configs && Array.isArray(configs)) {
+      configs.forEach(config => {
+        if (config.key && config.value) {
+          App.state.data.config[config.key] = config.value;
+        }
+      });
+    }
+    return App.state.data.config;
   }
 
   function groupEnumByType(enums) {
@@ -195,16 +207,16 @@
     return grouped;
   }
 
-  function groupPrefix(prefixes) {
+  function mapPrefix(prefixes) {
     // PREFIX データを table_name をキー、prefix_value を値として格納
     if (prefixes && Array.isArray(prefixes)) {
       prefixes.forEach(prefix => {
         if (prefix.table_name && prefix.prefix_value) {
-          prefixData[prefix.table_name] = prefix.prefix_value;
+          App.state.data.prefix[prefix.table_name] = prefix.prefix_value;
         }
       });
     }
-    return prefixData;
+    return App.state.data.prefix;
   }
 
   let loadingTimeout = null;
@@ -258,10 +270,11 @@
   // ============================================
   // ヘルパー関数
   // ============================================
-  function getConfigLabel(key, type) {
-    if (!key || !configData[type]) return key;
-    const config = configData[type].find(c => c.config_key === key);
-    return config ? config.config_value : key;
+  function getEnumLabel(key, type) {
+    const enumData = App.state.data.enum;
+    if (!key || !enumData[type]) return key;
+    const enuma = enumData[type].find(e => e.key === key);
+    return enuma ? enuma.value : key;
   }
   function formatDate(dateString) {
     if (!dateString) return '-';
@@ -335,7 +348,7 @@
     if (!display_id) return '-';
 
     // prefixData から prefix_value を取得
-    const prefix_value = prefixData[table_name] || '';
+    const prefix_value = App.state.data.prefix[table_name] || '';
 
     // display_id を4桁固定で0パディング
     const paddedId = String(display_id).padStart(4, '0');
@@ -376,7 +389,7 @@
     showLoading();
 
     // まずデータ配列を更新する
-    const data = tableName === SHEET_NAMES.CREATIVES ? creativesData : tableName === SHEET_NAMES.PLANS ? plansData : tableName === SHEET_NAMES.TASKS ? tasksData : membersData;
+    const data = tableName === SHEET_NAMES.CREATIVES ? App.state.data.creatives : tableName === SHEET_NAMES.PLANS ? App.state.data.plans : tableName === SHEET_NAMES.TASKS ? App.state.data.tasks : App.state.data.members;
     const idKey = tableName === SHEET_NAMES.MEMBERS ? 'member_email' : (tableName === SHEET_NAMES.CREATIVES ? 'id' : (tableName === SHEET_NAMES.TASKS ? 'id' : 'id'));
     const item = data.find(d => String(d[idKey]) === String(id));
     if (item) {
@@ -472,10 +485,10 @@
     menu.innerHTML = '';
 
     const header = getHeaderDef(tableName, field);
-    const options = configData[header.configType] || [];
+    const options = App.state.data.config[header.configType] || [];
     if (options.length === 0) return;
 
-    const data = (tableName === SHEET_NAMES.TASKS ? tasksData : tableName === SHEET_NAMES.CREATIVES ? creativesData : tableName === SHEET_NAMES.PLANS ? plansData : membersData);
+    const data = (tableName === SHEET_NAMES.TASKS ? App.state.data.tasks : tableName === SHEET_NAMES.CREATIVES ? App.state.data.creatives : tableName === SHEET_NAMES.PLANS ? App.state.data.plans : App.state.data.members);
     const idKey = tableName === SHEET_NAMES.MEMBERS ? 'member_email' : 'id';
     const item = data.find(d => String(d[idKey]) === String(id));
     const currentValue = item ? item[field] : '';
@@ -597,28 +610,28 @@
    */
   function getDataArray(tableName) {
     const dataArrayMap = {
-      [SHEET_NAMES.ADVERTISEMENTS]: advertisementsData,
-      [SHEET_NAMES.BUDGETS]: budgetsData,
-      [SHEET_NAMES.CREATIVES]: creativesData,
-      [SHEET_NAMES.DIRECTORIES]: directoriesData,
-      [SHEET_NAMES.EVENTS]: eventsData,
-      [SHEET_NAMES.EXPENSES]: expensesData,
-      [SHEET_NAMES.FORMS]: formsData,
-      [SHEET_NAMES.HARDWARES]: hardwaresData,
-      [SHEET_NAMES.JOBS]: jobsData,
-      [SHEET_NAMES.KNOWLEDGES]: knowledgesData,
-      [SHEET_NAMES.LICENSES]: licensesData,
-      [SHEET_NAMES.MEDIUMS]: mediumsData,
-      [SHEET_NAMES.MEMBERS]: membersData,
-      [SHEET_NAMES.MERCHANDISES]: merchandisesData,
-      [SHEET_NAMES.MUSICS]: musicsData,
-      [SHEET_NAMES.PLANS]: plansData,
-      [SHEET_NAMES.QUESTIONS]: questionsData,
-      [SHEET_NAMES.RESOURCES]: resourcesData,
-      [SHEET_NAMES.SHIFTS]: shiftsData,
-      [SHEET_NAMES.SKILLS]: skillsData,
-      [SHEET_NAMES.TASKS]: tasksData,
-      [SHEET_NAMES.WIKIS]: wikisData
+      [SHEET_NAMES.ADVERTISEMENTS]: App.state.data.advertisements,
+      [SHEET_NAMES.BUDGETS]: App.state.data.budgets,
+      [SHEET_NAMES.CREATIVES]: App.state.data.creatives,
+      [SHEET_NAMES.DIRECTORIES]: App.state.data.directories,
+      [SHEET_NAMES.EVENTS]: App.state.data.events,
+      [SHEET_NAMES.EXPENSES]: App.state.data.expenses,
+      [SHEET_NAMES.FORMS]: App.state.data.forms,
+      [SHEET_NAMES.HARDWARES]: App.state.data.hardwares,
+      [SHEET_NAMES.JOBS]: App.state.data.jobs,
+      [SHEET_NAMES.KNOWLEDGES]: App.state.data.knowledges,
+      [SHEET_NAMES.LICENSES]: App.state.data.licenses,
+      [SHEET_NAMES.MEDIUMS]: App.state.data.mediums,
+      [SHEET_NAMES.MEMBERS]: App.state.data.members,
+      [SHEET_NAMES.MERCHANDISES]: App.state.data.merchandises,
+      [SHEET_NAMES.MUSICS]: App.state.data.musics,
+      [SHEET_NAMES.PLANS]: App.state.data.plans,
+      [SHEET_NAMES.QUESTIONS]: App.state.data.questions,
+      [SHEET_NAMES.RESOURCES]: App.state.data.resources,
+      [SHEET_NAMES.SHIFTS]: App.state.data.shifts,
+      [SHEET_NAMES.SKILLS]: App.state.data.skills,
+      [SHEET_NAMES.TASKS]: App.state.data.tasks,
+      [SHEET_NAMES.WIKIS]: App.state.data.wikis
     };
     return dataArrayMap[tableName];
   }

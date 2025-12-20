@@ -10,11 +10,13 @@
 
         App.modals.new_creative.open = function () {
             const promises = [];
+            const plansData = App.state.data.plans;
             if (!plansData || plansData.length === 0) {
                 promises.push(callGAS('getItems', SHEET_NAMES.PLANS));
             } else {
                 promises.push(Promise.resolve(plansData));
             }
+            const directoriesData = App.state.data.directories;
             if (!directoriesData || directoriesData.length === 0) {
                 promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES));
             } else {
@@ -24,8 +26,8 @@
             if (promises.length > 0) {
                 showLoading();
                 Promise.all(promises).then(([plans, directories]) => {
-                    if (!plansData || plansData.length === 0) plansData = plans;
-                    if (!directoriesData || directoriesData.length === 0) directoriesData = directories;
+                    if (!App.state.data.plans || App.state.data.plans.length === 0) App.state.data.plans = plans;
+                    if (!App.state.data.directories || App.state.data.directories.length === 0) App.state.data.directories = directories;
                     hideLoading();
                     buildNewCreativeForm();
                     openModal('modal-new-creative');
@@ -38,8 +40,11 @@
 
         function buildNewCreativeForm() {
             const formContainer = document.getElementById('new-creative-form');
-            const creativeTypes = configData['CREATIVE_TYPE'] || [];
-            const creativeTypeOptions = creativeTypes.map(wt => `<option value="${wt.config_key}">${wt.config_value}</option>`).join('');
+            const enumData = App.state.data.enum;
+            const plansData = App.state.data.plans;
+            const directoriesData = App.state.data.directories;
+            const creativeTypes = enumData['CREATIVE_TYPE'] || [];
+            const creativeTypeOptions = creativeTypes.map(wt => `<option value="${wt.enum_key}">${wt.enum_value}</option>`).join('');
 
             // ディレクトリ（依頼元組織）の選択肢を作成
             const directoryOptions = (directoriesData || [])
@@ -105,9 +110,10 @@
 
         App.modals.new_creative.updateRegulationPreset = function (creativeTypeKey) {
             if (!creativeTypeKey) return;
-            const creativeType = (configData['CREATIVE_TYPE'] || []).find(wt => wt.config_key === creativeTypeKey);
-            if (creativeType && creativeType.config_preset_value) {
-                document.querySelector('textarea[name="creative_detail_regulation"]').value = creativeType.config_preset_value;
+            const enumData = App.state.data.enum;
+            const creativeType = (enumData['CREATIVE_TYPE'] || []).find(wt => wt.enum_key === creativeTypeKey);
+            if (creativeType && creativeType.enum_preset_value) {
+                document.querySelector('textarea[name="creative_detail_regulation"]').value = creativeType.enum_preset_value;
             }
         };
 
@@ -119,6 +125,7 @@
                 return;
             }
             const lowerCaseQuery = query.toLowerCase();
+            const plansData = App.state.data.plans;
             const filteredPlans = plansData.filter(p => p.title.toLowerCase().includes(lowerCaseQuery));
             suggestionsContainer.innerHTML = '';
             filteredPlans.forEach(p => {

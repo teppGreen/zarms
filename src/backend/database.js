@@ -158,23 +158,15 @@ function prepareNewData(userId, sheetName, dataObject, sheet) {
 
     // ID生成ロジック
     // 1. UUID (PK) の生成
-    // CONFIGテーブル以外で、'id'カラムが存在し、かつ値が未設定の場合
-    if (sheetName !== 'CONFIG' && headers.includes('id') && !newData['id']) {
+    // 'id'カラムが存在し、かつ値が未設定の場合
+    if (headers.includes('id') && !newData['id']) {
         newData['id'] = generateUuid();
-    }
-    // logsテーブルの特例: PKは 'log'
-    if (sheetName === 'logs' && headers.includes('log') && !newData['log']) {
-        newData['log'] = generateUuid();
     }
 
     // 2. Serial ID (display_id) の生成
     // 'display_id' カラムが存在する場合
     if (headers.includes('display_id') && !newData['display_id']) {
         newData['display_id'] = getNextSerial(sheet, 'display_id');
-    }
-    // CONFIGテーブルの特例: PK 'id' がシリアル
-    if (sheetName === 'CONFIG' && headers.includes('id') && !newData['id']) {
-        newData['id'] = getNextSerial(sheet, 'id');
     }
 
     return newData;
