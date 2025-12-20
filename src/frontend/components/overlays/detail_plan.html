@@ -38,7 +38,8 @@
             if (view) view.style.display = 'block';
 
             callGAS('getItemById', SHEET_NAMES.PLANS, id)
-                .then(plan => {
+                .then(response => {
+                    const plan = response.data;
                     if (!plan) {
                         alert('企画が見つかりません');
                         App.utils.navigation.switchTab('plans');

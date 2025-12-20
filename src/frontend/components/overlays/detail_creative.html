@@ -164,6 +164,23 @@
       // Prepare promises for data loading
       const promises = [
         callGAS('getItemById', SHEET_NAMES.CREATIVES, id)
+          .then(response => {
+            // SWR Pattern
+            if (response.isCached) {
+              console.log(`[CreativeDetail] Cached data used. Fetching fresh data for ID: ${id}`);
+              callGAS('getItemById', SHEET_NAMES.CREATIVES, id, true) // Force refresh
+                .then(freshResponse => {
+                  const freshData = freshResponse.data;
+                  if (freshData && App.pages.creativeDetail.currentId === id) { // Ensure still on same item
+                    console.log('[CreativeDetail] Fresh data received via background fetch');
+                    App.pages.creativeDetail.currentItem = freshData;
+                    App.pages.creativeDetail.render(freshData);
+                  }
+                })
+                .catch(err => console.error('[CreativeDetail] Background refresh failed:', err));
+            }
+            return response.data;
+          })
           .catch(err => {
             console.error('[CreativeDetail] Failed to load creative:', err);
             throw new Error(`制作物データの取得に失敗しました: ${err.message}`);

@@ -83,6 +83,35 @@ function checkPermission(member, operation) {
 }
 
 // ============================================
+// Caching Utility
+// ============================================
+const CacheManager = {
+  get: function (key, isPublic) {
+    const cache = isPublic ? CacheService.getScriptCache() : CacheService.getUserCache();
+    const cached = cache.get(key);
+    if (!cached) return null;
+    try {
+      return JSON.parse(cached);
+    } catch (e) {
+      console.warn("Cache parse failed:", e);
+      return null;
+    }
+  },
+  put: function (key, value, isPublic, ttl = 21600) {
+    const cache = isPublic ? CacheService.getScriptCache() : CacheService.getUserCache();
+    try {
+      cache.put(key, JSON.stringify(value), ttl);
+    } catch (e) {
+      console.warn("Cache put failed:", e);
+    }
+  },
+  invalidate: function (key, isPublic) {
+    const cache = isPublic ? CacheService.getScriptCache() : CacheService.getUserCache();
+    cache.remove(key);
+  }
+};
+
+// ============================================
 // 汎用データ操作関数 (Consolidated DB Operations)
 // ============================================
 
@@ -114,21 +143,29 @@ function getItems(tableName) {
  * ID指定でデータを取得します（必要に応じてエンリッチメントを行います）
  * @param {string} tableName - テーブル名
  * @param {string} id - ID
- * @returns {Object|null} データ
+ * @param {boolean} forceRefresh - キャッシュを無視するかどうか
+ * @returns {Object} { data: Object, isCached: boolean }
  */
-function getItemById(tableName, id) {
+function getItemById(tableName, id, forceRefresh = false) {
+  let data = null;
+
   switch (tableName) {
     case SHEET_NAMES.CREATIVES:
-      return getCreativeById(id);
+      return getCreativeById(id, forceRefresh);
     case SHEET_NAMES.PLANS:
-      return getPlanById(id);
+      data = getPlanById(id);
+      break;
     case SHEET_NAMES.TASKS:
-      return getTaskById(id);
+      data = getTaskById(id);
+      break;
     case SHEET_NAMES.MEMBERS:
-      return getMemberById(id);
+      data = getMemberById(id);
+      break;
     default:
-      return getDataById(tableName, id);
+      data = getDataById(tableName, id);
+      break;
   }
+  return { data: data, isCached: false };
 }
 
 /**
@@ -192,15 +229,22 @@ function getCreatives() {
   return creatives;
 }
 
-function getCreativeById(id) {
-  const creative = getDataById(SHEET_NAMES.CREATIVES, id);
-  if (!creative) return null;
+function getCreativeById(id, forceRefresh = false) {
+  const cacheKey = `creative_detail_${id}`;
 
-  // Frontend handles joins now, but we can provide some helpers if needed.
-  // For compatibility with updated frontend, we return the creative object.
-  // We can add 'assignees' if we want to pre-fetch.
+  if (!forceRefresh) {
+    const cached = CacheManager.get(cacheKey, true); // Public Cache
+    if (cached) return { data: cached, isCached: true };
+  }
+
+  const creative = getDataById(SHEET_NAMES.CREATIVES, id);
+  if (!creative) return { data: null, isCached: false };
+
+  // Enrichment
   creative.assignees = getCreativeAssignees(creative.id);
-  return creative;
+
+  CacheManager.put(cacheKey, creative, true);
+  return { data: creative, isCached: false };
 }
 
 function createCreative(data) {
@@ -491,17 +535,26 @@ function getOrCreatePlanId(planTitle) {
 // Other Specific Functions (kept as is or refactored)
 // ============================================
 
-function getHomeData() {
+function getHomeData(forceRefresh = false) {
   const member = getActiveUser();
 
   if (!member) {
     return {
-      greeting: 'こんにちは',
-      memberName: 'ゲスト',
-      new_requests: [],
-      assigned_creatives: [],
-      knowledge: []
+      data: {
+        greeting: 'こんにちは',
+        memberName: 'ゲスト',
+        new_requests: [],
+        assigned_creatives: [],
+        knowledge: []
+      },
+      isCached: false
     };
+  }
+
+  const cacheKey = `home_data_${member.id}`;
+  if (!forceRefresh) {
+    const cached = CacheManager.get(cacheKey, false); // Private Cache
+    if (cached) return { data: cached, isCached: true };
   }
 
   // バックエンドでフィルタリングしたデータを取得（セキュリティ向上）
@@ -513,12 +566,15 @@ function getHomeData() {
   if (hour < 11) greeting = 'おはようございます';
   else if (hour >= 18) greeting = 'こんばんは';
 
-  return {
+  const result = {
     greeting: greeting,
     memberName: member.nickname || member.member_name,
     new_requests: newRequests || [],
     assigned_creatives: assignedCreatives || []
   };
+
+  CacheManager.put(cacheKey, result, false);
+  return { data: result, isCached: false };
 }
 
 /**

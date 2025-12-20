@@ -38,7 +38,8 @@
             if (view) view.style.display = 'block';
 
             callGAS('getItemById', SHEET_NAMES.TASKS, id)
-                .then(task => {
+                .then(response => {
+                    const task = response.data;
                     if (!task) {
                         alert('タスクが見つかりません');
                         App.utils.navigation.switchTab('tasks');

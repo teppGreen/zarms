@@ -27,7 +27,8 @@
         const view = document.getElementById('detail-member');
         if (view) view.style.display = 'block';
 
-        callGAS('getItemById', SHEET_NAMES.MEMBERS, memberEmail).then(member => {
+        callGAS('getItemById', SHEET_NAMES.MEMBERS, memberEmail).then(response => {
+          const member = response.data;
           if (!member) {
             alert('メンバーが見つかりません');
             App.utils.navigation.switchTab('members');

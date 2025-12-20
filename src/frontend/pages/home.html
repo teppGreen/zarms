@@ -69,14 +69,25 @@
 
         // Phase 1: バックエンドでフィルタリング済みのホームデータを取得
         callGAS('getHomeData')
-            .then(homeData => {
-                // 挨拶を更新
+            .then(response => {
+                const homeData = response.data;
+
+                // キャッシュヒット時の再取得（SWRパターン）
+                if (response.isCached) {
+                    console.log('HomeData cached. Fetching fresh data...');
+                    callGAS('getHomeData', true).then(freshResponse => {
+                        const freshData = freshResponse.data;
+                        if (!freshData) return;
+
+                        App.pages.home.renderGreeting(freshData);
+                        App.pages.home.renderNewRequests(freshData.new_requests || []);
+                        App.pages.home.renderMyTasks(freshData.assigned_creatives || []);
+                    }).catch(err => console.error('Background refresh failed', err));
+                }
+
+                // 初回描画（キャッシュまたは最新）
                 App.pages.home.renderGreeting(homeData);
-
-                // Column 1: 新規依頼（バックエンドでフィルタリング済み）
                 App.pages.home.renderNewRequests(homeData.new_requests || []);
-
-                // Column 2: マイタスク（バックエンドでフィルタリング済み）
                 App.pages.home.renderMyTasks(homeData.assigned_creatives || []);
 
                 // Phase 2: 追加データの取得（リレーション用）
