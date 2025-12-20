@@ -22,12 +22,12 @@
     App.pages.mediums.loadData = function () {
         callGAS('getItems', SHEET_NAMES.MEDIUMS)
             .then(data => {
-                mediumsData = data;
+                App.state.data.mediums = data;
 
                 // ReadOnlyテーブルをレンダリング
-                App.utils.tables.render(SHEET_NAMES.MEDIUMS, App.utils.tables.applyFiltersAndSort(SHEET_NAMES.MEDIUMS, mediumsData), mediumsTableHeaders);
+                App.utils.tables.render(SHEET_NAMES.MEDIUMS, App.utils.tables.applyFiltersAndSort(SHEET_NAMES.MEDIUMS, App.state.data.mediums), mediumsTableHeaders);
                 hideLoading();
             })
-            .catch(App.error.handle);
+            .catch(App.utils.error.handle);
     };
 </script>

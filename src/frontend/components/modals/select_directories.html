@@ -70,11 +70,11 @@
             if (searchInput) searchInput.value = '';
 
             // directoriesDataをロード
-            if (!directoriesData || directoriesData.length === 0) {
+            if (!App.state.data.directories || App.state.data.directories.length === 0) {
                 showLoading();
                 callGAS('getItems', SHEET_NAMES.DIRECTORIES)
                     .then(directories => {
-                        directoriesData = directories;
+                        App.state.data.directories = directories;
                         this.allDirectories = directories;
                         this.render();
                         hideLoading();
@@ -82,7 +82,7 @@
                     })
                     .catch(App.utils.error.handle);
             } else {
-                this.allDirectories = directoriesData;
+                this.allDirectories = App.state.data.directories;
                 this.render();
                 ui('#modal-select-directories');
             }
@@ -91,6 +91,7 @@
         render: function () {
             // タイプフィルタのオプションを生成
             const typeFilter = document.getElementById('directory-type-filter');
+            const enumData = App.state.data.enum;
             if (typeFilter && enumData && enumData['DIRECTORY_TYPE']) {
                 const options = enumData['DIRECTORY_TYPE'].map(opt =>
                     `<option value="${escapeHtml(opt.key)}">${escapeHtml(opt.value)}</option>`

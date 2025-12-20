@@ -182,11 +182,20 @@
             // メンバー選択肢を設定
             const assignToSelect = form.elements.assign_to;
             assignToSelect.innerHTML = '<option value="">選択してください</option>';
+            const membersData = App.state.data.members;
             if (membersData && membersData.length > 0) {
                 membersData.forEach(member => {
                     const option = document.createElement('option');
-                    option.value = member.member_email;
-                    option.textContent = member.member_name;
+                    option.value = member.id; // Corrected from member_email to id if available, but checking previous code: option.value = member.member_email;
+                    // Let's check what membersData actually contains. Usually it's members from SHEET_NAMES.MEMBERS.
+                    // Usually members have 'id' and 'display_name' or 'name'.
+                    // The old code used 'member_email' and 'member_name'. This might be from a join.
+                    // But if it's from SHEET_NAMES.MEMBERS, it should be 'id' and 'email' and 'display_name'.
+                    // Wait, I should stick to the same property names if possible, but let me check App.state.data.members properties.
+                    // Based on SHEET_NAMES.MEMBERS, properties are 'id', 'email', 'display_name', 'first_name', 'last_name'.
+                    // Let's use 'id' and 'display_name'.
+                    option.value = member.id;
+                    option.textContent = member.display_name || member.email;
                     assignToSelect.appendChild(option);
                 });
             }
@@ -194,12 +203,13 @@
             // ステータス選択肢を設定
             const statusSelect = form.elements.status_key;
             statusSelect.innerHTML = '<option value="">選択してください</option>';
-            const taskStatuses = configData['TASK_STATUS'] || [];
+            const enumData = App.state.data.enum;
+            const taskStatuses = enumData['TASK_STATUS'] || [];
             taskStatuses.forEach(status => {
                 const option = document.createElement('option');
-                option.value = status.config_key;
-                option.textContent = status.config_value;
-                if (status.config_key === 'TODO') {
+                option.value = status.enum_key;
+                option.textContent = status.enum_value;
+                if (status.enum_key === 'TODO') {
                     option.selected = true;
                 }
                 statusSelect.appendChild(option);
@@ -208,12 +218,13 @@
             // 優先度選択肢を設定
             const prioritySelect = form.elements.priority_key;
             prioritySelect.innerHTML = '<option value="">選択してください</option>';
-            const priorities = configData['TASK_PRIORITY'] || [];
+            // enumData is already defined above
+            const priorities = enumData['PRIORITY'] || [];
             priorities.forEach(priority => {
                 const option = document.createElement('option');
-                option.value = priority.config_key;
-                option.textContent = priority.config_value;
-                if (priority.config_key === 'MEDIUM') {
+                option.value = priority.enum_key;
+                option.textContent = priority.enum_value;
+                if (priority.enum_key === 'MEDIUM') {
                     option.selected = true;
                 }
                 prioritySelect.appendChild(option);

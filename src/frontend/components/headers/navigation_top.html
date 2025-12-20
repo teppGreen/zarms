@@ -151,7 +151,7 @@
             callGAS('getItems', 'timetracks')
                 .then(timetracks => {
                     const currentUserEmail = templateVariables?.email;
-                    const currentUser = membersData.find(m => m.email === currentUserEmail);
+                    const currentUser = App.state.data.members.find(m => m.email === currentUserEmail);
 
                     if (!currentUser) {
                         alert('ユーザー情報が見つかりません');
@@ -495,10 +495,10 @@
 
             // 検索対象のテーブルとフィールドを定義
             const searchConfigs = [
-                { data: creativesData, tableName: SHEET_NAMES.CREATIVES, fields: ['title', 'display_id'] },
-                { data: plansData, tableName: SHEET_NAMES.PLANS, fields: ['title', 'display_id'] },
-                { data: tasksData, tableName: SHEET_NAMES.TASKS, fields: ['title', 'display_id'] },
-                { data: membersData, tableName: SHEET_NAMES.MEMBERS, fields: ['nickname', 'email'] }
+                { data: App.state.data.creatives, tableName: SHEET_NAMES.CREATIVES, fields: ['title', 'display_id'] },
+                { data: App.state.data.plans, tableName: SHEET_NAMES.PLANS, fields: ['title', 'display_id'] },
+                { data: App.state.data.tasks, tableName: SHEET_NAMES.TASKS, fields: ['title', 'display_id'] },
+                { data: App.state.data.members, tableName: SHEET_NAMES.MEMBERS, fields: ['display_name', 'email'] }
             ];
 
             searchConfigs.forEach(config => {
@@ -515,7 +515,7 @@
                         });
                     } else if (searchTarget === 'title') {
                         // タイトルのみ検索
-                        const titleField = config.fields.find(f => f.includes('title') || f.includes('nickname'));
+                        const titleField = config.fields.find(f => f.includes('title') || f.includes('display_name'));
                         if (titleField) {
                             const value = item[titleField];
                             matches = value && value.toString().toLowerCase().includes(searchLower);
@@ -528,7 +528,7 @@
                             item: item,
                             tableName: config.tableName,
                             id: item.id,
-                            displayText: `[${config.tableName}] ${formattedDisplayId || item.id}: ${item.title || item.nickname || item.email || ''}`
+                            displayText: `[${config.tableName}] ${formattedDisplayId || item.id}: ${item.title || item.display_name || item.email || ''}`
                         });
                     }
                 });

@@ -193,26 +193,30 @@
       ];
 
       // Defensively load master data if missing
+      const directoriesData = App.state.data.directories;
       if (typeof directoriesData === 'undefined' || directoriesData.length === 0) {
-        promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES).then(d => { directoriesData = d; return d; }));
+        promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES).then(d => { App.state.data.directories = d; return d; }));
       } else {
         promises.push(Promise.resolve(directoriesData));
       }
 
+      const plansData = App.state.data.plans;
       if (typeof plansData === 'undefined' || plansData.length === 0) {
-        promises.push(callGAS('getItems', SHEET_NAMES.PLANS).then(d => { plansData = d; return d; }));
+        promises.push(callGAS('getItems', SHEET_NAMES.PLANS).then(d => { App.state.data.plans = d; return d; }));
       } else {
         promises.push(Promise.resolve(plansData));
       }
 
+      const membersData = App.state.data.members;
       if (typeof membersData === 'undefined' || membersData.length === 0) {
-        promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS).then(d => { membersData = d; return d; }));
+        promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS).then(d => { App.state.data.members = d; return d; }));
       } else {
         promises.push(Promise.resolve(membersData));
       }
 
+      const configData = App.state.data.config;
       if (typeof configData === 'undefined' || Object.keys(configData).length === 0) {
-        promises.push(callGAS('getItems', SHEET_NAMES.CONFIG).then(d => { configData = groupConfigByType(d); return d; }));
+        promises.push(callGAS('getItems', SHEET_NAMES.CONFIG).then(d => { const grouped = groupConfigByType(d); App.state.data.config = grouped; return grouped; }));
       } else {
         promises.push(Promise.resolve(configData));
       }
@@ -315,19 +319,20 @@
           if (!container) return;
 
           container.innerHTML = creativeAssignments.map(assignment => {
+            const membersData = App.state.data.members;
             const member = membersData.find(m => m.id === assignment.member_id);
             if (!member) return '';
             const iconUrl = member.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}` : ''; // fallback or specific logic?
-            const nickname = member.nickname || member.email || '不明';
+            const display_name = member.display_name || member.email || '不明';
             const iconContent = iconUrl
-              ? `<img class="responsive" src="${escapeHtml(iconUrl)}" alt="${escapeHtml(nickname)} title="alt="${escapeHtml(nickname)}"">`
+              ? `<img class="responsive" src="${escapeHtml(iconUrl)}" alt="${escapeHtml(display_name)} title="alt="${escapeHtml(display_name)}"">`
               : `<i>account_circle</i>`;
 
             // Using App.pages.memberDetail.open(member.email) as verified in detail_member.html
             return `
               <button class="transparent circle small" onclick="App.pages.memberDetail.open('${escapeHtml(member.id)}')">
                 ${iconContent}
-                <div class="tooltip right round">${escapeHtml(nickname)}</div>
+                <div class="tooltip right round">${escapeHtml(display_name)}</div>
               </button>
             `;
           }).join('');
@@ -381,6 +386,7 @@
     },
 
     renderEnumOptions: function (enumType, selectedValue) {
+      const enumData = App.state.data.enum;
       if (!enumData || !enumData[enumType]) {
         console.warn(`[CreativeDetail] Enum options not found for ${enumType}`);
         return '';
@@ -393,6 +399,7 @@
 
     // 組織名を上層階層のものを含めて取得し、スラッシュでつなぐ。現状使用していないが一応残す。
     getDirectoryFullName: function (directoryId) {
+      const directoriesData = App.state.data.directories;
       if (!directoryId || !directoriesData) return '';
       const dir = directoriesData.find(d => d.id === directoryId);
       if (!dir) return '';
@@ -406,6 +413,7 @@
     },
 
     getDirectoryDisplayInfo: function (directoryId) {
+      const directoriesData = App.state.data.directories;
       if (!directoryId || !directoriesData) return '';
       const dir = directoriesData.find(d => d.id === directoryId);
       if (!dir) return '';
@@ -415,6 +423,7 @@
 
       // directory_type_keyからENUMのvalueを取得
       let typeValue = dir.directory_type_key || '-';
+      const enumData = App.state.data.enum;
       if (enumData && enumData['DIRECTORY_TYPE']) {
         const enumItem = enumData['DIRECTORY_TYPE'].find(e => e.key === dir.directory_type_key);
         if (enumItem) {
@@ -543,13 +552,14 @@
           }
 
           container.innerHTML = creativeAssignments.map(assignment => {
+            const membersData = App.state.data.members;
             const member = membersData.find(m => m.id === assignment.member_id);
             if (!member) return '';
             const iconUrl = member.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}` : '';
             return `
               <div class="chip">
                 ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" alt="">` : ''}
-                <span>${escapeHtml(member.nickname || member.email || '不明')}</span>
+                <span>${escapeHtml(member.display_name || member.email || '不明')}</span>
                 <i onclick="App.pages.creativeDetail.removeMember('${assignment.id}')">close</i>
               </div>
             `;
@@ -577,8 +587,9 @@
           notes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
           container.innerHTML = notes.map((note, index) => {
+            const membersData = App.state.data.members;
             const author = membersData.find(m => m.email === note.created_by);
-            const authorName = author ? (author.nickname || author.email) : '不明';
+            const authorName = author ? (author.display_name || author.email) : '不明';
             const iconUrl = author && author.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${author.icon_gfile_id}` : '';
             const isLast = index === notes.length - 1;
             return `

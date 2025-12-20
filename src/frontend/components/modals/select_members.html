@@ -61,11 +61,11 @@
             this.selectedIds = options.preSelected || [];
 
             // membersDataをロード
-            if (!membersData || membersData.length === 0) {
+            if (!App.state.data.members || App.state.data.members.length === 0) {
                 showLoading();
                 callGAS('getItems', SHEET_NAMES.MEMBERS)
                     .then(members => {
-                        membersData = members;
+                        App.state.data.members = members;
                         this.allMembers = members;
                         this.render();
                         hideLoading();
@@ -73,7 +73,7 @@
                     })
                     .catch(App.utils.error.handle);
             } else {
-                this.allMembers = membersData;
+                this.allMembers = App.state.data.members;
                 this.render();
                 ui('#modal-select-members');
             }
@@ -82,6 +82,7 @@
         render: function () {
             // ロールフィルタのオプションを生成
             const roleFilter = document.getElementById('member-role-filter');
+            const configData = App.state.data.config;
             if (roleFilter && configData['SYSTEM_ROLE']) {
                 const options = configData['SYSTEM_ROLE'].map(opt =>
                     `<option value="${escapeHtml(opt.config_key)}">${escapeHtml(opt.config_value)}</option>`
@@ -107,7 +108,7 @@
             // フィルタリング
             let filtered = this.allMembers.filter(member => {
                 const matchesSearch = !searchTerm ||
-                    (member.nickname && member.nickname.toLowerCase().includes(searchTerm)) ||
+                    (member.display_name && member.display_name.toLowerCase().includes(searchTerm)) ||
                     (member.email && member.email.toLowerCase().includes(searchTerm)) ||
                     (member.first_name && member.first_name.toLowerCase().includes(searchTerm)) ||
                     (member.last_name && member.last_name.toLowerCase().includes(searchTerm));
@@ -139,7 +140,7 @@
                    onchange="App.modals.selectMembers.toggleSelection('${member.id}', this.checked)">
             ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar" alt="">` : ''}
             <span class="max">
-              <strong>${escapeHtml(member.nickname || member.email)}</strong>
+              <strong>${escapeHtml(member.display_name || member.email)}</strong>
               ${member.email ? `<br><span class="small-text">${escapeHtml(member.id)}</span>` : ''}
             </span>
           </label>

@@ -47,7 +47,7 @@ const SHEET_NAMES = {
 
 // IDカラム名の定義
 const ID_COLUMNS = {
-  [SHEET_NAMES.CONFIG]: 'id',
+  [SHEET_NAMES.CONFIG]: 'key',
   [SHEET_NAMES.ENUM]: 'key',
   [SHEET_NAMES.LOGS]: 'id',
   [SHEET_NAMES.ASSIGNMENTS]: 'id',

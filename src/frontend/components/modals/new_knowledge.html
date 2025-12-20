@@ -58,19 +58,20 @@
             // ナレッジタイプ選択肢を設定
             const typeSelect = form.elements.knowledge_type_key;
             typeSelect.innerHTML = '<option value="">選択してください</option>';
-            const knowledgeTypes = configData['KNOWLEDGE_TYPE'] || [];
+            const enumData = App.state.data.enum;
+            const knowledgeTypes = enumData['KNOWLEDGE_TYPE'] || [];
             knowledgeTypes.forEach(type => {
                 const option = document.createElement('option');
-                option.value = type.config_key;
-                option.textContent = type.config_value;
+                option.value = type.enum_key;
+                option.textContent = type.enum_value;
                 typeSelect.appendChild(option);
             });
 
             // Creativesデータを取得（まだ取得していない場合）
-            if (!creativesData || creativesData.length === 0) {
+            if (!App.state.data.creatives || App.state.data.creatives.length === 0) {
                 showLoading();
                 callGAS('getItems', SHEET_NAMES.CREATIVES).then(data => {
-                    creativesData = data;
+                    App.state.data.creatives = data;
                     hideLoading();
                     openModal('modal-new-knowledge');
                     initRichTextEditors();
@@ -89,6 +90,7 @@
                 return;
             }
             const lowerCaseQuery = query.toLowerCase();
+            const creativesData = App.state.data.creatives;
             const filteredCreatives = (creativesData || []).filter(w =>
                 w.title.toLowerCase().includes(lowerCaseQuery) ||
                 (w.plan_title && w.plan_title.toLowerCase().includes(lowerCaseQuery))

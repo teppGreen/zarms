@@ -36,13 +36,14 @@
      */
     App.pages.directories.loadData = function () {
         // directoriesDataが既にあればそれを使う、なければ取得
+        const directoriesData = App.state.data.directories;
         if (directoriesData && directoriesData.length > 0) {
             App.pages.directories.renderTree();
             hideLoading();
         } else {
             callGAS('getItems', SHEET_NAMES.DIRECTORIES)
                 .then(data => {
-                    directoriesData = data;
+                    App.state.data.directories = data;
                     App.pages.directories.renderTree();
                     hideLoading();
                 })
@@ -102,7 +103,7 @@
         if (!tbody) return;
 
         // ツリー構造を構築
-        const tree = App.pages.directories.buildTree(directoriesData);
+        const tree = App.pages.directories.buildTree(App.state.data.directories);
 
         // HTML生成
         let html = '';
@@ -179,6 +180,7 @@
      */
     App.pages.directories.getTypeLabel = function (typeKey) {
         if (!typeKey) return '-';
+        const enumData = App.state.data.enum;
         if (!enumData || !enumData['DIRECTORY_TYPE']) return typeKey;
         const enumItem = enumData['DIRECTORY_TYPE'].find(e => e.key === typeKey);
         return enumItem ? enumItem.value : typeKey;
