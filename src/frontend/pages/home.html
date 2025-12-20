@@ -79,6 +79,12 @@
                         const freshData = freshResponse.data;
                         if (!freshData) return;
 
+                        // Smart Diff Check
+                        if (JSON.stringify(freshData) === JSON.stringify(homeData)) {
+                            console.log('HomeData fresh is same as cache. Skipping render.');
+                            return;
+                        }
+
                         App.pages.home.renderGreeting(freshData);
                         App.pages.home.renderNewRequests(freshData.new_requests || []);
                         App.pages.home.renderMyTasks(freshData.assigned_creatives || []);

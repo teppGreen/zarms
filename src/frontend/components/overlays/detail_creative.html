@@ -172,9 +172,14 @@
                 .then(freshResponse => {
                   const freshData = freshResponse.data;
                   if (freshData && App.pages.creativeDetail.currentId === id) { // Ensure still on same item
-                    console.log('[CreativeDetail] Fresh data received via background fetch');
-                    App.pages.creativeDetail.currentItem = freshData;
-                    App.pages.creativeDetail.render(freshData);
+                    const currentJson = JSON.stringify(App.pages.creativeDetail.currentItem);
+                    if (JSON.stringify(freshData) !== currentJson) {
+                      console.log('[CreativeDetail] Fresh data updated, re-rendering');
+                      App.pages.creativeDetail.currentItem = freshData;
+                      App.pages.creativeDetail.render(freshData);
+                    } else {
+                      console.log('[CreativeDetail] Fresh data unchanged, skipping');
+                    }
                   }
                 })
                 .catch(err => console.error('[CreativeDetail] Background refresh failed:', err));
@@ -244,35 +249,62 @@
 
       const displayIdEl = document.getElementById('display-id');
       const displayIdStr = formatDisplayId(SHEET_NAMES.CREATIVES, creative.display_id);
-
-      if (displayIdEl) displayIdEl.textContent = displayIdStr;
+      if (displayIdEl && displayIdEl.textContent !== displayIdStr) displayIdEl.textContent = displayIdStr;
 
       const titleInput = document.getElementById('creative-title-input');
-      if (titleInput) titleInput.value = creative.title || '';
+      const newTitle = creative.title || '';
+      if (titleInput && titleInput !== document.activeElement && titleInput.value !== newTitle) {
+        titleInput.value = newTitle;
+      }
 
       const statusSelect = document.getElementById('creative-status-select');
-      if (statusSelect) statusSelect.innerHTML = App.pages.creativeDetail.renderEnumOptions('CREATIVE_STATUS', creative.creative_status_key);
+      if (statusSelect && statusSelect !== document.activeElement) {
+        const newHtml = App.pages.creativeDetail.renderEnumOptions('CREATIVE_STATUS', creative.creative_status_key);
+        if (statusSelect.innerHTML !== newHtml) statusSelect.innerHTML = newHtml;
+      }
 
       const typeSelect = document.getElementById('creative-type-select');
-      if (typeSelect) typeSelect.innerHTML = App.pages.creativeDetail.renderEnumOptions('CREATIVE_TYPE', creative.creative_type_key);
+      if (typeSelect && typeSelect !== document.activeElement) {
+        const newHtml = App.pages.creativeDetail.renderEnumOptions('CREATIVE_TYPE', creative.creative_type_key);
+        if (typeSelect.innerHTML !== newHtml) typeSelect.innerHTML = newHtml;
+      }
 
       const prioritySelect = document.getElementById('creative-priority-select');
-      if (prioritySelect) prioritySelect.innerHTML = App.pages.creativeDetail.renderEnumOptions('PRIORITY', creative.priority_key);
+      if (prioritySelect && prioritySelect !== document.activeElement) {
+        const newHtml = App.pages.creativeDetail.renderEnumOptions('PRIORITY', creative.priority_key);
+        if (prioritySelect.innerHTML !== newHtml) prioritySelect.innerHTML = newHtml;
+      }
 
       const deadlineInput = document.getElementById('creative-deadline-input');
-      if (deadlineInput) deadlineInput.value = formatDateTimeForInput(creative.deadline_at);
+      const newDeadline = formatDateTimeForInput(creative.deadline_at);
+      if (deadlineInput && deadlineInput !== document.activeElement && deadlineInput.value !== newDeadline) {
+        deadlineInput.value = newDeadline;
+      }
 
       const clientInput = document.getElementById('creative-client-display');
-      if (clientInput) clientInput.value = App.pages.creativeDetail.getDirectoryDisplayInfo(creative.client_directory_id);
+      const newClient = App.pages.creativeDetail.getDirectoryDisplayInfo(creative.client_directory_id);
+      if (clientInput && clientInput.value !== newClient) clientInput.value = newClient;
 
       const contractorInput = document.getElementById('creative-contractor-display');
-      if (contractorInput) contractorInput.value = App.pages.creativeDetail.getDirectoryDisplayInfo(creative.contractor_directory_id);
+      const newContractor = App.pages.creativeDetail.getDirectoryDisplayInfo(creative.contractor_directory_id);
+      if (contractorInput && contractorInput.value !== newContractor) contractorInput.value = newContractor;
 
-
+      // Complex sub-renders usually handle their own clearing/diffing, 
+      // but for simplicity we reload lists if the main object renders.
+      // We could optimize loadMembers/Assignees too but strict DOM value check is most critical for inputs.
       App.pages.creativeDetail.loadMembers(creative.id);
       App.pages.creativeDetail.loadAssignees(creative.id);
       App.pages.creativeDetail.loadNotes(creative.id);
-      App.pages.creativeDetail.switchTab(null, 'documents');
+
+      // Check if tabs need refresh (only if ID changed or first load?)
+      // switchTab renders content from scratch. 
+      // If we re-render, we might reset tab state.
+      // Current implementation of render calls switchTab('documents') at the end (Line 258).
+      // This resets the user back to Documents tab! 
+      // We should PRESERVE the active tab.
+      const activeTab = document.querySelector('#detail-center-column-nav .active');
+      const currentTabName = activeTab ? activeTab.getAttribute('onclick').match(/'([^']+)'\)/)[1] : 'documents';
+      App.pages.creativeDetail.switchTab(null, currentTabName);
     },
 
     loadAssignees: function (creativeId) {
