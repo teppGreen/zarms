@@ -1,17 +1,7 @@
 // ============================================
 // database.gs - データベース操作の抽象化 (Backend)
 // SSSQLライブラリを使用したCRUD操作
-// CacheService によるキャッシュ機能
 // ============================================
-
-// キャッシュ設定
-const CACHE_EXPIRATION_SECONDS = 600; // 10分間キャッシュ
-
-// パブリックキャッシュ対象のテーブル（全ユーザーで共有可能）
-const PUBLIC_CACHE_TABLES = [
-    'CONFIG', 'ENUM', 'PREFIX', 'DIRECTORIES',
-    'MEMBERS', 'PLANS', 'SKILLS'
-];
 
 /**
  * スプレッドシートオブジェクトを取得します。
@@ -45,108 +35,17 @@ function getHeaders(sheet) {
 }
 
 // ============================================
-// キャッシュ機能
+// SSSQL を使用した CRUD 操作
 // ============================================
 
 /**
- * 適切なキャッシュインスタンスを取得
+ * シートからすべてのデータを取得します。
  * @param {string} sheetName - シート名
- * @param {boolean} forcePrivate - プライベートキャッシュを強制するか
- * @returns {GoogleAppsScript.Cache.Cache} キャッシュインスタンス
- */
-function getCacheInstance(sheetName, forcePrivate = false) {
-    if (forcePrivate || !PUBLIC_CACHE_TABLES.includes(sheetName)) {
-        return CacheService.getUserCache();
-    }
-    return CacheService.getScriptCache();
-}
-
-/**
- * キャッシュからデータを取得
- * @param {string} cacheKey - キャッシュキー
- * @param {string} sheetName - シート名（キャッシュタイプ決定用）
- * @param {boolean} forcePrivate - プライベートキャッシュを強制するか
- * @returns {Object[]|null} キャッシュされたデータまたはnull
- */
-function getFromCache(cacheKey, sheetName, forcePrivate = false) {
-    try {
-        const cache = getCacheInstance(sheetName, forcePrivate);
-        const cached = cache.get(cacheKey);
-        if (cached) {
-            return JSON.parse(cached);
-        }
-    } catch (e) {
-        Logger.log('キャッシュ読み込みエラー: ' + e.message);
-    }
-    return null;
-}
-
-/**
- * データをキャッシュに保存
- * @param {string} cacheKey - キャッシュキー
- * @param {Object[]} data - 保存するデータ
- * @param {string} sheetName - シート名（キャッシュタイプ決定用）
- * @param {boolean} forcePrivate - プライベートキャッシュを強制するか
- */
-function setToCache(cacheKey, data, sheetName, forcePrivate = false) {
-    try {
-        const cache = getCacheInstance(sheetName, forcePrivate);
-        const jsonData = JSON.stringify(data);
-        // GASのキャッシュは最大100KB
-        if (jsonData.length < 100000) {
-            cache.put(cacheKey, jsonData, CACHE_EXPIRATION_SECONDS);
-        }
-    } catch (e) {
-        Logger.log('キャッシュ保存エラー: ' + e.message);
-    }
-}
-
-/**
- * キャッシュを無効化
- * @param {string} sheetName - シート名
- */
-function invalidateCache(sheetName) {
-    try {
-        const cacheKey = `table_${sheetName}`;
-        // 両方のキャッシュをクリア
-        CacheService.getScriptCache().remove(cacheKey);
-        CacheService.getUserCache().remove(cacheKey);
-    } catch (e) {
-        Logger.log('キャッシュ無効化エラー: ' + e.message);
-    }
-}
-
-// ============================================
-// SSSQL を使用した CRUD 操作（キャッシュ対応）
-// ============================================
-
-/**
- * シートからすべてのデータを取得します（キャッシュ対応）。
- * @param {string} sheetName - シート名
- * @param {boolean} skipCache - キャッシュをスキップするか
  * @returns {Object[]} データのオブジェクト配列
  */
-function getAllData(sheetName, skipCache = false) {
-    const cacheKey = `table_${sheetName}`;
-
-    // キャッシュから取得を試みる
-    if (!skipCache) {
-        const cachedData = getFromCache(cacheKey, sheetName);
-        if (cachedData) {
-            Logger.log(`[Cache] Hit: ${sheetName}`);
-            return cachedData;
-        }
-    }
-
-    // DBから取得
-    Logger.log(`[Cache] Miss: ${sheetName}`);
+function getAllData(sheetName) {
     const sheet = getSheet(sheetName);
-    const data = SSSQL.select(sheet, {});
-
-    // キャッシュに保存
-    setToCache(cacheKey, data, sheetName);
-
-    return data;
+    return SSSQL.select(sheet, {});
 }
 
 /**
@@ -299,9 +198,6 @@ function createData(userId, sheetName, idColumnName, dataObject) {
     // SSSQLを使用してデータを挿入
     const result = SSSQL.insert(sheet, newData);
 
-    // キャッシュを無効化
-    invalidateCache(sheetName);
-
     // ログ記録
     const idColumn = idColumnName || (headers.includes('id') ? 'id' : null);
     const recordId = idColumn ? newData[idColumn] : '';
@@ -332,9 +228,6 @@ function bulkCreateData(userId, sheetName, idColumnName, dataObjects) {
 
     // SSSQLを使用してデータを一括挿入
     const result = SSSQL.bulkInsert(sheet, preparedData);
-
-    // キャッシュを無効化
-    invalidateCache(sheetName);
 
     // ログ記録
     const idColumn = idColumnName || (headers.includes('id') ? 'id' : null);
@@ -387,9 +280,6 @@ function updateData(userId, sheetName, idColumnName, id, updateDataObject) {
         where: { [idColumnName]: ["=", id] }
     });
 
-    // キャッシュを無効化
-    invalidateCache(sheetName);
-
     // 各フィールドごとにログを記録
     Object.keys(updateDataObject).forEach(key => {
         const oldValue = oldRecord[key];
@@ -419,9 +309,6 @@ function deleteData(userId, sheetName, idColumnName, condition) {
 
     // SSSQLを使用してデータを削除
     const deletedRecords = SSSQL.remove(sheet, { where: whereClause });
-
-    // キャッシュを無効化
-    invalidateCache(sheetName);
 
     // ログ記録（削除された各レコードに対して）
     if (deletedRecords.length > 0) {
