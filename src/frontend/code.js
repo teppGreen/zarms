@@ -504,9 +504,9 @@ function getHomeData() {
     };
   }
 
+  // バックエンドでフィルタリングしたデータを取得（セキュリティ向上）
   const newRequests = getAvailableCreatives(member.id);
   const assignedCreatives = getAssignedCreatives(member.id);
-  const knowledge = getAllData(SHEET_NAMES.KNOWLEDGES);
 
   const hour = new Date().getHours();
   let greeting = 'こんにちは';
@@ -517,21 +517,55 @@ function getHomeData() {
     greeting: greeting,
     memberName: member.nickname || member.member_name,
     new_requests: newRequests || [],
-    assigned_creatives: assignedCreatives || [],
-    knowledge: knowledge || []
+    assigned_creatives: assignedCreatives || []
   };
 }
 
+/**
+ * 新規依頼として表示可能な制作物を取得（バックエンドでフィルタリング）
+ * @param {string} memberId - メンバーID
+ * @returns {Object[]} 条件に一致する制作物
+ */
 function getAvailableCreatives(memberId) {
-  const creatives = getAllData(SHEET_NAMES.CREATIVES);
-  return creatives.filter(c => c.creative_status_key === 'CREATE');
+  // SSSQLのwhere句を使用してバックエンドでフィルタリング
+  // TODO/APPROVED ステータスの制作物のみを取得
+  const whereConditions = {
+    creative_status_key: ["IN", ["TODO", "APPROVED"]]
+  };
+
+  // フロントエンドのAPI wrapper関数を使用（callBackendAPIを呼び出す）
+  const result = getFilteredData(SHEET_NAMES.CREATIVES, whereConditions, {
+    orderBy: { created_at: "DESC" }
+  });
+  return result.slice(0, 10); // 最新10件のみ
 }
 
+/**
+ * 自分に割り当てられた制作物を取得
+ * @param {string} memberId - メンバーID
+ * @returns {Object[]} 割り当てられた制作物
+ */
 function getAssignedCreatives(memberId) {
-  const assignments = findData(SHEET_NAMES.MEMBER_ASSIGNMENTS, { member_id: memberId, related_table: SHEET_NAMES.CREATIVES });
+  // メンバーアサインメントをフィルタリング
+  // findData は frontend/database.js で定義されている（callBackendAPIを使用）
+  const assignments = findData(SHEET_NAMES.MEMBER_ASSIGNMENTS, {
+    member_id: memberId,
+    related_table: SHEET_NAMES.CREATIVES
+  });
+
+  if (assignments.length === 0) {
+    return [];
+  }
+
   const creativeIds = assignments.map(a => a.related_id);
-  const allCreatives = getAllData(SHEET_NAMES.CREATIVES);
-  return allCreatives.filter(c => creativeIds.includes(c.id));
+
+  // 制作物を取得（IDリストでフィルタリング）
+  // getFilteredData は frontend/database.js で定義されている（callBackendAPIを使用）
+  const whereConditions = {
+    id: ["IN", creativeIds]
+  };
+
+  return getFilteredData(SHEET_NAMES.CREATIVES, whereConditions);
 }
 
 function updateSingleField(tableName, id, field, value) {

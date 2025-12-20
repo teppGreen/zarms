@@ -70,9 +70,30 @@ function doPost(e) {
                         data: result
                     });
 
+                case 'read_filtered':
+                    // バックエンドでフィルタリング（SSSQLのwhere句形式）
+                    if (!data || !data.where) throw new Error('Where conditions are required for read_filtered operation');
+                    const options = {};
+                    if (data.orderBy) options.orderBy = data.orderBy;
+                    if (data.columns) options.columns = data.columns;
+                    result = findDataAdvanced(sheetName, data.where, options);
+                    return createResponse({
+                        status: 'success',
+                        data: result
+                    });
+
                 case 'create':
                     if (!data) throw new Error('Data is required for create operation');
                     result = createData(userId, sheetName, idColumnName, data);
+                    return createResponse({
+                        status: 'success',
+                        data: result
+                    });
+
+                case 'bulk_create':
+                    // 複数データの一括挿入
+                    if (!data || !Array.isArray(data)) throw new Error('Data array is required for bulk_create operation');
+                    result = bulkCreateData(userId, sheetName, idColumnName, data);
                     return createResponse({
                         status: 'success',
                         data: result

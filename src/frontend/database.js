@@ -40,6 +40,23 @@ function findData(sheetName, condition) {
   });
 }
 
+/**
+ * 高度な条件でフィルタリングしたデータを取得します（バックエンドでフィルタリング）。
+ * @param {string} sheetName - シート名
+ * @param {Object} whereConditions - SSSQL形式の検索条件
+ * @param {Object} options - 追加オプション（orderBy, columns など）
+ * @returns {Object[]} 条件に一致したデータのオブジェクト配列
+ */
+function getFilteredData(sheetName, whereConditions, options = {}) {
+  return callBackendAPI('read_filtered', {
+    sheetName: sheetName,
+    data: {
+      where: whereConditions,
+      ...options
+    }
+  });
+}
+
 
 
 /**
@@ -52,6 +69,20 @@ function createData(sheetName, dataObject) {
   return callBackendAPI('create', {
     sheetName: sheetName,
     data: dataObject,
+    idColumnName: ID_COLUMNS[sheetName]
+  });
+}
+
+/**
+ * 複数のデータを一括でシートに追加します。
+ * @param {string} sheetName - シート名
+ * @param {Object[]} dataObjects - 追加するデータオブジェクトの配列
+ * @returns {Object[]} 作成されたデータオブジェクトの配列
+ */
+function bulkCreateData(sheetName, dataObjects) {
+  return callBackendAPI('bulk_create', {
+    sheetName: sheetName,
+    data: dataObjects,
     idColumnName: ID_COLUMNS[sheetName]
   });
 }
