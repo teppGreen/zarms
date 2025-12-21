@@ -1,7 +1,8 @@
 <!-- 詳細画面: 制作物 -->
 <div id="detail-creative" style="display: none;">
   <nav class="small-margin row align-center">
-    <button class="circle transparent" onclick="App.pages.creativeDetail.goBack()">
+    <button class="circle transparent"
+      onclick="App.utils.navigation.goBack(App.state.previousTab, App.pages.creativeDetail)">
       <i>arrow_back</i>
     </button>
     <h5 class="bold max" id="creative-detail-title">制作物詳細</h5>
@@ -162,6 +163,13 @@
     open: function (id) {
       console.log(`[CreativeDetail] open called with id: ${id}`);
 
+      // 元々開いていたページのIDを記録
+      const currentViewEl = Array.from(document.querySelectorAll('main > div'))
+        .find(el => el.style.display !== 'none');
+      if (currentViewEl) {
+        App.state.previousTab = currentViewEl.id;
+      }
+
       if (!id || typeof id !== 'string') {
         console.error('[CreativeDetail] Invalid ID provided:', id);
         App.utils.error.handle({ message: '無効なIDが指定されました: ' + id });
@@ -264,7 +272,7 @@
           if (!creative) {
             console.warn('[CreativeDetail] Creative not found for id:', id);
             alert('制作物が見つかりません');
-            App.utils.navigation.switchTab('creatives');
+            App.utils.navigation.goBack(App.state.previousTab, App.pages.creativeDetail);
             return;
           }
 
@@ -274,7 +282,7 @@
         .catch(error => {
           console.error('[CreativeDetail] Fatal error during loading:', error);
           App.utils.error.handle(error);
-          App.utils.navigation.switchTab('creatives');
+          App.utils.navigation.goBack(App.state.previousTab, App.pages.creativeDetail);
         })
         .finally(() => {
           App.pages.creativeDetail.isLoading = false;

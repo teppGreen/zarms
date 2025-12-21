@@ -50,9 +50,6 @@
 
 <script>
     (function () {
-        // ナビゲーション用の名前空間を初期化
-        if (!App.utils) App.utils = {};
-
         App.utils.navigation = {
             /**
              * タブを切り替える
@@ -105,8 +102,22 @@
              * @param {string} tabName - 戻り先のタブ名
              * @param {Object} detailPageObj - 詳細ページオブジェクト (resetメソッドを持つ)
              */
-            goBack: function (tabName, detailPageObj) {
-                App.utils.navigation.switchTab(tabName);
+            goBack: function (targetId, detailPageObj) {
+                if (!targetId) targetId = 'home';
+
+                if (targetId.startsWith('tab-')) {
+                    // タブIDの場合
+                    App.utils.navigation.switchTab(targetId.replace('tab-', ''));
+                } else if (targetId.startsWith('detail-')) {
+                    // 詳細画面IDの場合
+                    document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
+                    const targetEl = document.getElementById(targetId);
+                    if (targetEl) targetEl.style.display = 'block';
+                } else {
+                    // 単なるタブ名の場合
+                    App.utils.navigation.switchTab(targetId);
+                }
+
                 if (detailPageObj && typeof detailPageObj.reset === 'function') {
                     detailPageObj.reset();
                 }
