@@ -16,7 +16,6 @@
 
 <script>
     (function () {
-        if (!App.modals.new_note) App.modals.new_note = {};
         App.modals.new_note = {
             open: function (creativeId) {
                 const form = document.getElementById('new-note-form');
@@ -55,8 +54,8 @@
                 callGAS('createItem', 'notes', noteData)
                     .then(() => {
                         closeModal('modal-new-note');
-                        if (App.pages.creativeDetail && App.pages.creativeDetail.currentId === creativeId) {
-                            App.pages.creativeDetail.loadNotes(creativeId);
+                        if (App.overlays.creativeDetail && App.overlays.creativeDetail.currentId === creativeId) {
+                            App.overlays.creativeDetail.loadNotes(creativeId);
                         }
                     })
                     .catch(err => {
