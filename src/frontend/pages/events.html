@@ -20,17 +20,17 @@
 
 <script>
     // Namespace initialization
-    App.pages.events = {};
+    App.pages.events = {
+        loadData: function () {
+            callGAS('getItems', SHEET_NAMES.EVENTS)
+                .then(data => {
+                    App.state.data.events = data;
 
-    App.pages.events.loadData = function () {
-        callGAS('getItems', SHEET_NAMES.EVENTS)
-            .then(data => {
-                App.state.data.events = data;
-
-                // ReadOnlyテーブルをレンダリング
-                App.utils.tables.render(SHEET_NAMES.EVENTS, App.utils.tables.applyFiltersAndSort(SHEET_NAMES.EVENTS, App.state.data.events), eventsTableHeaders);
-                hideLoading();
-            })
-            .catch(App.utils.error.handle);
+                    // ReadOnlyテーブルをレンダリング
+                    App.utils.tables.render(SHEET_NAMES.EVENTS, App.utils.tables.applyFiltersAndSort(SHEET_NAMES.EVENTS, App.state.data.events), eventsTableHeaders);
+                    hideLoading();
+                })
+                .catch(App.utils.error.handle);
+        }
     };
 </script>

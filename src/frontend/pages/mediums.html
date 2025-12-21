@@ -17,17 +17,17 @@
 
 <script>
     // Namespace initialization
-    App.pages.mediums = {};
+    App.pages.mediums = {
+        loadData: function () {
+            callGAS('getItems', SHEET_NAMES.MEDIUMS)
+                .then(data => {
+                    App.state.data.mediums = data;
 
-    App.pages.mediums.loadData = function () {
-        callGAS('getItems', SHEET_NAMES.MEDIUMS)
-            .then(data => {
-                App.state.data.mediums = data;
-
-                // ReadOnlyテーブルをレンダリング
-                App.utils.tables.render(SHEET_NAMES.MEDIUMS, App.utils.tables.applyFiltersAndSort(SHEET_NAMES.MEDIUMS, App.state.data.mediums), mediumsTableHeaders);
-                hideLoading();
-            })
-            .catch(App.utils.error.handle);
+                    // ReadOnlyテーブルをレンダリング
+                    App.utils.tables.render(SHEET_NAMES.MEDIUMS, App.utils.tables.applyFiltersAndSort(SHEET_NAMES.MEDIUMS, App.state.data.mediums), mediumsTableHeaders);
+                    hideLoading();
+                })
+                .catch(App.utils.error.handle);
+        }
     };
 </script>

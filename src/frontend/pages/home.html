@@ -62,270 +62,270 @@
 
 <script>
     // Namespace initialization
-    App.pages.home = {};
+    App.pages.home = {
+        loadData: function () {
+            showLoading();
 
-    App.pages.home.loadData = function () {
-        showLoading();
-
-        // Phase 1: バックエンドでフィルタリング済みのホームデータを取得
-        callGAS('getHomeData')
-            .then(response => {
-                const homeData = response.data;
-
-                // キャッシュヒット時の再取得（SWRパターン）
-                if (response.isCached) {
-                    console.log('HomeData cached. Fetching fresh data...');
-                    callGAS('getHomeData', true).then(freshResponse => {
-                        const freshData = freshResponse.data;
-                        if (!freshData) return;
-
-                        // Granular Smart Diff Check - only update changed sections
-                        // Greeting
-                        if (JSON.stringify(freshData.greeting) !== JSON.stringify(homeData.greeting) ||
-                            JSON.stringify(freshData.memberName) !== JSON.stringify(homeData.memberName)) {
-                            App.pages.home.renderGreeting(freshData);
-                        }
-
-                        // New Requests
-                        if (JSON.stringify(freshData.new_requests) !== JSON.stringify(homeData.new_requests)) {
-                            App.pages.home.renderNewRequests(freshData.new_requests || []);
-                        }
-
-                        // My Tasks
-                        if (JSON.stringify(freshData.assigned_creatives) !== JSON.stringify(homeData.assigned_creatives)) {
-                            App.pages.home.renderMyTasks(freshData.assigned_creatives || []);
-                        }
-
-                    }).catch(err => console.error('Background refresh failed', err));
-                }
-
-                // 初回描画（キャッシュまたは最新）
-                App.pages.home.renderGreeting(homeData);
-                App.pages.home.renderNewRequests(homeData.new_requests || []);
-                App.pages.home.renderMyTasks(homeData.assigned_creatives || []);
-
-                // Phase 2: 追加データの取得（リレーション用）
-                return App.pages.home.loadRelatedData();
-            })
-            .then(() => {
-                // Column 3: リレーション
-                App.pages.home.loadRelations();
-                hideLoading();
-            })
-            .catch(App.utils.error.handle);
-    };
-
-    /**
-     * 挨拶を描画
-     */
-    App.pages.home.renderGreeting = function (homeData) {
-        const greetingEl = document.getElementById('home-greeting');
-        if (greetingEl) {
-            const greeting = (homeData.greeting || 'こんにちは') + '、' + (homeData.memberName || 'ゲスト') + 'さん。';
-            greetingEl.textContent = greeting;
-        }
-
-        const greetingSubEl = document.getElementById('home-greeting-sub');
-        if (greetingSubEl) {
-            const messages = [
-                'ステータスは最新ですか？随時更新しましょう。',
-                '右上のボタンから打刻して、今日のタスクを始めましょう。',
-                '新着依頼が来ていたら、早めに処理しましょう。',
-                'リレーション（担当企画など）の状態を、こまめにチェックしましょう。',
-                'ZARMSで管理できない情報がありますか？総務に機能追加をリクエストしましょう。',
-                'フロー情報はSlackで共有し、ストック情報はZARMSで管理しましょう。',
-                'ZARMSにある情報が最新、と言い切れるようにしましょう。',
-                '独自のスプレッドシートなどを作ることは、最新の情報がわからなくなる原因になります。避けましょう。',
-            ];
-            const num = Math.floor(Math.random() * (messages.length));
-            greetingSubEl.textContent = messages[num];
-        }
-    };
-
-    /**
-     * 関連データを順次取得（リレーション表示用）
-     */
-    App.pages.home.loadRelatedData = function () {
-        const loadPromises = [];
-
-        // Helper for SWR execution
-        const loadWithSWR = (tableName, setGlobalData, getGlobalData) => {
-            return callGAS('getItemsCached', tableName)
+            // Phase 1: バックエンドでフィルタリング済みのホームデータを取得
+            callGAS('getHomeData')
                 .then(response => {
-                    const data = response.data || [];
-                    setGlobalData(data); // Set initial data (Cache or Fresh)
+                    const homeData = response.data;
 
-                    // SWR: Background Fetch & Diff Check
+                    // キャッシュヒット時の再取得（SWRパターン）
                     if (response.isCached) {
-                        console.log(`[Home] ${tableName} cached. Fetching fresh data...`);
-                        callGAS('getItemsCached', tableName, true).then(freshResponse => {
-                            const freshData = freshResponse.data || [];
-                            const currentData = getGlobalData();
+                        console.log('HomeData cached. Fetching fresh data...');
+                        callGAS('getHomeData', true).then(freshResponse => {
+                            const freshData = freshResponse.data;
+                            if (!freshData) return;
 
-                            if (JSON.stringify(freshData) !== JSON.stringify(currentData)) {
-                                console.log(`[Home] ${tableName} updated. Re-rendering relations.`);
-                                setGlobalData(freshData);
-                                // Only re-render if this table is currently selected in Relations column?
-                                // Simplified: Just call loadRelations. It checks selected type.
-                                const typeSelect = document.getElementById('relation-type-select');
-                                if (typeSelect) {
-                                    const selectedType = typeSelect.value; // 'creatives', 'plans'
-                                    if ((tableName === SHEET_NAMES.CREATIVES && selectedType === 'creatives') ||
-                                        (tableName === SHEET_NAMES.PLANS && selectedType === 'plans')) {
-                                        App.pages.home.loadRelations();
-                                    }
-                                }
-                            } else {
-                                console.log(`[Home] ${tableName} unchanged.`);
+                            // Granular Smart Diff Check - only update changed sections
+                            // Greeting
+                            if (JSON.stringify(freshData.greeting) !== JSON.stringify(homeData.greeting) ||
+                                JSON.stringify(freshData.memberName) !== JSON.stringify(homeData.memberName)) {
+                                App.pages.home.renderGreeting(freshData);
                             }
-                        }).catch(err => console.error(`[Home] ${tableName} refresh failed`, err));
+
+                            // New Requests
+                            if (JSON.stringify(freshData.new_requests) !== JSON.stringify(homeData.new_requests)) {
+                                App.pages.home.renderNewRequests(freshData.new_requests || []);
+                            }
+
+                            // My Tasks
+                            if (JSON.stringify(freshData.assigned_creatives) !== JSON.stringify(homeData.assigned_creatives)) {
+                                App.pages.home.renderMyTasks(freshData.assigned_creatives || []);
+                            }
+
+                        }).catch(err => console.error('Background refresh failed', err));
                     }
-                    return data;
-                });
-        };
 
-        if (!App.state.data.creatives || App.state.data.creatives.length === 0) {
-            loadPromises.push(
-                loadWithSWR(SHEET_NAMES.CREATIVES, (d) => { App.state.data.creatives = d; }, () => App.state.data.creatives)
-            );
+                    // 初回描画（キャッシュまたは最新）
+                    App.pages.home.renderGreeting(homeData);
+                    App.pages.home.renderNewRequests(homeData.new_requests || []);
+                    App.pages.home.renderMyTasks(homeData.assigned_creatives || []);
+
+                    // Phase 2: 追加データの取得（リレーション用）
+                    return App.pages.home.loadRelatedData();
+                })
+                .then(() => {
+                    // Column 3: リレーション
+                    App.pages.home.loadRelations();
+                    hideLoading();
+                })
+                .catch(App.utils.error.handle);
+        },
+
+        /**
+         * 挨拶を描画
+         */
+        renderGreeting: function (homeData) {
+            const greetingEl = document.getElementById('home-greeting');
+            if (greetingEl) {
+                const greeting = (homeData.greeting || 'こんにちは') + '、' + (homeData.memberName || 'ゲスト') + 'さん。';
+                greetingEl.textContent = greeting;
+            }
+
+            const greetingSubEl = document.getElementById('home-greeting-sub');
+            if (greetingSubEl) {
+                const messages = [
+                    'ステータスは最新ですか？随時更新しましょう。',
+                    '右上のボタンから打刻して、今日のタスクを始めましょう。',
+                    '新着依頼が来ていたら、早めに処理しましょう。',
+                    'リレーション（担当企画など）の状態を、こまめにチェックしましょう。',
+                    'ZARMSで管理できない情報がありますか？総務に機能追加をリクエストしましょう。',
+                    'フロー情報はSlackで共有し、ストック情報はZARMSで管理しましょう。',
+                    'ZARMSにある情報が最新、と言い切れるようにしましょう。',
+                    '独自のスプレッドシートなどを作ることは、最新の情報がわからなくなる原因になります。避けましょう。',
+                ];
+                const num = Math.floor(Math.random() * (messages.length));
+                greetingSubEl.textContent = messages[num];
+            }
+        },
+
+        /**
+         * 関連データを順次取得（リレーション表示用）
+         */
+        loadRelatedData: function () {
+            const loadPromises = [];
+
+            // Helper for SWR execution
+            const loadWithSWR = (tableName, setGlobalData, getGlobalData) => {
+                return callGAS('getItemsCached', tableName)
+                    .then(response => {
+                        const data = response.data || [];
+                        setGlobalData(data); // Set initial data (Cache or Fresh)
+
+                        // SWR: Background Fetch & Diff Check
+                        if (response.isCached) {
+                            console.log(`[Home] ${tableName} cached. Fetching fresh data...`);
+                            callGAS('getItemsCached', tableName, true).then(freshResponse => {
+                                const freshData = freshResponse.data || [];
+                                const currentData = getGlobalData();
+
+                                if (JSON.stringify(freshData) !== JSON.stringify(currentData)) {
+                                    console.log(`[Home] ${tableName} updated. Re-rendering relations.`);
+                                    setGlobalData(freshData);
+                                    // Only re-render if this table is currently selected in Relations column?
+                                    // Simplified: Just call loadRelations. It checks selected type.
+                                    const typeSelect = document.getElementById('relation-type-select');
+                                    if (typeSelect) {
+                                        const selectedType = typeSelect.value; // 'creatives', 'plans'
+                                        if ((tableName === SHEET_NAMES.CREATIVES && selectedType === 'creatives') ||
+                                            (tableName === SHEET_NAMES.PLANS && selectedType === 'plans')) {
+                                            App.pages.home.loadRelations();
+                                        }
+                                    }
+                                } else {
+                                    console.log(`[Home] ${tableName} unchanged.`);
+                                }
+                            }).catch(err => console.error(`[Home] ${tableName} refresh failed`, err));
+                        }
+                        return data;
+                    });
+            };
+
+            if (!App.state.data.creatives || App.state.data.creatives.length === 0) {
+                loadPromises.push(
+                    loadWithSWR(SHEET_NAMES.CREATIVES, (d) => { App.state.data.creatives = d; }, () => App.state.data.creatives)
+                );
+            }
+
+            if (!App.state.data.plans || App.state.data.plans.length === 0) {
+                loadPromises.push(
+                    loadWithSWR(SHEET_NAMES.PLANS, (d) => { App.state.data.plans = d; }, () => App.state.data.plans)
+                );
+            }
+
+            return Promise.all(loadPromises);
+        },
+
+        /**
+         * Column 1: 新規依頼
+         * ステータスが未着手（creative_status_key === 'TODO'）の制作物を表示
+         */
+        renderNewRequests: function (creatives) {
+            const container = document.getElementById('home-new-requests-container');
+            if (!container) return;
+
+            const newRequests = creatives.filter(c =>
+                c.creative_status_key === 'TODO' ||
+                c.creative_status_key === 'APPROVED'
+            ).slice(0, 10); // 最新10件
+
+            if (newRequests.length === 0) {
+                container.innerHTML = '<article class="transparent"><i>info</i><p>新規依頼はありません</p></article>';
+                return;
+            }
+
+            container.innerHTML = newRequests.map(creative => {
+                const statusLabel = getEnumLabel(creative.creative_status_key, 'CREATIVE_STATUS');
+                const priorityLabel = getEnumLabel(creative.priority_key, 'PRIORITY');
+
+                return `
+                    <article class="small-padding bottom-margin" style="cursor: pointer;" onclick="App.overlays.creativeDetail.open('${creative.id}')">
+                        <div class="small-text" style="font-family: 'Roboto Mono', monospace; font-weight: 500;"><strong>${escapeHtml(formatDisplayId(SHEET_NAMES.CREATIVES, creative.display_id))}</strong></div>
+                        <div class="small-text">${escapeHtml(creative.title || '')}</div>
+                        <div class="row no-space" style="margin-top: 4px;">
+                            <span class="chip small">${escapeHtml(statusLabel)}</span>
+                            ${priorityLabel ? `<span class="chip small">${escapeHtml(priorityLabel)}</span>` : ''}
+                        </div>
+                        ${creative.deadline_at ? `<div class="small-text" style="margin-top: 4px;">納期: ${formatDate(creative.deadline_at)}</div>` : ''}
+                    </article>
+                `;
+            }).join('');
+        },
+
+        /**
+         * Column 2: マイタスク
+         * 自分が担当者で、ステータスが未完了（task_status_key !== 'DONE'）のタスクを表示
+         */
+        renderMyTasks: function (tasks) {
+            const container = document.getElementById('home-tasks-container');
+            if (!container) return;
+
+            // 現在のユーザーを取得（仮）
+            const currentUserEmail = templateVariables?.email;
+            const currentUser = App.state.data.members.find(m => m.email === currentUserEmail);
+
+            const myTasks = tasks.filter(t =>
+                t.assign_to === currentUser?.id &&
+                t.task_status_key !== 'DONE'
+            ).sort((a, b) => {
+                // ends_at昇順でソート
+                const aDate = a.ends_at ? new Date(a.ends_at) : new Date('9999-12-31');
+                const bDate = b.ends_at ? new Date(b.ends_at) : new Date('9999-12-31');
+                return aDate - bDate;
+            }).slice(0, 10);
+
+            if (myTasks.length === 0) {
+                container.innerHTML = '<article class="transparent"><i>info</i><p>タスクはありません</p></article>';
+                return;
+            }
+
+            container.innerHTML = myTasks.map(task => {
+                const statusLabel = getEnumLabel(task.task_status_key, 'TASK_STATUS');
+                const priorityLabel = getEnumLabel(task.priority_key, 'PRIORITY');
+
+                return `
+                    <article class="small-padding bottom-margin" style="cursor: pointer;" onclick="if(App.overlays.taskDetail) App.overlays.taskDetail.open('${task.id}')">
+                        <div class="small-text" style="font-family: 'Roboto Mono', monospace; font-weight: 500;"><strong>${escapeHtml(formatDisplayId(SHEET_NAMES.TASKS, task.display_id))}</strong></div>
+                        <div class="small-text">${escapeHtml(task.title || '')}</div>
+                        <div class="row no-space" style="margin-top: 4px;">
+                            <span class="chip small">${escapeHtml(statusLabel)}</span>
+                            ${priorityLabel ? `<span class="chip small">${escapeHtml(priorityLabel)}</span>` : ''}
+                        </div>
+                        ${task.ends_at ? `<div class="small-text" style="margin-top: 4px;">期限: ${formatDate(task.ends_at)}</div>` : ''}
+                    </article>
+                `;
+            }).join('');
+        },
+
+        /**
+         * Column 3: リレーション
+         * ドロップダウンで選択されたタイプに応じてassignmentsテーブルから関連アイテムを表示
+         */
+        loadRelations: function () {
+            const container = document.getElementById('home-relations-container');
+            const typeSelect = document.getElementById('relation-type-select');
+
+            if (!container || !typeSelect) return;
+
+            const selectedType = typeSelect.value;
+
+            // 現在は簡易実装：creativesDataから表示
+            let items = [];
+
+            switch (selectedType) {
+                case 'creatives':
+                    items = App.state.data.creatives.slice(0, 10);
+                    break;
+                case 'advertisements':
+                    items = App.state.data.advertisements ? App.state.data.advertisements.slice(0, 10) : [];
+                    break;
+                case 'plans':
+                    items = App.state.data.plans.slice(0, 10);
+                    break;
+            }
+
+            if (items.length === 0) {
+                container.innerHTML = '<article class="transparent"><i>info</i><p>関連アイテムはありません</p></article>';
+                return;
+            }
+
+            container.innerHTML = items.map(item => {
+                const title = item.title || item.name || '';
+                // selectedType に応じて適切なテーブル名を決定
+                const tableName = selectedType === 'creatives' ? SHEET_NAMES.CREATIVES :
+                    selectedType === 'plans' ? SHEET_NAMES.PLANS :
+                        SHEET_NAMES.ADVERTISEMENTS;
+                const displayId = formatDisplayId(tableName, item.display_id);
+
+                return `
+                    <article class="small-padding bottom-margin" style="cursor: pointer;" onclick="if(App.overlays.${selectedType === 'creatives' ? 'creativeDetail' : selectedType === 'plans' ? 'planDetail' : 'advertisementDetail'}) App.overlays.${selectedType === 'creatives' ? 'creativeDetail' : selectedType === 'plans' ? 'planDetail' : 'advertisementDetail'}.open('${item.id}')">
+                        <div class="small-text" style="font-family: 'Roboto Mono', monospace; font-weight: 500;"><strong>${escapeHtml(displayId)}</strong></div>
+                        <div class="small-text">${escapeHtml(title)}</div>
+                    </article>
+                `;
+            }).join('');
         }
-
-        if (!App.state.data.plans || App.state.data.plans.length === 0) {
-            loadPromises.push(
-                loadWithSWR(SHEET_NAMES.PLANS, (d) => { App.state.data.plans = d; }, () => App.state.data.plans)
-            );
-        }
-
-        return Promise.all(loadPromises);
-    };
-
-    /**
-     * Column 1: 新規依頼
-     * ステータスが未着手（creative_status_key === 'TODO'）の制作物を表示
-     */
-    App.pages.home.renderNewRequests = function (creatives) {
-        const container = document.getElementById('home-new-requests-container');
-        if (!container) return;
-
-        const newRequests = creatives.filter(c =>
-            c.creative_status_key === 'TODO' ||
-            c.creative_status_key === 'APPROVED'
-        ).slice(0, 10); // 最新10件
-
-        if (newRequests.length === 0) {
-            container.innerHTML = '<article class="transparent"><i>info</i><p>新規依頼はありません</p></article>';
-            return;
-        }
-
-        container.innerHTML = newRequests.map(creative => {
-            const statusLabel = getEnumLabel(creative.creative_status_key, 'CREATIVE_STATUS');
-            const priorityLabel = getEnumLabel(creative.priority_key, 'PRIORITY');
-
-            return `
-                <article class="small-padding bottom-margin" style="cursor: pointer;" onclick="App.overlays.creativeDetail.open('${creative.id}')">
-                    <div class="small-text" style="font-family: 'Roboto Mono', monospace; font-weight: 500;"><strong>${escapeHtml(formatDisplayId(SHEET_NAMES.CREATIVES, creative.display_id))}</strong></div>
-                    <div class="small-text">${escapeHtml(creative.title || '')}</div>
-                    <div class="row no-space" style="margin-top: 4px;">
-                        <span class="chip small">${escapeHtml(statusLabel)}</span>
-                        ${priorityLabel ? `<span class="chip small">${escapeHtml(priorityLabel)}</span>` : ''}
-                    </div>
-                    ${creative.deadline_at ? `<div class="small-text" style="margin-top: 4px;">納期: ${formatDate(creative.deadline_at)}</div>` : ''}
-                </article>
-            `;
-        }).join('');
-    };
-
-    /**
-     * Column 2: マイタスク
-     * 自分が担当者で、ステータスが未完了（task_status_key !== 'DONE'）のタスクを表示
-     */
-    App.pages.home.renderMyTasks = function (tasks) {
-        const container = document.getElementById('home-tasks-container');
-        if (!container) return;
-
-        // 現在のユーザーを取得（仮）
-        const currentUserEmail = templateVariables?.email;
-        const currentUser = App.state.data.members.find(m => m.email === currentUserEmail);
-
-        const myTasks = tasks.filter(t =>
-            t.assign_to === currentUser?.id &&
-            t.task_status_key !== 'DONE'
-        ).sort((a, b) => {
-            // ends_at昇順でソート
-            const aDate = a.ends_at ? new Date(a.ends_at) : new Date('9999-12-31');
-            const bDate = b.ends_at ? new Date(b.ends_at) : new Date('9999-12-31');
-            return aDate - bDate;
-        }).slice(0, 10);
-
-        if (myTasks.length === 0) {
-            container.innerHTML = '<article class="transparent"><i>info</i><p>タスクはありません</p></article>';
-            return;
-        }
-
-        container.innerHTML = myTasks.map(task => {
-            const statusLabel = getEnumLabel(task.task_status_key, 'TASK_STATUS');
-            const priorityLabel = getEnumLabel(task.priority_key, 'PRIORITY');
-
-            return `
-                <article class="small-padding bottom-margin" style="cursor: pointer;" onclick="if(App.overlays.taskDetail) App.overlays.taskDetail.open('${task.id}')">
-                    <div class="small-text" style="font-family: 'Roboto Mono', monospace; font-weight: 500;"><strong>${escapeHtml(formatDisplayId(SHEET_NAMES.TASKS, task.display_id))}</strong></div>
-                    <div class="small-text">${escapeHtml(task.title || '')}</div>
-                    <div class="row no-space" style="margin-top: 4px;">
-                        <span class="chip small">${escapeHtml(statusLabel)}</span>
-                        ${priorityLabel ? `<span class="chip small">${escapeHtml(priorityLabel)}</span>` : ''}
-                    </div>
-                    ${task.ends_at ? `<div class="small-text" style="margin-top: 4px;">期限: ${formatDate(task.ends_at)}</div>` : ''}
-                </article>
-            `;
-        }).join('');
-    };
-
-    /**
-     * Column 3: リレーション
-     * ドロップダウンで選択されたタイプに応じてassignmentsテーブルから関連アイテムを表示
-     */
-    App.pages.home.loadRelations = function () {
-        const container = document.getElementById('home-relations-container');
-        const typeSelect = document.getElementById('relation-type-select');
-
-        if (!container || !typeSelect) return;
-
-        const selectedType = typeSelect.value;
-
-        // 現在は簡易実装：creativesDataから表示
-        let items = [];
-
-        switch (selectedType) {
-            case 'creatives':
-                items = App.state.data.creatives.slice(0, 10);
-                break;
-            case 'advertisements':
-                items = App.state.data.advertisements ? App.state.data.advertisements.slice(0, 10) : [];
-                break;
-            case 'plans':
-                items = App.state.data.plans.slice(0, 10);
-                break;
-        }
-
-        if (items.length === 0) {
-            container.innerHTML = '<article class="transparent"><i>info</i><p>関連アイテムはありません</p></article>';
-            return;
-        }
-
-        container.innerHTML = items.map(item => {
-            const title = item.title || item.name || '';
-            // selectedType に応じて適切なテーブル名を決定
-            const tableName = selectedType === 'creatives' ? SHEET_NAMES.CREATIVES :
-                selectedType === 'plans' ? SHEET_NAMES.PLANS :
-                    SHEET_NAMES.ADVERTISEMENTS;
-            const displayId = formatDisplayId(tableName, item.display_id);
-
-            return `
-                <article class="small-padding bottom-margin" style="cursor: pointer;" onclick="if(App.overlays.${selectedType === 'creatives' ? 'creativeDetail' : selectedType === 'plans' ? 'planDetail' : 'advertisementDetail'}) App.overlays.${selectedType === 'creatives' ? 'creativeDetail' : selectedType === 'plans' ? 'planDetail' : 'advertisementDetail'}.open('${item.id}')">
-                    <div class="small-text" style="font-family: 'Roboto Mono', monospace; font-weight: 500;"><strong>${escapeHtml(displayId)}</strong></div>
-                    <div class="small-text">${escapeHtml(title)}</div>
-                </article>
-            `;
-        }).join('');
     };
 </script>

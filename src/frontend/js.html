@@ -5,50 +5,52 @@
   // App.state の初期化とデータ管理用関数の定義
   (function () {
     // 従来のグローバル変数を App.state.data に集約
-    App.state.data = {
-      config: {},
-      prefix: {},
-      enum: {},
-      advertisements: [],
-      budgets: [],
-      creatives: [],
-      directories: [],
-      events: [],
-      expenses: [],
-      forms: [],
-      hardwares: [],
-      jobs: [],
-      knowledges: [],
-      licenses: [],
-      mediums: [],
-      members: [],
-      merchandises: [],
-      musics: [],
-      plans: [],
-      questions: [],
-      resources: [],
-      shifts: [],
-      skills: [],
-      tasks: [],
-      wikis: []
-    };
+    App.state = {
+      data: {
+        config: {},
+        prefix: {},
+        enum: {},
+        advertisements: [],
+        budgets: [],
+        creatives: [],
+        directories: [],
+        events: [],
+        expenses: [],
+        forms: [],
+        hardwares: [],
+        jobs: [],
+        knowledges: [],
+        licenses: [],
+        mediums: [],
+        members: [],
+        merchandises: [],
+        musics: [],
+        plans: [],
+        questions: [],
+        resources: [],
+        shifts: [],
+        skills: [],
+        tasks: [],
+        wikis: []
+      },
 
-    /**
-     * 指定したテーブルのデータを取得します
-     * @param {string} tableName - テーブル名
-     * @returns {Array|Object} データ
-     */
-    App.state.get = function (tableName) {
-      return App.state.data[tableName];
-    };
+      /**
+       * 指定したテーブルのデータを取得します
+       * @param {string} tableName - テーブル名
+       * @returns {Array|Object} データ
+       */
+      get: function (tableName) {
+        return this.data[tableName];
+      },
 
-    /**
-     * 指定したテーブルにデータをセットします
-     * @param {string} tableName - テーブル名
-     * @param {Array|Object} data - データ
-     */
-    App.state.set = function (tableName, data) {
-      App.state.data[tableName] = data;
+      /**
+       * 指定したテーブルにデータをセットします
+       * @param {string} tableName - テーブル名
+       * @param {Array|Object} data - データ
+       */
+      set: function (tableName, data) {
+        this.data[tableName] = data;
+      }
     };
   })();
 
@@ -603,40 +605,40 @@
   // ============================================
   // UI Utilities
   // ============================================
-  if (!App.utils.ui) App.utils.ui = {};
+  App.utils.ui = {
+    /**
+     * Mainタグ内のすべてのインタラクティブ要素のReadonly/Disabled状態を切り替えます
+     * @param {boolean} readonly - trueで無効化、falseで有効化
+     */
+    setMainReadonly: function (readonly) {
+      const main = document.querySelector('main');
 
-  /**
-   * Mainタグ内のすべてのインタラクティブ要素のReadonly/Disabled状態を切り替えます
-   * @param {boolean} readonly - trueで無効化、falseで有効化
-   */
-  App.utils.ui.setMainReadonly = function (readonly) {
-    const main = document.querySelector('main');
+      // fields (inputs wrappers) and buttons within main
+      // Also include inputs, selects, textareas directly
+      const selectors = [
+        '.field',
+        'button',
+        'input',
+        'select',
+        'textarea',
+        'a[onclick]',  // Links acting as buttons
+        'i[onclick]',  // Icons acting as buttons
+        '.chip i'      // Close icons in chips
+      ];
 
-    // fields (inputs wrappers) and buttons within main
-    // Also include inputs, selects, textareas directly
-    const selectors = [
-      '.field',
-      'button',
-      'input',
-      'select',
-      'textarea',
-      'a[onclick]',  // Links acting as buttons
-      'i[onclick]',  // Icons acting as buttons
-      '.chip i'      // Close icons in chips
-    ];
+      const elements = main.querySelectorAll(selectors.join(', '));
 
-    const elements = main.querySelectorAll(selectors.join(', '));
+      elements.forEach(el => {
+        // Toggle disabled attribute for form elements and buttons
+        if ('disabled' in el) {
+          el.disabled = readonly;
+        }
 
-    elements.forEach(el => {
-      // Toggle disabled attribute for form elements and buttons
-      if ('disabled' in el) {
-        el.disabled = readonly;
-      }
-
-      // Control pointer events and visual opacity
-      el.style.pointerEvents = readonly ? 'none' : '';
-      el.style.opacity = readonly ? '0.8' : '';
-    });
+        // Control pointer events and visual opacity
+        el.style.pointerEvents = readonly ? 'not-allowed' : '';
+        el.style.opacity = readonly ? '0.8' : '';
+      });
+    }
   };
 
 
