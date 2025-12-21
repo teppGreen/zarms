@@ -123,7 +123,9 @@
 </div>
 
 <script>
-  App.pages.creativeDetail = {
+    (function () {
+      if (!App.pages.creativeDetail) App.pages.creativeDetail = {};
+    App.pages.creativeDetail = {
     currentId: null,
     isLoading: false,
     isRefetching: false,
@@ -667,7 +669,5 @@
         .catch(App.utils.error.handle);
     }
   };
-
-  // Maintain alias for other components if they use App.overlays.creativeDetail
-  App.overlays.creativeDetail = App.pages.creativeDetail;
+})();
 </script>
