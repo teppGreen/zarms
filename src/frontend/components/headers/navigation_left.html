@@ -101,6 +101,18 @@
         };
 
         /**
+         * 詳細画面から戻る
+         * @param {string} tabName - 戻り先のタブ名
+         * @param {Object} detailPageObj - 詳細ページオブジェクト (resetメソッドを持つ)
+         */
+        App.utils.navigation.goBack = function (tabName, detailPageObj) {
+            App.utils.navigation.switchTab(tabName);
+            if (detailPageObj && typeof detailPageObj.reset === 'function') {
+                detailPageObj.reset();
+            }
+        };
+
+        /**
          * タブデータを読み込む
          */
         App.utils.navigation.loadTabData = function (tabName) {
