@@ -2,6 +2,8 @@
 // code.gs - メインロジックとWebアプリのエントリーポイント
 // ============================================
 
+let activeUser;
+
 // Webアプリのエントリーポイント
 function doGet(e) {
   // starting.html をテンプレートとして作成
@@ -24,7 +26,7 @@ function doGet(e) {
 function loadMainApplication(params) {
   // 認証チェック
   const userEmail = Session.getActiveUser().getEmail();
-  const activeUser = getActiveUser();
+  activeUser = getActiveUser();
   if (!checkPermission(activeUser, 'view')) {
     const template = HtmlService.createTemplate(
       `<h1>アクセス権限がありません</h1>` +

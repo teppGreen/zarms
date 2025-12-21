@@ -124,15 +124,13 @@ function deleteData(sheetName, condition) {
  * @returns {any} 結果データ (read系) または 成功フラグ (write系)
  */
 function callBackendAPI(operation, payload) {
-  const userEmail = Session.getActiveUser().getEmail();
-
   if (!BACKEND_URL || !BACKEND_URL.includes('/exec')) {
     throw new Error('Invalid BACKEND_URL. Please check Script Properties. The URL must end with "/exec". Current value: ' + BACKEND_URL);
   }
 
   const requestPayload = {
     token: API_TOKEN,
-    userId: userEmail,
+    userId: activeUser.id,
     operation: operation,
     ...payload
   };
