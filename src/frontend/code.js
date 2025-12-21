@@ -344,18 +344,16 @@ function getMemberById(id) {
 }
 
 function createMember(memberData) {
-  const userEmail = Session.getActiveUser().getEmail();
-  const now = new Date();
   const newMember = {
-    member_email: memberData.member_email,
-    slack_member_id: memberData.slack_member_id || '',
-    member_name: memberData.member_name,
-    member_team_key: memberData.member_team_key,
-    role_key: memberData.role_key,
-    member_notes: memberData.member_notes || '',
-    member_icon: memberData.member_icon || '',
-    created_by: userEmail,
-    created_at: now,
+    email: memberData.email,
+    slack_profile_url: memberData.slack_profile_url || '',
+    display_name: memberData.display_name,
+    display_name_yomi: memberData.display_name_yomi || '',
+    last_name: memberData.last_name,
+    last_name_yomi: memberData.last_name_yomi || '',
+    first_name: memberData.first_name,
+    first_name_yomi: memberData.first_name_yomi || '',
+    icon_gfile_id: memberData.icon_gfile_id || ''
   };
   return createData('members', newMember);
 }

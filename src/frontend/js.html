@@ -601,6 +601,46 @@
 
 
   // ============================================
+  // UI Utilities
+  // ============================================
+  if (!App.utils.ui) App.utils.ui = {};
+
+  /**
+   * Mainタグ内のすべてのインタラクティブ要素のReadonly/Disabled状態を切り替えます
+   * @param {boolean} readonly - trueで無効化、falseで有効化
+   */
+  App.utils.ui.setMainReadonly = function (readonly) {
+    const main = document.querySelector('main');
+
+    // fields (inputs wrappers) and buttons within main
+    // Also include inputs, selects, textareas directly
+    const selectors = [
+      '.field',
+      'button',
+      'input',
+      'select',
+      'textarea',
+      'a[onclick]',  // Links acting as buttons
+      'i[onclick]',  // Icons acting as buttons
+      '.chip i'      // Close icons in chips
+    ];
+
+    const elements = main.querySelectorAll(selectors.join(', '));
+
+    elements.forEach(el => {
+      // Toggle disabled attribute for form elements and buttons
+      if ('disabled' in el) {
+        el.disabled = readonly;
+      }
+
+      // Control pointer events and visual opacity
+      el.style.pointerEvents = readonly ? 'none' : '';
+      el.style.opacity = readonly ? '0.8' : '';
+    });
+  };
+
+
+  // ============================================
   // Optimistic UI: データ同期ロジック
   // ============================================
 
