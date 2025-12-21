@@ -37,233 +37,209 @@
 
 <script>
     (function () {
-        App.modals.new_task = App.modals.new_task || {};
+        App.modals.new_task = {
+            updateDateTimeValue: function (inputs, hiddenInput) {
+                const values = Array.from(inputs).map(input => input.value);
+                const [yyyy, mm, dd, hh, min] = values;
 
-        App.modals.new_task.updateDateTimeValue = function (inputs, hiddenInput) {
-            const values = Array.from(inputs).map(input => input.value);
-            const [yyyy, mm, dd, hh, min] = values;
-
-            // すべての値が入力されている場合のみ、隠しフィールドに値を設定
-            if (yyyy && yyyy.length === 4 && mm && mm.length === 2 && dd && dd.length === 2 && hh && hh.length === 2 && min && min.length === 2) {
-                const paddedYyyy = yyyy.padStart(4, '0');
-                const paddedMm = mm.padStart(2, '0');
-                const paddedDd = dd.padStart(2, '0');
-                const paddedHh = hh.padStart(2, '0');
-                const paddedMin = min.padStart(2, '0');
-                hiddenInput.value = `${paddedYyyy}-${paddedMm}-${paddedDd}T${paddedHh}:${paddedMin}:00`;
-            } else {
-                hiddenInput.value = '';
-            }
-        };
-
-        App.modals.new_task.open = function (creativeId) {
-            const form = document.getElementById('new-task-form');
-            form.elements.creative_id.value = creativeId;
-
-            // IME変換確定時のEnterキーを無視する処理を追加
-            const textInputs = form.querySelectorAll('input[type="text"], textarea');
-            textInputs.forEach(input => {
-                input.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' && e.isComposing) {
-                        e.stopPropagation();
-                    }
-                });
-            });
-
-            // datetime-localをカスタム日時入力フィールドに置き換え
-            const datetimeInput = form.querySelector('input[name="planned_end_datetime"]');
-            if (datetimeInput && datetimeInput.type === 'datetime-local') {
-                const formGroup = datetimeInput.closest('.form-group'); // Note: This class might not exist in beer css structure used? in html it is .field.label.border. Check html.
-                // In original html: <div class="field label border">.
-                // And in js.html code: const formGroup = datetimeInput.closest('.form-group');
-                // If .form-group is not there, logic might fail. But I'll copy as is from js.html.
-                // Wait, let me check js.html line 1170.
-                /*
-                   1170:       const formGroup = datetimeInput.closest('.form-group');
-                   1171:       if (formGroup) {
-                */
-                // In new_task.html: <div class="field label border">. I don't see .form-group.
-                // So the original code might have been broken or relied on a class I don't see.
-                // Ah, maybe I should change .closest('.form-group') to .closest('.field')?
-                // Since I am refactoring, and I see the HTML, I should fix it.
-
-                let containerElement = datetimeInput.closest('.field'); // Use .field instead of .form-group
-                if (containerElement) {
-                    const label = containerElement.querySelector('label');
-                    const labelText = label ? label.textContent : '終了予定日';
-
-                    // 既存のdatetime-localを非表示にして、カスタム日時入力フィールドを作成
-                    datetimeInput.style.display = 'none';
-                    datetimeInput.setAttribute('data-original-type', 'datetime-local');
-                    // Hide standard inputs? BeerCSS might style them.
-
-                    // カスタム日時入力フィールドのコンテナを作成
-                    let datetimeContainer = containerElement.querySelector('#new-task-datetime-container');
-                    if (!datetimeContainer) {
-                        datetimeContainer = document.createElement('div');
-                        datetimeContainer.id = 'new-task-datetime-container';
-                        datetimeContainer.className = 'datetime-custom-editor';
-                        datetimeContainer.style.cssText = 'display: flex; align-items: center; gap: 4px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; background-color: white;';
-                        datetimeContainer.innerHTML = `
-            <input type="text" class="datetime-segment" data-segment="yyyy" maxlength="4" value="" placeholder="yyyy" style="width: 60px; text-align: center; border: none; outline: none; background: transparent;">
-            <span class="datetime-separator">/</span>
-            <input type="text" class="datetime-segment" data-segment="mm" maxlength="2" value="" placeholder="mm" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;">
-            <span class="datetime-separator">/</span>
-            <input type="text" class="datetime-segment" data-segment="dd" maxlength="2" value="" placeholder="dd" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;">
-            <span class="datetime-separator"> </span>
-            <input type="text" class="datetime-segment" data-segment="hh" maxlength="2" value="" placeholder="hh" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;">
-            <span class="datetime-separator">:</span>
-            <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="" placeholder="mm" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;">
-          `;
-                        datetimeInput.parentNode.insertBefore(datetimeContainer, datetimeInput);
-                    }
-
-                    // カスタム日時入力フィールドの設定
-                    const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
-
-                    inputs.forEach((input, index) => {
-                        // 数字のみ入力可能
-                        input.addEventListener('input', (e) => {
-                            let value = e.target.value.replace(/[^0-9]/g, '');
-                            const maxLength = parseInt(e.target.getAttribute('maxlength'));
-
-                            if (value.length > maxLength) {
-                                value = value.substring(0, maxLength);
-                            }
-
-                            e.target.value = value;
-
-                            // 最大桁数に達したら次のフィールドへ
-                            if (value.length >= maxLength && index < inputs.length - 1) {
-                                inputs[index + 1].focus();
-                                inputs[index + 1].select();
-                            }
-
-                            // 隠しフィールドに値を更新
-                            App.modals.new_task.updateDateTimeValue(inputs, datetimeInput);
-                        });
-
-                        // キーボード操作
-                        input.addEventListener('keydown', (e) => {
-                            if (e.key === 'Enter' && !e.isComposing) {
-                                e.preventDefault();
-                                // Enterキーで日時を確定（最後のフィールドの場合、またはすべてのフィールドが入力されている場合）
-                                if (index === inputs.length - 1) {
-                                    // 最後のフィールドでEnterキーを押した場合、フォーカスを外して確定
-                                    input.blur();
-                                } else {
-                                    // 次のフィールドに移動
-                                    if (index < inputs.length - 1) {
-                                        inputs[index + 1].focus();
-                                        inputs[index + 1].select();
-                                    }
-                                }
-                            } else if (e.key === 'ArrowRight' && e.target.selectionStart === e.target.value.length) {
-                                // カーソルが末尾にある場合は次のフィールドへ
-                                if (index < inputs.length - 1) {
-                                    e.preventDefault();
-                                    inputs[index + 1].focus();
-                                    inputs[index + 1].setSelectionRange(0, 0);
-                                }
-                            } else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) {
-                                // カーソルが先頭にある場合は前のフィールドへ
-                                if (index > 0) {
-                                    e.preventDefault();
-                                    const prevInput = inputs[index - 1];
-                                    prevInput.focus();
-                                    prevInput.setSelectionRange(prevInput.value.length, prevInput.value.length);
-                                }
-                            }
-                        });
-                    });
+                // すべての値が入力されている場合のみ、隠しフィールドに値を設定
+                if (yyyy && yyyy.length === 4 && mm && mm.length === 2 && dd && dd.length === 2 && hh && hh.length === 2 && min && min.length === 2) {
+                    const paddedYyyy = yyyy.padStart(4, '0');
+                    const paddedMm = mm.padStart(2, '0');
+                    const paddedDd = dd.padStart(2, '0');
+                    const paddedHh = hh.padStart(2, '0');
+                    const paddedMin = min.padStart(2, '0');
+                    hiddenInput.value = `${paddedYyyy}-${paddedMm}-${paddedDd}T${paddedHh}:${paddedMin}:00`;
+                } else {
+                    hiddenInput.value = '';
                 }
-            }
+            },
 
-            // メンバー選択肢を設定
-            const assignToSelect = form.elements.assign_to;
-            assignToSelect.innerHTML = '<option value="">選択してください</option>';
-            const membersData = App.state.data.members;
-            if (membersData && membersData.length > 0) {
-                membersData.forEach(member => {
-                    const option = document.createElement('option');
-                    option.value = member.id; // Corrected from member_email to id if available, but checking previous code: option.value = member.member_email;
-                    // Let's check what membersData actually contains. Usually it's members from SHEET_NAMES.MEMBERS.
-                    // Usually members have 'id' and 'display_name' or 'name'.
-                    // The old code used 'member_email' and 'member_name'. This might be from a join.
-                    // But if it's from SHEET_NAMES.MEMBERS, it should be 'id' and 'email' and 'display_name'.
-                    // Wait, I should stick to the same property names if possible, but let me check App.state.data.members properties.
-                    // Based on SHEET_NAMES.MEMBERS, properties are 'id', 'email', 'display_name', 'first_name', 'last_name'.
-                    // Let's use 'id' and 'display_name'.
-                    option.value = member.id;
-                    option.textContent = member.display_name || member.email;
-                    assignToSelect.appendChild(option);
-                });
-            }
+            open: function (creativeId) {
+                const form = document.getElementById('new-task-form');
+                form.elements.creative_id.value = creativeId;
 
-            // ステータス選択肢を設定
-            const statusSelect = form.elements.status_key;
-            statusSelect.innerHTML = '<option value="">選択してください</option>';
-            const enumData = App.state.data.enum;
-            const taskStatuses = enumData['TASK_STATUS'] || [];
-            taskStatuses.forEach(status => {
-                const option = document.createElement('option');
-                option.value = status.enum_key;
-                option.textContent = status.enum_value;
-                if (status.enum_key === 'TODO') {
-                    option.selected = true;
-                }
-                statusSelect.appendChild(option);
-            });
-
-            // 優先度選択肢を設定
-            const prioritySelect = form.elements.priority_key;
-            prioritySelect.innerHTML = '<option value="">選択してください</option>';
-            // enumData is already defined above
-            const priorities = enumData['PRIORITY'] || [];
-            priorities.forEach(priority => {
-                const option = document.createElement('option');
-                option.value = priority.enum_key;
-                option.textContent = priority.enum_value;
-                if (priority.enum_key === 'MEDIUM') {
-                    option.selected = true;
-                }
-                prioritySelect.appendChild(option);
-            });
-
-            openModal('modal-new-task');
-        };
-
-        App.modals.new_task.submit = function (event) {
-            event.preventDefault();
-            const form = event.target;
-
-            // カスタム日時入力フィールドの値を確実に更新
-            const datetimeContainer = document.getElementById('new-task-datetime-container');
-            const datetimeInput = form.querySelector('input[name="planned_end_datetime"]');
-            if (datetimeContainer && datetimeInput) {
-                const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
-                App.modals.new_task.updateDateTimeValue(inputs, datetimeInput);
-            }
-
-            const formData = new FormData(form);
-            const taskData = Object.fromEntries(formData.entries());
-
-            showModalLoading('modal-new-task', '新規タスクを作成しています');
-            callGAS('createItem', SHEET_NAMES.TASKS, taskData)
-                .then(taskId => {
-                    showModalSuccess('modal-new-task', '新規タスクを作成しました', () => {
-                        // Creative詳細を再読み込み
-                        if (typeof currentReviewRequestCreativeId !== 'undefined' && currentReviewRequestCreativeId) {
-                            if (App.overlays.creativeDetail) App.overlays.creativeDetail.open(currentReviewRequestCreativeId);
-                        } else if (typeof currentCreativeId !== 'undefined' && currentCreativeId) {
-                            if (App.overlays.creativeDetail) App.overlays.creativeDetail.open(currentCreativeId);
+                // IME変換確定時のEnterキーを無視する処理を追加
+                const textInputs = form.querySelectorAll('input[type="text"], textarea');
+                textInputs.forEach(input => {
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' && e.isComposing) {
+                            e.stopPropagation();
                         }
                     });
-                })
-                .catch(error => {
-                    App.utils.error.handle(error);
-                    resetModalState('modal-new-task');
                 });
+
+                // datetime-localをカスタム日時入力フィールドに置き換え
+                const datetimeInput = form.querySelector('input[name="planned_end_datetime"]');
+                if (datetimeInput && datetimeInput.type === 'datetime-local') {
+                    const containerElement = datetimeInput.closest('.field');
+                    if (containerElement) {
+                        const label = containerElement.querySelector('label');
+                        const labelText = label ? label.textContent : '終了予定日';
+
+                        // 既存のdatetime-localを非表示にして、カスタム日時入力フィールドを作成
+                        datetimeInput.style.display = 'none';
+                        datetimeInput.setAttribute('data-original-type', 'datetime-local');
+
+                        // カスタム日時入力フィールドのコンテナを作成
+                        let datetimeContainer = containerElement.querySelector('#new-task-datetime-container');
+                        if (!datetimeContainer) {
+                            datetimeContainer = document.createElement('div');
+                            datetimeContainer.id = 'new-task-datetime-container';
+                            datetimeContainer.className = 'datetime-custom-editor';
+                            datetimeContainer.style.cssText = 'display: flex; align-items: center; gap: 4px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; background-color: white;';
+                            datetimeContainer.innerHTML = `
+                <input type="text" class="datetime-segment" data-segment="yyyy" maxlength="4" value="" placeholder="yyyy" style="width: 60px; text-align: center; border: none; outline: none; background: transparent;">
+                <span class="datetime-separator">/</span>
+                <input type="text" class="datetime-segment" data-segment="mm" maxlength="2" value="" placeholder="mm" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;">
+                <span class="datetime-separator">/</span>
+                <input type="text" class="datetime-segment" data-segment="dd" maxlength="2" value="" placeholder="dd" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;">
+                <span class="datetime-separator"> </span>
+                <input type="text" class="datetime-segment" data-segment="hh" maxlength="2" value="" placeholder="hh" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;">
+                <span class="datetime-separator">:</span>
+                <input type="text" class="datetime-segment" data-segment="min" maxlength="2" value="" placeholder="mm" style="width: 40px; text-align: center; border: none; outline: none; background: transparent;">
+              `;
+                            datetimeInput.parentNode.insertBefore(datetimeContainer, datetimeInput);
+                        }
+
+                        // カスタム日時入力フィールドの設定
+                        const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
+
+                        inputs.forEach((input, index) => {
+                            // 数字のみ入力可能
+                            input.addEventListener('input', (e) => {
+                                let value = e.target.value.replace(/[^0-9]/g, '');
+                                const maxLength = parseInt(e.target.getAttribute('maxlength'));
+
+                                if (value.length > maxLength) {
+                                    value = value.substring(0, maxLength);
+                                }
+
+                                e.target.value = value;
+
+                                // 最大桁数に達したら次のフィールドへ
+                                if (value.length >= maxLength && index < inputs.length - 1) {
+                                    inputs[index + 1].focus();
+                                    inputs[index + 1].select();
+                                }
+
+                                // 隠しフィールドに値を更新
+                                App.modals.new_task.updateDateTimeValue(inputs, datetimeInput);
+                            });
+
+                            // キーボード操作
+                            input.addEventListener('keydown', (e) => {
+                                if (e.key === 'Enter' && !e.isComposing) {
+                                    e.preventDefault();
+                                    // Enterキーで日時を確定（最後のフィールドの場合、またはすべてのフィールドが入力されている場合）
+                                    if (index === inputs.length - 1) {
+                                        // 最後のフィールドでEnterキーを押した場合、フォーカスを外して確定
+                                        input.blur();
+                                    } else {
+                                        // 次のフィールドに移動
+                                        if (index < inputs.length - 1) {
+                                            inputs[index + 1].focus();
+                                            inputs[index + 1].select();
+                                        }
+                                    }
+                                } else if (e.key === 'ArrowRight' && e.target.selectionStart === e.target.value.length) {
+                                    // カーソルが末尾にある場合は次のフィールドへ
+                                    if (index < inputs.length - 1) {
+                                        e.preventDefault();
+                                        inputs[index + 1].focus();
+                                        inputs[index + 1].setSelectionRange(0, 0);
+                                    }
+                                } else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) {
+                                    // カーソルが先頭にある場合は前のフィールドへ
+                                    if (index > 0) {
+                                        e.preventDefault();
+                                        const prevInput = inputs[index - 1];
+                                        prevInput.focus();
+                                        prevInput.setSelectionRange(prevInput.value.length, prevInput.value.length);
+                                    }
+                                }
+                            });
+                        });
+                    }
+                }
+
+                // メンバー選択肢を設定
+                const assignToSelect = form.elements.assign_to;
+                assignToSelect.innerHTML = '<option value="">選択してください</option>';
+                const membersData = App.state.data.members;
+                if (membersData && membersData.length > 0) {
+                    membersData.forEach(member => {
+                        const option = document.createElement('option');
+                        option.value = member.id;
+                        option.textContent = member.display_name || member.email;
+                        assignToSelect.appendChild(option);
+                    });
+                }
+
+                // ステータス選択肢を設定
+                const statusSelect = form.elements.status_key;
+                statusSelect.innerHTML = '<option value="">選択してください</option>';
+                const enumData = App.state.data.enum;
+                const taskStatuses = enumData['TASK_STATUS'] || [];
+                taskStatuses.forEach(status => {
+                    const option = document.createElement('option');
+                    option.value = status.enum_key;
+                    option.textContent = status.enum_value;
+                    if (status.enum_key === 'TODO') {
+                        option.selected = true;
+                    }
+                    statusSelect.appendChild(option);
+                });
+
+                // 優先度選択肢を設定
+                const prioritySelect = form.elements.priority_key;
+                prioritySelect.innerHTML = '<option value="">選択してください</option>';
+                const priorities = enumData['PRIORITY'] || [];
+                priorities.forEach(priority => {
+                    const option = document.createElement('option');
+                    option.value = priority.enum_key;
+                    option.textContent = priority.enum_value;
+                    if (priority.enum_key === 'MEDIUM') {
+                        option.selected = true;
+                    }
+                    prioritySelect.appendChild(option);
+                });
+
+                openModal('modal-new-task');
+            },
+
+            submit: function (event) {
+                event.preventDefault();
+                const form = event.target;
+
+                // カスタム日時入力フィールドの値を確実に更新
+                const datetimeContainer = document.getElementById('new-task-datetime-container');
+                const datetimeInput = form.querySelector('input[name="planned_end_datetime"]');
+                if (datetimeContainer && datetimeInput) {
+                    const inputs = datetimeContainer.querySelectorAll('.datetime-segment');
+                    App.modals.new_task.updateDateTimeValue(inputs, datetimeInput);
+                }
+
+                const formData = new FormData(form);
+                const taskData = Object.fromEntries(formData.entries());
+
+                showModalLoading('modal-new-task', '新規タスクを作成しています');
+                callGAS('createItem', SHEET_NAMES.TASKS, taskData)
+                    .then(taskId => {
+                        showModalSuccess('modal-new-task', '新規タスクを作成しました', () => {
+                            // Creative詳細を再読み込み
+                            if (typeof currentReviewRequestCreativeId !== 'undefined' && currentReviewRequestCreativeId) {
+                                if (App.overlays.creativeDetail) App.overlays.creativeDetail.open(currentReviewRequestCreativeId);
+                            } else if (typeof currentCreativeId !== 'undefined' && currentCreativeId) {
+                                if (App.overlays.creativeDetail) App.overlays.creativeDetail.open(currentCreativeId);
+                            }
+                        });
+                    })
+                    .catch(error => {
+                        App.utils.error.handle(error);
+                        resetModalState('modal-new-task');
+                    });
+            }
         };
     })();
 </script>

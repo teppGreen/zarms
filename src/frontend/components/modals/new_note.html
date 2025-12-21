@@ -16,56 +16,56 @@
 
 <script>
     (function () {
-        App.modals.new_note = {};
-
-        App.modals.new_note.open = function (creativeId) {
-            const form = document.getElementById('new-note-form');
-            if (form) {
-                form.reset();
-                if (form.elements.creative_id) {
-                    form.elements.creative_id.value = creativeId;
-                }
-                openModal('modal-new-note');
-                // Focus the textarea
-                setTimeout(() => {
-                    const textarea = form.querySelector('textarea');
-                    if (textarea) textarea.focus();
-                }, 100);
-            }
-        };
-
-        App.modals.new_note.submit = function (event) {
-            event.preventDefault();
-            const form = event.target;
-            const content = form.elements.content.value.trim();
-            const creativeId = form.elements.creative_id.value;
-
-            if (!content) return;
-
-            const noteData = {
-                content: content,
-                related_table: SHEET_NAMES.CREATIVES,
-                related_id: creativeId
-            };
-
-            // Disable button to prevent double submit
-            const submitBtn = form.querySelector('button[type="submit"]');
-            if (submitBtn) submitBtn.disabled = true;
-
-            callGAS('createItem', 'notes', noteData)
-                .then(() => {
-                    closeModal('modal-new-note');
-                    if (App.pages.creativeDetail && App.pages.creativeDetail.currentId === creativeId) {
-                        App.pages.creativeDetail.loadNotes(creativeId);
+        App.modals.new_note = {
+            open: function (creativeId) {
+                const form = document.getElementById('new-note-form');
+                if (form) {
+                    form.reset();
+                    if (form.elements.creative_id) {
+                        form.elements.creative_id.value = creativeId;
                     }
-                })
-                .catch(err => {
-                    console.error('[NewNote] Failed to post note:', err);
-                    alert('送信に失敗しました: ' + (err.message || err));
-                })
-                .finally(() => {
-                    if (submitBtn) submitBtn.disabled = false;
-                });
+                    openModal('modal-new-note');
+                    // Focus the textarea
+                    setTimeout(() => {
+                        const textarea = form.querySelector('textarea');
+                        if (textarea) textarea.focus();
+                    }, 100);
+                }
+            },
+
+            submit: function (event) {
+                event.preventDefault();
+                const form = event.target;
+                const content = form.elements.content.value.trim();
+                const creativeId = form.elements.creative_id.value;
+
+                if (!content) return;
+
+                const noteData = {
+                    content: content,
+                    related_table: SHEET_NAMES.CREATIVES,
+                    related_id: creativeId
+                };
+
+                // Disable button to prevent double submit
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = true;
+
+                callGAS('createItem', 'notes', noteData)
+                    .then(() => {
+                        closeModal('modal-new-note');
+                        if (App.pages.creativeDetail && App.pages.creativeDetail.currentId === creativeId) {
+                            App.pages.creativeDetail.loadNotes(creativeId);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('[NewNote] Failed to post note:', err);
+                        alert('送信に失敗しました: ' + (err.message || err));
+                    })
+                    .finally(() => {
+                        if (submitBtn) submitBtn.disabled = false;
+                    });
+            }
         };
     })();
 </script>

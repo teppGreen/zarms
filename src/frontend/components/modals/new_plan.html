@@ -17,35 +17,35 @@
 
 <script>
     (function () {
-        App.modals.new_plan = App.modals.new_plan || {};
-
-        App.modals.new_plan.open = function () {
-            const form = document.getElementById('new-plan-form');
-            form.reset();
-            // IME変換確定時のEnterキーを無視する処理を追加
-            const textInputs = form.querySelectorAll('input[type="text"], textarea');
-            textInputs.forEach(input => {
-                input.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' && e.isComposing) {
-                        e.stopPropagation();
-                    }
+        App.modals.new_plan = {
+            open: function () {
+                const form = document.getElementById('new-plan-form');
+                form.reset();
+                // IME変換確定時のEnterキーを無視する処理を追加
+                const textInputs = form.querySelectorAll('input[type="text"], textarea');
+                textInputs.forEach(input => {
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' && e.isComposing) {
+                            e.stopPropagation();
+                        }
+                    });
                 });
-            });
-            openModal('modal-new-plan');
-        };
+                openModal('modal-new-plan');
+            },
 
-        App.modals.new_plan.submit = function (event) {
-            event.preventDefault();
-            const title = event.target.elements.title.value;
-            showModalLoading('modal-new-plan', '新規企画を作成しています');
-            callGAS('createItem', SHEET_NAMES.PLANS, { title: title }).then(() => {
-                showModalSuccess('modal-new-plan', '企画を作成しました', () => {
-                    loadTabData(SHEET_NAMES.PLANS);
+            submit: function (event) {
+                event.preventDefault();
+                const title = event.target.elements.title.value;
+                showModalLoading('modal-new-plan', '新規企画を作成しています');
+                callGAS('createItem', SHEET_NAMES.PLANS, { title: title }).then(() => {
+                    showModalSuccess('modal-new-plan', '企画を作成しました', () => {
+                        loadTabData(SHEET_NAMES.PLANS);
+                    });
+                }).catch(error => {
+                    App.utils.error.handle(error);
+                    resetModalState('modal-new-plan');
                 });
-            }).catch(error => {
-                App.utils.error.handle(error);
-                resetModalState('modal-new-plan');
-            });
+            }
         };
     })();
 </script>

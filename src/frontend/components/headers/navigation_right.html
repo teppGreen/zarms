@@ -47,7 +47,8 @@
     <button id="members-nav-right" class="round transparent" onclick="App.utils.navigation.openRightNavPage('members')">
         <i>groups</i>
     </button>
-    <button id="directories-nav-right" class="round transparent" onclick="App.utils.navigation.openRightNavPage('directories')">
+    <button id="directories-nav-right" class="round transparent"
+        onclick="App.utils.navigation.openRightNavPage('directories')">
         <i>account_tree</i>
     </button>
 </nav>
@@ -61,80 +62,82 @@
         // 現在開いている右navページを追跡
         let currentRightNavPage = null;
 
-        /**
-         * 右navからページをオーバーレイ表示する（BeerCSS Dialog使用）
-         */
-        App.utils.navigation.openRightNavPage = function (pageName) {
-            console.log(`currentRightNavPage: ${currentRightNavPage}`);
-            // 既に別のページが開いている場合は先に閉じる
-            if (currentRightNavPage === pageName) {
-                App.utils.navigation.closeRightNavOverlay();
-                return;
-            } else if (currentRightNavPage) {
-                App.utils.navigation.closeRightNavOverlay();
+        Object.assign(App.utils.navigation, {
+            /**
+             * 右navからページをオーバーレイ表示する（BeerCSS Dialog使用）
+             */
+            openRightNavPage: function (pageName) {
+                console.log(`currentRightNavPage: ${currentRightNavPage}`);
+                // 既に別のページが開いている場合は先に閉じる
+                if (currentRightNavPage === pageName) {
+                    App.utils.navigation.closeRightNavOverlay();
+                    return;
+                } else if (currentRightNavPage) {
+                    App.utils.navigation.closeRightNavOverlay();
+                }
+
+                // dialog要素を取得
+                const dialogElement = document.getElementById('overlay-contents');
+
+                // overlay-contentを取得
+                const overlayContent = document.getElementById('overlay-contents-' + pageName);
+
+                // overlayを取得
+                const overlay = document.getElementById('overlay');
+
+                // overlay-contentを表示
+                overlayContent.style.removeProperty('display');
+
+                // overlayを表示
+                overlay.classList.add('active');
+
+                // データを読み込み
+                if (App.utils.navigation.loadTabData) {
+                    App.utils.navigation.loadTabData(pageName);
+                }
+
+                // dialogにactiveクラスを追加
+                dialogElement.classList.add('active');
+
+                // 右navのアクティブ状態を更新
+                const activeButton = document.getElementById(pageName + '-nav-right');
+                if (activeButton) {
+                    activeButton.classList.add('right-round');
+                    activeButton.classList.add('secondary');
+                }
+
+                // 現在のページを記録
+                currentRightNavPage = pageName;
+            },
+
+            /**
+             * 右navオーバーレイを閉じる（BeerCSS Dialog使用）
+             */
+            closeRightNavOverlay: function () {
+                console.log(`currentRightNavPage: ${currentRightNavPage}`);
+                if (!currentRightNavPage) {
+                    return;
+                }
+
+                // dialog要素を取得
+                const dialogElement = document.getElementById('overlay-contents');
+                dialogElement.classList.remove('active');
+
+                // overlay-contentを閉じる
+                const overlayContent = document.getElementById('overlay-contents-' + currentRightNavPage);
+                overlayContent.style.display = 'none';
+
+                // 右navのアクティブ状態を解除
+                document.querySelectorAll('nav.right button[id$="-nav-right"]').forEach(btn => {
+                    btn.classList.remove('right-round');
+                    btn.classList.remove('secondary');
+                });
+
+                // overlayを非表示
+                overlay.classList.remove('active');
+
+                currentRightNavPage = null;
             }
-
-            // dialog要素を取得
-            const dialogElement = document.getElementById('overlay-contents');
-
-            // overlay-contentを取得
-            const overlayContent = document.getElementById('overlay-contents-' + pageName);
-
-            // overlayを取得
-            const overlay = document.getElementById('overlay');
-
-            // overlay-contentを表示
-            overlayContent.style.removeProperty('display');
-
-            // overlayを表示
-            overlay.classList.add('active');
-
-            // データを読み込み
-            if (App.utils.navigation.loadTabData) {
-                App.utils.navigation.loadTabData(pageName);
-            }
-
-            // dialogにactiveクラスを追加
-            dialogElement.classList.add('active');
-
-            // 右navのアクティブ状態を更新
-            const activeButton = document.getElementById(pageName + '-nav-right');
-            if (activeButton) {
-                activeButton.classList.add('right-round');
-                activeButton.classList.add('secondary');
-            }
-
-            // 現在のページを記録
-            currentRightNavPage = pageName;
-        };
-
-        /**
-         * 右navオーバーレイを閉じる（BeerCSS Dialog使用）
-         */
-        App.utils.navigation.closeRightNavOverlay = function () {
-            console.log(`currentRightNavPage: ${currentRightNavPage}`);
-            if (!currentRightNavPage) {
-                return;
-            }
-
-            // dialog要素を取得
-            const dialogElement = document.getElementById('overlay-contents');
-            dialogElement.classList.remove('active');
-
-            // overlay-contentを閉じる
-            const overlayContent = document.getElementById('overlay-contents-' + currentRightNavPage);
-            overlayContent.style.display = 'none';
-
-            // 右navのアクティブ状態を解除
-            document.querySelectorAll('nav.right button[id$="-nav-right"]').forEach(btn => {
-                btn.classList.remove('right-round');
-                btn.classList.remove('secondary');
-            });
-
-            // overlayを非表示
-            overlay.classList.remove('active');
-
-            currentRightNavPage = null;
-        };
+        });
     })();
 </script>
