@@ -130,7 +130,6 @@ function callBackendAPI(operation, payload) {
 
   const requestPayload = {
     token: API_TOKEN,
-    userId: activeUser.id,
     operation: operation,
     ...payload
   };
