@@ -64,6 +64,20 @@
                     }
                 }
 
+                // Overlayが開いている場合はリセット
+                if (currentTab && currentTab.id.startsWith('detail-')) {
+                    const overlayMap = {
+                        'detail-creative': 'creativeDetail',
+                        'detail-member': 'memberDetail',
+                        'detail-plan': 'planDetail',
+                        'detail-task': 'taskDetail'
+                    };
+                    const overlayName = overlayMap[currentTab.id];
+                    if (overlayName && App.overlays[overlayName] && typeof App.overlays[overlayName].reset === 'function') {
+                        App.overlays[overlayName].reset();
+                    }
+                }
+
                 // 右navから開いているページを閉じる
                 if (App.utils.navigation.closeRightNavOverlay) {
                     App.utils.navigation.closeRightNavOverlay();
