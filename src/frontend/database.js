@@ -3,117 +3,79 @@
 // ============================================
 
 /**
- * シートからすべてのデータを取得します。
+ * シートからデータを条件に基づいて取得します (SSSQL.select like)
  * @param {string} sheetName - シート名
+ * @param {Object} query - クエリオブジェクト (columns, where, groupBy, orderBy)
+ * @param {Object} [options] - オプション (withRowNum, asArray)
  * @returns {Object[]} データのオブジェクト配列
  */
-function getAllData(sheetName) {
-  return callBackendAPI('read_all', {
-    sheetName: sheetName
-  });
-}
-
-/**
- * IDに基づいてシートから単一のデータを取得します。
- * @param {string} sheetName - シート名
- * @param {any} id - 検索するID
- * @returns {Object|null} 見つかったデータオブジェクト、またはnull
- */
-function getDataById(sheetName, id) {
-  return callBackendAPI('read_by_id', {
-    sheetName: sheetName,
-    id: id,
-    idColumnName: ID_COLUMNS[sheetName]
-  });
-}
-
-/**
- * 条件に一致するデータをシートから検索します。
- * @param {string} sheetName - シート名
- * @param {Object} condition - 検索条件 (例: { key: 'value', ... })
- * @returns {Object[]} 条件に一致したデータのオブジェクト配列
- */
-function findData(sheetName, condition) {
-  return callBackendAPI('find', {
-    sheetName: sheetName,
-    condition: condition
-  });
-}
-
-/**
- * 高度な条件でフィルタリングしたデータを取得します（バックエンドでフィルタリング）。
- * @param {string} sheetName - シート名
- * @param {Object} whereConditions - SSSQL形式の検索条件
- * @param {Object} options - 追加オプション（orderBy, columns など）
- * @returns {Object[]} 条件に一致したデータのオブジェクト配列
- */
-function getFilteredData(sheetName, whereConditions, options = {}) {
-  return callBackendAPI('read_filtered', {
+function select(sheetName, query, options) {
+  return callBackendAPI('select', {
     sheetName: sheetName,
     data: {
-      where: whereConditions,
-      ...options
+      query: query || {},
+      options: options
     }
   });
 }
 
-
-
 /**
- * シートに新しいデータを追加します。
+ * シートに単一のデータを挿入します (SSSQL.insert like)
  * @param {string} sheetName - シート名
- * @param {Object} dataObject - 追加するデータオブジェクト
- * @returns {boolean} 成功したかどうか
+ * @param {Object} record - 挿入するデータ
+ * @returns {Object} 挿入されたデータ
  */
-function createData(sheetName, dataObject) {
-  return callBackendAPI('create', {
+function insert(sheetName, record) {
+  return callBackendAPI('insert', {
     sheetName: sheetName,
-    data: dataObject,
-    idColumnName: ID_COLUMNS[sheetName]
+    data: {
+      record: record
+    }
   });
 }
 
 /**
- * 複数のデータを一括でシートに追加します。
+ * シートに複数のデータを一括挿入します (SSSQL.bulkInsert like)
  * @param {string} sheetName - シート名
- * @param {Object[]} dataObjects - 追加するデータオブジェクトの配列
- * @returns {Object[]} 作成されたデータオブジェクトの配列
+ * @param {Object[]} records - 挿入するデータの配列
+ * @returns {Object[]} 挿入されたデータの配列
  */
-function bulkCreateData(sheetName, dataObjects) {
-  return callBackendAPI('bulk_create', {
+function bulkInsert(sheetName, records) {
+  return callBackendAPI('bulkinsert', {
     sheetName: sheetName,
-    data: dataObjects,
-    idColumnName: ID_COLUMNS[sheetName]
+    data: {
+      records: records
+    }
   });
 }
 
 /**
- * IDに基づいてシートのデータを更新します。
+ * 条件に一致するデータを更新します (SSSQL.update like)
  * @param {string} sheetName - シート名
- * @param {any} id - 更新するデータのID
- * @param {Object} updateDataObject - 更新するデータを含むオブジェクト
- * @returns {boolean} 成功したかどうか
+ * @param {Object} query - クエリオブジェクト (set, where)
+ * @returns {Object[]} 更新結果 (before/after のペア)
  */
-function updateData(sheetName, id, updateDataObject) {
+function update(sheetName, query) {
   return callBackendAPI('update', {
     sheetName: sheetName,
-    id: id,
-    data: updateDataObject,
-    idColumnName: ID_COLUMNS[sheetName]
+    data: {
+      query: query
+    }
   });
 }
 
 /**
- * 条件に一致する行を削除します。
+ * 条件に一致するデータを削除します (SSSQL.remove like)
  * @param {string} sheetName - シート名
- * @param {Object} condition - 削除する行の条件 (例: { work_id: '...', member_email: '...' })
- * @returns {boolean} 少なくとも1行削除されたかどうか
+ * @param {Object} query - クエリオブジェクト (where)
+ * @returns {Object[]} 削除されたデータ
  */
-function deleteData(sheetName, condition) {
-  return callBackendAPI('delete', {
+function remove(sheetName, query) {
+  return callBackendAPI('remove', {
     sheetName: sheetName,
-    condition: condition,
-    idColumnName: ID_COLUMNS[sheetName]
+    data: {
+      query: query
+    }
   });
 }
 
@@ -130,6 +92,7 @@ function callBackendAPI(operation, payload) {
 
   const requestPayload = {
     token: API_TOKEN,
+    email: activeUserEmail,
     operation: operation,
     ...payload
   };

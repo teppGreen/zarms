@@ -11,7 +11,7 @@
  */
 function doPost(e) {
     try {
-        Logger.log('doPost started');
+        console.log('doPost started');
 
         if (!e) throw new Error('Event object is undefined');
         if (!e.postData) throw new Error('e.postData is undefined');
@@ -24,7 +24,7 @@ function doPost(e) {
 
             // リクエストボディの解析
             const contents = JSON.parse(e.postData.contents);
-            const { token, userId, operation, sheetName, data, id, condition, idColumnName } = contents;
+            const { token, email, operation, sheetName, data } = contents;
 
             // トークン検証
             if (token !== API_TOKEN) {
@@ -35,81 +35,69 @@ function doPost(e) {
             }
 
             // 必須パラメータの簡易チェック
-            if (!userId || !operation || !sheetName) {
-                Logger.log(`Missing parameters: operation=${operation}, sheetName=${sheetName}`);
+            if (!email || !operation || !sheetName) {
+                console.log(`Missing parameters: operation=${operation}, sheetName=${sheetName}`);
                 return createResponse({
                     status: 'error',
                     message: 'Missing required parameters'
                 }, 400);
             }
 
+            const activeUserEmail = Session.getActiveUser().getEmail();
+            const userId = activeUserEmail;
+
+            if (activeUserEmail !== email) {
+                console.log(`リクエスト元のユーザーがBackendWebAppをデプロイしたユーザーと同じ Google Workspace ドメインに属していない場合、本システムは使用できません。`);
+                return createResponse({
+                    status: 'error',
+                    message: 'リクエスト元のユーザーがBackendWebAppをデプロイしたユーザーと同じ Google Workspace ドメインに属していない場合、本システムは使用できません。'
+                }, 401);
+            }
+
             let result = false;
 
             // 操作の実行
             switch (operation) {
-                case 'read_all':
-                    result = getAllData(sheetName);
+                case 'select':
+                    // data.query, data.options
+                    if (!data || !data.query) throw new Error('Query is required for select operation');
+                    result = select(sheetName, data.query, data.options);
                     return createResponse({
                         status: 'success',
                         data: result
                     });
 
-                case 'read_by_id':
-                    if (!id) throw new Error('ID is required for read_by_id operation');
-                    result = getDataById(sheetName, idColumnName, id);
+                case 'insert':
+                    // data.record
+                    if (!data || !data.record) throw new Error('Record is required for insert operation');
+                    result = insert(userId, sheetName, data.record);
                     return createResponse({
                         status: 'success',
                         data: result
                     });
 
-                case 'find':
-                    if (!condition) throw new Error('Condition is required for find operation');
-                    result = findData(sheetName, condition);
-                    return createResponse({
-                        status: 'success',
-                        data: result
-                    });
-
-                case 'read_filtered':
-                    // バックエンドでフィルタリング（SSSQLのwhere句形式）
-                    if (!data || !data.where) throw new Error('Where conditions are required for read_filtered operation');
-                    const options = {};
-                    if (data.orderBy) options.orderBy = data.orderBy;
-                    if (data.columns) options.columns = data.columns;
-                    result = findDataAdvanced(sheetName, data.where, options);
-                    return createResponse({
-                        status: 'success',
-                        data: result
-                    });
-
-                case 'create':
-                    if (!data) throw new Error('Data is required for create operation');
-                    result = createData(userId, sheetName, idColumnName, data);
-                    return createResponse({
-                        status: 'success',
-                        data: result
-                    });
-
-                case 'bulk_create':
-                    // 複数データの一括挿入
-                    if (!data || !Array.isArray(data)) throw new Error('Data array is required for bulk_create operation');
-                    result = bulkCreateData(userId, sheetName, idColumnName, data);
+                case 'bulkinsert':
+                    // data.records
+                    if (!data || !data.records) throw new Error('Records are required for bulkinsert operation');
+                    result = bulkInsert(userId, sheetName, data.records);
                     return createResponse({
                         status: 'success',
                         data: result
                     });
 
                 case 'update':
-                    if (!id || !data) throw new Error('ID and Data are required for update operation');
-                    result = updateData(userId, sheetName, idColumnName, id, data);
+                    // data.query
+                    if (!data || !data.query) throw new Error('Query is required for update operation');
+                    result = update(userId, sheetName, data.query);
                     return createResponse({
                         status: 'success',
                         data: result
                     });
 
-                case 'delete':
-                    if (!condition) throw new Error('Condition is required for delete operation');
-                    result = deleteData(userId, sheetName, idColumnName, condition);
+                case 'remove':
+                    // data.query
+                    if (!data || !data.query) throw new Error('Query is required for remove operation');
+                    result = remove(userId, sheetName, data.query);
                     return createResponse({
                         status: 'success',
                         data: result
@@ -126,7 +114,7 @@ function doPost(e) {
 
         } catch (error) {
             // ロック取得タイムアウトまたはその他のエラー
-            Logger.log('API Error: ' + error.message);
+            console.log('API Error: ' + error.message);
             return createResponse({
                 status: 'error',
                 message: error.message
@@ -137,11 +125,11 @@ function doPost(e) {
             try {
                 lock.releaseLock();
             } catch (e) {
-                Logger.log('Error releasing lock: ' + e.message);
+                console.log('Error releasing lock: ' + e.message);
             }
         }
     } catch (fatalError) {
-        Logger.log('Fatal Error in doPost: ' + fatalError.toString());
+        console.log('Fatal Error in doPost: ' + fatalError.toString());
         const output = ContentService.createTextOutput();
         output.setMimeType(ContentService.MimeType.JSON);
         output.setContent(JSON.stringify({
