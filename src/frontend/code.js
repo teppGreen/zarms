@@ -2,6 +2,9 @@
 // code.gs - メインロジックとWebアプリのエントリーポイント
 // ============================================
 
+let activeUser;
+let activeUserEmail;
+
 // Webアプリのエントリーポイント
 function doGet(e) {
   // starting.html をテンプレートとして作成
@@ -23,13 +26,13 @@ function doGet(e) {
  */
 function loadMainApplication(params) {
   // 認証チェック
-  const userEmail = Session.getActiveUser().getEmail();
-  const activeUser = getActiveUser();
+  activeUserEmail = Session.getActiveUser().getEmail();
+  activeUser = getActiveUser();
   if (!checkPermission(activeUser, 'view')) {
     const template = HtmlService.createTemplate(
       `<h1>アクセス権限がありません</h1>` +
       `<p>ZARMSへのアクセスが許可されていません。間違いだと思われる場合は、総務ユニットまでお問い合わせください。</p>` +
-      `<p>ログイン中のアカウント: ${userEmail}</p>`
+      `<p>ログイン中のアカウント: ${activeUserEmail}</p>`
     );
     return template.evaluate().getContent();
   }
@@ -51,7 +54,7 @@ function loadMainApplication(params) {
 
 function getActiveUser() {
   const userEmail = Session.getActiveUser().getEmail();
-  const members = findData(SHEET_NAMES.MEMBERS, { email: userEmail });
+  const members = select(SHEET_NAMES.MEMBERS, { where: { email: ["=", userEmail] } });
   return members.length > 0 ? members[0] : null;
 }
 
@@ -115,6 +118,14 @@ const CacheManager = {
 // 汎用データ操作関数 (Consolidated DB Operations)
 // ============================================
 
+function toSssqlCond(condition) {
+  const where = {};
+  Object.keys(condition).forEach(key => {
+    where[key] = ["=", condition[key]];
+  });
+  return where;
+}
+
 /**
  * データを取得します（必要に応じてエンリッチメントを行います）
  * @param {string} tableName - テーブル名 ('works', 'projects', etc.)
@@ -133,7 +144,7 @@ function getItems(tableName) {
     case SHEET_NAMES.KNOWLEDGES:
       return getKnowledges();
     default:
-      return getAllData(tableName);
+      return select(tableName, {});
   }
 }
 
@@ -184,7 +195,11 @@ function getItemById(tableName, id, forceRefresh = false) {
       data = getMemberById(id);
       break;
     default:
-      data = getDataById(tableName, id);
+      const idCol = ID_COLUMNS[tableName];
+      if (idCol) {
+        const res = select(tableName, { where: { [idCol]: ["=", id] } });
+        data = res.length > 0 ? res[0] : null;
+      }
       break;
   }
   return { data: data, isCached: false };
@@ -209,7 +224,7 @@ function createItem(tableName, data) {
     case SHEET_NAMES.KNOWLEDGES:
       return createKnowledge(data);
     default:
-      return createData(tableName, data);
+      return insert(tableName, data);
   }
 }
 
@@ -225,7 +240,12 @@ function updateItem(tableName, id, data) {
     case SHEET_NAMES.MEMBERS:
       return updateMember(id, data);
     default:
-      return updateData(tableName, id, data);
+      const idCol = ID_COLUMNS[tableName];
+      if (idCol) {
+        const res = update(tableName, { set: data, where: { [idCol]: ["=", id] } });
+        return res && res.length > 0;
+      }
+      return false;
   }
 }
 
@@ -236,7 +256,8 @@ function updateItem(tableName, id, data) {
  * @returns {boolean} 成功フラグ
  */
 function deleteItem(tableName, condition) {
-  return deleteData(tableName, condition);
+  const res = remove(tableName, { where: toSssqlCond(condition) });
+  return res && res.length > 0;
 }
 
 // ============================================
@@ -245,7 +266,7 @@ function deleteItem(tableName, condition) {
 
 // --- Creatives ---
 function getCreatives() {
-  const creatives = getAllData(SHEET_NAMES.CREATIVES);
+  const creatives = select(SHEET_NAMES.CREATIVES, {});
   // Enrichment is now done in frontend or here if needed.
   // For now, return raw data to let frontend handle joins, or minimal enrichment.
   return creatives;
@@ -259,7 +280,8 @@ function getCreativeById(id, forceRefresh = false) {
     if (cached) return { data: cached, isCached: true };
   }
 
-  const creative = getDataById(SHEET_NAMES.CREATIVES, id);
+  const res = select(SHEET_NAMES.CREATIVES, { where: { id: ["=", id] } });
+  const creative = res.length > 0 ? res[0] : null;
   if (!creative) return { data: null, isCached: false };
 
   // Enrichment
@@ -288,12 +310,12 @@ function createCreative(data) {
     client_directory_id: data.client_directory_id,
   };
 
-  return createData(SHEET_NAMES.CREATIVES, newCreative);
+  return insert(SHEET_NAMES.CREATIVES, newCreative);
 }
 
 // --- Plans ---
 function getPlans() {
-  const plans = getAllData(SHEET_NAMES.PLANS);
+  const plans = select(SHEET_NAMES.PLANS, {});
   return plans.map(plan => {
     // plan.created_by_name = getMemberName(plan.created_by); // created_by is now member ID
     // const creativeStats = getPlanCreativeStats(plan.id);
@@ -304,7 +326,8 @@ function getPlans() {
 }
 
 function getPlanById(id) {
-  const plan = getDataById(SHEET_NAMES.PLANS, id);
+  const res = select(SHEET_NAMES.PLANS, { where: { id: ["=", id] } });
+  const plan = res.length > 0 ? res[0] : null;
   if (!plan) return null;
   // plan.creator_name = getMemberName(plan.created_by);
   plan.creatives = getCreativesByPlanId(plan.id);
@@ -324,17 +347,18 @@ function createPlan(data) {
     description: data.description || ''
   };
 
-  const created = createData(SHEET_NAMES.PLANS, newPlan);
+  const created = insert(SHEET_NAMES.PLANS, newPlan);
   return created;
 }
 
 // --- Members ---
 function getMembers() {
-  return getAllData('members');
+  return select('members', {});
 }
 
 function getMemberById(id) {
-  const member = getDataById(SHEET_NAMES.MEMBERS, id);
+  const res = select(SHEET_NAMES.MEMBERS, { where: { email: ["=", id] } }); // Member ID is email
+  const member = res.length > 0 ? res[0] : null;
   if (!member) return null;
   // const assignments = findData(SHEET_NAMES.MEMBER_ASSIGNMENTS, { member_id: id });
   // const creativeIds = assignments.map(a => a.creative_id);
@@ -355,16 +379,17 @@ function createMember(memberData) {
     first_name_yomi: memberData.first_name_yomi || '',
     icon_gfile_id: memberData.icon_gfile_id || ''
   };
-  return createData('members', newMember);
+  return insert('members', newMember);
 }
 
 function updateMember(memberEmail, memberData) {
-  return updateData('members', memberEmail, memberData);
+  const res = update('members', { set: memberData, where: { email: ["=", memberEmail] } });
+  return res && res.length > 0;
 }
 
 // --- Tasks ---
 function getTasks() {
-  const tasks = getAllData(SHEET_NAMES.TASKS);
+  const tasks = select(SHEET_NAMES.TASKS, {});
   return tasks.map(task => {
     task.assignee_name = getMemberName(task.assign_to);
     return task;
@@ -372,8 +397,8 @@ function getTasks() {
 }
 
 function getTaskById(taskId) {
-  const task = getDataById(SHEET_NAMES.TASKS, taskId);
-  return task ? task : null;
+  const res = select(SHEET_NAMES.TASKS, { where: { id: ["=", taskId] } });
+  return res.length > 0 ? res[0] : null;
 }
 
 function createTask(taskData) {
@@ -396,13 +421,13 @@ function createTask(taskData) {
     created_by: userEmail,
     created_at: now,
   };
-  const created = createData(SHEET_NAMES.TASKS, newTask);
+  const created = insert(SHEET_NAMES.TASKS, newTask);
   return created;
 }
 
 // --- Knowledges ---
 function getKnowledges() {
-  const knowledges = getAllData(SHEET_NAMES.KNOWLEDGES);
+  const knowledges = select(SHEET_NAMES.KNOWLEDGES, {});
   // const enriched = knowledges.map(item => {
   //   const creator = getItemById(SHEET_NAMES.MEMBERS, item.created_by);
   //   item.creator_name = creator ? creator.member_name : '';
@@ -425,7 +450,7 @@ function createKnowledge(knowledgeData) {
     created_by: userEmail,
     created_at: now,
   };
-  const created = createData(SHEET_NAMES.KNOWLEDGES, newKnowledge);
+  const created = insert(SHEET_NAMES.KNOWLEDGES, newKnowledge);
   return created;
 }
 
@@ -442,13 +467,13 @@ function addMemberSkill(memberId, skillId) {
     created_by: userEmail,
     created_at: now,
   };
-  return createData(SHEET_NAMES.MEMBER_ASSIGNMENTS, newAssignment);
+  return insert(SHEET_NAMES.MEMBER_ASSIGNMENTS, newAssignment);
 }
 
 function getMemberSkills(memberId) {
-  const assignments = findData(SHEET_NAMES.MEMBER_ASSIGNMENTS, { member_id: memberId, related_table: SHEET_NAMES.SKILLS, is_active: true });
+  const assignments = select(SHEET_NAMES.MEMBER_ASSIGNMENTS, { where: toSssqlCond({ member_id: memberId, related_table: SHEET_NAMES.SKILLS, is_active: true }) });
   const skillIds = assignments.map(a => a.related_id);
-  const allSkills = getAllData(SHEET_NAMES.SKILLS);
+  const allSkills = select(SHEET_NAMES.SKILLS, {});
   return allSkills.filter(s => skillIds.includes(s.id));
 }
 
@@ -458,35 +483,38 @@ function getMemberSkills(memberId) {
 
 function getPlanTitle(id) {
   if (!id) return '';
-  const plan = getDataById(SHEET_NAMES.PLANS, id);
-  return plan ? plan.title : '';
+  const res = select(SHEET_NAMES.PLANS, { where: { id: ["=", id] } });
+  return res.length > 0 ? res[0].title : '';
 }
 
 function getMemberName(id) {
   if (!id) return '';
-  const member = getDataById(SHEET_NAMES.MEMBERS, id);
+  const res = select(SHEET_NAMES.MEMBERS, { where: { email: ["=", id] } });
+  const member = res.length > 0 ? res[0] : null;
   return member ? (member.display_name || member.member_name) : '';
 }
 
 function getCreativeTitle(id) {
   if (!id) return '';
-  const creative = getDataById(SHEET_NAMES.CREATIVES, id);
-  return creative ? creative.title : '';
+  const res = select(SHEET_NAMES.CREATIVES, { where: { id: ["=", id] } });
+  return res.length > 0 ? res[0].title : '';
 }
 
 function getCreativeAssignees(creativeId) {
-  const assignments = findData(SHEET_NAMES.MEMBER_ASSIGNMENTS, { related_table: SHEET_NAMES.CREATIVES, related_id: creativeId });
-  const assignees = assignments.map(assignment => getDataById(SHEET_NAMES.MEMBERS, assignment.member_id));
+  const assignments = select(SHEET_NAMES.MEMBER_ASSIGNMENTS, { where: toSssqlCond({ related_table: SHEET_NAMES.CREATIVES, related_id: creativeId }) });
+  const assignees = assignments.map(assignment => {
+    const res = select(SHEET_NAMES.MEMBERS, { where: { email: ["=", assignment.member_id] } });
+    return res.length > 0 ? res[0] : null;
+  });
   return assignees.filter(member => member !== null);
 }
 
 function getCreativesByPlanId(planId) {
-  const creatives = findData(SHEET_NAMES.CREATIVES, { plan_id: planId });
-  return creatives;
+  return select(SHEET_NAMES.CREATIVES, { where: toSssqlCond({ plan_id: planId }) });
 }
 
 function getTasksByCreativeId(creativeId) {
-  const tasks = findData(SHEET_NAMES.TASKS, { creative_id: creativeId });
+  const tasks = select(SHEET_NAMES.TASKS, { where: toSssqlCond({ creative_id: creativeId }) });
   return tasks.map(task => {
     task.assignee_name = getMemberName(task.assign_to);
     return task;
@@ -494,12 +522,12 @@ function getTasksByCreativeId(creativeId) {
 }
 
 function isProjectTitleDuplicate(projectTitle) {
-  const projects = findData(SHEET_NAMES.PLANS, { title: projectTitle });
+  const projects = select(SHEET_NAMES.PLANS, { where: toSssqlCond({ title: projectTitle }) });
   return projects.length > 0;
 }
 
 function getProjectCreativeStats(projectId) {
-  const creatives = findData(SHEET_NAMES.CREATIVES, { plan_id: projectId });
+  const creatives = select(SHEET_NAMES.CREATIVES, { where: toSssqlCond({ plan_id: projectId }) });
   const statusCounts = {};
   creatives.forEach(creative => {
     const status = creative.creative_status_key;
@@ -508,21 +536,19 @@ function getProjectCreativeStats(projectId) {
   return { count: creatives.length, status: statusCounts };
 }
 
-function getCreativesByPlanId(planId) {
-  return findData(SHEET_NAMES.CREATIVES, { plan_id: planId });
-}
+// Duplicate function definition removed (getCreativesByPlanId was defined twice)
 
 function getOrCreatePlanId(planTitle) {
   if (!planTitle) return null;
-  const plans = findData(SHEET_NAMES.PLANS, { title: planTitle });
+  const plans = select(SHEET_NAMES.PLANS, { where: toSssqlCond({ title: planTitle }) });
   if (plans.length > 0) return plans[0].id;
 
   try {
     const created = createItem(SHEET_NAMES.PLANS, { title: planTitle });
-    return created.id || created; // Handle object or string (fallback)
+    return created.id || created;
   } catch (e) {
     if (e.message.includes('既に存在します')) {
-      const plans = findData(SHEET_NAMES.PLANS, { title: planTitle });
+      const plans = select(SHEET_NAMES.PLANS, { where: toSssqlCond({ title: planTitle }) });
       if (plans.length > 0) return plans[0].id;
     }
     throw e;
@@ -587,11 +613,11 @@ function getAvailableCreatives(memberId) {
     creative_status_key: ["IN", ["TODO", "APPROVED"]]
   };
 
-  // フロントエンドのAPI wrapper関数を使用（callBackendAPIを呼び出す）
-  const result = getFilteredData(SHEET_NAMES.CREATIVES, whereConditions, {
+  const result = select(SHEET_NAMES.CREATIVES, {
+    where: whereConditions,
     orderBy: { created_at: "DESC" }
   });
-  return result.slice(0, 10); // 最新10件のみ
+  return result.slice(0, 10);
 }
 
 /**
@@ -600,11 +626,11 @@ function getAvailableCreatives(memberId) {
  * @returns {Object[]} 割り当てられた制作物
  */
 function getAssignedCreatives(memberId) {
-  // メンバーアサインメントをフィルタリング
-  // findData は frontend/database.js で定義されている（callBackendAPIを使用）
-  const assignments = findData(SHEET_NAMES.MEMBER_ASSIGNMENTS, {
-    member_id: memberId,
-    related_table: SHEET_NAMES.CREATIVES
+  const assignments = select(SHEET_NAMES.MEMBER_ASSIGNMENTS, {
+    where: {
+      member_id: ["=", memberId],
+      related_table: ["=", SHEET_NAMES.CREATIVES]
+    }
   });
 
   if (assignments.length === 0) {
@@ -613,13 +639,11 @@ function getAssignedCreatives(memberId) {
 
   const creativeIds = assignments.map(a => a.related_id);
 
-  // 制作物を取得（IDリストでフィルタリング）
-  // getFilteredData は frontend/database.js で定義されている（callBackendAPIを使用）
   const whereConditions = {
     id: ["IN", creativeIds]
   };
 
-  return getFilteredData(SHEET_NAMES.CREATIVES, whereConditions);
+  return select(SHEET_NAMES.CREATIVES, { where: whereConditions });
 }
 
 function updateSingleField(tableName, id, field, value) {
@@ -639,21 +663,21 @@ function createCreativeDocument(creativeId, creativeTitle, content, design, regu
 }
 
 function getCreativeflowTimestamps(creativeId) {
-  // Keep as is, but use string literals
-  const creative = getDataById(SHEET_NAMES.CREATIVES, creativeId);
+  const res = select(SHEET_NAMES.CREATIVES, { where: { id: ["=", creativeId] } });
+  const creative = res.length > 0 ? res[0] : null;
   if (!creative) return null;
-  const logs = getAllData(SHEET_NAMES.LOGS);
+  const logs = select(SHEET_NAMES.LOGS, {});
   // ... logic ...
   return {};
 }
 
 function acceptCreative(creativeId) {
   const userEmail = Session.getActiveUser().getEmail();
-  const members = findData(SHEET_NAMES.MEMBERS, { email: userEmail });
+  const members = select(SHEET_NAMES.MEMBERS, { where: { email: ["=", userEmail] } });
   if (members.length === 0) throw new Error('Member not found');
   const memberId = members[0].id;
 
-  const existing = findData(SHEET_NAMES.MEMBER_ASSIGNMENTS, { related_table: SHEET_NAMES.CREATIVES, related_id: creativeId, member_id: memberId });
+  const existing = select(SHEET_NAMES.MEMBER_ASSIGNMENTS, { where: toSssqlCond({ related_table: SHEET_NAMES.CREATIVES, related_id: creativeId, member_id: memberId }) });
   if (existing.length > 0) return { success: true, message: '既に承諾済みです' };
 
   const newAssignment = {
@@ -662,7 +686,7 @@ function acceptCreative(creativeId) {
     member_id: memberId,
     role_key: 'MEMBER' // Default role
   };
-  createData(SHEET_NAMES.MEMBER_ASSIGNMENTS, newAssignment);
+  insert(SHEET_NAMES.MEMBER_ASSIGNMENTS, newAssignment);
   return { success: true, message: '承諾しました' };
 }
 
@@ -706,8 +730,7 @@ function searchByCode(code) {
   const serialId = parseInt(match[2], 10);
 
   // 2. PREFIXテーブルからテーブル名を特定
-  // PREFIXテーブルの構造: id_prefix, table_name
-  const prefixes = getAllData(SHEET_NAMES.PREFIX);
+  const prefixes = select(SHEET_NAMES.PREFIX, {});
   const prefixRecord = prefixes.find(p => p.id_prefix === prefix);
 
   if (!prefixRecord) {
@@ -717,7 +740,7 @@ function searchByCode(code) {
   const tableName = prefixRecord.table_name;
 
   // 3. 特定したテーブルの該当レコードを検索 (id_serial列)
-  const items = findData(tableName, { id_serial: serialId });
+  const items = select(tableName, { where: { id_serial: ["=", serialId] } });
 
   if (items.length === 0) {
     return null;
@@ -739,5 +762,5 @@ function include(filename) {
 }
 
 function getKnowledge() {
-  return getAllData(SHEET_NAMES.KNOWLEDGES);
+  return select(SHEET_NAMES.KNOWLEDGES, {});
 }

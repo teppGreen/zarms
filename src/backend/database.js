@@ -39,71 +39,15 @@ function getHeaders(sheet) {
 // ============================================
 
 /**
- * シートからすべてのデータを取得します。
+ * シートからデータを条件に基づいて取得します (SSSQL.select wrapper)
  * @param {string} sheetName - シート名
+ * @param {Object} query - クエリオブジェクト (columns, where, groupBy, orderBy)
+ * @param {Object} [options] - オプション (withRowNum, asArray)
  * @returns {Object[]} データのオブジェクト配列
  */
-function getAllData(sheetName) {
+function select(sheetName, query, options) {
     const sheet = getSheet(sheetName);
-    return SSSQL.select(sheet, {});
-}
-
-/**
- * IDに基づいてシートから単一のデータを取得します。
- * @param {string} sheetName - シート名
- * @param {string} idColumnName - ID列名
- * @param {any} id - 検索するID
- * @returns {Object|null} 見つかったデータオブジェクト、またはnull
- */
-function getDataById(sheetName, idColumnName, id) {
-    if (!idColumnName) {
-        throw new Error(`ID列が定義されていません: ${sheetName}`);
-    }
-
-    const sheet = getSheet(sheetName);
-    const result = SSSQL.select(sheet, {
-        where: { [idColumnName]: ["=", id] }
-    });
-
-    return result.length > 0 ? result[0] : null;
-}
-
-/**
- * 条件に一致するデータをシートから検索します。
- * @param {string} sheetName - シート名
- * @param {Object} condition - 検索条件 (例: { key: 'value', ... })
- * @returns {Object[]} 条件に一致したデータのオブジェクト配列
- */
-function findData(sheetName, condition) {
-    const sheet = getSheet(sheetName);
-
-    // 条件オブジェクトをSSSQLのwhere形式に変換
-    const whereClause = {};
-    Object.keys(condition).forEach(key => {
-        whereClause[key] = ["=", condition[key]];
-    });
-
-    return SSSQL.select(sheet, { where: whereClause });
-}
-
-/**
- * 高度な条件でデータを検索します（SSSQLのwhere句を直接使用）。
- * @param {string} sheetName - シート名
- * @param {Object} whereConditions - SSSQL形式の検索条件
- * @param {Object} options - 追加オプション（orderBy, columns など）
- * @returns {Object[]} 条件に一致したデータのオブジェクト配列
- */
-function findDataAdvanced(sheetName, whereConditions, options = {}) {
-    const sheet = getSheet(sheetName);
-
-    const query = { where: whereConditions };
-
-    // オプションをマージ
-    if (options.orderBy) query.orderBy = options.orderBy;
-    if (options.columns) query.columns = options.columns;
-    if (options.groupBy) query.groupBy = options.groupBy;
-
-    return SSSQL.select(sheet, query);
+    return SSSQL.select(sheet, query, options);
 }
 
 /**
@@ -173,26 +117,26 @@ function prepareNewData(userId, sheetName, dataObject, sheet) {
 }
 
 /**
- * シートに新しいデータを追加します。
- * @param {string} userId - 操作ユーザーのID
+ * シートに単一のデータを挿入します (SSSQL.insert wrapper)
+ * @param {string} userId - 操作ユーザーID
  * @param {string} sheetName - シート名
- * @param {string} idColumnName - IDカラム名 (Optional)
- * @param {Object} dataObject - 追加するデータオブジェクト
- * @returns {Object} 作成されたデータオブジェクト
+ * @param {Object} record - 挿入するデータ
+ * @returns {Object} 挿入されたデータ
  */
-function createData(userId, sheetName, idColumnName, dataObject) {
+function insert(userId, sheetName, record) {
     const sheet = getSheet(sheetName);
     const headers = getHeaders(sheet);
 
     // データの準備（ID生成、監査情報付与）
-    const newData = prepareNewData(userId, sheetName, dataObject, sheet);
+    const newData = prepareNewData(userId, sheetName, record, sheet);
 
     // SSSQLを使用してデータを挿入
     const result = SSSQL.insert(sheet, newData);
 
     // ログ記録
-    const idColumn = idColumnName || (headers.includes('id') ? 'id' : null);
-    const recordId = idColumn ? newData[idColumn] : '';
+    let recordId = '';
+    if (newData['id']) recordId = newData['id'];
+    else if (newData['display_id']) recordId = newData['display_id'];
 
     if (recordId) {
         logOperation('ADD', sheetName, recordId, null, null, newData, userId);
@@ -202,29 +146,29 @@ function createData(userId, sheetName, idColumnName, dataObject) {
 }
 
 /**
- * 複数のデータを一括で追加します。
- * @param {string} userId - 操作ユーザーのID
+ * シートに複数のデータを一括挿入します (SSSQL.bulkInsert wrapper)
+ * @param {string} userId - 操作ユーザーID
  * @param {string} sheetName - シート名
- * @param {string} idColumnName - IDカラム名 (Optional)
- * @param {Object[]} dataObjects - 追加するデータオブジェクトの配列
- * @returns {Object[]} 作成されたデータオブジェクトの配列
+ * @param {Object[]} records - 挿入するデータの配列
+ * @returns {Object[]} 挿入されたデータの配列
  */
-function bulkCreateData(userId, sheetName, idColumnName, dataObjects) {
+function bulkInsert(userId, sheetName, records) {
     const sheet = getSheet(sheetName);
-    const headers = getHeaders(sheet);
 
     // 各データの準備（ID生成、監査情報付与）
-    const preparedData = dataObjects.map(dataObject =>
-        prepareNewData(userId, sheetName, dataObject, sheet)
+    const preparedData = records.map(record =>
+        prepareNewData(userId, sheetName, record, sheet)
     );
 
     // SSSQLを使用してデータを一括挿入
     const result = SSSQL.bulkInsert(sheet, preparedData);
 
     // ログ記録
-    const idColumn = idColumnName || (headers.includes('id') ? 'id' : null);
     preparedData.forEach(newData => {
-        const recordId = idColumn ? newData[idColumn] : '';
+        let recordId = '';
+        if (newData['id']) recordId = newData['id'];
+        else if (newData['display_id']) recordId = newData['display_id'];
+
         if (recordId) {
             logOperation('ADD', sheetName, recordId, null, null, newData, userId);
         }
@@ -234,83 +178,70 @@ function bulkCreateData(userId, sheetName, idColumnName, dataObjects) {
 }
 
 /**
- * IDに基づいてシートのデータを更新します。
- * @param {string} userId - 操作ユーザーのID
+ * 条件に一致するデータを更新します (SSSQL.update wrapper)
+ * @param {string} userId - 操作ユーザーID
  * @param {string} sheetName - シート名
- * @param {string} idColumnName - ID列名
- * @param {any} id - 更新するデータのID
- * @param {Object} updateDataObject - 更新するデータを含むオブジェクト
- * @returns {boolean} 成功したかどうか
+ * @param {Object} query - クエリオブジェクト (set, where)
+ * @returns {Object[]} 更新結果 (before/after のペア)
  */
-function updateData(userId, sheetName, idColumnName, id, updateDataObject) {
-    if (!idColumnName) {
-        throw new Error(`ID列が定義されていません: ${sheetName}`);
-    }
-
+function update(userId, sheetName, query) {
     const sheet = getSheet(sheetName);
 
-    // 更新前のデータを取得
-    const oldRecords = SSSQL.select(sheet, {
-        where: { [idColumnName]: ["=", id] }
-    });
-
-    if (oldRecords.length === 0) {
-        return false;
-    }
-
-    const oldRecord = oldRecords[0];
-
-    // 監査情報の付与
+    // 監査情報の付与 (query.set に追加)
     const now = new Date().toISOString();
-    const updateData = { ...updateDataObject };
-    updateData['updated_by'] = userId;
-    updateData['updated_at'] = now;
+    const updateSet = { ...query.set };
+    updateSet['updated_by'] = userId;
+    updateSet['updated_at'] = now;
+
+    const newQuery = { ...query, set: updateSet };
 
     // SSSQLを使用してデータを更新
-    const result = SSSQL.update(sheet, {
-        set: updateData,
-        where: { [idColumnName]: ["=", id] }
+    const result = SSSQL.update(sheet, newQuery);
+
+    // ログ記録
+    result.forEach(updateResult => {
+        const oldRecord = updateResult.before;
+        const newRecord = updateResult.after;
+
+        let recordId = '';
+        if (newRecord['id']) recordId = newRecord['id'];
+        else if (newRecord['display_id']) recordId = newRecord['display_id'];
+
+        Object.keys(newRecord).forEach(key => {
+            const oldValue = oldRecord[key];
+            const newValue = newRecord[key];
+            if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+                logOperation('MODIFIED', sheetName, recordId, key, oldValue, newValue, userId);
+            }
+        });
     });
 
-    // 各フィールドごとにログを記録
-    Object.keys(updateDataObject).forEach(key => {
-        const oldValue = oldRecord[key];
-        const newValue = updateDataObject[key];
-        logOperation('MODIFIED', sheetName, id, key, oldValue, newValue, userId);
-    });
-
-    return result.length > 0;
+    return result;
 }
 
 /**
- * 条件に一致する行を削除します。
- * @param {string} userId - 操作ユーザーのID
+ * 条件に一致するデータを削除します (SSSQL.remove wrapper)
+ * @param {string} userId - 操作ユーザーID
  * @param {string} sheetName - シート名
- * @param {string} idColumnName - ID列名
- * @param {Object} condition - 削除する行の条件 (例: { work_id: '...', member_email: '...' })
- * @returns {boolean} 少なくとも1行削除されたかどうか
+ * @param {Object} query - クエリオブジェクト (where)
+ * @returns {Object[]} 削除されたデータ
  */
-function deleteData(userId, sheetName, idColumnName, condition) {
+function remove(userId, sheetName, query) {
     const sheet = getSheet(sheetName);
 
-    // 条件オブジェクトをSSSQLのwhere形式に変換
-    const whereClause = {};
-    Object.keys(condition).forEach(key => {
-        whereClause[key] = ["=", condition[key]];
+    // SSSQLを使用してデータを削除
+    const deletedRecords = SSSQL.remove(sheet, query);
+
+    // ログ記録
+    deletedRecords.forEach(record => {
+        let recordId = '';
+        if (record['id']) recordId = record['id'];
+        else if (record['display_id']) recordId = record['display_id'];
+
+        logOperation('DELETE', sheetName, recordId, null, record, null, userId);
     });
 
-    // SSSQLを使用してデータを削除
-    const deletedRecords = SSSQL.remove(sheet, { where: whereClause });
-
-    // ログ記録（削除された各レコードに対して）
-    if (deletedRecords.length > 0) {
-        deletedRecords.forEach(record => {
-            const recordId = idColumnName ? record[idColumnName] : JSON.stringify(condition);
-            logOperation('DELETE', sheetName, recordId, null, record, null, userId);
-        });
-    }
-
-    return deletedRecords.length > 0;
+    return deletedRecords;
 }
 
 
