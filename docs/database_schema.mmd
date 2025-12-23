@@ -133,7 +133,6 @@ erDiagram
     }
     events {
         uuid id PK "イベントID"
-        serial display_id "イベントID"
         varchar ical_id "イベントID(iCal): Google カレンダーから取得"
         uuid owner_directory_id "主催組織ID"
         varchar calendar_id "カレンダーID: どのGoogle カレンダーに登録するか"
@@ -379,6 +378,7 @@ erDiagram
     plans {
         uuid id PK "企画ID"
         serial display_id "企画ID(シリアル)"
+        varchar plan_type_key "企画種別キー"
         varchar plan_status_key "企画ステータスキー"
         varchar title "企画名"
         text description "企画概要"
@@ -388,10 +388,9 @@ erDiagram
         text external_detail "外部連携詳細"
         varchar expected_operators "運営者数（見込）"
         varchar expected_entries "参加者数（見込）"
-        varchar actual_operators "運営者数（実績）"
-        varchar actual_entries "参加者数（実績）"
-        int dur_minutes "所要分数: 企画応募時の回答内容を反映（ステージ企画）"
-        float dur_days "所要日数: 企画応募時の回答内容を反映（ブース企画）"
+        float stage_duration_minutes "所要分数: 企画応募時の回答内容を反映（ステージ企画）"
+        float booth_duration_days "所要日数: 企画応募時の回答内容を反映（ブース企画）"
+        varchar online_page_url "オンラインページURL"
         varchar folder_id "フォルダID"
         varchar thumbnail_file_id "サムネイルファイルID"
         text remark "システム備考"
@@ -517,6 +516,7 @@ erDiagram
     musics }|--|| ENUM : "music_status_key"
     musics }|--|| ENUM : "music_type_key"
     plans }|--|| ENUM : "plan_status_key"
+    plans }|--|| ENUM : "plan_type_key"
     plans }|--|| ENUM : "guest_invitation_status_key"
     plans }|--|| ENUM : "external_collaboration_status_key"
     plans }|--|| ENUM : "sale_status_key"

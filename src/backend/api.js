@@ -24,7 +24,7 @@ function doPost(e) {
 
             // リクエストボディの解析
             const contents = JSON.parse(e.postData.contents);
-            const { token, email, operation, sheetName, data } = contents;
+            const { token, sheetnames, email, operation, targetSheetName, data } = contents;
 
             // トークン検証
             if (token !== API_TOKEN) {
@@ -35,8 +35,8 @@ function doPost(e) {
             }
 
             // 必須パラメータの簡易チェック
-            if (!email || !operation || !sheetName) {
-                console.log(`Missing parameters: operation=${operation}, sheetName=${sheetName}`);
+            if (!email || !operation || !targetSheetName) {
+                console.log(`Missing parameters: operation=${operation}, targetSheetName=${targetSheetName}`);
                 return createResponse({
                     status: 'error',
                     message: 'Missing required parameters'
@@ -44,8 +44,6 @@ function doPost(e) {
             }
 
             const activeUserEmail = Session.getActiveUser().getEmail();
-            const userId = activeUserEmail;
-
             if (activeUserEmail !== email) {
                 console.log(`リクエスト元のユーザーがBackendWebAppをデプロイしたユーザーと同じ Google Workspace ドメインに属していない場合、本システムは使用できません。`);
                 return createResponse({
@@ -54,6 +52,8 @@ function doPost(e) {
                 }, 401);
             }
 
+            const activeUserId = select(sheetnames.MEMBERS, { where: { email: email } })[0].id;
+
             let result = false;
 
             // 操作の実行
@@ -61,7 +61,7 @@ function doPost(e) {
                 case 'select':
                     // data.query, data.options
                     if (!data || !data.query) throw new Error('Query is required for select operation');
-                    result = select(sheetName, data.query, data.options);
+                    result = select(targetSheetName, data.query, data.options);
                     return createResponse({
                         status: 'success',
                         data: result
@@ -70,7 +70,7 @@ function doPost(e) {
                 case 'insert':
                     // data.record
                     if (!data || !data.record) throw new Error('Record is required for insert operation');
-                    result = insert(userId, sheetName, data.record);
+                    result = insert(userId, targetSheetName, data.record);
                     return createResponse({
                         status: 'success',
                         data: result
@@ -79,7 +79,7 @@ function doPost(e) {
                 case 'bulkinsert':
                     // data.records
                     if (!data || !data.records) throw new Error('Records are required for bulkinsert operation');
-                    result = bulkInsert(userId, sheetName, data.records);
+                    result = bulkInsert(userId, targetSheetName, data.records);
                     return createResponse({
                         status: 'success',
                         data: result
@@ -88,7 +88,7 @@ function doPost(e) {
                 case 'update':
                     // data.query
                     if (!data || !data.query) throw new Error('Query is required for update operation');
-                    result = update(userId, sheetName, data.query);
+                    result = update(userId, targetSheetName, data.query);
                     return createResponse({
                         status: 'success',
                         data: result
@@ -97,7 +97,7 @@ function doPost(e) {
                 case 'remove':
                     // data.query
                     if (!data || !data.query) throw new Error('Query is required for remove operation');
-                    result = remove(userId, sheetName, data.query);
+                    result = remove(userId, targetSheetName, data.query);
                     return createResponse({
                         status: 'success',
                         data: result
