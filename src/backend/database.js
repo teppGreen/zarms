@@ -133,15 +133,6 @@ function insert(userId, sheetName, record) {
     // SSSQLを使用してデータを挿入
     const result = SSSQL.insert(sheet, newData);
 
-    // ログ記録
-    let recordId = '';
-    if (newData['id']) recordId = newData['id'];
-    else if (newData['display_id']) recordId = newData['display_id'];
-
-    if (recordId) {
-        logOperation('ADD', sheetName, recordId, null, null, newData, userId);
-    }
-
     return result;
 }
 
@@ -162,17 +153,6 @@ function bulkInsert(userId, sheetName, records) {
 
     // SSSQLを使用してデータを一括挿入
     const result = SSSQL.bulkInsert(sheet, preparedData);
-
-    // ログ記録
-    preparedData.forEach(newData => {
-        let recordId = '';
-        if (newData['id']) recordId = newData['id'];
-        else if (newData['display_id']) recordId = newData['display_id'];
-
-        if (recordId) {
-            logOperation('ADD', sheetName, recordId, null, null, newData, userId);
-        }
-    });
 
     return result;
 }
@@ -198,24 +178,6 @@ function update(userId, sheetName, query) {
     // SSSQLを使用してデータを更新
     const result = SSSQL.update(sheet, newQuery);
 
-    // ログ記録
-    result.forEach(updateResult => {
-        const oldRecord = updateResult.before;
-        const newRecord = updateResult.after;
-
-        let recordId = '';
-        if (newRecord['id']) recordId = newRecord['id'];
-        else if (newRecord['display_id']) recordId = newRecord['display_id'];
-
-        Object.keys(newRecord).forEach(key => {
-            const oldValue = oldRecord[key];
-            const newValue = newRecord[key];
-            if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
-                logOperation('MODIFIED', sheetName, recordId, key, oldValue, newValue, userId);
-            }
-        });
-    });
-
     return result;
 }
 
@@ -232,95 +194,7 @@ function remove(userId, sheetName, query) {
     // SSSQLを使用してデータを削除
     const deletedRecords = SSSQL.remove(sheet, query);
 
-    // ログ記録
-    deletedRecords.forEach(record => {
-        let recordId = '';
-        if (record['id']) recordId = record['id'];
-        else if (record['display_id']) recordId = record['display_id'];
-
-        logOperation('DELETE', sheetName, recordId, null, record, null, userId);
-    });
-
     return deletedRecords;
-}
-
-
-// ============================================
-// ログ記録機能
-// ============================================
-
-/**
- * ログシートを初期化します
- * @returns {GoogleAppsScript.Spreadsheet.Sheet} ログシート
- */
-function initializeLogSheet() {
-    const ss = getSpreadsheet();
-    let logSheet = ss.getSheetByName('logs');
-
-    return logSheet;
-}
-
-/**
- * 操作ログを記録します。
- * @param {string} log_type_key - 操作種別（'ADD', 'MODIFIED', 'DELETE'）
- * @param {string} tableName - テーブル名（シート名）
- * @param {any} recordId - レコードID（主キー値）
- * @param {string|null} columnId - カラムID（更新時のみ、変更されたカラム名）
- * @param {any|null} oldValue - 変更前の値
- * @param {any|null} newValue - 変更後の値
- * @param {string} userId - 操作ユーザーのID
- */
-function logOperation(log_type_key, tableName, recordId, columnId, oldValue, newValue, userId) {
-    try {
-        const logId = Utilities.getUuid();
-        const now = new Date();
-
-        const logSheet = initializeLogSheet();
-        if (!logSheet) {
-            Logger.log('ログシートが見つかりません');
-            return;
-        }
-
-        const headers = getHeaders(logSheet);
-
-        // 値をJSON形式に変換（Dateオブジェクトも含む）
-        let oldValueJson = '';
-        let newValueJson = '';
-
-        if (log_type_key === 'MODIFIED') {
-            // 更新時は単一フィールドの値のみを保存
-            oldValueJson = oldValue !== null && oldValue !== undefined ? JSON.stringify(sanitizeForClient(oldValue)) : '';
-            newValueJson = newValue !== null && newValue !== undefined ? JSON.stringify(sanitizeForClient(newValue)) : '';
-        } else {
-            // ADD/DELETE時はレコード全体を保存
-            oldValueJson = oldValue ? JSON.stringify(sanitizeForClient(oldValue)) : '';
-            newValueJson = newValue ? JSON.stringify(sanitizeForClient(newValue)) : '';
-        }
-
-        // ログデータを作成
-        const logData = {
-            log_id: logId,
-            created_by: userId,
-            log_type_key: log_type_key,
-            table_name: tableName,
-            record_id: recordId,
-            column_id: columnId || '',
-            old_value: oldValueJson,
-            new_value: newValueJson,
-            created_at: now
-        };
-
-        // SSSQLを使用してログを挿入（ログテーブル自体は直接appendRowを使用して循環を避ける）
-        const logRow = headers.map(header => {
-            const val = logData[header];
-            return (val === undefined || val === null) ? '' : val;
-        });
-
-        logSheet.appendRow(logRow);
-    } catch (e) {
-        // ログ記録の失敗は本処理を止めない
-        Logger.log('ログ記録エラー: ' + e.message);
-    }
 }
 
 // ============================================

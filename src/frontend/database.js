@@ -4,14 +4,14 @@
 
 /**
  * シートからデータを条件に基づいて取得します (SSSQL.select like)
- * @param {string} sheetName - シート名
+ * @param {string} targetSheetName - シート名
  * @param {Object} query - クエリオブジェクト (columns, where, groupBy, orderBy)
  * @param {Object} [options] - オプション (withRowNum, asArray)
  * @returns {Object[]} データのオブジェクト配列
  */
-function select(sheetName, query, options) {
+function select(targetSheetName, query, options) {
   return callBackendAPI('select', {
-    sheetName: sheetName,
+    targetSheetName: targetSheetName,
     data: {
       query: query || {},
       options: options
@@ -21,13 +21,13 @@ function select(sheetName, query, options) {
 
 /**
  * シートに単一のデータを挿入します (SSSQL.insert like)
- * @param {string} sheetName - シート名
+ * @param {string} targetSheetName - シート名
  * @param {Object} record - 挿入するデータ
  * @returns {Object} 挿入されたデータ
  */
-function insert(sheetName, record) {
+function insert(targetSheetName, record) {
   return callBackendAPI('insert', {
-    sheetName: sheetName,
+    targetSheetName: targetSheetName,
     data: {
       record: record
     }
@@ -36,13 +36,13 @@ function insert(sheetName, record) {
 
 /**
  * シートに複数のデータを一括挿入します (SSSQL.bulkInsert like)
- * @param {string} sheetName - シート名
+ * @param {string} targetSheetName - シート名
  * @param {Object[]} records - 挿入するデータの配列
  * @returns {Object[]} 挿入されたデータの配列
  */
-function bulkInsert(sheetName, records) {
+function bulkInsert(targetSheetName, records) {
   return callBackendAPI('bulkinsert', {
-    sheetName: sheetName,
+    targetSheetName: targetSheetName,
     data: {
       records: records
     }
@@ -51,13 +51,13 @@ function bulkInsert(sheetName, records) {
 
 /**
  * 条件に一致するデータを更新します (SSSQL.update like)
- * @param {string} sheetName - シート名
+ * @param {string} targetSheetName - シート名
  * @param {Object} query - クエリオブジェクト (set, where)
  * @returns {Object[]} 更新結果 (before/after のペア)
  */
-function update(sheetName, query) {
+function update(targetSheetName, query) {
   return callBackendAPI('update', {
-    sheetName: sheetName,
+    targetSheetName: targetSheetName,
     data: {
       query: query
     }
@@ -66,13 +66,13 @@ function update(sheetName, query) {
 
 /**
  * 条件に一致するデータを削除します (SSSQL.remove like)
- * @param {string} sheetName - シート名
+ * @param {string} targetSheetName - シート名
  * @param {Object} query - クエリオブジェクト (where)
  * @returns {Object[]} 削除されたデータ
  */
-function remove(sheetName, query) {
+function remove(targetSheetName, query) {
   return callBackendAPI('remove', {
-    sheetName: sheetName,
+    targetSheetName: targetSheetName,
     data: {
       query: query
     }
@@ -92,6 +92,7 @@ function callBackendAPI(operation, payload) {
 
   const requestPayload = {
     token: API_TOKEN,
+    sheetNames: SHEET_NAMES,
     email: activeUserEmail,
     operation: operation,
     ...payload
