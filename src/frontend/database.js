@@ -93,7 +93,7 @@ function callBackendAPI(operation, payload) {
   const requestPayload = {
     token: API_TOKEN,
     sheetNames: SHEET_NAMES,
-    email: activeUserEmail,
+    email: Session.getActiveUser().getEmail(),
     operation: operation,
     ...payload
   };
