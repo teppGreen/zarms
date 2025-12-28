@@ -35,13 +35,15 @@ function doPost(e) {
             }
 
             // 必須パラメータの簡易チェック
-            if (!email || !operation || !targetSheetName) {
+            if (!sheetnames || !email || !operation || !targetSheetName) {
                 console.log(`Missing parameters: operation=${operation}, targetSheetName=${targetSheetName}`);
                 return createResponse({
                     status: 'error',
                     message: 'Missing required parameters'
                 }, 400);
             }
+
+            SHEET_NAMES = sheetnames;
 
             const activeUserEmail = Session.getActiveUser().getEmail();
             if (activeUserEmail !== email) {
@@ -52,7 +54,14 @@ function doPost(e) {
                 }, 401);
             }
 
-            const activeUserId = select(sheetnames.MEMBERS, { where: { email: email } })[0].id;
+            const activeUserPermission = getUserPermission(email);
+            if (!activeUserPermission) {
+                console.log(`User ${email} is not authorized to perform this operation`);
+                return createResponse({
+                    status: 'error',
+                    message: 'User is not authorized to perform this operation'
+                }, 403);
+            }
 
             let result = false;
 
@@ -155,3 +164,13 @@ function createResponse(content, statusCode = 200) {
     output.setContent(JSON.stringify(content));
     return output;
 }
+
+/**
+ * APIリクエスト送信元のユーザーの権限を取得します。
+ * @param {string} email - ユーザーのメールアドレス
+ * @returns {string} ユーザーの権限
+ */
+function getUserPermission(email) {
+    const user = select(sheetnames.MEMBERS, { where: { email: email } });
+    if (!user) return 'guest';
+    return user.permission;

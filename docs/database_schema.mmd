@@ -2,6 +2,10 @@
 title: ZARMS Database Schema
 ---
 
+%% スプレッドシートを更新したらこちらも更新すること！
+%% viewテーブル(テーブル名にv_とついているもの)を除き、1つのテーブルに持たせられるカラム数は26まで
+%% 27カラム以上持たせたい場合はテーブルの分割を推奨
+
 erDiagram
     PREFIX {
         uuid id PK "接頭辞ID"
@@ -24,17 +28,24 @@ erDiagram
         boolean is_active "有効"
         int sort_order "並び順"
     }
-    logs {
+    LOG {
         uuid log PK "ログID"
         varchar log_type_key "操作タイプキー"
-        varchar table_name "テーブル名"
-        varchar record_id "レコードID"
-        varchar column_name "カラムID"
+        varchar recorded_table "テーブル名"
+        varchar recorded_id "レコードID"
         text old_value "変更前の値"
         text new_value "変更後の値"
         text remark "システム備考"
         uuid created_by "作成者"
         datetime created_at "作成日時"
+    }
+    PERMISSION {
+        varchar table_name "テーブル名"
+        varchar permission_action_key "権限アクションキー"
+        varchar target_type "ターゲットタイプ"
+        varchar target_key "ターゲットキー"
+        text remark "システム備考"
+        boolean is_active "有効"
     }
     assignments {
         uuid id PK "割り当てID"
@@ -173,27 +184,20 @@ erDiagram
         serial display_id "フォームID(シリアル)"
         uuid owner_directory_id "組織ID"
         varchar gfile_id "Google ドライブのファイルID"
-        varchar title "公開フォームのタイトル"
-        text description "説明"
+        varchar title "Google ドライブのファイル名"
         varchar destination_gfile_id "スプレッドシートのID"
         varchar edit_url "編集URL"
-        varchar summary_url "概要URL(編集画面)"
         varchar published_url "回答URL(長い)"
         varchar shorten_url "回答URL(短い)"
         boolean can_edit_response "回答を編集可能か"
         boolean is_email_collected "メールアドレスの収集"
-        text confirmation_message "回答送信後のメッセージ"
-        text closed_form_message "回答受付期間外のメッセージ"
         int limit_response_per_form "フォーム全体の回答数の上限（到達したら自動で回答締切）"
         int limit_response_per_user "1ユーザー1回までの送信制限"
         boolean is_published "フォームを公開しているか"
         boolean is_accepting_response "フォームの回答を受け付けているか"
-        boolean has_respond_again_link "回答終了後に別の回答を送信のリンクを表示するか"
         boolean is_publishing_summary "回答の概要を公開しているか"
-        datetime starts_publishing_at
-        datetime ends_publishing_at
-        datetime starts_accepting_response_at
-        datetime ends_accepting_response_at
+        datetime starts_accepting_response_at "回答開始日時"
+        datetime ends_accepting_response_at "回答終了日時"
         text remark "システム備考"
         boolean is_deleted "フォームのファイルが削除済みか"
         uuid created_by "作成者: フォームの作成者"
@@ -386,8 +390,8 @@ erDiagram
         text guest_detail "ゲスト詳細"
         varchar external_collaboration_status_key "外部連携ステータスキー"
         text external_detail "外部連携詳細"
-        varchar expected_operators "運営者数（見込）"
-        varchar expected_entries "参加者数（見込）"
+        varchar expected_operator_count "運営者数（見込）"
+        varchar expected_entry_count "参加者数（見込）"
         float stage_duration_minutes "所要分数: 企画応募時の回答内容を反映（ステージ企画）"
         float booth_duration_days "所要日数: 企画応募時の回答内容を反映（ブース企画）"
         varchar online_page_url "オンラインページURL"
@@ -492,8 +496,7 @@ erDiagram
         uuid updated_by "最終更新者"
         datetime updated_at "最終更新日時"
     }
-    ENUM }|--|| ENUM : "parent_key"
-    logs }|--|| ENUM : "log_type_key"
+    LOG }|--|| ENUM : "log_type_key"
     advertisements }|--|| ENUM : "advertisement_status_key"
     advertisements }|--|| ENUM : "advertisement_type_key"
     attendances }|--|| ENUM : "attendance_type_key"
@@ -524,8 +527,7 @@ erDiagram
     skills }|--|| ENUM : "skill_type_key"
     tasks }|--|| ENUM : "task_status_key"
     tasks }|--|| ENUM : "priority_key"
-    logs }|--|| members : "created_by"
-    logs }|--|| members : "updated_by"
+    LOG }|--|| members : "created_by"
     assignments }|--|| members : "created_by"
     assignments }|--|| members : "updated_by"
     advertisements }|--|| mediums : "medium_id"
@@ -540,10 +542,8 @@ erDiagram
     budgets }|--|| directories : "managing_directory_id"
     budgets }|--|| members : "created_by"
     budgets }|--|| members : "updated_by"
-    creatives }|--|| plans : "plan_id"
-    creatives }|--|| advertisements : "advertisement_id"
     creatives }|--|| directories : "client_directory_id"
-    creatives }|--|| members : "client_member_id"
+    creatives }|--|| directories : "contract_directory_id"
     creatives }|--|| members : "created_by"
     creatives }|--|| members : "updated_by"
     directories }|--|| directories : "parent_directory_id"

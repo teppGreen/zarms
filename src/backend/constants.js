@@ -2,6 +2,7 @@
 // constants.gs - 定数管理
 // ============================================
 
+let SHEET_NAMES; // フロントエンドから定義を受け取る
 const scriptProperties = PropertiesService.getScriptProperties();
 const API_TOKEN = scriptProperties.getProperty('API_TOKEN');
 let SPREADSHEET_ID = scriptProperties.getProperty('SPREADSHEET_ID');
