@@ -34,10 +34,6 @@ function getHeaders(sheet) {
     return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 }
 
-// ============================================
-// SSSQL を使用した CRUD 操作
-// ============================================
-
 /**
  * シートからデータを条件に基づいて取得します (SSSQL.select wrapper)
  * @param {string} sheetName - シート名
@@ -45,10 +41,6 @@ function getHeaders(sheet) {
  * @param {Object} [options] - オプション (withRowNum, asArray)
  * @returns {Object[]} データのオブジェクト配列
  */
-function select(sheetName, query, options) {
-    const sheet = getSheet(sheetName);
-    return SSSQL.select(sheet, query, options);
-}
 
 /**
  * UUIDを生成します。
@@ -73,7 +65,7 @@ function getNextSerial(sheet, columnName) {
         ]
     });
 
-    if (result.length > 0 && result[0].maxSerial !== null && result[0].maxSerial !== undefined) {
+    if (result.length > 0 && result[0].maxSerial) {
         const maxVal = Number(result[0].maxSerial);
         return isNaN(maxVal) ? 1 : maxVal + 1;
     }
@@ -84,12 +76,11 @@ function getNextSerial(sheet, columnName) {
 /**
  * 新しいデータを追加する前の準備処理（ID生成、監査情報付与）
  * @param {string} userId - 操作ユーザーのID
- * @param {string} sheetName - シート名
  * @param {Object} dataObject - 追加するデータオブジェクト
  * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - シートオブジェクト
  * @returns {Object} 準備されたデータオブジェクト
  */
-function prepareNewData(userId, sheetName, dataObject, sheet) {
+function prepareNewData(userId, sheet, dataObject) {
     const headers = getHeaders(sheet);
     const newData = { ...dataObject };
 
@@ -97,9 +88,6 @@ function prepareNewData(userId, sheetName, dataObject, sheet) {
     const now = new Date().toISOString();
     newData['created_by'] = userId;
     newData['created_at'] = now;
-    newData['updated_by'] = userId;
-    newData['updated_at'] = now;
-
     // ID生成ロジック
     // 1. UUID (PK) の生成
     // 'id'カラムが存在し、かつ値が未設定の場合
@@ -114,6 +102,15 @@ function prepareNewData(userId, sheetName, dataObject, sheet) {
     }
 
     return newData;
+}
+
+// ============================================
+// SSSQL を使用した CRUD 操作
+// ============================================
+
+function select(sheetName, query, options) {
+    const sheet = getSheet(sheetName);
+    return SSSQL.select(sheet, query, options);
 }
 
 /**

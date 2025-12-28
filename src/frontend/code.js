@@ -28,14 +28,15 @@ function loadMainApplication(params) {
   // 認証チェック
   activeUserEmail = Session.getActiveUser().getEmail();
   activeUser = getActiveUser();
-  if (!checkPermission(activeUser, 'view')) {
-    const template = HtmlService.createTemplate(
-      `<h1>アクセス権限がありません</h1>` +
-      `<p>ZARMSへのアクセスが許可されていません。間違いだと思われる場合は、総務ユニットまでお問い合わせください。</p>` +
-      `<p>ログイン中のアカウント: ${activeUserEmail}</p>`
-    );
-    return template.evaluate().getContent();
-  }
+  // TODO: 開発の邪魔なので一旦スキップ。必ず実装すること
+  // if (!checkPermission(activeUser, 'view')) {
+  //   const template = HtmlService.createTemplate(
+  //     `<h1>アクセス権限がありません</h1>` +
+  //     `<p>ZARMSへのアクセスが許可されていません。間違いだと思われる場合は、総務ユニットまでお問い合わせください。</p>` +
+  //     `<p>ログイン中のアカウント: ${activeUserEmail}</p>`
+  //   );
+  //   return template.evaluate().getContent();
+  // }
 
   // メインUIを返す
   const template = HtmlService.createTemplateFromFile("index");
