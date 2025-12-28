@@ -24,7 +24,7 @@ function doPost(e) {
 
             // リクエストボディの解析
             const contents = JSON.parse(e.postData.contents);
-            const { token, sheetnames, email, operation, targetSheetName, data } = contents;
+            const { token, sheetNames, email, operation, targetSheetName, data } = contents;
 
             // トークン検証
             if (token !== API_TOKEN) {
@@ -35,15 +35,15 @@ function doPost(e) {
             }
 
             // 必須パラメータの簡易チェック
-            if (!sheetnames || !email || !operation || !targetSheetName) {
-                console.log(`Missing parameters: operation=${operation}, targetSheetName=${targetSheetName}`);
+            if (!sheetNames || !email || !operation || !targetSheetName) {
+                console.log(`Missing parameters: operation=${operation}, targetSheetName=${targetSheetName}, sheetNames=${sheetNames}, email=${email}`);
                 return createResponse({
                     status: 'error',
                     message: 'Missing required parameters'
                 }, 400);
             }
 
-            SHEET_NAMES = sheetnames;
+            SHEET_NAMES = sheetNames;
 
             const activeUserEmail = Session.getActiveUser().getEmail();
             if (activeUserEmail !== email) {
@@ -171,6 +171,6 @@ function createResponse(content, statusCode = 200) {
  * @returns {string} ユーザーの権限
  */
 function getUserPermission(email) {
-    const user = select(sheetnames.MEMBERS, { where: { email: email } });
-    if (!user) return 'guest';
-    return user.permission;
+    const user = select(SHEET_NAMES.MEMBERS, {where: {email: ["=", email]}});
+    return user.length > 0 ? user[0].system_role_key : null;
+}
