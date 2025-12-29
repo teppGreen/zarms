@@ -1,0 +1,33 @@
+<!-- mediumsテーブルを表示するページ -->
+
+<div id="tab-mediums" style="display: none;">
+    <article class="no-padding">
+        <div class="scroll">
+            <table id="mediums-table" class="stripes">
+                <thead>
+                    <!-- ヘッダーは App.utils.tables.render() で動的生成 -->
+                </thead>
+                <tbody>
+                    <!-- ボディは App.utils.tables.render() で動的生成 -->
+                </tbody>
+            </table>
+        </div>
+    </article>
+</div>
+
+<script>
+    // Namespace initialization
+    App.pages.mediums = {
+        loadData: function () {
+            callGAS('getItems', SHEET_NAMES.MEDIUMS)
+                .then(data => {
+                    App.state.data.mediums = data;
+
+                    // ReadOnlyテーブルをレンダリング
+                    App.utils.tables.render(SHEET_NAMES.MEDIUMS, App.utils.tables.applyFiltersAndSort(SHEET_NAMES.MEDIUMS, App.state.data.mediums), mediumsTableHeaders);
+                    hideLoading();
+                })
+                .catch(App.utils.error.handle);
+        }
+    };
+</script>

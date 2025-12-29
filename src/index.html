@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/beercss@3.13.1/dist/cdn/beer.min.css" rel="stylesheet">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/beercss@3.13.1/dist/cdn/beer.min.js"></script>
+  <script type="module"
+    src="https://cdn.jsdelivr.net/npm/material-dynamic-colors@1.1.2/dist/cdn/material-dynamic-colors.min.js"></script>
+
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://apis.google.com/js/picker.js"></script>
+  <script>
+    window.App = {
+      pages: {},
+      overlays: {},
+      utils: {},
+      constants: {},
+      modals: {},
+      state: {
+        data: {}
+      }
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wdth,wght,GRAD,ROND@6..144,-10..0,25..151,1..1000,0..100,0..100&family=Noto+Sans+JP:wght@100..900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap"
+    rel="stylesheet">
+  <?!= include('css'); ?>
+</head>
+
+<body class="light">
+  <?!= include('components/popups/error'); ?>
+
+  <div>
+    <?!= include('components/headers/navigation_top'); ?>
+    <?!= include('components/headers/navigation_left'); ?>
+    <?!= include('components/headers/navigation_right'); ?>
+
+    <main class="surface-container round padding bottom-margin">
+      <?!= include('pages/home'); ?>
+      <?!= include('pages/advertisements'); ?>
+      <?!= include('pages/analytics'); ?>
+      <?!= include('pages/budgets'); ?>
+      <?!= include('pages/creatives'); ?>
+      <?!= include('pages/forms'); ?>
+      <?!= include('pages/hardwares'); ?>
+      <?!= include('pages/jobs'); ?>
+      <?!= include('pages/licenses'); ?>
+      <?!= include('pages/mediums'); ?>
+      <?!= include('pages/plans'); ?>
+      <?!= include('pages/questions'); ?>
+      <?!= include('pages/resources'); ?>
+
+      <div id="overlay" class="overlay dark small-blur" style="position: absolute;"></div>
+
+      <!-- BeerCSS Overlay for right nav dialogs -->
+      <dialog class="max transparent page right no-padding" id="overlay-contents" style="position: absolute;">
+        <div style="height: 100%;">
+          <div class="grid no-space" style="height: 100%;">
+            <div class="l1" onclick="App.utils.navigation.closeRightNavOverlay()">
+              <button id="close-overlay" class="transparent circle large center no-margin middle"
+                onclick="App.utils.navigation.closeRightNavOverlay()">
+                <i>chevron_right</i>
+              </button>
+            </div>
+            <div class="l11" style="height: 100%;">
+              <div class="surface-container round padding" style="height: 100%;">
+                <?!= include('pages/events'); ?>
+                <?!= include('pages/knowledges'); ?>
+                <?!= include('pages/tasks'); ?>
+                <?!= include('pages/members'); ?>
+                <?!= include('pages/directories'); ?>
+              </div>
+            </div>
+          </div>
+        </div>
+      </dialog>
+
+      <!-- Details (Moved from Overlays to Main Area) -->
+      <?!= include('components/overlays/detail_creative'); ?>
+      <?!= include('components/overlays/detail_member'); ?>
+      <?!= include('components/overlays/detail_plan'); ?>
+      <?!= include('components/overlays/detail_task'); ?>
+    </main>
+
+    <!-- Modals -->
+    <?!= include('components/modals/new_task'); ?>
+    <?!= include('components/modals/new_member'); ?>
+    <?!= include('components/modals/select_directories'); ?>
+    <?!= include('components/modals/select_members'); ?>
+    <?!= include('components/modals/new_note'); ?>
+  </div>
+
+  <script>
+    const templateVariables = <?!= JSON.stringify(templateVariables) ?>;
+  </script>
+  <?!= include('renderTables') ?>
+  <?!= include('js') ?>
+</body>
+
+</html>
