@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { Routes } from '@angular/router';
+import { DetailedViewComponent } from './features/detailed-view/detailed-view.component';
 
-import { hello } from '../src/example-module';
-
-describe('example-module', () => {
-  describe('hello', () => {
-    it('Returns a hello message', () => {
-      expect(hello()).toBe('Hello Apps Script!');
-    });
-  });
-});
+export const routes: Routes = [
+  { path: '', redirectTo: 'detail', pathMatch: 'full' }, // Temporary redirect as requested
+  { path: 'detail', component: DetailedViewComponent },
+  // Add other routes as we migrate: 'plans', 'advertisements', etc.
+  { path: '**', redirectTo: 'detail' },
+];

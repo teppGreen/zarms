@@ -1,0 +1,609 @@
+<!--
+Copyright 2025 TEPPei
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<nav class="top surface">
+
+    <nav class="min">
+        <button id="new-button" class="extend square extra primary"
+            onclick="App.utils.header.toggleNewButtonDropdown(event)">
+            <i>add</i>
+            <span>新規作成</span>
+        </button>
+        <!-- ドロップダウンの項目は、表示中のページに応じて動的に変更 -->
+        <menu id="new-button-dropdown" class="bottom transparent no-wrap">
+            <li>
+                <button class="fill large-elevate" onclick="App.modals.new_task.open()">
+                    <i>check_circle</i>
+                    <span>タスク</span>
+                </button>
+            </li>
+            <li>
+                <button class="fill large-elevate" onclick="App.modals.new_creative.open()">
+                    <i>palette</i>
+                    <span>制作物</span>
+                </button>
+            </li>
+            <li>
+                <button class="fill large-elevate" onclick="App.modals.new_plan.open()">
+                    <i>folder</i>
+                    <span>企画</span>
+                </button>
+            </li>
+            <li>
+                <button class="fill large-elevate" onclick="App.modals.new_member.open()">
+                    <i>person_add</i>
+                    <span>メンバー</span>
+                </button>
+            </li>
+            <li>
+                <button class="fill large-elevate" onclick="App.modals.new_knowledge.open()">
+                    <i>lightbulb</i>
+                    <span>ナレッジ</span>
+                </button>
+            </li>
+        </menu>
+    </nav>
+
+
+    <h1 class="medium" style="font-family: 'Google Sans Flex', sans-serif; font-weight: 600; font-size: 2rem;"
+        id="header-title-default">ZARMS 2026</h1>
+
+    <div class="medium"></div>
+
+    <!-- 強化された検索バー -->
+    <div class="max field round border prefix" id="search-container">
+        <i class="front">search</i>
+        <input placeholder="IDまたはタイトルで検索" id="search-input" onkeydown="handleSearchKeydown(event)"
+            oninput="handleSearchInput(event)" onfocus="handleSearchFocus(event)" onblur="handleSearchBlur(event)">
+        <!-- 検索ターゲット (hidden for now, default to 'all') -->
+        <input type="hidden" id="search-target" value="all">
+        <menu id="search-results-menu" class="min">
+            <!-- Results will be injected here -->
+        </menu>
+    </div>
+
+    <div class="medium"></div>
+
+    <!-- 勤怠ボタン -->
+    <nav class="group split">
+        <button class="left-round large" onclick="handleTimetrackClick()">
+            <i>alarm</i>
+            <span>0:00:00</span>
+        </button>
+        <button class="right-round square large">
+            <i>keyboard_arrow_down</i>
+            <menu class="left no-wrap">
+                <li>
+                    <a>
+                        <i>play_circle</i>
+                        <span>業務開始/終了</span>
+                    </a>
+                </li>
+                <li>
+                    <a>
+                        <i>history</i>
+                        <span>打刻履歴</span>
+                    </a>
+                </li>
+            </menu>
+        </button>
+    </nav>
+</nav>
+
+<script>
+    (function () {
+        App.utils.header = {
+            /**
+             * 新規作成ボタンのドロップダウンを閉じます
+             */
+            closeNewButtonDropdown: function () {
+                const dropdown = document.getElementById('new-button-dropdown');
+                if (dropdown) {
+                    dropdown.classList.remove('show');
+                }
+            },
+
+            /**
+             * 「+ 新規作成」ボタンのドロップダウンの表示/非表示を切り替えます。
+             */
+            toggleNewButtonDropdown: function (event) {
+                event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
+                const dropdown = document.getElementById('new-button-dropdown');
+                if (dropdown) {
+                    dropdown.classList.toggle('show');
+                }
+            },
+
+            /**
+             * メインの「+ 新規作成」ボタンがクリックされたときの処理
+             */
+            handleMainButtonClick: function (event) {
+                // アクティブなナビゲーションアイテムを確認してタブを判定
+                const activeNavItem = document.querySelector('.nav-item.active');
+                console.log('アクティブなナビゲーションアイテム:', activeNavItem);
+                if (!activeNavItem) {
+                    return;
+                }
+
+                const navItemId = activeNavItem.id;
+
+                switch (navItemId) {
+                    case 'creatives-nav': App.modals.new_creative.open(); break;
+                    case 'plans-nav': App.modals.new_plan.open(); break;
+                    case 'members-nav': App.modals.new_member.open(); break;
+                    case 'knowledges-nav': App.modals.new_knowledge.open(); break;
+                    default: App.utils.header.toggleNewButtonDropdown(event);
+                }
+            },
+
+            /**
+             * 勤怠ボタンクリック（打刻）
+             */
+            handleTimetrackClick: function () {
+                showLoading();
+
+                // 現在のユーザーの最新の勤怠レコードを取得
+                callGAS('getItems', 'timetracks')
+                    .then(timetracks => {
+                        const currentUserEmail = templateVariables?.email;
+                        const currentUser = App.state.data.members.find(m => m.email === currentUserEmail);
+
+                        if (!currentUser) {
+                            alert('ユーザー情報が見つかりません');
+                            hideLoading();
+                            return;
+                        }
+
+                        // 最新の勤怠レコード（ended_atがnullのもの）を探す
+                        const activeTimetracks = timetracks.filter(t =>
+                            t.member_id === currentUser.id && !t.ended_at
+                        );
+
+                        if (activeTimetracks.length > 0) {
+                            // 終了打刻
+                            const activeRecord = activeTimetracks[0];
+                            const now = new Date().toISOString();
+
+                            callGAS('updateItem', 'timetracks', activeRecord.id, { ended_at: now })
+                                .then(() => {
+                                    hideLoading();
+                                    alert('退勤を記録しました');
+                                })
+                                .catch(error => {
+                                    hideLoading();
+                                    App.utils.error.handle(error);
+                                });
+                        } else {
+                            // 開始打刻
+                            const now = new Date().toISOString();
+                            const timetackData = {
+                                member_id: currentUser.id,
+                                started_at: now
+                            };
+
+                            callGAS('createItem', 'timetracks', timetackData)
+                                .then(() => {
+                                    hideLoading();
+                                    alert('出勤を記録しました');
+                                })
+                                .catch(error => {
+                                    hideLoading();
+                                    App.utils.error.handle(error);
+                                });
+                        }
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        App.utils.error.handle(error);
+                    });
+            },
+
+            /**
+             * プロフィール表示
+             */
+            handleUserProfile: function () {
+                if (templateVariables?.activeUser && App.overlays.memberDetail) {
+                    App.overlays.memberDetail.open(templateVariables.activeUser.email);
+                } else {
+                    alert('プロフィールを開けません');
+                }
+            },
+
+            /**
+             * ヘッダークローズボタンクリック
+             */
+            handleHeaderCloseClick: function () {
+                // 詳細画面を閉じる処理
+                if (typeof closeAllPopups === 'function') {
+                    closeAllPopups();
+                }
+                if (App.utils.navigation && App.utils.navigation.switchTab) {
+                    App.utils.navigation.switchTab('home');
+                }
+            }
+        };
+
+        // 下位互換性のための関数エイリアス
+        window.handleHeaderCloseClick = App.utils.header.handleHeaderCloseClick;
+
+    })();
+
+    (function () {
+        // 検索機能用の名前空間を初期化
+        if (!App.utils) App.utils = {};
+
+        App.utils.search = {
+            showIdSearchLoading: function () {
+                const container = document.getElementById('id-search-container');
+                if (container) {
+                    container.classList.add('id-search-loading');
+                }
+            },
+
+            hideIdSearchLoading: function () {
+                const container = document.getElementById('id-search-container');
+                if (container) {
+                    container.classList.remove('id-search-loading');
+                }
+            },
+
+            clearIdSearchInput: function () {
+                const input = document.getElementById('id-search-input');
+                if (!input) return;
+
+                input.value = '';
+                input.placeholder = 'ID検索';
+            },
+
+            // ID検索の共通処理
+            executeIdSearch: function (searchValue) {
+                if (!searchValue) return;
+
+                // 1. "P0001-W0001" 形式の対応 (最後のIDをターゲットにする)
+                const parts = searchValue.split('-');
+                const targetCode = parts[parts.length - 1];
+
+                if (typeof handleHeaderCloseClick === 'function') {
+                    handleHeaderCloseClick();
+                }
+
+                // 検索実行
+                App.utils.search.showIdSearchLoading();
+                callGAS('searchByCode', targetCode)
+                    .then(result => {
+                        App.utils.search.hideIdSearchLoading();
+
+                        // 検索ボックスからフォーカスを外す
+                        const input = document.getElementById('id-search-input');
+                        if (input) {
+                            input.blur();
+                            input.value = searchValue; // 入力値はそのまま保持
+                        }
+
+                        if (!result) {
+                            alert('該当するデータが見つかりません');
+                            return;
+                        }
+
+                        const { item, tableName } = result;
+
+                        // テーブル名に応じた処理
+                        if (tableName === SHEET_NAMES.TASKS) {
+                            App.pages.taskDetail.openDetailModal(item.id);
+                        } else if (tableName === SHEET_NAMES.CREATIVES) {
+                            App.overlays.creativeDetail.openDetailModal(item.id);
+                        } else if (tableName === SHEET_NAMES.PLANS) {
+                            App.pages.planDetail.openDetailModal(item.id);
+                        } else if (tableName === SHEET_NAMES.KNOWLEDGES) {
+                            App.pages.knowledgeDetail.openDetailModal(item.id);
+                        } else {
+                            console.log('Unknown table for search result:', tableName);
+                            alert('このIDタイプの詳細は表示できません: ' + tableName);
+                        }
+                    })
+                    .catch(error => {
+                        App.utils.search.hideIdSearchLoading();
+                        App.utils.error.handle(error);
+                    });
+            },
+
+            handleIdSearchClick: function () {
+                const input = document.getElementById('id-search-input');
+                if (!input) return;
+
+                const searchValue = input.value.trim();
+                App.utils.search.executeIdSearch(searchValue);
+            },
+
+            handleIdSearchFocus: function (event) {
+                const input = event.target;
+                console.log('[DEBUG] handleIdSearchFocus triggered');
+            },
+
+            handleIdSearchBlur: function (event) {
+                const input = event.target;
+                console.log('[DEBUG] handleIdSearchBlur triggered', {
+                    value: input.value,
+                    activeElement: document.activeElement,
+                    isInputFocused: document.activeElement === input
+                });
+            },
+
+            handleIdSearchInput: function (event) {
+                const input = event.target;
+                let value = input.value;
+
+                // 全角英数字を半角に変換
+                value = value.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function (s) {
+                    return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+                });
+
+                // 小文字を大文字に変換
+                value = value.toUpperCase();
+
+                // 許可された文字以外を削除 (ハイフンは許可)
+                value = value.replace(/[^A-Z0-9-]/g, '');
+
+                if (input.value !== value) {
+                    input.value = value;
+                }
+            },
+
+            handleIdSearchKeydown: function (event) {
+                if (event.key === 'Enter' && !event.isComposing) {
+                    event.preventDefault();
+                    const input = event.target;
+                    const searchValue = input.value.trim();
+                    App.utils.search.executeIdSearch(searchValue);
+                }
+            },
+
+            /**
+             * 検索入力時のハンドラー（リアルタイム候補表示）
+             */
+            handleSearchInput: function (event) {
+                const input = event.target;
+                const searchValue = input.value.trim();
+                const searchTarget = document.getElementById('search-target').value;
+                const resultsMenu = document.getElementById('search-results-menu');
+
+                if (!searchValue) {
+                    resultsMenu.style.display = 'none';
+                    return;
+                }
+
+                // ID検索の場合
+                if (searchTarget === 'id') {
+                    // リアルタイム検索はせず、Enterキー押下時に実行
+                    resultsMenu.style.display = 'none';
+                    return;
+                }
+
+                // テキスト検索の場合
+                const results = App.utils.search.performTextSearch(searchValue, searchTarget);
+                App.utils.search.displaySearchResults(results);
+            },
+
+            /**
+             * キーダウンハンドラー（Enter検索）
+             */
+            handleSearchKeydown: function (event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    App.utils.search.handleSearchClick();
+                }
+            },
+
+            /**
+             * フォーカスハンドラー
+             */
+            handleSearchFocus: function (event) {
+                // 既に入力値がある場合は候補を再表示
+                const input = event.target;
+                if (input.value.trim()) {
+                    App.utils.search.handleSearchInput(event);
+                }
+            },
+
+            /**
+             * ブラーハンドラー（少し遅延してメニューを閉じる）
+             */
+            handleSearchBlur: function (event) {
+                setTimeout(() => {
+                    const resultsMenu = document.getElementById('search-results-menu');
+                    if (resultsMenu) {
+                        resultsMenu.style.display = 'none';
+                    }
+                }, 200);
+            },
+
+            /**
+             * 検索ボタンクリック / Enterキー押下時の検索実行
+             */
+            handleSearchClick: function () {
+                const input = document.getElementById('search-input');
+                const searchValue = input.value.trim();
+                const searchTarget = document.getElementById('search-target').value;
+
+                if (!searchValue) return;
+
+                const resultsMenu = document.getElementById('search-results-menu');
+                resultsMenu.style.display = 'none';
+
+                // ID検索の場合
+                if (searchTarget === 'id') {
+                    App.utils.search.performIdSearch(searchValue);
+                } else {
+                    // テキスト検索の場合は候補を表示
+                    const results = App.utils.search.performTextSearch(searchValue, searchTarget);
+                    if (results.length === 1) {
+                        // 結果が1件のみの場合は直接開く
+                        App.utils.search.openDetailModal(results[0]);
+                    } else if (results.length > 0) {
+                        // 複数の場合はドロップダウン表示
+                        App.utils.search.displaySearchResults(results);
+                    } else {
+                        alert('該当するデータが見つかりません');
+                    }
+                }
+            },
+
+            /**
+             * ID検索の実行
+             */
+            performIdSearch: function (searchValue) {
+                const parts = searchValue.split('-');
+                const targetCode = parts[parts.length - 1];
+
+                showLoading();
+                callGAS('searchByCode', targetCode)
+                    .then(result => {
+                        hideLoading();
+
+                        if (!result) {
+                            alert('該当するデータが見つかりません');
+                            return;
+                        }
+
+                        const { item, tableName } = result;
+                        App.utils.search.openDetailModal({ item, tableName, id: item.id });
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        App.utils.error.handle(error);
+                    });
+            },
+
+            /**
+             * テキスト検索の実行（フロントエンドデータから検索）
+             */
+            performTextSearch: function (searchValue, searchTarget) {
+                const results = [];
+                const searchLower = searchValue.toLowerCase();
+
+                // 検索対象のテーブルとフィールドを定義
+                const searchConfigs = [
+                    { data: App.state.data.creatives, tableName: SHEET_NAMES.CREATIVES, fields: ['title', 'display_id'] },
+                    { data: App.state.data.plans, tableName: SHEET_NAMES.PLANS, fields: ['title', 'display_id'] },
+                    { data: App.state.data.tasks, tableName: SHEET_NAMES.TASKS, fields: ['title', 'display_id'] },
+                    { data: App.state.data.members, tableName: SHEET_NAMES.MEMBERS, fields: ['display_name', 'email'] }
+                ];
+
+                searchConfigs.forEach(config => {
+                    if (!config.data) return;
+
+                    config.data.forEach(item => {
+                        let matches = false;
+
+                        if (searchTarget === 'all') {
+                            // すべてのフィールドを検索
+                            matches = config.fields.some(field => {
+                                const value = item[field];
+                                return value && value.toString().toLowerCase().includes(searchLower);
+                            });
+                        } else if (searchTarget === 'title') {
+                            // タイトルのみ検索
+                            const titleField = config.fields.find(f => f.includes('title') || f.includes('display_name'));
+                            if (titleField) {
+                                const value = item[titleField];
+                                matches = value && value.toString().toLowerCase().includes(searchLower);
+                            }
+                        }
+
+                        if (matches) {
+                            const formattedDisplayId = formatDisplayId(config.tableName, item.display_id);
+                            results.push({
+                                item: item,
+                                tableName: config.tableName,
+                                id: item.id,
+                                displayText: `[${config.tableName}] ${formattedDisplayId || item.id}: ${item.title || item.display_name || item.email || ''}`
+                            });
+                        }
+                    });
+                });
+
+                return results.slice(0, 20); // 最大20件
+            },
+
+            /**
+             * 検索結果をドロップダウンに表示
+             */
+            displaySearchResults: function (results) {
+                const resultsMenu = document.getElementById('search-results-menu');
+                if (!resultsMenu) return;
+
+                // 既存の結果（入力項目以外）を削除
+                // 最初のliは入力フィールドなので残す
+                const listItems = resultsMenu.querySelectorAll('li');
+                for (let i = 1; i < listItems.length; i++) {
+                    resultsMenu.removeChild(listItems[i]);
+                }
+
+                if (results.length === 0) {
+                    resultsMenu.classList.add('active');
+                    return;
+                }
+
+                // 新しい結果を追加
+                const newResultsHtml = results.map(result => {
+                    return `
+                                <li><i>open_in_new</i><a style="cursor: pointer;" onclick='App.utils.search.openDetailModalFromSearch(${JSON.stringify(result).replace(/'/g, "\\'")}); event.stopPropagation();'>
+                                    <span class="small-text">${escapeHtml(result.displayText)}</span>
+                                </a></li>
+                    `;
+                }).join('');
+
+                resultsMenu.insertAdjacentHTML('beforeend', newResultsHtml);
+
+                resultsMenu.style.display = 'block';
+            },
+
+            /**
+             * 検索結果から詳細モーダルを開く（グローバル関数）
+             */
+            openDetailModalFromSearch: function (result) {
+                App.utils.search.openDetailModal(result);
+                const resultsMenu = document.getElementById('search-results-menu');
+                if (resultsMenu) resultsMenu.style.display = 'none';
+                const input = document.getElementById('search-input');
+                if (input) input.value = '';
+            },
+
+            /**
+             * テーブル名に応じた詳細モーダルを開く
+             */
+            openDetailModal: function (result) {
+                const { tableName, id } = result;
+
+                if (tableName === SHEET_NAMES.CREATIVES && App.overlays.creativeDetail) {
+                    App.overlays.creativeDetail.open(id);
+                } else if (tableName === SHEET_NAMES.PLANS && App.overlays.planDetail) {
+                    App.overlays.planDetail.open(id);
+                } else if (tableName === SHEET_NAMES.TASKS && App.overlays.taskDetail) {
+                    App.overlays.taskDetail.open(id);
+                } else if (tableName === SHEET_NAMES.MEMBERS && App.overlays.memberDetail) {
+                    App.overlays.memberDetail.open(id);
+                } else {
+                    console.log('Unknown table for search result:', tableName);
+                    alert('このテーブルの詳細は表示できません: ' + tableName);
+                }
+            }
+        };
+
+        // 下位互換性のためのグローバル関数
+        window.openDetailModalFromSearch = App.utils.search.openDetailModalFromSearch;
+
+    })();
+</script>

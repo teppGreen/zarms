@@ -1,0 +1,687 @@
+<!--
+Copyright 2025 TEPPei
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<!-- 詳細画面: 制作物 -->
+<div id="detail-creative" style="display: none;">
+  <nav class="small-margin row align-center">
+    <button class="circle transparent"
+      onclick="App.utils.navigation.goBack(App.state.previousTab, App.overlays.creativeDetail)">
+      <i>arrow_back</i>
+    </button>
+    <h5 class="bold max" id="creative-detail-title">制作物詳細</h5>
+    <div class="max"></div>
+    <button class="border round">
+      <i>link</i>
+      <span id="display-id" style="font-family: 'Roboto Mono', monospace; font-weight: 500;" class="large-text"></span>
+    </button>
+  </nav>
+
+  <div id="creative-detail-content" class="grid no-space top-margin">
+    <!-- Left Column (s12 m3): Basic Info -->
+    <div class="s12 m3 small-margin">
+      <article class="no-round no-padding no-margin transparent large-height">
+        <!-- Title -->
+        <div class="field label border">
+          <input type="text" id="creative-title-input"
+            onchange="App.overlays.creativeDetail.updateField('title', this.value)">
+          <label>タイトル</label>
+        </div>
+
+        <!-- Status -->
+        <div class="field label border">
+          <select id="creative-status-select"
+            onchange="App.overlays.creativeDetail.updateField('creative_status_key', this.value)">
+          </select>
+          <label>ステータス</label>
+        </div>
+
+        <!-- Type -->
+        <div class="field label border">
+          <select id="creative-type-select"
+            onchange="App.overlays.creativeDetail.updateField('creative_type_key', this.value)">
+          </select>
+          <label>タイプ</label>
+        </div>
+
+        <!-- Priority -->
+        <div class="field label border">
+          <select id="creative-priority-select"
+            onchange="App.overlays.creativeDetail.updateField('priority_key', this.value)">
+          </select>
+          <label>優先度</label>
+        </div>
+
+        <!-- Deadline -->
+        <div class="field label border">
+          <input type="datetime-local" id="creative-deadline-input"
+            onchange="App.overlays.creativeDetail.updateField('deadline_at', this.value)">
+          <label>納品期限</label>
+        </div>
+
+        <div class="small-space"></div>
+
+        <!-- Client -->
+        <div class="field label border suffix">
+          <input type="text" id="creative-client-display" style="font-family: 'Roboto Mono', monospace;" readonly>
+          <label>依頼元</label>
+          <i class="front" onclick="App.overlays.creativeDetail.selectDirectory('client_directory_id')">edit</i>
+        </div>
+
+        <!-- Contractor -->
+        <div class="field label border suffix">
+          <input type="text" id="creative-contractor-display" style="font-family: 'Roboto Mono', monospace;" readonly>
+          <label>依頼先</label>
+          <i class="front" onclick="App.overlays.creativeDetail.selectDirectory('contractor_directory_id')">edit</i>
+        </div>
+
+        <!-- Asignees -->
+        <div class="row scroll tiny-space tiny-padding" id="creative-asignees-container"></div>
+      </article>
+
+      <!-- Members -->
+      <div id="creative-members-container" class="chips"></div>
+
+      <nav class="center-align top-margin tiny-space">
+        <button class="round primary large max" onclick="App.overlays.creativeDetail.addMembers()">
+          <i>person_edit</i>
+          <span>担当者を編集</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Center Column (s12 m6): Content -->
+    <div class="s12 m6 small-margin">
+      <article id="creative-main-content-area" style="background-color: white;"
+        class="small-round no-padding no-elevate large-height scroll"></article>
+      <nav class="center-align max tiny-space top-margin" id="detail-center-column-nav">
+        <nav class="tabbed small surface max" id="detail-center-column-tab">
+          <a onclick="App.overlays.creativeDetail.switchTab(event, 'documents')"><span>ドキュメント</span></a>
+          <a onclick="App.overlays.creativeDetail.switchTab(event, 'folder')"><span>フォルダ</span></a>
+          <a onclick="App.overlays.creativeDetail.switchTab(event, 'relations')"><span>リレーション</span></a>
+          <a onclick="App.overlays.creativeDetail.switchTab(event, 'tasks')"><span>タスク</span></a>
+        </nav>
+        <button onclick="App.overlays.creativeDetail.switchTab(event, 'settings')" class="circle large surface">
+          <i>settings</i>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Right Column (s12 m3): Notes -->
+    <div class="s12 m3 small-margin">
+      <div>
+        <article id="creative-notes-list"
+          class="small-round large-height no-elevate no-margin surface-container-lowest small-padding scroll"></article>
+      </div>
+      <div class="m l center">
+        <nav class="center-align max top-margin">
+          <button class="round large primary max"
+            onclick="App.modals.new_note.open(App.overlays.creativeDetail.currentId)">
+            <i>add_comment</i>
+            <span>コメントを追加</span>
+          </button>
+        </nav>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    App.overlays.creativeDetail = {
+      currentId: null,
+      isLoading: false,
+      isRefetching: false,
+      currentItem: null,
+
+
+
+      reset: function () {
+        const inputs = [
+          ...Array.from(document.querySelectorAll(".field :is(input, select, textarea)"))
+            .map(el => el.id)
+            .filter(id => id)
+        ];
+        inputs.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+
+        // Display ID
+        const displayId = document.getElementById('display-id');
+        if (displayId) displayId.textContent = '';
+
+        // Containers
+        ['creative-asignees-container', 'creative-members-container', 'creative-notes-list', 'creative-main-content-area'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.innerHTML = '';
+        });
+
+        App.overlays.creativeDetail.currentId = null;
+        App.overlays.creativeDetail.currentItem = null;
+      },
+
+      openDetailModal: function (id) {
+        App.overlays.creativeDetail.open(id);
+      },
+
+      open: function (id) {
+        console.log(`[CreativeDetail] open called with id: ${id}`);
+
+        // 元々開いていたページのIDを記録
+        const currentViewEl = Array.from(document.querySelectorAll('main > div'))
+          .find(el => el.style.display !== 'none');
+        if (currentViewEl) {
+          App.state.previousTab = currentViewEl.id;
+        }
+
+        if (!id || typeof id !== 'string') {
+          console.error('[CreativeDetail] Invalid ID provided:', id);
+          App.utils.error.handle({ message: '無効なIDが指定されました: ' + id });
+          return;
+        }
+
+        if (typeof SHEET_NAMES === 'undefined') {
+          console.error('[CreativeDetail] SHEET_NAMES is not defined');
+          App.utils.error.handle({ message: 'システムエラー: テーブル定義が見つかりません' });
+          return;
+        }
+
+        App.overlays.creativeDetail.currentId = id;
+        App.overlays.creativeDetail.isLoading = true;
+        App.overlays.creativeDetail.isRefetching = false;
+        App.utils.ui.setMainReadonly(true);
+        showLoading();
+        console.log(`currentId is ${App.overlays.creativeDetail.currentId}`);
+
+        // View switching
+        document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
+        const view = document.getElementById('detail-creative');
+        if (view) {
+          view.style.removeProperty('display'); ''
+        } else {
+          console.error('[CreativeDetail] View element #detail-creative not found');
+          return;
+        }
+
+        // Prepare promises for data loading
+        const promises = [
+          callGAS('getItemById', SHEET_NAMES.CREATIVES, id)
+            .then(response => {
+              // SWR Pattern
+              if (response.isCached) {
+                console.log(`[CreativeDetail] Cached data used. Fetching fresh data for ID: ${id}`);
+                App.overlays.creativeDetail.isRefetching = true;
+                callGAS('getItemById', SHEET_NAMES.CREATIVES, id, true) // Force refresh
+                  .then(freshResponse => {
+                    const freshData = freshResponse.data;
+                    if (freshData && App.overlays.creativeDetail.currentId === id) { // Ensure still on same item
+                      const currentJson = JSON.stringify(App.overlays.creativeDetail.currentItem);
+                      if (JSON.stringify(freshData) !== currentJson) {
+                        console.log('[CreativeDetail] Fresh data updated, re-rendering');
+                        App.overlays.creativeDetail.currentItem = freshData;
+                        App.overlays.creativeDetail.render(freshData);
+                      } else {
+                        console.log('[CreativeDetail] Fresh data unchanged, skipping');
+                      }
+                    }
+                  })
+                  .catch(err => console.error('[CreativeDetail] Background refresh failed:', err))
+                  .finally(() => {
+                    if (App.overlays.creativeDetail.currentId === id) {
+                      App.utils.ui.setMainReadonly(false);
+                    }
+                  });
+              }
+              return response.data;
+            })
+            .catch(err => {
+              console.error('[CreativeDetail] Failed to load creative:', err);
+              throw new Error(`制作物データの取得に失敗しました: ${err.message}`);
+            })
+        ];
+
+        // Defensively load master data if missing
+        const directoriesData = App.state.data.directories;
+        if (typeof directoriesData === 'undefined' || directoriesData.length === 0) {
+          promises.push(callGAS('getItems', SHEET_NAMES.DIRECTORIES).then(d => { App.state.data.directories = d; return d; }));
+        } else {
+          promises.push(Promise.resolve(directoriesData));
+        }
+
+        const plansData = App.state.data.plans;
+        if (typeof plansData === 'undefined' || plansData.length === 0) {
+          promises.push(callGAS('getItems', SHEET_NAMES.PLANS).then(d => { App.state.data.plans = d; return d; }));
+        } else {
+          promises.push(Promise.resolve(plansData));
+        }
+
+        const membersData = App.state.data.members;
+        if (typeof membersData === 'undefined' || membersData.length === 0) {
+          promises.push(callGAS('getItems', SHEET_NAMES.MEMBERS).then(d => { App.state.data.members = d; return d; }));
+        } else {
+          promises.push(Promise.resolve(membersData));
+        }
+
+        const configData = App.state.data.config;
+        if (typeof configData === 'undefined' || Object.keys(configData).length === 0) {
+          promises.push(callGAS('getItems', SHEET_NAMES.CONFIG).then(d => { const grouped = groupConfigByType(d); App.state.data.config = grouped; return grouped; }));
+        } else {
+          promises.push(Promise.resolve(configData));
+        }
+
+        Promise.all(promises)
+          .then(([creative]) => {
+            console.log('[CreativeDetail] Data loaded successfully', creative);
+
+            if (!creative) {
+              console.warn('[CreativeDetail] Creative not found for id:', id);
+              alert('制作物が見つかりません');
+              App.utils.navigation.goBack(App.state.previousTab, App.overlays.creativeDetail);
+              return;
+            }
+
+            App.overlays.creativeDetail.currentItem = creative;
+            App.overlays.creativeDetail.render(creative);
+          })
+          .catch(error => {
+            console.error('[CreativeDetail] Fatal error during loading:', error);
+            App.utils.error.handle(error);
+            App.utils.navigation.goBack(App.state.previousTab, App.overlays.creativeDetail);
+          })
+          .finally(() => {
+            App.overlays.creativeDetail.isLoading = false;
+            hideLoading();
+            if (!App.overlays.creativeDetail.isRefetching) {
+              App.utils.ui.setMainReadonly(false);
+            }
+          });
+      },
+
+      render: function (creative) {
+        console.log('[CreativeDetail] Rendering creative:', creative);
+        const container = document.getElementById('detail-creative');
+        if (!container) return;
+
+        const displayIdEl = document.getElementById('display-id');
+        const displayIdStr = formatDisplayId(SHEET_NAMES.CREATIVES, creative.display_id);
+        if (displayIdEl && displayIdEl.textContent !== displayIdStr) displayIdEl.textContent = displayIdStr;
+
+        const titleInput = document.getElementById('creative-title-input');
+        const newTitle = creative.title || '';
+        if (titleInput && titleInput !== document.activeElement && titleInput.value !== newTitle) {
+          titleInput.value = newTitle;
+        }
+
+        const statusSelect = document.getElementById('creative-status-select');
+        if (statusSelect && statusSelect !== document.activeElement) {
+          const newHtml = App.overlays.creativeDetail.renderEnumOptions('CREATIVE_STATUS', creative.creative_status_key);
+          if (statusSelect.innerHTML !== newHtml) statusSelect.innerHTML = newHtml;
+        }
+
+        const typeSelect = document.getElementById('creative-type-select');
+        if (typeSelect && typeSelect !== document.activeElement) {
+          const newHtml = App.overlays.creativeDetail.renderEnumOptions('CREATIVE_TYPE', creative.creative_type_key);
+          if (typeSelect.innerHTML !== newHtml) typeSelect.innerHTML = newHtml;
+        }
+
+        const prioritySelect = document.getElementById('creative-priority-select');
+        if (prioritySelect && prioritySelect !== document.activeElement) {
+          const newHtml = App.overlays.creativeDetail.renderEnumOptions('PRIORITY', creative.priority_key);
+          if (prioritySelect.innerHTML !== newHtml) prioritySelect.innerHTML = newHtml;
+        }
+
+        const deadlineInput = document.getElementById('creative-deadline-input');
+        const newDeadline = formatDateTimeForInput(creative.deadline_at);
+        if (deadlineInput && deadlineInput !== document.activeElement && deadlineInput.value !== newDeadline) {
+          deadlineInput.value = newDeadline;
+        }
+
+        const clientInput = document.getElementById('creative-client-display');
+        const newClient = App.overlays.creativeDetail.getDirectoryDisplayInfo(creative.client_directory_id);
+        if (clientInput && clientInput.value !== newClient) clientInput.value = newClient;
+
+        const contractorInput = document.getElementById('creative-contractor-display');
+        const newContractor = App.overlays.creativeDetail.getDirectoryDisplayInfo(creative.contractor_directory_id);
+        if (contractorInput && contractorInput.value !== newContractor) contractorInput.value = newContractor;
+
+        // Complex sub-renders usually handle their own clearing/diffing, 
+        // but for simplicity we reload lists if the main object renders.
+        // We could optimize loadMembers/Assignees too but strict DOM value check is most critical for inputs.
+        App.overlays.creativeDetail.loadMembers(creative.id);
+        App.overlays.creativeDetail.loadAssignees(creative.id);
+        App.overlays.creativeDetail.loadNotes(creative.id);
+
+        // Check if tabs need refresh (only if ID changed or first load?)
+        // switchTab renders content from scratch. 
+        // If we re-render, we might reset tab state.
+        // Current implementation of render calls switchTab('documents') at the end (Line 258).
+        // This resets the user back to Documents tab! 
+        // We should PRESERVE the active tab.
+        const activeTab = document.querySelector('#detail-center-column-nav .active');
+        const currentTabName = activeTab ? activeTab.getAttribute('onclick').match(/'([^']+)'\)/)[1] : 'documents';
+        App.overlays.creativeDetail.switchTab(null, currentTabName);
+      },
+
+      loadAssignees: function (creativeId) {
+        callGAS('getItems', SHEET_NAMES.MEMBER_ASSIGNMENTS)
+          .then(assignments => {
+            const creativeAssignments = assignments.filter(a => a.related_table === SHEET_NAMES.CREATIVES && a.related_id === creativeId);
+            const container = document.getElementById('creative-asignees-container');
+            if (!container) return;
+
+            container.innerHTML = creativeAssignments.map(assignment => {
+              const membersData = App.state.data.members;
+              const member = membersData.find(m => m.id === assignment.member_id);
+              if (!member) return '';
+              const iconUrl = member.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}` : ''; // fallback or specific logic?
+              const display_name = member.display_name || member.email || '不明';
+              const iconContent = iconUrl
+                ? `<img class="responsive" src="${escapeHtml(iconUrl)}" alt="${escapeHtml(display_name)} title="alt="${escapeHtml(display_name)}"">`
+                : `<i>account_circle</i>`;
+
+              // Using App.pages.memberDetail.open(member.email) as verified in detail_member.html
+              return `
+              <button class="transparent circle small" onclick="App.pages.memberDetail.open('${escapeHtml(member.id)}')">
+                ${iconContent}
+                <div class="tooltip right round">${escapeHtml(display_name)}</div>
+              </button>
+            `;
+            }).join('');
+          })
+          .catch(err => {
+            console.error('[CreativeDetail] Failed to load assignees:', err);
+          });
+      },
+
+      switchTab: function (event, tab) {
+        const contentArea = document.getElementById('creative-main-content-area');
+        if (!contentArea) return;
+
+        const creative = App.overlays.creativeDetail.currentItem;
+        console.log(`[CreativeDetail] Switching tab to ${tab}`);
+
+        switch (tab) {
+          case 'documents':
+            contentArea.innerHTML = creative.document_gfile_id ?
+              `<iframe src="https:/\/docs.google.com/document/d/${creative.document_gfile_id}/edit?rm=minimal" style="width: 100%; height: 100%; border: 0;"></iframe>` :
+              '<p>ドキュメントが設定されていません</p>';
+            break;
+          case 'folder':
+            contentArea.innerHTML = creative.gfolder_id ?
+              `<iframe src="https:/\/drive.google.com/embeddedfolderview?id=${creative.gfolder_id}#list" style="width: 100%; height: 100%; border: 0;"></iframe>` :
+              '<p>フォルダが設定されていません</p>';
+            break;
+          case 'relations':
+            contentArea.innerHTML = '<h5>関連アイテム</h5><p>リレーション機能は実装予定です</p>';
+            break;
+          case 'tasks':
+            contentArea.innerHTML = '<h5>タスク一覧</h5><p>タスク機能は実装予定です</p>';
+            break;
+          case 'settings':
+            contentArea.innerHTML = '<h5>設定</h5><p>設定機能は実装予定です</p>';
+            break;
+        }
+
+        // Tab activation logic
+        const container = document.getElementById('detail-center-column-nav');
+        if (container) {
+          container.querySelectorAll("nav > a, button").forEach(a => a.classList.remove('active'));
+          if (event && event.currentTarget) {
+            event.currentTarget.classList.add('active');
+          }
+        }
+      },
+
+      renderEnumOptions: function (enumType, selectedValue) {
+        const enumData = App.state.data.enum;
+        if (!enumData || !enumData[enumType]) {
+          console.warn(`[CreativeDetail] Enum options not found for ${enumType}`);
+          return '';
+        }
+        const options = enumData[enumType] || [];
+        return options.map(opt =>
+          `<option value="${escapeHtml(opt.key)}" ${opt.key === selectedValue ? 'selected' : ''}>${escapeHtml(opt.value)}</option>`
+        ).join('');
+      },
+
+      // 組織名を上層階層のものを含めて取得し、スラッシュでつなぐ。現状使用していないが一応残す。
+      getDirectoryFullName: function (directoryId) {
+        const directoriesData = App.state.data.directories;
+        if (!directoryId || !directoriesData) return '';
+        const dir = directoriesData.find(d => d.id === directoryId);
+        if (!dir) return '';
+        if (!dir.parent_directory_id) return dir.name || '';
+
+        const parent = directoriesData.find(d => d.id === dir.parent_directory_id);
+        if (!parent) return dir.name || '';
+
+        // Recursive call with safety check to avoid infinite loops (basic depth check implied by data structure, but beware circular refs)
+        return App.overlays.creativeDetail.getDirectoryFullName(dir.parent_directory_id) + ' / ' + (dir.name || '');
+      },
+
+      getDirectoryDisplayInfo: function (directoryId) {
+        const directoriesData = App.state.data.directories;
+        if (!directoryId || !directoriesData) return '';
+        const dir = directoriesData.find(d => d.id === directoryId);
+        if (!dir) return '';
+
+        // display_idをフォーマット
+        const displayIdStr = formatDisplayId(SHEET_NAMES.DIRECTORIES, dir.display_id);
+
+        // directory_type_keyからENUMのvalueを取得
+        let typeValue = dir.directory_type_key || '-';
+        const enumData = App.state.data.enum;
+        if (enumData && enumData['DIRECTORY_TYPE']) {
+          const enumItem = enumData['DIRECTORY_TYPE'].find(e => e.key === dir.directory_type_key);
+          if (enumItem) {
+            typeValue = enumItem.value;
+          }
+        }
+
+        // display_id / name / directory_type_key の形式で返す
+        return `${displayIdStr} | ${dir.name || ''} | ${typeValue}`;
+      },
+
+      selectDirectory: function (field) {
+        App.modals.selectDirectories.open({
+          multiSelect: false,
+          preSelected: App.overlays.creativeDetail.currentItem[field] ? [App.overlays.creativeDetail.currentItem[field]] : [],
+          callback: (selectedIds) => {
+            if (selectedIds && selectedIds.length > 0) {
+              console.log(`[CreativeDetail] Validating directory selection for ${field}:`, selectedIds[0]);
+              App.overlays.creativeDetail.updateField(field, selectedIds[0]);
+
+              // Optimistic UI update for the input field
+              const displayField = field === 'client_directory_id' ? 'creative-client-display' : 'creative-contractor-display';
+              const input = document.getElementById(displayField);
+              if (input) {
+                input.value = App.overlays.creativeDetail.getDirectoryDisplayInfo(selectedIds[0]);
+              }
+            }
+          }
+        });
+      },
+
+      addMembers: function () {
+        App.modals.selectMembers.open({
+          multiSelect: true,
+          preSelected: [],
+          callback: (selectedIds) => {
+            if (selectedIds && selectedIds.length > 0) {
+              console.log(`currentId is ${App.overlays.creativeDetail.currentId}`);
+              selectedIds.forEach(memberId => {
+                const assignmentData = {
+                  related_table: SHEET_NAMES.CREATIVES,
+                  related_id: App.overlays.creativeDetail.currentId,
+                  member_id: memberId
+                };
+                callGAS('createItem', 'member_assignments', assignmentData)
+                  .then(() => App.overlays.creativeDetail.loadMembers(App.overlays.creativeDetail.currentId))
+                  .catch(err => {
+                    console.error('[CreativeDetail] Failed to add member:', err);
+                    App.utils.error.handle(err);
+                  });
+              });
+            }
+          }
+        });
+      },
+
+      updateField: function (field, value) {
+        const id = App.overlays.creativeDetail.currentId;
+        console.log(`[CreativeDetail] Update requested - Field: ${field}, Value: ${value}, ID: ${id}`);
+
+        if (!id) {
+          console.error('[CreativeDetail] Cannot update: No ID');
+          return;
+        }
+
+        let finalValue = value;
+        // Date handling
+        if (field === 'deadline_at') {
+          if (value) {
+            try {
+              const d = new Date(value);
+              // Ensure valid date before conversion
+              if (isNaN(d.getTime())) {
+                throw new Error('Invalid date');
+              }
+              finalValue = d.toISOString();
+            } catch (e) {
+              console.warn('[CreativeDetail] Invalid date format for deadline input', value);
+              // Revert UI? For now let's just not update if invalid.
+              return;
+            }
+          } else {
+            finalValue = null; // Handle clear
+          }
+        }
+
+        const oldItem = { ...App.overlays.creativeDetail.currentItem };
+        App.overlays.creativeDetail.currentItem[field] = finalValue;
+
+        // Optimistic update
+        updateLocalData(SHEET_NAMES.CREATIVES, id, { [field]: finalValue });
+
+        callGAS('updateItem', SHEET_NAMES.CREATIVES, id, { [field]: finalValue })
+          .then(success => {
+            if (!success) {
+              console.error('[CreativeDetail] Update returned failure (false)');
+              alert('更新に失敗しました');
+              // Rollback
+              App.overlays.creativeDetail.currentItem[field] = oldItem[field];
+              rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
+              App.overlays.creativeDetail.render(App.overlays.creativeDetail.currentItem);
+            } else {
+              console.log('[CreativeDetail] Update successful');
+            }
+          })
+          .catch(error => {
+            console.error('[CreativeDetail] Update exception:', error);
+            App.utils.error.handle(error);
+            // Rollback
+            App.overlays.creativeDetail.currentItem[field] = oldItem[field];
+            rollbackLocalData(SHEET_NAMES.CREATIVES, id, oldItem);
+            App.overlays.creativeDetail.render(App.overlays.creativeDetail.currentItem);
+          });
+      },
+
+      loadMembers: function (creativeId) {
+        callGAS('getItems', 'member_assignments')
+          .then(assignments => {
+            const creativeAssignments = assignments.filter(a => a.related_table === SHEET_NAMES.CREATIVES && a.related_id === creativeId);
+            const container = document.getElementById('creative-members-container');
+            if (!container) return;
+
+            if (creativeAssignments.length === 0) {
+              container.innerHTML = '<p class="small-text">担当者が割り当てられていません</p>';
+              return;
+            }
+
+            container.innerHTML = creativeAssignments.map(assignment => {
+              const membersData = App.state.data.members;
+              const member = membersData.find(m => m.id === assignment.member_id);
+              if (!member) return '';
+              const iconUrl = member.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}` : '';
+              return `
+              <div class="chip">
+                ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" alt="">` : ''}
+                <span>${escapeHtml(member.display_name || member.email || '不明')}</span>
+                <i onclick="App.overlays.creativeDetail.removeMember('${assignment.id}')">close</i>
+              </div>
+            `;
+            }).join('');
+          })
+          .catch(err => {
+            console.error('[CreativeDetail] Failed to load members:', err);
+            // Non-critical, just log
+          });
+      },
+
+      loadNotes: function (creativeId) {
+        callGAS('getItems', 'notes')
+          .then(allNotes => {
+            if (!allNotes) return;
+            const notes = allNotes.filter(n => n.related_table === SHEET_NAMES.CREATIVES && n.related_id === creativeId && !n.is_archived);
+            const container = document.getElementById('creative-notes-list');
+            if (!container) return;
+
+            if (notes.length === 0) {
+              container.innerHTML = '<p class="small-text middle center-align">コメントはありません</p>';
+              return;
+            }
+
+            notes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            container.innerHTML = notes.map((note, index) => {
+              const membersData = App.state.data.members;
+              const author = membersData.find(m => m.email === note.created_by);
+              const authorName = author ? (author.display_name || author.email) : '不明';
+              const iconUrl = author && author.icon_gfile_id ? `https:/\/drive.google.com/thumbnail?id=${author.icon_gfile_id}` : '';
+              const isLast = index === notes.length - 1;
+              return `
+              <div class="row no-margin top-align tiny-space">
+                  ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="small circle" alt="">` : ''}
+                <div class="max">
+                  <div class="row secondary-text tiny-space">
+                    <strong class="small-text">${escapeHtml(authorName)}</strong>
+                    <span class="small-text">${formatDateTimeForDisplay(note.created_at)}</span>
+                    <div class="badge primary" style="display: none"></div>
+                  </div>
+                  <div class="small-text no-line" style="white-space: pre-wrap; word-break: break-word;">${escapeHtml(note.content)}</div>
+                </div>
+              </div>
+              ${!isLast ? '<div class=""><i class="small-margin medium secondary-text">keyboard_arrow_up</i></div>' : ''}
+            `;
+            }).join('');
+
+            // container.querySelectorAll('div > div > div > div.badge')[0].removeProperty('display');
+          })
+          .catch(err => {
+            console.error('[CreativeDetail] Failed to load notes:', err);
+          });
+      },
+
+
+
+      removeMember: function (assignmentId) {
+        if (!confirm('この担当者を削除しますか？')) return;
+        callGAS('deleteItem', 'member_assignments', { id: assignmentId })
+          .then(() => App.overlays.creativeDetail.loadMembers(App.overlays.creativeDetail.currentId))
+          .catch(App.utils.error.handle);
+      }
+    };
+  })();
+</script>
