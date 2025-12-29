@@ -1,0 +1,293 @@
+<!--
+Copyright 2025 TEPPei
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Noto+Sans+JP:wght@100..900"
+    rel="stylesheet">
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: black;
+      font-family: "Google Sans Flex", sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* 背景のCanvas用スタイル */
+    #particle-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    /* メインコンテンツコンテナ */
+    .container {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      max-width: 800px;
+    }
+
+    /* タイトルスタイルとグリッチエフェクト */
+    h1 {
+      font-weight: 600;
+      font-size: 6rem;
+      margin: 0;
+      color: white;
+      position: relative;
+    }
+
+    /* サブテキストのデザイン */
+    .sub-title {
+      font-family: "Google Sans Flex", sans-serif;
+      font-weight: 200;
+      color: white;
+      font-size: 1rem;
+      margin-bottom: 3rem;
+    }
+
+    /* ステータステキスト */
+    .status-container {
+      height: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    p#status-text {
+      font-family: "Noto Sans JP", sans-serif;
+      font-weight: 400;
+      font-size: 1rem;
+      color: lightgray;
+      margin: 0;
+    }
+
+    /* プログレスバー */
+    .progress-wrapper {
+      width: 300px;
+      height: 4px;
+      background: lightgray;
+      border-radius: 2px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90.06deg, #5cadca 5.2%, #edb1cd 50.06%, #f14ba2 94.91%);
+      transition: width 0.3s ease-out;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- 背景用キャンバス -->
+  <canvas id="particle-canvas"></canvas>
+
+  <div class="container">
+    <h1>ZARMS 2026</h1>
+    <div class="sub-title">ZEN University Festival All Resource Management System - 2026 Edition</div>
+
+    <div class="status-container">
+      <p id="status-text">初期化中...</p>
+    </div>
+
+    <div class="progress-wrapper">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+  </div>
+
+  <script>
+    // --- 演出用ロジック ---
+
+    // サーバーから渡された初期パラメータを取得
+    const INITIAL_PARAMS = <?!= initialParams ?>;
+
+    // 認証ステップの定義
+    const steps = [
+      { msg: "ログイン情報を取得中..." },
+      { msg: "データベースに接続中..." },
+      { msg: "ユーザーテーブルを読込中..." },
+      { msg: "ユーザープロファイルを検索中..." },
+      { msg: "権限レベルを確認中..." },
+      { msg: "認証中..." }
+    ];
+
+    const statusText = document.getElementById('status-text');
+    const progressBar = document.getElementById('progress-bar');
+
+    let currentStep = 0;
+    const maxIntervalSec = 1000;
+
+    function runAuthProcess() {
+      if (currentStep >= steps.length) {
+        return;
+      }
+
+      const step = steps[currentStep];
+
+      // プログレスバー更新
+      const percentage = ((currentStep + 1) / (steps.length + 1)) * 100;
+      progressBar.style.width = `${percentage}%`;
+
+
+      // テキスト更新アニメーション
+      setTimeout(() => {
+        statusText.innerText = step.msg;
+      }, 200);
+
+      currentStep++;
+      const intervalTime = Math.random() * maxIntervalSec;
+      setTimeout(runAuthProcess, intervalTime);
+    }
+
+    // プロセス開始（演出）
+    runAuthProcess();
+
+    // --- 本処理: アプリケーション読込 ---
+    // 画面描写と同時にバックグラウンドでメインアプリを取得しに行く
+    google.script.run
+      .withSuccessHandler(function (html) {
+        statusText.innerText = "アプリケーションを起動中...";
+        progressBar.style.width = '100%';
+        document.open();
+        document.write(html);
+        document.close();
+      })
+      .withFailureHandler(function (err) {
+        console.error(err);
+        const errorMsg = document.createElement('div');
+        errorMsg.style.color = 'red';
+        errorMsg.style.marginTop = '20px';
+        errorMsg.innerText = 'エラーが発生しました: ' + err.message;
+        document.querySelector('.container').appendChild(errorMsg);
+      })
+      .loadMainApplication(INITIAL_PARAMS);
+
+
+    // --- 背景パーティクルアニメーション (Canvas) ---
+    const canvas = document.getElementById('particle-canvas');
+    const ctx = canvas.getContext('2d');
+    let width, height;
+    let particles = [];
+
+    // キャンバスのリサイズ
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+      initParticles();
+    }
+
+    // パーティクルクラス
+    class Particle {
+      constructor() {
+        this.x = Math.random() * width;
+        this.y = Math.random() * height;
+        this.vx = (Math.random() - 0.5) * 1; // ゆっくり動く
+        this.vy = (Math.random() - 0.5) * 1;
+        this.size = Math.random() * 2 + 1;
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // 画面外に出たら反対側へ
+        if (this.x < 0) this.x = width;
+        if (this.x > width) this.x = 0;
+        if (this.y < 0) this.y = height;
+        if (this.y > height) this.y = 0;
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 242, 255, 0.5)'; // シアン色
+        ctx.fill();
+      }
+    }
+
+    function initParticles() {
+      particles = [];
+      const particleCount = Math.min(Math.floor(width * height / 15000), 100); // 画面サイズに応じて数を調整
+      for (let i = 0; i < particleCount; i++) {
+        particles.push(new Particle());
+      }
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, width, height);
+
+      // パーティクルの更新と描画
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.update();
+        p.draw();
+
+        // 近くのパーティクル同士を線で結ぶ
+        for (let j = i; j < particles.length; j++) {
+          const p2 = particles[j];
+          const dx = p.x - p2.x;
+          const dy = p.y - p2.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance < 150) {
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(34, 139, 230, ${1 - distance / 150})`; // 紫色の線
+            ctx.lineWidth = 0.5;
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+          }
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+    animate();
+
+  </script>
+</body>
+
+</html>
