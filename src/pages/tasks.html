@@ -1,0 +1,73 @@
+<div id="overlay-contents-tasks" style="display: none;">
+    <article class="no-padding">
+        <div class="scroll">
+            <table id="tasks-table" class="stripes">
+                <thead>
+                    <!-- ヘッダーは App.utils.tables.render() で動的生成 -->
+                </thead>
+                <tbody>
+                    <!-- ボディは App.utils.tables.render() で動的生成 -->
+                </tbody>
+                <tfoot>
+                    <!-- フッターは App.utils.tables.render() で動的生成 -->
+                </tfoot>
+            </table>
+        </div>
+    </article>
+</div>
+
+<script>
+    // Namespace initialization
+    App.pages.tasks = {
+        loadData: function () {
+            showLoading();
+
+            // Phase 1: メインテーブル（tasks）を取得・即時描画
+            callGAS('getItems', SHEET_NAMES.TASKS)
+                .then(tasks => {
+                    App.state.data.tasks = tasks;
+
+                    // 外部キー情報なしでまず描画
+                    App.utils.tables.render(
+                        SHEET_NAMES.TASKS,
+                        App.utils.tables.applyFiltersAndSort(SHEET_NAMES.TASKS, App.state.data.tasks),
+                        tasksTableHeaders
+                    );
+
+                    // Phase 2: 外部テーブルを順次取得
+                    return App.pages.tasks.loadRelatedData();
+                })
+                .then(() => {
+                    // 外部キー情報を含めて再描画
+                    App.utils.tables.render(
+                        SHEET_NAMES.TASKS,
+                        App.utils.tables.applyFiltersAndSort(SHEET_NAMES.TASKS, App.state.data.tasks),
+                        tasksTableHeaders
+                    );
+                    hideLoading();
+                })
+                .catch(App.utils.error.handle);
+        },
+
+        /**
+         * 関連データを順次取得
+         */
+        loadRelatedData: function () {
+            const loadPromises = [];
+
+            if (!App.state.data.creatives || App.state.data.creatives.length === 0) {
+                loadPromises.push(
+                    callGAS('getItems', SHEET_NAMES.CREATIVES).then(data => { App.state.data.creatives = data || []; })
+                );
+            }
+
+            if (!App.state.data.members || App.state.data.members.length === 0) {
+                loadPromises.push(
+                    callGAS('getItems', SHEET_NAMES.MEMBERS).then(data => { App.state.data.members = data || []; })
+                );
+            }
+
+            return Promise.all(loadPromises);
+        }
+    };
+</script>

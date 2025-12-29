@@ -1,0 +1,13 @@
+---
+trigger: always_on
+---
+
+- このシステムはGoogle Apps Script上で動作します
+- html内にURLを記述する際は、コメントアウトの中であっても、ダブルスラッシュをエスケープしてください
+- チャットでは常に日本語で応答してください
+- コメント・コミットメッセージは日本語で記述してください
+- js.html 内でのスクリプトレットの使用を許可してください
+- backendとfrontendは、別のAppsScriptプロジェクトで動作します
+- データベース設計は、常に schema.mmd を正としてください。
+- カスタムCSSは原則使用しないでください
+- CSSライブラリはbeercss (https://github.com/beercss/beercss/tree/main/docs) を使用してください

@@ -1,0 +1,177 @@
+<!-- directoriesテーブルをツリー構造で表示するページ -->
+<div id="overlay-contents-directories" style="display: none;">
+    <nav class="small-margin row">
+        <h5 class="bold max">組織一覧</h5>
+    </nav>
+
+    <div class="top-margin">
+        <article class="no-padding scroll large-height">
+            <!-- ツリーテーブルヘッダー -->
+            <table id="directories-tree-table" class="">
+                <thead class="fixed">
+                    <tr>
+                        <th class="min">ID</th>
+                        <th>組織名</th>
+                        <th>組織タイプ</th>
+                        <th>作成日</th>
+                    </tr>
+                </thead>
+                <tbody id="directories-tree-body">
+                    <!-- ツリー行は App.pages.directories.renderTree() で動的生成 -->
+                </tbody>
+            </table>
+        </article>
+    </div>
+</div>
+
+<script>
+    // Namespace initialization
+    App.pages.directories = {
+        // 展開状態を保持するオブジェクト（キー: directory.id, 値: true/false）
+        expandedNodes: {},
+
+        /**
+         * データを読み込みツリーを描画する
+         */
+        loadData: function () {
+            // directoriesDataが既にあればそれを使う、なければ取得
+            const directoriesData = App.state.data.directories;
+            if (directoriesData && directoriesData.length > 0) {
+                App.pages.directories.renderTree();
+                hideLoading();
+            } else {
+                callGAS('getItems', SHEET_NAMES.DIRECTORIES)
+                    .then(data => {
+                        App.state.data.directories = data;
+                        App.pages.directories.renderTree();
+                        hideLoading();
+                    })
+                    .catch(App.utils.error.handle);
+            }
+        },
+
+        /**
+         * フラットなデータをツリー構造に変換する
+         * @param {Array} flatData - フラットなdirectoriesデータ配列
+         * @returns {Array} ツリー構造の配列（ルートノードのみ）
+         */
+        buildTree: function (flatData) {
+            if (!flatData || flatData.length === 0) return [];
+
+            // IDをキーにしたマップを作成
+            const nodeMap = {};
+            flatData.forEach(item => {
+                nodeMap[item.id] = {
+                    ...item,
+                    children: []
+                };
+            });
+
+            // 親子関係を構築
+            const rootNodes = [];
+            flatData.forEach(item => {
+                const node = nodeMap[item.id];
+                if (item.parent_directory_id && nodeMap[item.parent_directory_id]) {
+                    // 親が存在する場合は親の children に追加
+                    nodeMap[item.parent_directory_id].children.push(node);
+                } else {
+                    // 親がない場合はルートノード
+                    rootNodes.push(node);
+                }
+            });
+
+            return rootNodes;
+        },
+
+        /**
+         * ツリー構造をテーブルに描画する
+         */
+        renderTree: function () {
+            const tbody = document.getElementById('directories-tree-body');
+            if (!tbody) return;
+
+            // ツリー構造を構築
+            const tree = App.pages.directories.buildTree(App.state.data.directories);
+
+            // HTML生成
+            let html = '';
+            const renderNode = (node, level) => {
+                const hasChildren = node.children && node.children.length > 0;
+                const isExpanded = App.pages.directories.expandedNodes[node.id] !== false; // デフォルトは展開状態
+                const indent = level * 24; // 1レベルあたり24pxインデント
+
+                // トグルアイコンを決定
+                let toggleIcon = '';
+                if (hasChildren) {
+                    toggleIcon = isExpanded ? 'expand_more' : 'chevron_right';
+                } else {
+                    toggleIcon = 'remove'; // リーフノード
+                }
+
+                // 組織タイプのラベルを取得
+                const typeLabel = App.pages.directories.getTypeLabel(node.directory_type_key);
+
+                // 作成日をフォーマット
+                const createdAt = formatDate(node.created_at);
+
+                html += `
+                    <tr data-id="${escapeHtml(node.id)}" data-level="${level}" data-parent="${escapeHtml(node.parent_directory_id || '')}">
+                        <td class="min" style="font-family: 'Roboto Mono', monospace; font-weight: 500;">${escapeHtml(formatDisplayId(SHEET_NAMES.DIRECTORIES, node.display_id))}</td>
+                        <td>
+                            <div class="row no-space" style="padding-left: ${indent}px;">
+                                <button class="circle transparent small" 
+                                        onclick="App.pages.directories.toggleNode('${node.id}')"
+                                        ${hasChildren ? '' : 'disabled'}>
+                                    <i>${toggleIcon}</i>
+                                </button>
+                                <span class="max">${escapeHtml(node.name || '')}</span>
+                            </div>
+                        </td>
+                        <td>${escapeHtml(typeLabel)}</td>
+                        <td>${createdAt}</td>
+                    </tr>
+                `;
+
+                // 子ノードを再帰的に描画（展開状態の場合のみ）
+                if (hasChildren && isExpanded) {
+                    node.children.forEach(child => {
+                        renderNode(child, level + 1);
+                    });
+                }
+            };
+
+            // ルートノードから描画開始
+            tree.forEach(rootNode => {
+                renderNode(rootNode, 0);
+            });
+
+            tbody.innerHTML = html;
+        },
+
+        /**
+         * ノードの展開/折りたたみを切り替える
+         * @param {string} nodeId - ノードのID
+         */
+        toggleNode: function (nodeId) {
+            const currentState = App.pages.directories.expandedNodes[nodeId];
+            // デフォルトは展開状態なので、undefined の場合は true として扱う
+            App.pages.directories.expandedNodes[nodeId] = currentState === false ? true : false;
+
+            // ツリーを再描画
+            App.pages.directories.renderTree();
+        },
+
+        /**
+         * ディレクトリタイプのキーからラベルを取得する
+         * @param {string} typeKey - ディレクトリタイプのキー
+         * @returns {string} ラベル
+         */
+        getTypeLabel: function (typeKey) {
+            if (!typeKey) return '-';
+            const enumData = App.state.data.enum;
+            if (!enumData || !enumData['DIRECTORY_TYPE']) return typeKey;
+            const enumItem = enumData['DIRECTORY_TYPE'].find(e => e.key === typeKey);
+            return enumItem ? enumItem.value : typeKey;
+        }
+    };
+</script>

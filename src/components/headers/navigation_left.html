@@ -1,0 +1,169 @@
+<nav id="nav-grid" class="m l left no-wrap min surface">
+    <header>
+        <button id="home-nav" class="square extra primary-container" onclick="App.utils.navigation.switchTab('home')">
+            <i>home</i>
+            <span>ホーム</span>
+        </button>
+    </header>
+
+    <a id="plans-nav" onclick="App.utils.navigation.switchTab('plans')">
+        <i>folder</i>
+        <span>企画</span>
+    </a>
+    <a id="advertisements-nav" onclick="App.utils.navigation.switchTab('advertisements')">
+        <i>campaign</i>
+        <span>広報</span>
+    </a>
+    <a id="creatives-nav" onclick="App.utils.navigation.switchTab('creatives')">
+        <i>palette</i>
+        <span>制作物</span>
+    </a>
+    <a id="budgets-nav" onclick="App.utils.navigation.switchTab('budgets')">
+        <i>currency_yen</i>
+        <span>お金</span>
+    </a>
+    <a id="forms-nav" onclick="App.utils.navigation.switchTab('forms')">
+        <i>description</i>
+        <span>フォーム</span>
+    </a>
+    <a id="jobs-nav" onclick="App.utils.navigation.switchTab('jobs')">
+        <i>work</i>
+        <span>当日業務</span>
+    </a>
+    <a id="licenses-nav" onclick="App.utils.navigation.switchTab('licenses')">
+        <i>license</i>
+        <span>権利</span>
+    </a>
+    <a id="hardwares-nav" onclick="App.utils.navigation.switchTab('hardwares')">
+        <i>shelves</i>
+        <span>備品</span>
+    </a>
+    <a id="resources-nav" onclick="App.utils.navigation.switchTab('resources')">
+        <i>link</i>
+        <span>リンク集</span>
+    </a>
+    <a id="questions-nav" onclick="App.utils.navigation.switchTab('questions')">
+        <i>help</i>
+        <span>問合せ</span>
+    </a>
+</nav>
+
+<script>
+    (function () {
+        App.utils.navigation = {
+            /**
+             * タブを切り替える
+             */
+            switchTab: function (tabName) {
+                // 他のタブに切り替える前にhomeタブの処理を停止
+                const currentTab = Array.from(document.querySelectorAll('main > div')).find(el => el.style.display !== 'none');
+                if (currentTab && currentTab.id === 'tab-home') {
+                    // stopRemainingTimeUpdatesが存在する場合のみ呼び出し
+                    if (typeof stopRemainingTimeUpdates === 'function') {
+                        stopRemainingTimeUpdates();
+                    }
+                }
+
+                // Overlayが開いている場合はリセット
+                if (currentTab && currentTab.id.startsWith('detail-')) {
+                    const overlayMap = {
+                        'detail-creative': 'creativeDetail',
+                        'detail-member': 'memberDetail',
+                        'detail-plan': 'planDetail',
+                        'detail-task': 'taskDetail'
+                    };
+                    const overlayName = overlayMap[currentTab.id];
+                    if (overlayName && App.overlays[overlayName] && typeof App.overlays[overlayName].reset === 'function') {
+                        App.overlays[overlayName].reset();
+                    }
+                }
+
+                // 右navから開いているページを閉じる
+                if (App.utils.navigation.closeRightNavOverlay) {
+                    App.utils.navigation.closeRightNavOverlay();
+                }
+
+                // 左navのアクティブ状態管理
+                const sidebarLinks = document.querySelectorAll('nav.left a');
+                if (sidebarLinks.length > 0) {
+                    sidebarLinks.forEach(item => item.classList.remove('active'));
+                    const activeLink = document.getElementById(tabName + '-nav');
+                    if (activeLink) activeLink.classList.add('active');
+                } else {
+                    // Fallback for old structure if needed or during transition
+                    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                    const oldLink = document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`);
+                    if (oldLink) oldLink.classList.add('active');
+                }
+
+                // homeボタンのアクティブ状態管理
+                const homeNav = document.getElementById('home-nav');
+                if (homeNav) {
+                    if (tabName === 'home') {
+                        homeNav.classList.add('active');
+                    } else {
+                        homeNav.classList.remove('active');
+                    }
+                }
+
+                document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
+                document.getElementById('tab-' + tabName).style.display = 'block';
+                App.utils.navigation.loadTabData(tabName);
+            },
+
+            /**
+             * 詳細画面から戻る
+             * @param {string} tabName - 戻り先のタブ名
+             * @param {Object} detailPageObj - 詳細ページオブジェクト (resetメソッドを持つ)
+             */
+            goBack: function (targetId, detailPageObj) {
+                if (!targetId) targetId = 'home';
+
+                if (targetId.startsWith('tab-')) {
+                    // タブIDの場合
+                    App.utils.navigation.switchTab(targetId.replace('tab-', ''));
+                } else if (targetId.startsWith('detail-')) {
+                    // 詳細画面IDの場合
+                    document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
+                    const targetEl = document.getElementById(targetId);
+                    if (targetEl) targetEl.style.display = 'block';
+                } else {
+                    // 単なるタブ名の場合
+                    App.utils.navigation.switchTab(targetId);
+                }
+
+                if (detailPageObj && typeof detailPageObj.reset === 'function') {
+                    detailPageObj.reset();
+                }
+            },
+
+            /**
+             * タブデータを読み込む
+             */
+            loadTabData: function (tabName) {
+                console.log(`loadTabData called for: ${tabName}`);
+                console.log('App.pages state:', App.pages);
+                if (App.pages && App.pages[tabName]) {
+                    console.log(`App.pages.${tabName} state:`, App.pages[tabName]);
+                } else {
+                    console.warn(`App.pages.${tabName} is undefined`);
+                }
+
+                showLoading();
+                let loader = null;
+
+                if (App.pages[tabName] && App.pages[tabName].loadData) {
+                    loader = App.pages[tabName].loadData;
+                }
+
+                if (loader) {
+                    loader();
+                } else {
+                    console.warn(`No loader found for tab: ${tabName}`);
+                    hideLoading();
+                }
+            }
+        };
+
+    })();
+</script>

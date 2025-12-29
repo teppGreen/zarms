@@ -1,0 +1,37 @@
+<!-- membersテーブルを表示するページ -->
+<div id="overlay-contents-members" style="display: none;">
+    <article class="no-padding">
+        <div class="scroll">
+            <table id="members-table" class="stripes">
+                <thead>
+                    <!-- ヘッダーは App.utils.tables.render() で動的生成 -->
+                </thead>
+                <tbody>
+                    <!-- ボディは App.utils.tables.render() で動的生成 -->
+                </tbody>
+                <tfoot>
+                    <!-- フッターは App.utils.tables.render() で動的生成 -->
+                </tfoot>
+            </table>
+        </div>
+    </article>
+</div>
+
+<script>
+    // Namespace initialization
+    App.pages.members = {
+        loadData: function () {
+            showLoading();
+
+            callGAS('getItems', SHEET_NAMES.MEMBERS)
+                .then(data => {
+                    App.state.data.members = data;
+
+                    // ReadOnlyテーブルをレンダリング（行クリックで詳細モーダルを開く）
+                    App.utils.tables.render(SHEET_NAMES.MEMBERS, App.utils.tables.applyFiltersAndSort(SHEET_NAMES.MEMBERS, App.state.data.members), membersTableHeaders);
+                    hideLoading();
+                })
+                .catch(App.utils.error.handle);
+        }
+    };
+</script>
