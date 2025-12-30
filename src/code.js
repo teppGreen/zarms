@@ -4,21 +4,173 @@
 
 // Webアプリのエントリーポイント
 function doGet(e) {
-  const template = HtmlService.createTemplateFromFile('index');
-  template.templateVariables = {
-    urlParam: e.parameter,
-    TABLE_NAMES: TABLE_NAMES,
-    DIRECTORY_TYPES: DIRECTORY_TYPES,
-    TASK_STATUS: TASK_STATUS,
-    activeUser: getActiveUser()
-  };
+  try {
+    // Spreadsheetにアクセスできるか確認（これが権限チェック）
+    const testAccess = getSpreadsheet();
 
-  return template.evaluate()
-    .setTitle('ZEN Boards')
-    .setFaviconUrl('https://drive.google.com/uc?id=1rnkYniTkiKnVk5jNbx7V1nRrmwP6altL' + '&.png')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width')
-    .getContent();
+    // ユーザー登録完了パラメータをチェック
+    if (e.parameter && e.parameter.registered === 'true') {
+      // 登録完了後、通常のindex.htmlを表示
+      const activeUser = getActiveUser();
+      if (!activeUser) {
+        // まだ登録されていない場合は登録画面へ
+        return HtmlService.createHtmlOutputFromFile('register')
+          .setTitle('ユーザー登録 - ZEN Boards')
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      }
+    }
+
+    // 現在のユーザーを取得
+    const activeUser = getActiveUser();
+
+    // ユーザーが見つからない場合はユーザー登録画面を表示
+    if (!activeUser) {
+      return HtmlService.createHtmlOutputFromFile('register')
+        .setTitle('ユーザー登録 - ZEN Boards')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
+    const template = HtmlService.createTemplateFromFile('index');
+    template.templateVariables = {
+      urlParam: e.parameter,
+      TABLE_NAMES: TABLE_NAMES,
+      DIRECTORY_TYPES: DIRECTORY_TYPES,
+      TASK_STATUS: TASK_STATUS,
+      activeUser: activeUser
+    };
+
+    return template.evaluate()
+      .setTitle('ZEN Boards')
+      .setFaviconUrl('https://drive.google.com/uc?id=1rnkYniTkiKnVk5jNbx7V1nRrmwP6altL' + '&.png')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width');
+
+  } catch (error) {
+    // Spreadsheetアクセスエラー = 権限なし
+    console.error('doGet error:', error);
+    return HtmlService.createHtmlOutputFromFile('error')
+      .setTitle('アクセス権限エラー - ZEN Boards')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+}
+
+// ============================================
+// 認証・ユーザー管理
+// ============================================
+
+/**
+ * 現在ログイン中のユーザー情報を取得します
+ * @returns {Object|null} ユーザー情報（id, email, display_nameなど）またはnull
+ */
+function getActiveUser() {
+  try {
+    const email = Session.getActiveUser().getEmail();
+    if (!email) {
+      console.warn('No active user email found');
+      return null;
+    }
+
+    // membersテーブルからemailが一致するレコードを検索
+    const members = select(TABLE_NAMES.MEMBERS, {
+      where: { email: ["=", email] }
+    });
+
+    if (members.length === 0) {
+      console.warn(`User with email ${email} not found in members table`);
+      return null;
+    }
+
+    return members[0];
+  } catch (error) {
+    console.error('getActiveUser error:', error);
+    return null;
+  }
+}
+
+/**
+ * Slack URLからユーザーを検索します（ユーザー登録用）
+ * @param {string} slackProfileUrl - SlackプロフィールURL
+ * @returns {Object|null} ユーザー情報またはnull
+ */
+function findUserBySlackUrl(slackProfileUrl) {
+  try {
+    const members = select(TABLE_NAMES.MEMBERS, {
+      where: { slack_profile_url: ["=", slackProfileUrl] }
+    });
+
+    if (members.length === 0) {
+      return null;
+    }
+
+    return members[0];
+  } catch (error) {
+    console.error('findUserBySlackUrl error:', error);
+    return null;
+  }
+}
+
+/**
+ * ユーザーのemailを登録します（ユーザー登録用）
+ * @param {string} userId - ユーザーのID（uuid）
+ * @returns {boolean} 成功フラグ
+ */
+function registerUserEmail(userId) {
+  try {
+    const email = Session.getActiveUser().getEmail();
+    if (!email) {
+      console.error('No active user email found');
+      return false;
+    }
+
+    // emailを更新
+    const result = update(userId, TABLE_NAMES.MEMBERS, {
+      set: { email: email },
+      where: { id: ["=", userId] }
+    });
+
+    // ログ記録
+    if (result && result.length > 0) {
+      createLog('UPDATE', TABLE_NAMES.MEMBERS, userId, { email: email }, 'User registration');
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('registerUserEmail error:', error);
+    return false;
+  }
+}
+
+// ============================================
+// ログ記録
+// ============================================
+
+/**
+ * logsテーブルに操作履歴を記録します
+ * @param {string} logTypeKey - ログタイプ（INSERT, UPDATE, DELETEなど）
+ * @param {string} tableName - 操作対象のテーブル名
+ * @param {string} recordId - 操作対象のレコードID（uuid）
+ * @param {Object} data - 記録するデータ
+ * @param {string} remark - システム備考（オプション）
+ */
+function createLog(logTypeKey, tableName, recordId, data, remark = '') {
+  try {
+    const user = getActiveUser();
+    const userId = user ? user.id : null;
+
+    const logRecord = {
+      log_type_key: logTypeKey,
+      table_name: tableName,
+      record_id: recordId || '',
+      data: JSON.stringify(data),
+      remark: remark
+    };
+
+    insert(userId, TABLE_NAMES.LOGS, logRecord);
+  } catch (error) {
+    console.error('createLog error:', error);
+    // ログ記録失敗は処理を中断しない
+  }
 }
 
 // ============================================
@@ -148,9 +300,10 @@ function deleteItem(tableName, condition) {
 
 // --- Boards ---
 function getBoards() {
-  const boards = select(TABLE_NAMES.BOARDS, {});
-  // Enrichment is now done in frontend or here if needed.
-  // For now, return raw data to let frontend handle joins, or minimal enrichment.
+  // is_active=true のボードのみを取得
+  const boards = select(TABLE_NAMES.BOARDS, {
+    where: { is_active: ["=", true] }
+  });
   return boards;
 }
 
@@ -162,44 +315,49 @@ function getBoardById(id, forceRefresh = false) {
     if (cached) return { data: cached, isCached: true };
   }
 
-  const res = select(TABLE_NAMES.CREATIVES, { where: { id: ["=", id] } });
-  const creative = res.length > 0 ? res[0] : null;
-  if (!creative) return { data: null, isCached: false };
+  const res = select(TABLE_NAMES.BOARDS, { where: { id: ["=", id] } });
+  const board = res.length > 0 ? res[0] : null;
+  if (!board) return { data: null, isCached: false };
 
-  // Enrichment
-  creative.assignees = getCreativeAssignees(creative.id);
-
-  CacheManager.put(cacheKey, creative, true);
-  return { data: creative, isCached: false };
+  CacheManager.put(cacheKey, board, true);
+  return { data: board, isCached: false };
 }
 
-// --- Plans ---
-function getPlans() {
-  const plans = select(TABLE_NAMES.PLANS, {});
-  return plans.map(plan => {
-    // plan.created_by_name = getMemberName(plan.created_by); // created_by is now member ID
-    // const creativeStats = getPlanCreativeStats(plan.id);
-    // plan.creatives_count = creativeStats.count;
-    // plan.creatives_status = creativeStats.status;
-    return plan;
-  });
+function createBoard(data) {
+  const user = getActiveUser();
+  const userId = user ? user.id : null;
+
+  const result = insert(userId, TABLE_NAMES.BOARDS, data);
+
+  // ログ記録
+  if (result && result.id) {
+    createLog('INSERT', TABLE_NAMES.BOARDS, result.id, result);
+  }
+
+  return result;
 }
 
 // --- Members ---
 function getMembers() {
-  return select('members', {});
+  // is_active=true のメンバーのみを取得
+  const members = select(TABLE_NAMES.MEMBERS, {
+    where: { is_active: ["=", true] }
+  });
+  return members;
 }
 
 function getMemberById(id) {
-  const res = select(TABLE_NAMES.MEMBERS, { where: { email: ["=", id] } }); // Member ID is email
+  const res = select(TABLE_NAMES.MEMBERS, { where: { id: ["=", id] } });
   const member = res.length > 0 ? res[0] : null;
-  if (!member) return null;
-  // const assignments = findData(TABLE_NAMES.MEMBER_ASSIGNMENTS, { member_id: id });
-  // const creativeIds = assignments.map(a => a.creative_id);
-  // const allCreatives = getAllData(TABLE_NAMES.CREATIVES);
-  // member.assigned_creatives = allCreatives.filter(c => creativeIds.includes(c.id));
   return member;
 }
+
+function getMemberName(memberId) {
+  if (!memberId) return '';
+  const member = getMemberById(memberId);
+  return member ? member.display_name : '';
+}
+
 
 function createMember(memberData) {
   const newMember = {
@@ -221,8 +379,30 @@ function updateMember(memberEmail, memberData) {
   return res && res.length > 0;
 }
 
+// --- Directories ---
+function getDirectories() {
+  // ツリー構造表示用に全データを取得
+  const directories = select(TABLE_NAMES.DIRECTORIES, {});
+  return directories;
+}
+
+function createDirectory(data) {
+  const user = getActiveUser();
+  const userId = user ? user.id : null;
+
+  const result = insert(userId, TABLE_NAMES.DIRECTORIES, data);
+
+  // ログ記録
+  if (result && result.id) {
+    createLog('INSERT', TABLE_NAMES.DIRECTORIES, result.id, result);
+  }
+
+  return result;
+}
+
 // --- Tasks ---
 function getTasks() {
+  // 全タスクを取得（フロントエンドでboard_idによるフィルタリングを行う）
   const tasks = select(TABLE_NAMES.TASKS, {});
   return tasks.map(task => {
     task.assignee_name = getMemberName(task.assign_to);
@@ -236,26 +416,28 @@ function getTaskById(taskId) {
 }
 
 function createTask(taskData) {
-  const userEmail = Session.getActiveUser().getEmail();
+  const user = getActiveUser();
+  const userId = user ? user.id : null;
   const now = new Date();
+
   const newTask = {
-    // id: generated by backend
-    // display_id: generated by backend
-    parent_task_id: taskData.parent_task_id || '',
-    creative_id: taskData.creative_id,
-    title: taskData.title,
+    board_id: taskData.board_id,
+    name: taskData.name,
     description: taskData.description || '',
     task_status_key: taskData.task_status_key || 'TODO',
     priority_key: taskData.priority_key || 'MEDIUM',
     assign_to: taskData.assign_to || '',
     starts_at: taskData.starts_at || '',
-    ends_at: taskData.ends_at || '',
-    actual_starts_at: '',
-    actual_ends_at: '',
-    created_by: userEmail,
-    created_at: now,
+    ends_at: taskData.ends_at || ''
   };
-  const created = insert(TABLE_NAMES.TASKS, newTask);
+
+  const created = insert(userId, TABLE_NAMES.TASKS, newTask);
+
+  // ログ記録
+  if (created && created.id) {
+    createLog('INSERT', TABLE_NAMES.TASKS, created.id, created);
+  }
+
   return created;
 }
 
@@ -303,6 +485,15 @@ function getProjectCreativeStats(projectId) {
     statusCounts[status] = (statusCounts[status] || 0) + 1;
   });
   return { count: creatives.length, status: statusCounts };
+}
+
+/**
+ * 指定されたファイルをインクルードします
+ * @param {string} filename - インクルードするファイルの拡張子を除いた名前
+ * @returns {string} ファイルの内容
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
 // Duplicate function definition removed (getCreativesByPlanId was defined twice)

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/beercss@3.13.1/dist/cdn/beer.min.css" rel="stylesheet">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/beercss@3.13.1/dist/cdn/beer.min.js"></script>
+  <script type="module"
+    src="https://cdn.jsdelivr.net/npm/material-dynamic-colors@1.1.2/dist/cdn/material-dynamic-colors.min.js"></script>
+
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://apis.google.com/js/picker.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wdth,wght,GRAD,ROND@6..144,-10..0,25..151,1..1000,0..100,0..100&family=Noto+Sans+JP:wght@100..900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap"
+    rel="stylesheet">
+  <?!= include('css'); ?>
+</head>
+
+<body class="light">
+    <main class="center-align middle-align" style="height: 100vh;">
+        <article class="surface round padding large-width">
+            <!-- ステップ1: Slack URLの入力 -->
+            <div id="step-input" style="display: block;">
+                <i class="extra large-text">person_add</i>
+                <h3>ユーザー登録</h3>
+                <p>ZEN Boardsへようこそ。<br>初回利用のため、ユーザー登録が必要です。</p>
+
+                <div class="field label border">
+                    <input type="url" id="slack-profile-url" placeholder="https:\/\/...">
+                    <label>SlackプロフィールURL</label>
+                </div>
+
+                <div class="space"></div>
+                <button onclick="searchUser()" class="responsive">次へ</button>
+            </div>
+
+            <!-- ステップ2: 確認画面 -->
+            <div id="step-confirm" style="display: none;">
+                <div id="user-info"></div>
+                <div class="space"></div>
+                <nav class="center-align">
+                    <button onclick="showInputStep()" class="border">いいえ</button>
+                    <button onclick="registerUser()" class="responsive">はい</button>
+                </nav>
+            </div>
+
+            <!-- ステップ3: エラー表示 -->
+            <div id="step-error" style="display: none;">
+                <i class="extra large-text">error</i>
+                <h4>該当するユーザーが見つかりません</h4>
+                <p>お手数をおかけしますが、<br>総務ユニットリーダーにお問い合わせください。</p>
+                <div class="space"></div>
+                <button onclick="showInputStep()" class="border">戻る</button>
+            </div>
+
+            <!-- ローディング -->
+            <div id="loading" style="display: none;">
+                <progress class="circle"></progress>
+                <p>処理中...</p>
+            </div>
+        </article>
+    </main>
+
+    <script>
+        let foundUser = null;
+
+        function showLoading() {
+            document.getElementById('step-input').style.display = 'none';
+            document.getElementById('step-confirm').style.display = 'none';
+            document.getElementById('step-error').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showInputStep() {
+            document.getElementById('step-input').style.display = 'block';
+            document.getElementById('step-confirm').style.display = 'none';
+            document.getElementById('step-error').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showConfirmStep() {
+            document.getElementById('step-input').style.display = 'none';
+            document.getElementById('step-confirm').style.display = 'block';
+            document.getElementById('step-error').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showErrorStep() {
+            document.getElementById('step-input').style.display = 'none';
+            document.getElementById('step-confirm').style.display = 'none';
+            document.getElementById('step-error').style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function searchUser() {
+            const slackUrl = document.getElementById('slack-profile-url').value;
+
+            if (!slackUrl) {
+                alert('SlackプロフィールURLを入力してください');
+                return;
+            }
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function (user) {
+                    hideLoading();
+
+                    if (user) {
+                        foundUser = user;
+                        displayUserInfo(user);
+                        showConfirmStep();
+                    } else {
+                        showErrorStep();
+                    }
+                })
+                .withFailureHandler(function (error) {
+                    hideLoading();
+                    alert('エラーが発生しました: ' + error.message);
+                })
+                .findUserBySlackUrl(slackUrl);
+        }
+
+        function displayUserInfo(user) {
+            const container = document.getElementById('user-info');
+
+            let html = '<h4>確認</h4><p>あなたは以下のユーザーですか？</p>';
+
+            if (user.profile_photo_url) {
+                html += `<img src="${user.profile_photo_url}" class="circle large" alt="${user.display_name}">`;
+            } else {
+                html += '<i class="extra large-text">account_circle</i>';
+            }
+
+            html += `<h5>${user.display_name || '名前未設定'}</h5>`;
+
+            container.innerHTML = html;
+        }
+
+        function registerUser() {
+            if (!foundUser) {
+                alert('ユーザー情報が見つかりません');
+                return;
+            }
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function (success) {
+                    if (success) {
+                        // 登録完了後、システムを再読み込み
+                        window.location.href = window.location.origin + window.location.pathname + '?registered=true';
+                    } else {
+                        hideLoading();
+                        alert('登録に失敗しました');
+                    }
+                })
+                .withFailureHandler(function (error) {
+                    hideLoading();
+                    alert('エラーが発生しました: ' + error.message);
+                })
+                .registerUserEmail(foundUser.id);
+        }
+    </script>
+</body>
+
+</html>

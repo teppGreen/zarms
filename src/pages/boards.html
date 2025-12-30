@@ -1,0 +1,158 @@
+<!-- jKanban ライブラリの読み込み -->
+<link rel="stylesheet" href="https:\/\/cdn.jsdelivr.net\/npm\/jkanban@1.3.1\/dist\/jkanban.min.css">
+<script src="https:\/\/cdn.jsdelivr.net\/npm\/jkanban@1.3.1\/dist\/jkanban.min.js"></script>
+
+<!-- ボードページのコンテナ（動的に生成される） -->
+<div id="boards-container">
+    <!-- 各ボードのタブが動的に生成される -->
+</div>
+
+<script>
+    (function () {
+        // ボードページを動的に生成して DOM に追加
+        function initializeBoardPages() {
+            const boards = App.state.data.boards || [];
+            const container = document.getElementById('boards-container');
+
+            boards.forEach(board => {
+                const pageDiv = document.createElement('div');
+                pageDiv.id = `tab-board-${board.id}`;
+                pageDiv.className = 'page';
+                pageDiv.style.display = 'none';
+
+                pageDiv.innerHTML = `
+          <div class="padding">
+            <h4>${escapeHtml(board.name || '')}</h4>
+            <p class="small-text">${escapeHtml(board.description || '')}</p>
+          </div>
+          <div id="kanban-${board.id}" class="kanban-board"></div>
+        `;
+
+                container.appendChild(pageDiv);
+            });
+        }
+
+        // ページロード時にボードページを初期化
+        window.addEventListener('load', () => {
+            setTimeout(initializeBoardPages, 100);
+        });
+
+        // 各ボードのページロジックを App.pages に登録
+        App.pages.boards = {
+            kanbanInstances: {}, // jKanban インスタンスを保持
+
+            loadData: function (boardId) {
+                if (!boardId) {
+                    hideLoading();
+                    return;
+                }
+
+                this.renderKanban(boardId);
+                hideLoading();
+            },
+
+            renderKanban: function (boardId) {
+                const tasks = App.state.data.tasks || [];
+                const boardTasks = tasks.filter(task => task.board_id === boardId);
+
+                // タスクをステータスごとに分類
+                const draftTodoTasks = boardTasks.filter(t => ['DRAFT', 'TODO'].includes(t.task_status_key));
+                const inProgressTasks = boardTasks.filter(t => t.task_status_key === 'IN_PROGRESS');
+                const inReviewTasks = boardTasks.filter(t => t.task_status_key === 'IN_REVIEW');
+                const doneTasks = boardTasks.filter(t => t.task_status_key === 'DONE');
+
+                // jKanban用のデータ構造を構築
+                const kanbanData = [
+                    {
+                        id: 'draft-todo',
+                        title: '未着手',
+                        class: 'surface-variant',
+                        item: draftTodoTasks.map(task => this.createTaskCard(task))
+                    },
+                    {
+                        id: 'in-progress',
+                        title: '進行中',
+                        class: 'primary-container',
+                        item: inProgressTasks.map(task => this.createTaskCard(task))
+                    },
+                    {
+                        id: 'in-review',
+                        title: '確認中',
+                        class: 'tertiary-container',
+                        item: inReviewTasks.map(task => this.createTaskCard(task))
+                    },
+                    {
+                        id: 'done',
+                        title: '完了',
+                        class: 'secondary-container',
+                        item: doneTasks.map(task => this.createTaskCard(task))
+                    }
+                ];
+
+                // 既存のインスタンスがあれば破棄
+                if (this.kanbanInstances[boardId]) {
+                    const container = document.getElementById(`kanban-${boardId}`);
+                    if (container) {
+                        container.innerHTML = '';
+                    }
+                }
+
+                // jKanbanインスタンスを作成
+                const kanban = new jKanban({
+                    element: `#kanban-${boardId}`,
+                    gutter: '15px',
+                    widthBoard: '300px',
+                    boards: kanbanData,
+                    dragBoards: false,
+                    dragItems: false // ドラッグ&ドロップは後のフェーズで実装
+                });
+
+                this.kanbanInstances[boardId] = kanban;
+            },
+
+            createTaskCard: function (task) {
+                const assigneeName = task.assignee_name || '未割り当て';
+
+                return {
+                    id: task.id,
+                    title: `
+            <div class="padding small">
+              <strong>#${task.display_id || ''}</strong>
+              <h6 class="small no-margin">${escapeHtml(task.name || '')}</h6>
+              ${task.description ? `<p class="small-text">${escapeHtml(task.description.substring(0, 50))}${task.description.length > 50 ? '...' : ''}</p>` : ''}
+              <div class="row tiny-space">
+                <i class="tiny">person</i>
+                <span class="small-text">${escapeHtml(assigneeName)}</span>
+              </div>
+              ${task.ends_at ? `
+                <div class="row tiny-space">
+                  <i class="tiny">schedule</i>
+                  <span class="small-text">${formatDate(task.ends_at)}</span>
+                </div>
+              ` : ''}
+            </div>
+          `
+                };
+            },
+        };
+
+        // ナビゲーションから各ボードページを呼び出すためのラッパー関数
+        window.loadBoardPage = function (boardId) {
+            showLoading();
+            const boardPageId = `tab-board-${boardId}`;
+
+            // 全ページを非表示
+            document.querySelectorAll('main > div.page').forEach(el => el.style.display = 'none');
+
+            // 対象ボードページを表示
+            const boardPage = document.getElementById(boardPageId);
+            if (boardPage) {
+                boardPage.style.display = 'block';
+                App.pages.boards.loadData(boardId);
+            } else {
+                console.error(`Board page not found: ${boardPageId}`);
+                hideLoading();
+            }
+        };
+    })();
+</script>
