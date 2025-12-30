@@ -1,76 +1,36 @@
 <script>
-  const SHEET_NAMES = templateVariables.SHEET_NAMES;
-  const activeUser = templateVariables.activeUser;
+  const { TABLE_NAMES, DIRECTORY_TYPES, TASK_STATUS, activeUser } = templateVariables;
 
   // App.state の初期化とデータ管理用関数の定義
   (function () {
-    // 従来のグローバル変数を App.state.data に集約
     App.state = {
       data: {
-        config: {},
-        prefix: {},
-        enum: {},
-        advertisements: [],
-        budgets: [],
-        creatives: [],
+        boards: [],
         directories: [],
-        events: [],
-        expenses: [],
-        forms: [],
-        hardwares: [],
-        jobs: [],
-        knowledges: [],
-        licenses: [],
-        mediums: [],
         members: [],
-        merchandises: [],
-        musics: [],
-        plans: [],
-        questions: [],
-        resources: [],
-        shifts: [],
-        skills: [],
-        tasks: [],
-        wikis: []
+        tasks: []
       },
       previousTab: null,
 
-      /**
-       * 指定したテーブルのデータを取得します
-       * @param {string} tableName - テーブル名
-       * @returns {Array|Object} データ
-       */
       get: function (tableName) {
         return this.data[tableName];
       },
 
-      /**
-       * 指定したテーブルにデータをセットします
-       * @param {string} tableName - テーブル名
-       * @param {Array|Object} data - データ
-       */
       set: function (tableName, data) {
         this.data[tableName] = data;
       }
     };
   })();
 
+  window.onload = initializeApp;
+
   // 初期化
   async function initializeApp() {
-    try {
-      // データ読み込みを待つ
-      await loadInitialData();
-    } catch (error) {
-      console.error('loadInitialData でエラーが発生しました:', error);
-    }
-
-    // グローバルショートカットキーの設定
     setupGlobalShortcuts();
+    App.utils.navigation.switchTab('home');
   }
 
-  /**
-   * グローバルショートカットキーの設定
-   */
+  // グローバルショートカットキーの設定
   function setupGlobalShortcuts() {
     document.addEventListener('keydown', (e) => {
       // Cmd/Ctrl + K: 検索フォーカス
@@ -94,16 +54,6 @@
 
       // Esc: モーダルを閉じる
       if (e.key === 'Escape') {
-        // detail_creativeのオーバーレイを閉じる
-        const creativeDetailOverlay = document.getElementById('overlay-creative-detail');
-        if (creativeDetailOverlay && creativeDetailOverlay.style.display !== 'none') {
-          if (App.overlays.creativeDetail && typeof App.overlays.creativeDetail.close === 'function') {
-            App.overlays.creativeDetail.close();
-          }
-          return;
-        }
-
-        // その他の開いているモーダルを閉じる
         const openModals = document.querySelectorAll('dialog[open]');
         if (openModals.length > 0) {
           openModals.forEach(modal => {
@@ -116,36 +66,6 @@
         }
       }
     });
-  }
-
-  // // 複数の方法で初期化を試みる
-  // if (document.readyState === 'loading') {
-  //   document.addEventListener('DOMContentLoaded', initializeApp);
-  // } else {
-  //   console.log('DOMContentLoaded は既に発火済み。即座に実行します');
-  //   // DOMContentLoaded が既に発火している場合
-  //   initializeApp();
-  // }
-
-  // // window.onload も念のため設定
-  window.onload = initializeApp;
-
-  function loadInitialData(shouldSwitchTab = true) {
-    showLoading();
-
-    return Promise.all([
-      callGAS('getItems', SHEET_NAMES.CONFIG),
-      callGAS('getItems', SHEET_NAMES.ENUM),
-      callGAS('getItems', SHEET_NAMES.PREFIX),
-    ]).then(([configs, enums, prefixes]) => {
-      App.state.data.config = mapConfig(configs);
-      App.state.data.enum = groupEnumByType(enums);
-      App.state.data.prefix = mapPrefix(prefixes);
-      hideLoading();
-      if (shouldSwitchTab) {
-        App.utils.navigation.switchTab('home');
-      }
-    }).catch(App.utils.error.handle);
   }
 
   // 直前のcallGAS呼び出しを記録（HTTP 429エラー時の再試行用）
@@ -176,75 +96,14 @@
     });
   }
 
-  function mapConfig(configs) {
-    // CONFIG データを key をキー、value を値として格納
-    if (configs && Array.isArray(configs)) {
-      configs.forEach(config => {
-        if (config.key && config.value) {
-          App.state.data.config[config.key] = config.value;
-        }
-      });
-    }
-    return App.state.data.config;
-  }
-
-  function groupEnumByType(enums) {
-    const grouped = {};
-    if (!enums || !Array.isArray(enums)) return grouped;
-
-    // is_active でフィルタリング
-    const activeEnums = enums.filter(enuma =>
-      enuma.is_active === true || enuma.is_active === 'TRUE' || enuma.is_active === 'true'
-    );
-
-    // sort_order でソート
-    activeEnums.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-
-    // type ごとにグループ化
-    activeEnums.forEach(enuma => {
-      if (!grouped[enuma.type]) {
-        grouped[enuma.type] = [];
-      }
-      grouped[enuma.type].push(enuma);
-    });
-    return grouped;
-  }
-
-  function mapPrefix(prefixes) {
-    // PREFIX データを table_name をキー、prefix_value を値として格納
-    if (prefixes && Array.isArray(prefixes)) {
-      prefixes.forEach(prefix => {
-        if (prefix.table_name && prefix.prefix_value) {
-          App.state.data.prefix[prefix.table_name] = prefix.prefix_value;
-        }
-      });
-    }
-    return App.state.data.prefix;
-  }
-
   let loadingTimeout = null;
 
   function showLoading() {
     if (loadingTimeout) clearTimeout(loadingTimeout);
-
-    // app-headerにシマーエフェクトをON（スパイラルアニメーションの代わり）
-    const appHeader = document.querySelector('.app-header');
-    if (appHeader) {
-      appHeader.classList.add('shimmer-loading');
-    }
-
-    // bodyタグにcursor: waitを適用
     document.body.style.cursor = 'wait';
   }
 
   function hideLoading() {
-    // app-headerからシマーエフェクトをOFF（チェックマーク表示の代わり）
-    const appHeader = document.querySelector('.app-header');
-    if (appHeader) {
-      appHeader.classList.remove('shimmer-loading');
-    }
-
-    // bodyタグからcursor: waitを削除
     document.body.style.cursor = '';
   }
 
@@ -273,12 +132,6 @@
   // ============================================
   // ヘルパー関数
   // ============================================
-  function getEnumLabel(key, type) {
-    const enumData = App.state.data.enum;
-    if (!key || !enumData[type]) return key;
-    const enuma = enumData[type].find(e => e.key === key);
-    return enuma ? enuma.value : key;
-  }
   function formatDate(dateString) {
     if (!dateString) return '-';
     try {
@@ -286,9 +139,12 @@
       const offset = dt.getTimezoneOffset() * 60000;
       const localDate = new Date(dt.getTime() - offset);
       return localDate.toISOString().slice(0, 10);
-    } catch (e) { return dateString; }
+    } catch (e) { 
+      return dateString; 
+    }
   }
-  function formatDateTimeForDisplay(dateString, includeSeconds = false) {
+
+  function formatDateTimeForDisplay(dateString) {
     if (!dateString) return '-';
     try {
       const dt = new Date(dateString);
@@ -300,12 +156,11 @@
       const hours = String(dt.getHours()).padStart(2, '0');
       const minutes = String(dt.getMinutes()).padStart(2, '0');
       const seconds = String(dt.getSeconds()).padStart(2, '0');
-      return `${month}/${day}(${weekday}) ${hours}:${minutes}`;
+      return `${year}/${month}/${day}(${weekday}) ${hours}:${minutes}`;
     } catch (e) {
-      return '-';
+      return dateString;
     }
   }
-
 
   function formatDateTimeForInput(dateString) {
     if (!dateString) return '';
@@ -314,294 +169,15 @@
       const offset = dt.getTimezoneOffset() * 60000;
       const localDate = new Date(dt.getTime() - offset);
       return localDate.toISOString().slice(0, 16);
-    } catch (e) { return ''; }
-  }
-  function calculateDaysRemaining(dueDateString) {
-    if (!dueDateString) return '-';
-    try {
-      const dueDate = new Date(dueDateString);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      dueDate.setHours(0, 0, 0, 0);
-      const diffTime = dueDate - today;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      if (diffDays < 0) {
-        return `${Math.abs(diffDays)}日超過`;
-      } else if (diffDays === 0) {
-        return '今日';
-      } else {
-        return `${diffDays}日`;
-      }
-    } catch (e) {
-      return '-';
+    } catch (e) { 
+      return dateString; 
     }
   }
+
   function escapeHtml(text) {
     if (text === null || typeof text === 'undefined') return '';
     return String(text).replace(/[&<>"']/g, match => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[match]);
   }
-
-  /**
-   * display_id をフォーマットして返す
-   * @param {string} table_name - テーブル名
-   * @param {number|string} display_id - display_id
-   * @returns {string} フォーマットされた display_id
-   */
-  function formatDisplayId(table_name, display_id) {
-    if (!display_id) return '-';
-
-    // prefixData から prefix_value を取得
-    const prefix_value = App.state.data.prefix[table_name] || '';
-
-    // display_id を4桁固定で0パディング
-    const paddedId = String(display_id).padStart(4, '0');
-
-    // prefix_value と display_id を結合
-    return prefix_value + paddedId;
-  }
-
-
-  // ============================================
-  // インライン編集 & ポップアップ
-  // ============================================
-
-  function closeAllPopups() {
-    const popups = document.querySelectorAll('.popup-editor');
-    popups.forEach(p => p.remove());
-  }
-
-  function createPopup(referenceElement, editorElement) {
-    closeAllPopups();
-    const popup = document.createElement('div');
-    popup.className = 'popup-editor';
-    popup.appendChild(editorElement);
-    document.body.appendChild(popup);
-
-    const rect = referenceElement.getBoundingClientRect();
-    popup.style.left = `${rect.left}px`;
-    popup.style.top = `${rect.bottom}px`;
-    popup.style.width = `${rect.width}px`;
-
-    popup.addEventListener('click', e => e.stopPropagation());
-    return popup;
-  }
-
-  function saveChange(tableName, id, field, newValue, oldValue) {
-    if (String(newValue) === String(oldValue)) return;
-
-    showLoading();
-
-    // まずデータ配列を更新する
-    const data = tableName === SHEET_NAMES.CREATIVES ? App.state.data.creatives : tableName === SHEET_NAMES.PLANS ? App.state.data.plans : tableName === SHEET_NAMES.TASKS ? App.state.data.tasks : App.state.data.members;
-    const idKey = tableName === SHEET_NAMES.MEMBERS ? 'member_email' : (tableName === SHEET_NAMES.CREATIVES ? 'id' : (tableName === SHEET_NAMES.TASKS ? 'id' : 'id'));
-    const item = data.find(d => String(d[idKey]) === String(id));
-    if (item) {
-      item[field] = newValue;
-    }
-
-    // 次に表示を更新する
-    const table = document.getElementById(`${tableName}-table`);
-    const row = table.querySelector(`tr[data-id="${id}"]`);
-    if (row) {
-      const cell = row.querySelector(`td[data-field="${field}"]`);
-      if (cell) {
-        const header = getHeaderDef(tableName, field);
-        let displayValue = newValue;
-        if (header && header.configType) {
-          displayValue = getConfigLabel(newValue, header.configType);
-        } else if (header && header.editType === 'datetime') {
-          displayValue = formatDateTimeForDisplay(newValue);
-        }
-        // editable-container の中の span.editable-text を更新する
-        const editableTextSpan = cell.querySelector('.editable-text');
-        if (editableTextSpan) {
-          editableTextSpan.textContent = displayValue;
-        } else {
-          // editable-container がない場合（テキストフィールドなど）
-          cell.textContent = displayValue;
-        }
-      }
-    }
-
-    // 最後にサーバーに保存する
-    callGAS('updateItem', tableName, id, { [field]: newValue })
-      .then(success => {
-        hideLoading();
-        if (!success) {
-          App.utils.error.handle({ message: '更新に失敗しました。' });
-          // 失敗時はデータを再読み込み
-          if (tableName) {
-            loadTabData(tableName);
-          }
-        }
-      })
-      .catch(err => {
-        App.utils.error.handle(err);
-        // エラー時はデータを再読み込み
-        if (tableName) {
-          loadTabData(tableName);
-        }
-      });
-  }
-
-  // ---- テキスト編集 ----
-  function switchToEditMode(cell, header, tableName) {
-    cell.classList.add('editing');
-    const originalValue = cell.textContent;
-    cell.innerHTML = '';
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = originalValue;
-    input.className = 'inline-edit-input';
-    cell.appendChild(input);
-    input.focus();
-
-    const onSave = () => {
-      cell.innerHTML = escapeHtml(input.value);
-      cell.classList.remove('editing');
-      saveChange(tableName, cell.parentElement.dataset.id, header.key, input.value, originalValue);
-    };
-    input.addEventListener('blur', onSave);
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.isComposing) input.blur();
-      if (e.key === 'Escape') {
-        cell.innerHTML = escapeHtml(originalValue);
-        cell.classList.remove('editing');
-      }
-    });
-  }
-
-  // ---- セレクト（ドロップダウン）編集 ----
-  function showSelectEditor(event, tableName, id, field) {
-    event.stopPropagation();
-    // Stop propagation to prevent immediate closing if clicking the button triggers document click
-
-    // Find or create global menu
-    let menu = document.getElementById('global-select-menu');
-    if (!menu) {
-      menu = document.createElement('menu');
-      menu.id = 'global-select-menu';
-      document.body.appendChild(menu);
-    }
-
-    // Clear menu
-    menu.innerHTML = '';
-
-    const header = getHeaderDef(tableName, field);
-    const options = App.state.data.config[header.configType] || [];
-    if (options.length === 0) return;
-
-    const data = (tableName === SHEET_NAMES.TASKS ? App.state.data.tasks : tableName === SHEET_NAMES.CREATIVES ? App.state.data.creatives : tableName === SHEET_NAMES.PLANS ? App.state.data.plans : App.state.data.members);
-    const idKey = tableName === SHEET_NAMES.MEMBERS ? 'member_email' : 'id';
-    const item = data.find(d => String(d[idKey]) === String(id));
-    const currentValue = item ? item[field] : '';
-
-    options.forEach(opt => {
-      const a = document.createElement('a');
-      a.textContent = opt.config_value;
-      if (opt.config_key === currentValue) {
-        a.classList.add('active'); // BeerCSS active state for menu item? or just bold
-        a.style.fontWeight = 'bold';
-      }
-      a.onclick = () => {
-        saveChange(tableName, id, field, opt.config_key, currentValue);
-        // Menu closes automatically or we can force it? 
-        // BeerCSS menus close on click usually.
-      };
-      menu.appendChild(a);
-    });
-
-    // Open menu relative to trigger
-    const trigger = event.currentTarget; // The container (button + text) or button
-    ui(menu, trigger);
-  }
-
-  // ---- タスク日時編集（ネイティブ） ----
-  function openDateTimePickerForTask(taskId, field, originalValue) {
-    const container = document.getElementById('creative-tasks-container');
-    if (!container) return;
-    const row = container.querySelector(`tr[data-task-id="${taskId}"]`);
-    if (!row) return;
-    // Assuming 4th column is ends_at based on previous code reading
-    const cell = row.querySelector(`td:nth-child(4)`);
-    if (!cell) return;
-
-    if (cell.classList.contains('editing')) return;
-    cell.classList.add('editing');
-
-    cell.innerHTML = '';
-    const input = document.createElement('input');
-    input.type = 'datetime-local';
-    if (originalValue) {
-      input.value = originalValue.slice(0, 16);
-    }
-    input.style.width = '100%';
-    cell.appendChild(input);
-    input.focus();
-
-    const onSave = () => {
-      let newValue = input.value;
-      if (newValue && newValue.length === 16) newValue += ':00';
-      if (newValue) {
-        const d = new Date(newValue);
-        newValue = d.toISOString();
-      } else {
-        newValue = '';
-      }
-
-      // UI restore
-      cell.innerHTML = '';
-      cell.classList.remove('editing');
-
-      const datetimeContainer = document.createElement('div');
-      datetimeContainer.className = 'row no-space align-center';
-      const datetimeText = document.createElement('span');
-      datetimeText.className = 'editable-text max';
-      datetimeText.textContent = formatDateTimeForDisplay(newValue);
-      const datetimeBtn = document.createElement('button');
-      datetimeBtn.className = 'circle transparent small';
-      datetimeBtn.innerHTML = '<i>edit</i>';
-      datetimeContainer.appendChild(datetimeText);
-      datetimeContainer.appendChild(datetimeBtn);
-      datetimeContainer.addEventListener('click', () => {
-        openDateTimePickerForTask(taskId, field, newValue);
-      });
-      cell.appendChild(datetimeContainer);
-
-      if (newValue !== originalValue) {
-        App.pages.taskDetail.updateTaskField(taskId, field, newValue, originalValue);
-      }
-    };
-
-    input.addEventListener('blur', onSave);
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') input.blur();
-      if (e.key === 'Escape') {
-        input.removeEventListener('blur', onSave);
-        cell.classList.remove('editing');
-        cell.innerHTML = '';
-        // Restore
-        const datetimeContainer = document.createElement('div');
-        datetimeContainer.className = 'row no-space align-center';
-        const datetimeText = document.createElement('span');
-        datetimeText.className = 'editable-text max';
-        datetimeText.textContent = formatDateTimeForDisplay(originalValue);
-        const datetimeBtn = document.createElement('button');
-        datetimeBtn.className = 'circle transparent small';
-        datetimeBtn.innerHTML = '<i>edit</i>';
-        datetimeContainer.appendChild(datetimeText);
-        datetimeContainer.appendChild(datetimeBtn);
-        datetimeContainer.addEventListener('click', () => {
-          openDateTimePickerForTask(taskId, field, originalValue);
-        });
-        cell.appendChild(datetimeContainer);
-      }
-    });
-  }
-  // ID検索、テキスト検索、勤怠、ユーザーメニュー関連の関数は
-  // components/utils/search.html と components/utils/header.html に移動しました
-  // (App.utils.search.xxx, App.utils.header.xxx)
-
 
   // ============================================
   // UI Utilities
@@ -622,9 +198,9 @@
         'input',
         'select',
         'textarea',
-        'a[onclick]',  // Links acting as buttons
-        'i[onclick]',  // Icons acting as buttons
-        '.chip i'      // Close icons in chips
+        'a[onclick]',
+        'i[onclick]',
+        '.chip i'
       ];
 
       const elements = main.querySelectorAll(selectors.join(', '));
@@ -642,7 +218,6 @@
     }
   };
 
-
   // ============================================
   // Optimistic UI: データ同期ロジック
   // ============================================
@@ -652,31 +227,7 @@
    * @param {string} tableName - テーブル名
    */
   function getDataArray(tableName) {
-    const dataArrayMap = {
-      [SHEET_NAMES.ADVERTISEMENTS]: App.state.data.advertisements,
-      [SHEET_NAMES.BUDGETS]: App.state.data.budgets,
-      [SHEET_NAMES.CREATIVES]: App.state.data.creatives,
-      [SHEET_NAMES.DIRECTORIES]: App.state.data.directories,
-      [SHEET_NAMES.EVENTS]: App.state.data.events,
-      [SHEET_NAMES.EXPENSES]: App.state.data.expenses,
-      [SHEET_NAMES.FORMS]: App.state.data.forms,
-      [SHEET_NAMES.HARDWARES]: App.state.data.hardwares,
-      [SHEET_NAMES.JOBS]: App.state.data.jobs,
-      [SHEET_NAMES.KNOWLEDGES]: App.state.data.knowledges,
-      [SHEET_NAMES.LICENSES]: App.state.data.licenses,
-      [SHEET_NAMES.MEDIUMS]: App.state.data.mediums,
-      [SHEET_NAMES.MEMBERS]: App.state.data.members,
-      [SHEET_NAMES.MERCHANDISES]: App.state.data.merchandises,
-      [SHEET_NAMES.MUSICS]: App.state.data.musics,
-      [SHEET_NAMES.PLANS]: App.state.data.plans,
-      [SHEET_NAMES.QUESTIONS]: App.state.data.questions,
-      [SHEET_NAMES.RESOURCES]: App.state.data.resources,
-      [SHEET_NAMES.SHIFTS]: App.state.data.shifts,
-      [SHEET_NAMES.SKILLS]: App.state.data.skills,
-      [SHEET_NAMES.TASKS]: App.state.data.tasks,
-      [SHEET_NAMES.WIKIS]: App.state.data.wikis
-    };
-    return dataArrayMap[tableName];
+    return App.state.data[tableName];
   }
 
   /**
@@ -699,7 +250,6 @@
       return null;
     }
 
-    // オブジェクトを直接更新
     Object.keys(updates).forEach(key => {
       item[key] = updates[key];
     });
@@ -726,12 +276,8 @@
       return;
     }
 
-    // 古いデータで上書き
     Object.keys(oldData).forEach(key => {
       item[key] = oldData[key];
     });
-
-    // 行を再描画
-    App.utils.tables.reRenderTableRow(tableName, id);
   }
 </script>
