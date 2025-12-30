@@ -1,4 +1,4 @@
-<nav class="top surface">
+<nav class="top surface-container">
 
     <nav class="min">
         <button id="new-button" class="extend square extra primary"
@@ -11,39 +11,17 @@
             <li>
                 <button class="fill large-elevate" onclick="App.modals.new_task.open()">
                     <i>check_circle</i>
-                    <span>タスク</span>
+                    <span>新しいタスク</span>
                 </button>
             </li>
             <li>
                 <button class="fill large-elevate" onclick="App.modals.new_creative.open()">
-                    <i>palette</i>
-                    <span>制作物</span>
-                </button>
-            </li>
-            <li>
-                <button class="fill large-elevate" onclick="App.modals.new_plan.open()">
                     <i>folder</i>
-                    <span>企画</span>
-                </button>
-            </li>
-            <li>
-                <button class="fill large-elevate" onclick="App.modals.new_member.open()">
-                    <i>person_add</i>
-                    <span>メンバー</span>
-                </button>
-            </li>
-            <li>
-                <button class="fill large-elevate" onclick="App.modals.new_knowledge.open()">
-                    <i>lightbulb</i>
-                    <span>ナレッジ</span>
+                    <span>新しいボード</span>
                 </button>
             </li>
         </menu>
     </nav>
-
-
-    <h1 class="medium" style="font-family: 'Google Sans Flex', sans-serif; font-weight: 600; font-size: 2rem;"
-        id="header-title-default">ZARMS 2026</h1>
 
     <div class="medium"></div>
 
@@ -61,30 +39,43 @@
 
     <div class="medium"></div>
 
-    <!-- 勤怠ボタン -->
-    <nav class="group split">
-        <button class="left-round large" onclick="handleTimetrackClick()">
-            <i>alarm</i>
-            <span>0:00:00</span>
-        </button>
-        <button class="right-round square large">
-            <i>keyboard_arrow_down</i>
-            <menu class="left no-wrap">
-                <li>
-                    <a>
-                        <i>play_circle</i>
-                        <span>業務開始/終了</span>
+    <a class="button chip circle large transparent" href="https://gemini.google.com/">
+        <i>auto_awesome</i>
+        <div class="tooltip bottom">Gemini</div>
+    </a>
+
+    <button class="circle large transparent">
+        <i>apps</i>
+        <menu class="left no-wrap padding">
+            <div class="grid no-space">
+                <div class="s4 center-align">
+                    <a class="button transparent circle large" href="https://github.com/teppgreen/zarms">
+                        <i>link</i>
                     </a>
-                </li>
-                <li>
-                    <a>
-                        <i>history</i>
-                        <span>打刻履歴</span>
+                </div>
+                <div class="s4 center-align">
+                    <a class="button transparent circle large" href="https://github.com/teppgreen/zarms">
+                        <i>link</i>
                     </a>
-                </li>
-            </menu>
-        </button>
-    </nav>
+                </div>
+                <div class="s4 center-align">
+                    <a class="button transparent circle large" href="https://github.com/teppgreen/zarms">
+                        <i>link</i>
+                    </a>
+                </div>
+                <div class="s4 center-align">
+                    <a class="button transparent circle large" href="https://github.com/teppgreen/zarms">
+                        <i>link</i>
+                    </a>
+                </div>
+                <div class="s4 center-align">
+                    <a class="button transparent circle large" href="https://github.com/teppgreen/zarms">
+                        <i>link</i>
+                    </a>
+                </div>
+            </div>
+        </menu>
+    </button>
 </nav>
 
 <script>
@@ -205,19 +196,6 @@
                     alert('プロフィールを開けません');
                 }
             },
-
-            /**
-             * ヘッダークローズボタンクリック
-             */
-            handleHeaderCloseClick: function () {
-                // 詳細画面を閉じる処理
-                if (typeof closeAllPopups === 'function') {
-                    closeAllPopups();
-                }
-                if (App.utils.navigation && App.utils.navigation.switchTab) {
-                    App.utils.navigation.switchTab('home');
-                }
-            }
         };
 
         // 下位互換性のための関数エイリアス
@@ -285,13 +263,13 @@
                         const { item, tableName } = result;
 
                         // テーブル名に応じた処理
-                        if (tableName === SHEET_NAMES.TASKS) {
+                        if (tableName === TABLE_NAMES.TASKS) {
                             App.pages.taskDetail.openDetailModal(item.id);
-                        } else if (tableName === SHEET_NAMES.CREATIVES) {
+                        } else if (tableName === TABLE_NAMES.CREATIVES) {
                             App.overlays.creativeDetail.openDetailModal(item.id);
-                        } else if (tableName === SHEET_NAMES.PLANS) {
+                        } else if (tableName === TABLE_NAMES.PLANS) {
                             App.pages.planDetail.openDetailModal(item.id);
-                        } else if (tableName === SHEET_NAMES.KNOWLEDGES) {
+                        } else if (tableName === TABLE_NAMES.KNOWLEDGES) {
                             App.pages.knowledgeDetail.openDetailModal(item.id);
                         } else {
                             console.log('Unknown table for search result:', tableName);
@@ -480,10 +458,10 @@
 
                 // 検索対象のテーブルとフィールドを定義
                 const searchConfigs = [
-                    { data: App.state.data.creatives, tableName: SHEET_NAMES.CREATIVES, fields: ['title', 'display_id'] },
-                    { data: App.state.data.plans, tableName: SHEET_NAMES.PLANS, fields: ['title', 'display_id'] },
-                    { data: App.state.data.tasks, tableName: SHEET_NAMES.TASKS, fields: ['title', 'display_id'] },
-                    { data: App.state.data.members, tableName: SHEET_NAMES.MEMBERS, fields: ['display_name', 'email'] }
+                    { data: App.state.data.creatives, tableName: TABLE_NAMES.CREATIVES, fields: ['title', 'display_id'] },
+                    { data: App.state.data.plans, tableName: TABLE_NAMES.PLANS, fields: ['title', 'display_id'] },
+                    { data: App.state.data.tasks, tableName: TABLE_NAMES.TASKS, fields: ['title', 'display_id'] },
+                    { data: App.state.data.members, tableName: TABLE_NAMES.MEMBERS, fields: ['display_name', 'email'] }
                 ];
 
                 searchConfigs.forEach(config => {
@@ -572,13 +550,13 @@
             openDetailModal: function (result) {
                 const { tableName, id } = result;
 
-                if (tableName === SHEET_NAMES.CREATIVES && App.overlays.creativeDetail) {
+                if (tableName === TABLE_NAMES.CREATIVES && App.overlays.creativeDetail) {
                     App.overlays.creativeDetail.open(id);
-                } else if (tableName === SHEET_NAMES.PLANS && App.overlays.planDetail) {
+                } else if (tableName === TABLE_NAMES.PLANS && App.overlays.planDetail) {
                     App.overlays.planDetail.open(id);
-                } else if (tableName === SHEET_NAMES.TASKS && App.overlays.taskDetail) {
+                } else if (tableName === TABLE_NAMES.TASKS && App.overlays.taskDetail) {
                     App.overlays.taskDetail.open(id);
-                } else if (tableName === SHEET_NAMES.MEMBERS && App.overlays.memberDetail) {
+                } else if (tableName === TABLE_NAMES.MEMBERS && App.overlays.memberDetail) {
                     App.overlays.memberDetail.open(id);
                 } else {
                     console.log('Unknown table for search result:', tableName);

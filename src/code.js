@@ -2,88 +2,23 @@
 // code.gs - メインロジックとWebアプリのエントリーポイント
 // ============================================
 
-let activeUser;
-let activeUserEmail;
-
 // Webアプリのエントリーポイント
 function doGet(e) {
-  // starting.html をテンプレートとして作成
-  const template = HtmlService.createTemplateFromFile('starting');
-  // URLパラメータをテンプレート変数として渡す（JSON文字列化して渡すことでJS内で扱いやすくする）
-  template.initialParams = JSON.stringify(e.parameter || {});
+  const template = HtmlService.createTemplateFromFile('index');
+  template.templateVariables = {
+    urlParam: e.parameter,
+    TABLE_NAMES: TABLE_NAMES,
+    DIRECTORY_TYPES: DIRECTORY_TYPES,
+    TASK_STATUS: TASK_STATUS,
+    activeUser: getActiveUser()
+  };
 
   return template.evaluate()
-    .setTitle('ZARMS')
+    .setTitle('ZEN Boards')
     .setFaviconUrl('https://drive.google.com/uc?id=1rnkYniTkiKnVk5jNbx7V1nRrmwP6altL' + '&.png')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width');
-}
-
-/**
- * クライアントサイドから呼ばれ、認証チェック後にメインアプリのHTMLを返す
- * @param {Object} params - URLパラメータ
- * @returns {string} HTMLコンテンツ
- */
-function loadMainApplication(params) {
-  // 認証チェック
-  activeUserEmail = Session.getActiveUser().getEmail();
-  activeUser = getActiveUser();
-  // TODO: 開発の邪魔なので一旦スキップ。必ず実装すること
-  // if (!checkPermission(activeUser, 'view')) {
-  //   const template = HtmlService.createTemplate(
-  //     `<h1>アクセス権限がありません</h1>` +
-  //     `<p>ZARMSへのアクセスが許可されていません。間違いだと思われる場合は、総務ユニットまでお問い合わせください。</p>` +
-  //     `<p>ログイン中のアカウント: ${activeUserEmail}</p>`
-  //   );
-  //   return template.evaluate().getContent();
-  // }
-
-  // メインUIを返す
-  const template = HtmlService.createTemplateFromFile("index");
-  template.templateVariables = {
-    urlParam: params || {},
-    SHEET_NAMES: SHEET_NAMES,
-    activeUser: activeUser
-  };
-
-  return template.evaluate().getContent();
-}
-
-// ============================================
-// ユーザー情報取得
-// ============================================
-
-function getActiveUser() {
-  const userEmail = Session.getActiveUser().getEmail();
-  const members = select(SHEET_NAMES.MEMBERS, { where: { email: ["=", userEmail] } });
-  return members.length > 0 ? members[0] : null;
-}
-
-// ============================================
-// ユーザー認証・認可処理
-// ============================================
-
-function getRoleLevel(roleKey) {
-  const roleLevels = {
-    'ADMIN': 3,
-    'EDITOR': 2,
-    'VIEWER': 1,
-    'NONE': 0
-  };
-  return roleLevels[roleKey] || 0;
-}
-
-// 特定の操作が許可されているかチェック
-function checkPermission(member, operation) {
-
-  const permissions = {
-    'view': 1,           // VIEWER以上
-    'edit': 2,           // EDITOR以上
-    'delete': 3          // ADMIN
-  };
-
-  const requiredLevel = permissions[operation] || 1;
-  return getRoleLevel(member.system_role_key) >= requiredLevel;
+    .addMetaTag('viewport', 'width=device-width')
+    .getContent();
 }
 
 // ============================================
@@ -94,20 +29,11 @@ const CacheManager = {
     const cache = isPublic ? CacheService.getScriptCache() : CacheService.getUserCache();
     const cached = cache.get(key);
     if (!cached) return null;
-    try {
-      return JSON.parse(cached);
-    } catch (e) {
-      console.warn("Cache parse failed:", e);
-      return null;
-    }
+    return JSON.parse(cached);
   },
   put: function (key, value, isPublic, ttl = 21600) {
     const cache = isPublic ? CacheService.getScriptCache() : CacheService.getUserCache();
-    try {
-      cache.put(key, JSON.stringify(value), ttl);
-    } catch (e) {
-      console.warn("Cache put failed:", e);
-    }
+    cache.put(key, JSON.stringify(value), ttl);
   },
   invalidate: function (key, isPublic) {
     const cache = isPublic ? CacheService.getScriptCache() : CacheService.getUserCache();
@@ -119,14 +45,6 @@ const CacheManager = {
 // 汎用データ操作関数 (Consolidated DB Operations)
 // ============================================
 
-function toSssqlCond(condition) {
-  const where = {};
-  Object.keys(condition).forEach(key => {
-    where[key] = ["=", condition[key]];
-  });
-  return where;
-}
-
 /**
  * データを取得します（必要に応じてエンリッチメントを行います）
  * @param {string} tableName - テーブル名 ('works', 'projects', etc.)
@@ -134,16 +52,14 @@ function toSssqlCond(condition) {
  */
 function getItems(tableName) {
   switch (tableName) {
-    case SHEET_NAMES.CREATIVES:
-      return getCreatives();
-    case SHEET_NAMES.PLANS:
-      return getPlans();
-    case SHEET_NAMES.MEMBERS:
+    case TABLE_NAMES.BOARDS:
+      return getBoards();
+    case TABLE_NAMES.MEMBERS:
       return getMembers();
-    case SHEET_NAMES.TASKS:
+    case TABLE_NAMES.TASKS:
       return getTasks();
-    case SHEET_NAMES.KNOWLEDGES:
-      return getKnowledges();
+    case TABLE_NAMES.DIRECTORIES:
+      return getDirectories();
     default:
       return select(tableName, {});
   }
@@ -174,39 +90,6 @@ function getItemsCached(tableName, forceRefresh = false) {
 }
 
 /**
- * ID指定でデータを取得します（必要に応じてエンリッチメントを行います）
- * @param {string} tableName - テーブル名
- * @param {string} id - ID
- * @param {boolean} forceRefresh - キャッシュを無視するかどうか
- * @returns {Object} { data: Object, isCached: boolean }
- */
-function getItemById(tableName, id, forceRefresh = false) {
-  let data = null;
-
-  switch (tableName) {
-    case SHEET_NAMES.CREATIVES:
-      return getCreativeById(id, forceRefresh);
-    case SHEET_NAMES.PLANS:
-      data = getPlanById(id);
-      break;
-    case SHEET_NAMES.TASKS:
-      data = getTaskById(id);
-      break;
-    case SHEET_NAMES.MEMBERS:
-      data = getMemberById(id);
-      break;
-    default:
-      const idCol = ID_COLUMNS[tableName];
-      if (idCol) {
-        const res = select(tableName, { where: { [idCol]: ["=", id] } });
-        data = res.length > 0 ? res[0] : null;
-      }
-      break;
-  }
-  return { data: data, isCached: false };
-}
-
-/**
  * データを新規作成します
  * @param {string} tableName - テーブル名
  * @param {Object} data - データ
@@ -214,16 +97,14 @@ function getItemById(tableName, id, forceRefresh = false) {
  */
 function createItem(tableName, data) {
   switch (tableName) {
-    case SHEET_NAMES.CREATIVES:
-      return createCreative(data);
-    case SHEET_NAMES.PLANS:
-      return createPlan(data);
-    case SHEET_NAMES.MEMBERS:
+    case TABLE_NAMES.BOARDS:
+      return createBoard(data);
+    case TABLE_NAMES.MEMBERS:
       return createMember(data);
-    case SHEET_NAMES.TASKS:
+    case TABLE_NAMES.TASKS:
       return createTask(data);
-    case SHEET_NAMES.KNOWLEDGES:
-      return createKnowledge(data);
+    case TABLE_NAMES.DIRECTORIES:
+      return createDirectory(data);
     default:
       return insert(tableName, data);
   }
@@ -238,7 +119,7 @@ function createItem(tableName, data) {
  */
 function updateItem(tableName, id, data) {
   switch (tableName) {
-    case SHEET_NAMES.MEMBERS:
+    case TABLE_NAMES.MEMBERS:
       return updateMember(id, data);
     default:
       const idCol = ID_COLUMNS[tableName];
@@ -257,7 +138,7 @@ function updateItem(tableName, id, data) {
  * @returns {boolean} 成功フラグ
  */
 function deleteItem(tableName, condition) {
-  const res = remove(tableName, { where: toSssqlCond(condition) });
+  const res = remove(tableName, { where: condition });
   return res && res.length > 0;
 }
 
@@ -265,23 +146,23 @@ function deleteItem(tableName, condition) {
 // 内部ロジック (Internal Logic)
 // ============================================
 
-// --- Creatives ---
-function getCreatives() {
-  const creatives = select(SHEET_NAMES.CREATIVES, {});
+// --- Boards ---
+function getBoards() {
+  const boards = select(TABLE_NAMES.BOARDS, {});
   // Enrichment is now done in frontend or here if needed.
   // For now, return raw data to let frontend handle joins, or minimal enrichment.
-  return creatives;
+  return boards;
 }
 
-function getCreativeById(id, forceRefresh = false) {
-  const cacheKey = `creative_detail_${id}`;
+function getBoardById(id, forceRefresh = false) {
+  const cacheKey = `board_detail_${id}`;
 
   if (!forceRefresh) {
     const cached = CacheManager.get(cacheKey, true); // Public Cache
     if (cached) return { data: cached, isCached: true };
   }
 
-  const res = select(SHEET_NAMES.CREATIVES, { where: { id: ["=", id] } });
+  const res = select(TABLE_NAMES.CREATIVES, { where: { id: ["=", id] } });
   const creative = res.length > 0 ? res[0] : null;
   if (!creative) return { data: null, isCached: false };
 
@@ -292,31 +173,9 @@ function getCreativeById(id, forceRefresh = false) {
   return { data: creative, isCached: false };
 }
 
-function createCreative(data) {
-  const userEmail = Session.getActiveUser().getEmail();
-  const now = new Date();
-
-  const newCreative = {
-    // id: generated by backend
-    // display_id: generated by backend
-    plan_id: data.plan_id,
-    advertisement_id: data.advertisement_id,
-    title: data.title,
-    creative_status_key: 'TODO',
-    creative_type_key: data.creative_type_key,
-    priority_key: data.priority_key || 'MEDIUM',
-    deadline_at: data.deadline_at || null,
-    document_gfile_id: data.document_gfile_id,
-    document_gtab_id: data.document_gtab_id,
-    client_directory_id: data.client_directory_id,
-  };
-
-  return insert(SHEET_NAMES.CREATIVES, newCreative);
-}
-
 // --- Plans ---
 function getPlans() {
-  const plans = select(SHEET_NAMES.PLANS, {});
+  const plans = select(TABLE_NAMES.PLANS, {});
   return plans.map(plan => {
     // plan.created_by_name = getMemberName(plan.created_by); // created_by is now member ID
     // const creativeStats = getPlanCreativeStats(plan.id);
@@ -326,44 +185,18 @@ function getPlans() {
   });
 }
 
-function getPlanById(id) {
-  const res = select(SHEET_NAMES.PLANS, { where: { id: ["=", id] } });
-  const plan = res.length > 0 ? res[0] : null;
-  if (!plan) return null;
-  // plan.creator_name = getMemberName(plan.created_by);
-  plan.creatives = getCreativesByPlanId(plan.id);
-  return plan;
-}
-
-function createPlan(data) {
-  const planTitle = data.title || data; // Handle string or object
-
-  // Check duplicate title?
-  // if (isPlanTitleDuplicate(planTitle)) ...
-
-  const newPlan = {
-    // id: generated by backend
-    // display_id: generated by backend
-    title: planTitle,
-    description: data.description || ''
-  };
-
-  const created = insert(SHEET_NAMES.PLANS, newPlan);
-  return created;
-}
-
 // --- Members ---
 function getMembers() {
   return select('members', {});
 }
 
 function getMemberById(id) {
-  const res = select(SHEET_NAMES.MEMBERS, { where: { email: ["=", id] } }); // Member ID is email
+  const res = select(TABLE_NAMES.MEMBERS, { where: { email: ["=", id] } }); // Member ID is email
   const member = res.length > 0 ? res[0] : null;
   if (!member) return null;
-  // const assignments = findData(SHEET_NAMES.MEMBER_ASSIGNMENTS, { member_id: id });
+  // const assignments = findData(TABLE_NAMES.MEMBER_ASSIGNMENTS, { member_id: id });
   // const creativeIds = assignments.map(a => a.creative_id);
-  // const allCreatives = getAllData(SHEET_NAMES.CREATIVES);
+  // const allCreatives = getAllData(TABLE_NAMES.CREATIVES);
   // member.assigned_creatives = allCreatives.filter(c => creativeIds.includes(c.id));
   return member;
 }
@@ -390,7 +223,7 @@ function updateMember(memberEmail, memberData) {
 
 // --- Tasks ---
 function getTasks() {
-  const tasks = select(SHEET_NAMES.TASKS, {});
+  const tasks = select(TABLE_NAMES.TASKS, {});
   return tasks.map(task => {
     task.assignee_name = getMemberName(task.assign_to);
     return task;
@@ -398,7 +231,7 @@ function getTasks() {
 }
 
 function getTaskById(taskId) {
-  const res = select(SHEET_NAMES.TASKS, { where: { id: ["=", taskId] } });
+  const res = select(TABLE_NAMES.TASKS, { where: { id: ["=", taskId] } });
   return res.length > 0 ? res[0] : null;
 }
 
@@ -422,60 +255,8 @@ function createTask(taskData) {
     created_by: userEmail,
     created_at: now,
   };
-  const created = insert(SHEET_NAMES.TASKS, newTask);
+  const created = insert(TABLE_NAMES.TASKS, newTask);
   return created;
-}
-
-// --- Knowledges ---
-function getKnowledges() {
-  const knowledges = select(SHEET_NAMES.KNOWLEDGES, {});
-  // const enriched = knowledges.map(item => {
-  //   const creator = getItemById(SHEET_NAMES.MEMBERS, item.created_by);
-  //   item.creator_name = creator ? creator.member_name : '';
-  //   item.creator_icon = creator ? creator.member_icon : '';
-  //   item.creative_title = getCreativeTitle(item.creative_id);
-  //   return item;
-  // });
-  // enriched.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  return knowledges;
-}
-
-function createKnowledge(knowledgeData) {
-  const userEmail = Session.getActiveUser().getEmail();
-  const now = new Date();
-  const newKnowledge = {
-    // id: generated by backend
-    creative_id: knowledgeData.creative_id,
-    knowledge_type_key: knowledgeData.knowledge_type_key,
-    content: knowledgeData.content,
-    created_by: userEmail,
-    created_at: now,
-  };
-  const created = insert(SHEET_NAMES.KNOWLEDGES, newKnowledge);
-  return created;
-}
-
-// --- Skills (Assignments) ---
-function addMemberSkill(memberId, skillId) {
-  const userEmail = Session.getActiveUser().getEmail();
-  const now = new Date();
-  const newAssignment = {
-    // id: generated by backend
-    member_id: memberId,
-    related_table: SHEET_NAMES.SKILLS,
-    related_id: skillId,
-    is_active: true,
-    created_by: userEmail,
-    created_at: now,
-  };
-  return insert(SHEET_NAMES.MEMBER_ASSIGNMENTS, newAssignment);
-}
-
-function getMemberSkills(memberId) {
-  const assignments = select(SHEET_NAMES.MEMBER_ASSIGNMENTS, { where: toSssqlCond({ member_id: memberId, related_table: SHEET_NAMES.SKILLS, is_active: true }) });
-  const skillIds = assignments.map(a => a.related_id);
-  const allSkills = select(SHEET_NAMES.SKILLS, {});
-  return allSkills.filter(s => skillIds.includes(s.id));
 }
 
 // ============================================
@@ -484,38 +265,25 @@ function getMemberSkills(memberId) {
 
 function getPlanTitle(id) {
   if (!id) return '';
-  const res = select(SHEET_NAMES.PLANS, { where: { id: ["=", id] } });
+  const res = select(TABLE_NAMES.PLANS, { where: { id: ["=", id] } });
   return res.length > 0 ? res[0].title : '';
 }
 
-function getMemberName(id) {
-  if (!id) return '';
-  const res = select(SHEET_NAMES.MEMBERS, { where: { email: ["=", id] } });
-  const member = res.length > 0 ? res[0] : null;
-  return member ? (member.display_name || member.member_name) : '';
-}
-
-function getCreativeTitle(id) {
-  if (!id) return '';
-  const res = select(SHEET_NAMES.CREATIVES, { where: { id: ["=", id] } });
-  return res.length > 0 ? res[0].title : '';
-}
-
-function getCreativeAssignees(creativeId) {
-  const assignments = select(SHEET_NAMES.MEMBER_ASSIGNMENTS, { where: toSssqlCond({ related_table: SHEET_NAMES.CREATIVES, related_id: creativeId }) });
+function getAssignees(related_table, related_id) {
+  const assignments = select(TABLE_NAMES.MEMBER_ASSIGNMENTS, { where: { related_table: ["=", related_table], related_id: ["=", related_id] } });
   const assignees = assignments.map(assignment => {
-    const res = select(SHEET_NAMES.MEMBERS, { where: { email: ["=", assignment.member_id] } });
+    const res = select(TABLE_NAMES.MEMBERS, { where: { id: ["=", assignment.member_id] } });
     return res.length > 0 ? res[0] : null;
   });
   return assignees.filter(member => member !== null);
 }
 
 function getCreativesByPlanId(planId) {
-  return select(SHEET_NAMES.CREATIVES, { where: toSssqlCond({ plan_id: planId }) });
+  return select(TABLE_NAMES.CREATIVES, { where: toSssqlCond({ plan_id: planId }) });
 }
 
 function getTasksByCreativeId(creativeId) {
-  const tasks = select(SHEET_NAMES.TASKS, { where: toSssqlCond({ creative_id: creativeId }) });
+  const tasks = select(TABLE_NAMES.TASKS, { where: toSssqlCond({ creative_id: creativeId }) });
   return tasks.map(task => {
     task.assignee_name = getMemberName(task.assign_to);
     return task;
@@ -523,12 +291,12 @@ function getTasksByCreativeId(creativeId) {
 }
 
 function isProjectTitleDuplicate(projectTitle) {
-  const projects = select(SHEET_NAMES.PLANS, { where: toSssqlCond({ title: projectTitle }) });
+  const projects = select(TABLE_NAMES.PLANS, { where: toSssqlCond({ title: projectTitle }) });
   return projects.length > 0;
 }
 
 function getProjectCreativeStats(projectId) {
-  const creatives = select(SHEET_NAMES.CREATIVES, { where: toSssqlCond({ plan_id: projectId }) });
+  const creatives = select(TABLE_NAMES.CREATIVES, { where: toSssqlCond({ plan_id: projectId }) });
   const statusCounts = {};
   creatives.forEach(creative => {
     const status = creative.creative_status_key;
@@ -541,15 +309,15 @@ function getProjectCreativeStats(projectId) {
 
 function getOrCreatePlanId(planTitle) {
   if (!planTitle) return null;
-  const plans = select(SHEET_NAMES.PLANS, { where: toSssqlCond({ title: planTitle }) });
+  const plans = select(TABLE_NAMES.PLANS, { where: toSssqlCond({ title: planTitle }) });
   if (plans.length > 0) return plans[0].id;
 
   try {
-    const created = createItem(SHEET_NAMES.PLANS, { title: planTitle });
+    const created = createItem(TABLE_NAMES.PLANS, { title: planTitle });
     return created.id || created;
   } catch (e) {
     if (e.message.includes('既に存在します')) {
-      const plans = select(SHEET_NAMES.PLANS, { where: toSssqlCond({ title: planTitle }) });
+      const plans = select(TABLE_NAMES.PLANS, { where: toSssqlCond({ title: planTitle }) });
       if (plans.length > 0) return plans[0].id;
     }
     throw e;
@@ -614,7 +382,7 @@ function getAvailableCreatives(memberId) {
     creative_status_key: ["IN", ["TODO", "APPROVED"]]
   };
 
-  const result = select(SHEET_NAMES.CREATIVES, {
+  const result = select(TABLE_NAMES.CREATIVES, {
     where: whereConditions,
     orderBy: { created_at: "DESC" }
   });
@@ -627,10 +395,10 @@ function getAvailableCreatives(memberId) {
  * @returns {Object[]} 割り当てられた制作物
  */
 function getAssignedCreatives(memberId) {
-  const assignments = select(SHEET_NAMES.MEMBER_ASSIGNMENTS, {
+  const assignments = select(TABLE_NAMES.MEMBER_ASSIGNMENTS, {
     where: {
       member_id: ["=", memberId],
-      related_table: ["=", SHEET_NAMES.CREATIVES]
+      related_table: ["=", TABLE_NAMES.CREATIVES]
     }
   });
 
@@ -644,7 +412,7 @@ function getAssignedCreatives(memberId) {
     id: ["IN", creativeIds]
   };
 
-  return select(SHEET_NAMES.CREATIVES, { where: whereConditions });
+  return select(TABLE_NAMES.CREATIVES, { where: whereConditions });
 }
 
 function updateSingleField(tableName, id, field, value) {
@@ -664,104 +432,29 @@ function createCreativeDocument(creativeId, creativeTitle, content, design, regu
 }
 
 function getCreativeflowTimestamps(creativeId) {
-  const res = select(SHEET_NAMES.CREATIVES, { where: { id: ["=", creativeId] } });
+  const res = select(TABLE_NAMES.CREATIVES, { where: { id: ["=", creativeId] } });
   const creative = res.length > 0 ? res[0] : null;
   if (!creative) return null;
-  const logs = select(SHEET_NAMES.LOGS, {});
+  const logs = select(TABLE_NAMES.LOGS, {});
   // ... logic ...
   return {};
 }
 
 function acceptCreative(creativeId) {
   const userEmail = Session.getActiveUser().getEmail();
-  const members = select(SHEET_NAMES.MEMBERS, { where: { email: ["=", userEmail] } });
+  const members = select(TABLE_NAMES.MEMBERS, { where: { email: ["=", userEmail] } });
   if (members.length === 0) throw new Error('Member not found');
   const memberId = members[0].id;
 
-  const existing = select(SHEET_NAMES.MEMBER_ASSIGNMENTS, { where: toSssqlCond({ related_table: SHEET_NAMES.CREATIVES, related_id: creativeId, member_id: memberId }) });
+  const existing = select(TABLE_NAMES.MEMBER_ASSIGNMENTS, { where: toSssqlCond({ related_table: TABLE_NAMES.CREATIVES, related_id: creativeId, member_id: memberId }) });
   if (existing.length > 0) return { success: true, message: '既に承諾済みです' };
 
   const newAssignment = {
-    related_table: SHEET_NAMES.CREATIVES,
+    related_table: TABLE_NAMES.CREATIVES,
     related_id: creativeId,
     member_id: memberId,
     role_key: 'MEMBER' // Default role
   };
-  insert(SHEET_NAMES.MEMBER_ASSIGNMENTS, newAssignment);
+  insert(TABLE_NAMES.MEMBER_ASSIGNMENTS, newAssignment);
   return { success: true, message: '承諾しました' };
-}
-
-function getAnalyticsData() {
-  // Placeholder
-  return {};
-}
-
-// --- External Services & Utilities ---
-function getOAuthToken() {
-  return ScriptApp.getOAuthToken();
-}
-
-function getDriveFileInfo(fileId) {
-  try {
-    const file = DriveApp.getFileById(fileId);
-    return {
-      file_id: file.getId(),
-      file_name: file.getName(),
-      file_url: file.getUrl()
-    };
-  } catch (e) {
-    console.error('Drive file not found:', fileId);
-    return { file_id: fileId, file_name: 'Unknown File', file_url: '#' };
-  }
-}
-
-/**
- * コード（例：W0001）から対象のレコードを検索します
- * @param {string} code - 検索コード
- * @returns {Object|null} 検索結果 { item: Object, tableName: string }
- */
-function searchByCode(code) {
-  if (!code) return null;
-
-  // 1. アルファベットと数字を分ける
-  const match = code.match(/^([A-Z]+)(\d+)$/);
-  if (!match) return null;
-
-  const prefix = match[1];
-  const serialId = parseInt(match[2], 10);
-
-  // 2. PREFIXテーブルからテーブル名を特定
-  const prefixes = select(SHEET_NAMES.PREFIX, {});
-  const prefixRecord = prefixes.find(p => p.id_prefix === prefix);
-
-  if (!prefixRecord) {
-    return null;
-  }
-
-  const tableName = prefixRecord.table_name;
-
-  // 3. 特定したテーブルの該当レコードを検索 (id_serial列)
-  const items = select(tableName, { where: { id_serial: ["=", serialId] } });
-
-  if (items.length === 0) {
-    return null;
-  }
-
-  return {
-    item: items[0],
-    tableName: tableName
-  };
-}
-
-/**
- * HTMLファイルの内容をインクルードするための関数
- * @param {string} filename - インクルードするファイルの拡張子を除いた名前
- * @returns {string} ファイルの内容
- */
-function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
-}
-
-function getKnowledge() {
-  return select(SHEET_NAMES.KNOWLEDGES, {});
 }

@@ -43,7 +43,7 @@ function doPost(e) {
                 }, 400);
             }
 
-            SHEET_NAMES = sheetNames;
+            TABLE_NAMES = sheetNames;
 
             const activeUserEmail = Session.getActiveUser().getEmail();
             if (activeUserEmail !== email) {
@@ -171,6 +171,6 @@ function createResponse(content, statusCode = 200) {
  * @returns {string} ユーザーの権限
  */
 function getUserPermission(email) {
-    const user = select(SHEET_NAMES.MEMBERS, {where: {email: ["=", email]}});
+    const user = select(TABLE_NAMES.MEMBERS, { where: { email: ["=", email] } });
     return user.length > 0 ? user[0].system_role_key : null;
 }
