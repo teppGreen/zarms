@@ -1,39 +1,34 @@
 <nav id="left-nav" class="m l left no-wrap small-padding no-scroll small-width max surface-container">
     <header class="padding no-margin">
-        <h1 style="font-family: 'Google Sans Flex', sans-serif; font-weight: 600; font-size: 1.5rem;">ZARMS 2026</h1>
+        <h1 style="font-family: 'Google Sans Flex', sans-serif; font-weight: 600; font-size: 1.5rem;">ZEN Boards</h1>
     </header>
 
-    <a id="">
+    <a id="home-nav" onclick="App.utils.navigation.switchTab('home')">
         <i>home</i>
         <span>ホーム</span>
     </a>
-    <a id="">
+    <a id="members-nav" onclick="App.utils.navigation.switchTab('members')">
         <i>groups</i>
         <span>メンバー</span>
     </a>
-    <a id="">
+    <a id="my-boards-nav" onclick="App.utils.navigation.switchTab('home')">
         <i>assignment</i>
         <span>マイボード</span>
     </a>
     <hr class="small-margin">
-    <nav class="scroll no-padding left max">
+
+    <!-- 動的ボードリスト -->
+    <nav id="boards-navigation" class="scroll no-padding left max">
         <!-- is_activeがTRUEかつユーザープロパティのstarredBoards配列に含まれているボードを動的にここに入れ込む。 -->
-        <a id="">
-            <i>folder_special</i>
-            <span>boardName</span>
-        </a>
-        <hr class="small-margin">
+        <div id="starred-boards"></div>
+        <hr class="small-margin" id="starred-divider" style="display: none;">
+
         <!-- is_activeがTRUEかつユーザープロパティのstarredBoards配列に含まれていないボードを動的にここに入れ込む。 -->
-        <a id="">
-            <i>folder</i>
-            <span>boardName</span>
-        </a>
-        <hr class="small-margin">
+        <div id="active-boards"></div>
+        <hr class="small-margin" id="active-divider" style="display: none;">
+
         <!-- is_activeがFALSEのボードを動的にここに入れ込む。 -->
-        <a id="">
-            <i>folder_off</i>
-            <span>boardName</span>
-        </a>
+        <div id="inactive-boards"></div>
     </nav>
 </nav>
 
@@ -78,11 +73,6 @@
                     sidebarLinks.forEach(item => item.classList.remove('active'));
                     const activeLink = document.getElementById(tabName + '-nav');
                     if (activeLink) activeLink.classList.add('active');
-                } else {
-                    // Fallback for old structure if needed or during transition
-                    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-                    const oldLink = document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`);
-                    if (oldLink) oldLink.classList.add('active');
                 }
 
                 // homeボタンのアクティブ状態管理
@@ -97,7 +87,7 @@
 
                 document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
                 document.getElementById('tab-' + tabName).style.display = 'block';
-                App.utils.navigation.loadTabData(tabName);
+                this.loadTabData(tabName);
             },
 
             /**
@@ -110,7 +100,7 @@
 
                 if (targetId.startsWith('tab-')) {
                     // タブIDの場合
-                    App.utils.navigation.switchTab(targetId.replace('tab-', ''));
+                    this.switchTab(targetId.replace('tab-', ''));
                 } else if (targetId.startsWith('detail-')) {
                     // 詳細画面IDの場合
                     document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
@@ -118,7 +108,7 @@
                     if (targetEl) targetEl.style.display = 'block';
                 } else {
                     // 単なるタブ名の場合
-                    App.utils.navigation.switchTab(targetId);
+                    this.switchTab(targetId);
                 }
 
                 if (detailPageObj && typeof detailPageObj.reset === 'function') {
@@ -131,13 +121,6 @@
              */
             loadTabData: function (tabName) {
                 console.log(`loadTabData called for: ${tabName}`);
-                console.log('App.pages state:', App.pages);
-                if (App.pages && App.pages[tabName]) {
-                    console.log(`App.pages.${tabName} state:`, App.pages[tabName]);
-                } else {
-                    console.warn(`App.pages.${tabName} is undefined`);
-                }
-
                 showLoading();
                 let loader = null;
 
@@ -151,8 +134,66 @@
                     console.warn(`No loader found for tab: ${tabName}`);
                     hideLoading();
                 }
+            },
+
+            /**
+             * 動的にボードリストを生成
+             */
+            renderBoardsNavigation: function () {
+                const boards = App.state.data.boards || [];
+
+                // TODO: ユーザープロパティからstarredBoardsを取得
+                // 今は全ボードを通常表示
+                const starredBoards = [];
+
+                const starredContainer = document.getElementById('starred-boards');
+                const activeContainer = document.getElementById('active-boards');
+                const inactiveContainer = document.getElementById('inactive-boards');
+                const starredDivider = document.getElementById('starred-divider');
+                const activeDivider = document.getElementById('active-divider');
+
+                let starredHtml = '';
+                let activeHtml = '';
+                let inactiveHtml = '';
+
+                boards.forEach(board => {
+                    const isStarred = starredBoards.includes(board.id);
+
+                    const boardLink = `
+                        <a onclick="loadBoardPage('${board.id}')">
+                            <i>${board.is_active ? (isStarred ? 'folder_special' : 'folder') : 'folder_off'}</i>
+                            <span>${escapeHtml(board.name || '')}</span>
+                        </a>
+                    `;
+
+                    if (board.is_active) {
+                        if (isStarred) {
+                            starredHtml += boardLink;
+                        } else {
+                            activeHtml += boardLink;
+                        }
+                    } else {
+                        inactiveHtml += boardLink;
+                    }
+                });
+
+                starredContainer.innerHTML = starredHtml;
+                activeContainer.innerHTML = activeHtml;
+                inactiveContainer.innerHTML = inactiveHtml;
+
+                // 区切り線の表示制御
+                starredDivider.style.display = starredHtml ? 'block' : 'none';
+                activeDivider.style.display = activeHtml ? 'block' : 'none';
             }
         };
 
+        // ページロード時にボードナビゲーションを初期化
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (App.utils.navigation.renderBoardsNavigation) {
+                    App.utils.navigation.renderBoardsNavigation();
+                }
+            }, 200);
+        });
     })();
 </script>

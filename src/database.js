@@ -73,10 +73,10 @@ function getNextSerial(sheet, columnName) {
 }
 
 /**
- * 新しいデータを追加する前の準備処理（ID生成、監査情報付与）
- * @param {string} userId - 操作ユーザーのID
- * @param {Object} dataObject - 追加するデータオブジェクト
- * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - シートオブジェクト
+ * 新規データを準備します（ID生成、監査情報付与）
+ * @param {string} userId - 操作ユーザーID
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - 対象シート
+ * @param {Object} dataObject - 元データ
  * @returns {Object} 準備されたデータオブジェクト
  */
 function prepareNewData(userId, sheet, dataObject) {
@@ -144,7 +144,7 @@ function bulkInsert(userId, sheetName, records) {
 
     // 各データの準備（ID生成、監査情報付与）
     const preparedData = records.map(record =>
-        prepareNewData(userId, sheetName, record, sheet)
+        prepareNewData(userId, sheet, record)
     );
 
     // SSSQLを使用してデータを一括挿入

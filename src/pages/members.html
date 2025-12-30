@@ -1,0 +1,128 @@
+<div id="tab-members" class="page" style="display: none;">
+    <div class="grid" style="height: calc(100vh - 200px);">
+        <!-- 左側: Members (75%) -->
+        <div class="s12 m9 scroll" style="height: 100%; overflow-y: auto;">
+            <h5>メンバー</h5>
+            <div id="members-list" class="grid">
+                <!-- Memberカードが動的に生成される -->
+            </div>
+        </div>
+
+        <!-- 右側: Directories (25%) -->
+        <div class="s12 m3 scroll"
+            style="height: 100%; overflow-y: auto; border-left: 1px solid var(--surface-variant);">
+            <h6>組織</h6>
+            <div id="directories-tree">
+                <!-- ツリー構造が動的に生成される -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        App.pages.members = {
+            loadData: function () {
+                this.renderMembers();
+                this.renderDirectories();
+                hideLoading();
+            },
+
+            renderMembers: function () {
+                const members = App.state.data.members || [];
+                const container = document.getElementById('members-list');
+
+                if (members.length === 0) {
+                    container.innerHTML = '<p class="padding">メンバーが登録されていません</p>';
+                    return;
+                }
+
+                let html = '';
+                members.forEach(member => {
+                    //  Slack風のカード表示
+                    html += `
+            <article class="s12 m6 l4 padding border round">
+              <div class="row">
+                ${member.profile_photo_url
+                            ? `<img src="${escapeHtml(member.profile_photo_url)}" class="circle small" alt="${escapeHtml(member.display_name)}">`
+                            : '<i class="extra">account_circle</i>'}
+                <div class="max">
+                  <h6 class="small">${escapeHtml(member.display_name || '')}</h6>
+                  <p class="small-text">${escapeHtml(member.email || '')}</p>
+                </div>
+              </div>
+            </article>
+          `;
+                });
+
+                container.innerHTML = html;
+            },
+
+            renderDirectories: function () {
+                const directories = App.state.data.directories || [];
+                const container = document.getElementById('directories-tree');
+
+                if (directories.length === 0) {
+                    container.innerHTML = '<p class="padding small">組織が登録されていません</p>';
+                    return;
+                }
+
+                // ツリー構造を構築
+                const tree = this.buildTree(directories);
+                container.innerHTML = this.renderTree(tree, 0);
+            },
+
+            buildTree: function (flatData) {
+                if (!flatData || flatData.length === 0) return [];
+
+                // IDをキーにしたマップを作成
+                const nodeMap = {};
+                flatData.forEach(item => {
+                    nodeMap[item.id] = {
+                        ...item,
+                        children: []
+                    };
+                });
+
+                // 親子関係を構築
+                const rootNodes = [];
+                flatData.forEach(item => {
+                    const node = nodeMap[item.id];
+                    if (item.parent_directory_id && nodeMap[item.parent_directory_id]) {
+                        nodeMap[item.parent_directory_id].children.push(node);
+                    } else {
+                        rootNodes.push(node);
+                    }
+                });
+
+                return rootNodes;
+            },
+
+            renderTree: function (nodes, level) {
+                let html = '<ul class="no-space">';
+
+                nodes.forEach(node => {
+                    const hasChildren = node.children && node.children.length > 0;
+                    const indent = level * 16;
+
+                    html += `
+            <li style="padding-left: ${indent}px;">
+              <div class="row small-space small-padding">
+                <i class="tiny">${hasChildren ? 'folder' : 'folder_open'}</i>
+                <span class="small-text">${escapeHtml(node.name || '')}</span>
+              </div>
+          `;
+
+                    if (hasChildren) {
+                        html += this.renderTree(node.children, level + 1);
+                    }
+
+                    html += '</li>';
+                });
+
+                html += '</ul>';
+                return html;
+            }
+        };
+    })();
+</script>

@@ -10,6 +10,7 @@
         members: [],
         tasks: []
       },
+      userId: null, // 現在のユーザーのID（uuid）
       previousTab: null,
 
       get: function (tableName) {
@@ -27,7 +28,91 @@
   // 初期化
   async function initializeApp() {
     setupGlobalShortcuts();
+
+    // ユーザーIDを設定（templateVariablesから取得）
+    if (activeUser && activeUser.id) {
+      App.state.userId = activeUser.id;
+    }
+
+    // 全データを読み込み
+    await loadAllData();
+
+    // 自動更新を開始
+    startAutoRefresh();
+
+    // ホームページを表示
     App.utils.navigation.switchTab('home');
+  }
+
+  // 全テーブルのデータを読み込む
+  async function loadAllData() {
+    try {
+      showLoading();
+
+      // 各テーブルのデータを並列で取得
+      const [boards, members, tasks, directories] = await Promise.all([
+        callGAS('getItems', TABLE_NAMES.BOARDS),
+        callGAS('getItems', TABLE_NAMES.MEMBERS),
+        callGAS('getItems', TABLE_NAMES.TASKS),
+        callGAS('getItems', TABLE_NAMES.DIRECTORIES)
+      ]);
+
+      // App.stateに保存
+      App.state.data.boards = boards || [];
+      App.state.data.members = members || [];
+      App.state.data.tasks = tasks || [];
+      App.state.data.directories = directories || [];
+
+      hideLoading();
+    } catch (error) {
+      console.error('データ読み込みエラー:', error);
+      hideLoading();
+      App.utils.error.handle(error);
+    }
+  }
+
+  // 自動データ更新（1分ごと）
+  let autoRefreshInterval = null;
+
+  function startAutoRefresh() {
+    // 既存のインターバルがあればクリア
+    if (autoRefreshInterval) {
+      clearInterval(autoRefreshInterval);
+    }
+
+    // 1分ごとにデータを更新
+    autoRefreshInterval = setInterval(refreshData, 60000);
+  }
+
+  async function refreshData() {
+    try {
+      // バックグラウンドで全データを再取得
+      const [boards, members, tasks, directories] = await Promise.all([
+        callGAS('getItems', TABLE_NAMES.BOARDS),
+        callGAS('getItems', TABLE_NAMES.MEMBERS),
+        callGAS('getItems', TABLE_NAMES.TASKS),
+        callGAS('getItems', TABLE_NAMES.DIRECTORIES)
+      ]);
+
+      // App.stateを更新
+      App.state.data.boards = boards || [];
+      App.state.data.members = members || [];
+      App.state.data.tasks = tasks || [];
+      App.state.data.directories = directories || [];
+
+      // 現在表示中のページを再描画
+      const currentTab = document.querySelector('main > div[style*="display: block"]');
+      if (currentTab && currentTab.id) {
+        const tabName = currentTab.id.replace('tab-', '');
+        if (App.pages[tabName] && App.pages[tabName].loadData) {
+          App.pages[tabName].loadData();
+        }
+      }
+
+      console.log('データ自動更新完了');
+    } catch (error) {
+      console.error('データ自動更新エラー:', error);
+    }
   }
 
   // グローバルショートカットキーの設定
@@ -139,8 +224,8 @@
       const offset = dt.getTimezoneOffset() * 60000;
       const localDate = new Date(dt.getTime() - offset);
       return localDate.toISOString().slice(0, 10);
-    } catch (e) { 
-      return dateString; 
+    } catch (e) {
+      return dateString;
     }
   }
 
@@ -169,8 +254,8 @@
       const offset = dt.getTimezoneOffset() * 60000;
       const localDate = new Date(dt.getTime() - offset);
       return localDate.toISOString().slice(0, 16);
-    } catch (e) { 
-      return dateString; 
+    } catch (e) {
+      return dateString;
     }
   }
 
