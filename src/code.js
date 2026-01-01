@@ -41,10 +41,9 @@ function doGet(e) {
 
     return template.evaluate()
       .setTitle('ZEN Boards')
-      .setFaviconUrl('https://drive.google.com/uc?id=1rnkYniTkiKnVk5jNbx7V1nRrmwP6altL' + '&.png')
+      .setFaviconUrl('https://drive.google.com/uc?id=17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8' + '&.png')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width');
-
   } catch (error) {
     // Spreadsheetアクセスエラー = 権限なし
     console.error('doGet error:', error);
@@ -301,9 +300,7 @@ function deleteItem(tableName, condition) {
 // --- Boards ---
 function getBoards() {
   // is_active=true のボードのみを取得
-  const boards = select(TABLE_NAMES.BOARDS, {
-    where: { is_active: ["=", true] }
-  });
+  const boards = select(TABLE_NAMES.BOARDS);
   return boards;
 }
 

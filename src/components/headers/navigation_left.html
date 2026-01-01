@@ -1,5 +1,5 @@
-<nav id="left-nav" class="m l left no-wrap small-padding no-scroll small-width max surface-container">
-    <header class="padding no-margin">
+<nav id="left-nav" class="m l left no-wrap small-padding small-width max no-scroll surface-container">
+    <header class="row padding no-margin">
         <h1 style="font-family: 'Google Sans Flex', sans-serif; font-weight: 600; font-size: 1.5rem;">ZEN Boards</h1>
     </header>
 
@@ -11,24 +11,14 @@
         <i>groups</i>
         <span>メンバー</span>
     </a>
-    <a id="my-boards-nav" onclick="App.utils.navigation.switchTab('home')">
+    <a id="my-board-nav" onclick="App.utils.navigation.switchTab('')">
         <i>assignment</i>
         <span>マイボード</span>
     </a>
     <hr class="small-margin">
 
     <!-- 動的ボードリスト -->
-    <nav id="boards-navigation" class="scroll no-padding left max">
-        <!-- is_activeがTRUEかつユーザープロパティのstarredBoards配列に含まれているボードを動的にここに入れ込む。 -->
-        <div id="starred-boards"></div>
-        <hr class="small-margin" id="starred-divider" style="display: none;">
-
-        <!-- is_activeがTRUEかつユーザープロパティのstarredBoards配列に含まれていないボードを動的にここに入れ込む。 -->
-        <div id="active-boards"></div>
-        <hr class="small-margin" id="active-divider" style="display: none;">
-
-        <!-- is_activeがFALSEのボードを動的にここに入れ込む。 -->
-        <div id="inactive-boards"></div>
+    <nav id="boards-nav" class="scroll surface-container no-padding left max">
     </nav>
 </nav>
 
@@ -37,101 +27,104 @@
         App.utils.navigation = {
             /**
              * タブを切り替える
+             * @param {string} tabName - タブID（例: 'home', 'members', 'board-UUID'）
              */
             switchTab: function (tabName) {
-                // 他のタブに切り替える前にhomeタブの処理を停止
+                console.log(`switchTab called with: ${tabName}`);
+                const isBoardTab = tabName.startsWith('board-');
+
+                // 現在のタブを取得して処理（必要なら）
                 const currentTab = Array.from(document.querySelectorAll('main > div')).find(el => el.style.display !== 'none');
-                if (currentTab && currentTab.id === 'tab-home') {
-                    // stopRemainingTimeUpdatesが存在する場合のみ呼び出し
-                    if (typeof stopRemainingTimeUpdates === 'function') {
-                        stopRemainingTimeUpdates();
-                    }
-                }
+                console.log(`Current tab:`, currentTab);
 
-                // Overlayが開いている場合はリセット
-                if (currentTab && currentTab.id.startsWith('detail-')) {
-                    const overlayMap = {
-                        'detail-creative': 'creativeDetail',
-                        'detail-member': 'memberDetail',
-                        'detail-plan': 'planDetail',
-                        'detail-task': 'taskDetail'
-                    };
-                    const overlayName = overlayMap[currentTab.id];
-                    if (overlayName && App.overlays[overlayName] && typeof App.overlays[overlayName].reset === 'function') {
-                        App.overlays[overlayName].reset();
-                    }
-                }
-
-                // 右navから開いているページを閉じる
-                if (App.utils.navigation.closeRightNavOverlay) {
-                    App.utils.navigation.closeRightNavOverlay();
+                // Overlayが開いている場合はリセット (汎用化)
+                if (currentTab && typeof currentTab.id === 'string' && currentTab.id.startsWith('detail-')) {
+                    // モーダルやオーバーレイのリセット処理があればここで
+                    // 現状はHTML構造が変わったため（overlays -> modals）、一旦スキップまたは必要に応じて実装
                 }
 
                 // 左navのアクティブ状態管理
                 const sidebarLinks = document.querySelectorAll('nav.left a');
-                if (sidebarLinks.length > 0) {
-                    sidebarLinks.forEach(item => item.classList.remove('active'));
-                    const activeLink = document.getElementById(tabName + '-nav');
-                    if (activeLink) activeLink.classList.add('active');
+                sidebarLinks.forEach(item => item.classList.remove('active'));
+
+                let activeLink;
+                if (isBoardTab) {
+                    const boardId = tabName.replace('board-', '');
+                    activeLink = document.querySelector(`a[data-board-id="${boardId}"]`);
+                } else {
+                    activeLink = document.getElementById(tabName + '-nav');
                 }
 
-                // homeボタンのアクティブ状態管理
-                const homeNav = document.getElementById('home-nav');
-                if (homeNav) {
-                    if (tabName === 'home') {
-                        homeNav.classList.add('active');
+                if (activeLink) activeLink.classList.add('active');
+
+                // ページ表示切り替え
+                document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
+
+                if (isBoardTab) {
+                    // ボードタブの場合、ボードコンテナを表示し、その中の特定ボードを表示する
+                    const boardId = tabName.replace('board-', '');
+                    const boardContainer = document.getElementById('tab-board');
+                    if (boardContainer) {
+                        boardContainer.style.display = 'block';
+                        // 全ての個別ボードを一旦非表示
+                        Array.from(boardContainer.children).forEach(child => {
+                            if (child.id && child.id.startsWith('tab-board-')) {
+                                child.style.display = 'none';
+                            }
+                        });
+
+                        const targetBoardPageId = 'tab-board-' + boardId;
+                        const targetBoardPage = document.getElementById(targetBoardPageId);
+                        if (targetBoardPage) {
+                            targetBoardPage.style.display = 'block';
+                            if (App.pages.boards && App.pages.boards.loadData) {
+                                App.pages.boards.loadData(boardId);
+                            }
+                        } else {
+                            console.error('Target board page not found:', targetBoardPageId);
+                        }
+                    }
+                } else {
+                    let targetPageId = 'tab-' + tabName;
+                    let targetPage = document.getElementById(targetPageId);
+                    console.log(`Target page ID: ${targetPageId}, Found:`, !!targetPage);
+
+                    if (targetPage) {
+                        targetPage.style.display = 'block';
+                        this.loadTabData(tabName);
                     } else {
-                        homeNav.classList.remove('active');
+                        console.error('Target page not found:', targetPageId);
+                        // フォールバック: Homeへ
+                        if (tabName !== 'home') {
+                            this.switchTab('home');
+                        }
                     }
                 }
-
-                document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
-                document.getElementById('tab-' + tabName).style.display = 'block';
-                this.loadTabData(tabName);
             },
 
             /**
              * 詳細画面から戻る
-             * @param {string} tabName - 戻り先のタブ名
-             * @param {Object} detailPageObj - 詳細ページオブジェクト (resetメソッドを持つ)
              */
-            goBack: function (targetId, detailPageObj) {
+            goBack: function (targetId) {
                 if (!targetId) targetId = 'home';
 
                 if (targetId.startsWith('tab-')) {
-                    // タブIDの場合
                     this.switchTab(targetId.replace('tab-', ''));
-                } else if (targetId.startsWith('detail-')) {
-                    // 詳細画面IDの場合
-                    document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
-                    const targetEl = document.getElementById(targetId);
-                    if (targetEl) targetEl.style.display = 'block';
                 } else {
-                    // 単なるタブ名の場合
                     this.switchTab(targetId);
-                }
-
-                if (detailPageObj && typeof detailPageObj.reset === 'function') {
-                    detailPageObj.reset();
                 }
             },
 
             /**
-             * タブデータを読み込む
+             * 通常タブデータを読み込む
              */
             loadTabData: function (tabName) {
                 console.log(`loadTabData called for: ${tabName}`);
                 showLoading();
-                let loader = null;
 
                 if (App.pages[tabName] && App.pages[tabName].loadData) {
-                    loader = App.pages[tabName].loadData;
-                }
-
-                if (loader) {
-                    loader();
+                    App.pages[tabName].loadData();
                 } else {
-                    console.warn(`No loader found for tab: ${tabName}`);
                     hideLoading();
                 }
             },
@@ -141,59 +134,33 @@
              */
             renderBoardsNavigation: function () {
                 const boards = App.state.data.boards || [];
+                console.log('Rendering boards navigation. Boards data:', boards);
 
                 // TODO: ユーザープロパティからstarredBoardsを取得
-                // 今は全ボードを通常表示
                 const starredBoards = [];
 
-                const starredContainer = document.getElementById('starred-boards');
-                const activeContainer = document.getElementById('active-boards');
-                const inactiveContainer = document.getElementById('inactive-boards');
-                const starredDivider = document.getElementById('starred-divider');
-                const activeDivider = document.getElementById('active-divider');
+                const boardsNavigation = document.getElementById('boards-nav');
+                const divider = `<hr class="small-margin">`;
 
-                let starredHtml = '';
-                let activeHtml = '';
-                let inactiveHtml = '';
+                let html = '';
 
                 boards.forEach(board => {
+                    console.log(`Processing board: ${board.name}, is_active: ${board.is_active} (${typeof board.is_active})`);
                     const isStarred = starredBoards.includes(board.id);
+                    const boardTabName = 'board-' + board.id;
 
                     const boardLink = `
-                        <a onclick="loadBoardPage('${board.id}')">
+                        <a onclick="App.utils.navigation.switchTab('${boardTabName}')" data-board-id="${board.id}">
                             <i>${board.is_active ? (isStarred ? 'folder_special' : 'folder') : 'folder_off'}</i>
                             <span>${escapeHtml(board.name || '')}</span>
                         </a>
                     `;
 
-                    if (board.is_active) {
-                        if (isStarred) {
-                            starredHtml += boardLink;
-                        } else {
-                            activeHtml += boardLink;
-                        }
-                    } else {
-                        inactiveHtml += boardLink;
-                    }
+                    html += boardLink;
                 });
 
-                starredContainer.innerHTML = starredHtml;
-                activeContainer.innerHTML = activeHtml;
-                inactiveContainer.innerHTML = inactiveHtml;
-
-                // 区切り線の表示制御
-                starredDivider.style.display = starredHtml ? 'block' : 'none';
-                activeDivider.style.display = activeHtml ? 'block' : 'none';
+                boardsNavigation.innerHTML = html;
             }
         };
-
-        // ページロード時にボードナビゲーションを初期化
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                if (App.utils.navigation.renderBoardsNavigation) {
-                    App.utils.navigation.renderBoardsNavigation();
-                }
-            }, 200);
-        });
     })();
 </script>
