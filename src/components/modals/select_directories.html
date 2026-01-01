@@ -73,8 +73,9 @@
                 // directoriesDataをロード
                 if (!App.state.data.directories || App.state.data.directories.length === 0) {
                     showLoading();
-                    callGAS('getItems', TABLE_NAMES.DIRECTORIES)
-                        .then(directories => {
+                    callGAS('getItems', App.state.userId, TABLE_NAMES.DIRECTORIES)
+                        .then(result => {
+                            const directories = result?.data || result || [];
                             App.state.data.directories = directories;
                             this.allDirectories = directories;
                             this.render();
@@ -224,7 +225,7 @@
                                            ${isSelected ? 'checked' : ''}
                                            onchange="App.modals.selectDirectories.toggleSelection('${node.id}', this.checked)">
                                      <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">
-                                        <strong>${escapeHtml(formatDisplayId(TABLE_NAMES.DIRECTORIES, node.display_id))}</strong>
+                                        <strong>${escapeHtml(node.display_id)}</strong>
                                         ${escapeHtml(node.name || '')}
                                     </span>
                                 </label>

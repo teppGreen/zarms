@@ -50,19 +50,33 @@
       showLoading();
 
       // 各テーブルのデータを並列で取得
-      const [boards, members, tasks, directories] = await Promise.all([
-        callGAS('getItems', TABLE_NAMES.BOARDS),
-        callGAS('getItems', TABLE_NAMES.MEMBERS),
-        callGAS('getItems', TABLE_NAMES.TASKS),
-        callGAS('getItems', TABLE_NAMES.DIRECTORIES)
+      const [boardsResult, membersResult, tasksResult, directoriesResult] = await Promise.all([
+        callGAS('getItems', App.state.userId, TABLE_NAMES.BOARDS),
+        callGAS('getItems', App.state.userId, TABLE_NAMES.MEMBERS),
+        callGAS('getItems', App.state.userId, TABLE_NAMES.TASKS),
+        callGAS('getItems', App.state.userId, TABLE_NAMES.DIRECTORIES)
       ]);
+
+      // 結果からデータを取得（キャッシュ情報を含む可能性がある）
+      const boards = boardsResult?.data || boardsResult || [];
+      const members = membersResult?.data || membersResult || [];
+      const tasks = tasksResult?.data || tasksResult || [];
+      const directories = directoriesResult?.data || directoriesResult || [];
 
       // App.stateに保存
       console.log('Boards fetched:', boards);
-      App.state.data.boards = boards || [];
-      App.state.data.members = members || [];
-      App.state.data.tasks = tasks || [];
-      App.state.data.directories = directories || [];
+      App.state.data.boards = boards;
+      App.state.data.members = members;
+      App.state.data.tasks = tasks;
+      App.state.data.directories = directories;
+
+      // キャッシュからのデータだった場合、バックグラウンドで再取得
+      refreshCachedData([
+        { result: boardsResult, tableName: TABLE_NAMES.BOARDS },
+        { result: membersResult, tableName: TABLE_NAMES.MEMBERS },
+        { result: tasksResult, tableName: TABLE_NAMES.TASKS },
+        { result: directoriesResult, tableName: TABLE_NAMES.DIRECTORIES }
+      ]);
 
       // ナビゲーションとボードページを更新
       if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
@@ -95,35 +109,91 @@
 
   async function refreshData() {
     try {
-      // バックグラウンドで全データを再取得
-      const [boards, members, tasks, directories] = await Promise.all([
-        callGAS('getItems', TABLE_NAMES.BOARDS),
-        callGAS('getItems', TABLE_NAMES.MEMBERS),
-        callGAS('getItems', TABLE_NAMES.TASKS),
-        callGAS('getItems', TABLE_NAMES.DIRECTORIES)
+      // バックグラウンドで全データを再取得（forceRefreshを使用）
+      const [boardsResult, membersResult, tasksResult, directoriesResult] = await Promise.all([
+        callGAS('getItems', App.state.userId, TABLE_NAMES.BOARDS, true),  // forceRefresh = true
+        callGAS('getItems', App.state.userId, TABLE_NAMES.MEMBERS, true),
+        callGAS('getItems', App.state.userId, TABLE_NAMES.TASKS, true),
+        callGAS('getItems', App.state.userId, TABLE_NAMES.DIRECTORIES, true)
       ]);
 
-      // App.stateを更新
-      App.state.data.boards = boards || [];
-      App.state.data.members = members || [];
-      App.state.data.tasks = tasks || [];
-      App.state.data.directories = directories || [];
+      // 現在のアクティブタブ状態を保存
+      const currentTab = document.querySelector('main > div[style*="display: block"]');
+      const savedTabId = currentTab ? currentTab.id : null;
 
-      // ナビゲーションとボードページを更新
+      // ボードタブの場合、表示中の個別ボードIDも保存
+      let savedBoardId = null;
+      if (savedTabId === 'tab-board') {
+        const activeBoard = document.querySelector('#tab-board > div[style*="display: block"]');
+        if (activeBoard && activeBoard.id) {
+          savedBoardId = activeBoard.id.replace('tab-board-', '');
+        }
+      }
+
+      // 左ナビのアクティブ状態を保存
+      const activeNavLink = document.querySelector('nav.left a.active');
+      const savedNavDataBoardId = activeNavLink ? activeNavLink.dataset.boardId : null;
+      const savedNavId = activeNavLink ? activeNavLink.id : null;
+
+      // 結果からデータを取得
+      const boards = boardsResult?.data || boardsResult || [];
+      const members = membersResult?.data || membersResult || [];
+      const tasks = tasksResult?.data || tasksResult || [];
+      const directories = directoriesResult?.data || directoriesResult || [];
+
+      // App.stateを更新
+      App.state.data.boards = boards;
+      App.state.data.members = members;
+      App.state.data.tasks = tasks;
+      App.state.data.directories = directories;
+
+      // ナビゲーションを更新
       if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
         App.utils.navigation.renderBoardsNavigation();
       }
+
+      // 左ナビのアクティブ状態を復元
+      if (savedNavDataBoardId) {
+        const navLink = document.querySelector(`a[data-board-id="${savedNavDataBoardId}"]`);
+        if (navLink) navLink.classList.add('active');
+      } else if (savedNavId) {
+        const navLink = document.getElementById(savedNavId);
+        if (navLink) navLink.classList.add('active');
+      }
+
+      // ボードページを更新
       if (App.pages && App.pages.boards && App.pages.boards.initialize) {
         App.pages.boards.initialize();
       }
 
+      // ボードタブの表示状態を復元
+      if (savedTabId === 'tab-board' && savedBoardId) {
+        const boardContainer = document.getElementById('tab-board');
+        if (boardContainer) {
+          boardContainer.style.display = 'block';
+          // 全ての個別ボードを非表示にしてから対象を表示
+          Array.from(boardContainer.children).forEach(child => {
+            if (child.id && child.id.startsWith('tab-board-')) {
+              child.style.display = 'none';
+            }
+          });
+          const targetBoard = document.getElementById('tab-board-' + savedBoardId);
+          if (targetBoard) {
+            targetBoard.style.display = 'block';
+          }
+        }
+      }
+
       // 現在表示中のページを再描画
-      const currentTab = document.querySelector('main > div[style*="display: block"]');
-      if (currentTab && currentTab.id) {
-        let tabName = currentTab.id.replace('tab-', '');
+      if (savedTabId) {
+        let tabName = savedTabId.replace('tab-', '');
 
         // ボードタブの場合はID抽出
-        if (tabName.startsWith('board-')) {
+        if (tabName === 'board' && savedBoardId) {
+          if (App.pages.boards && App.pages.boards.loadData) {
+            App.pages.boards.loadData(savedBoardId);
+          }
+        } else if (tabName.startsWith('board-')) {
           const boardId = tabName.replace('board-', '');
           if (App.pages.boards && App.pages.boards.loadData) {
             App.pages.boards.loadData(boardId);
@@ -139,6 +209,99 @@
     } catch (error) {
       console.error('データ自動更新エラー:', error);
     }
+  }
+
+  /**
+   * キャッシュされたデータをバックグラウンドで再取得
+   * @param {Array} results - { result, tableName } の配列
+   */
+  async function refreshCachedData(results) {
+    const cachedTables = results.filter(r => r.result?.isCached === true);
+
+    if (cachedTables.length === 0) {
+      return; // キャッシュされたデータがない場合は何もしない
+    }
+
+    console.log('キャッシュデータを検出。バックグラウンドで再取得中...', cachedTables.map(r => r.tableName));
+
+    // バックグラウンドで最新データを取得
+    setTimeout(async () => {
+      try {
+        const promises = cachedTables.map(({ tableName }) =>
+          callGAS('getItems', App.state.userId, tableName, true)  // forceRefresh = true
+        );
+
+        const freshResults = await Promise.all(promises);
+
+        // UI更新前に現在のアクティブタブ状態を保存（非同期処理中にユーザーが移動した可能性を考慮）
+        const currentTab = document.querySelector('main > div[style*="display: block"]');
+        const savedTabId = currentTab ? currentTab.id : null;
+
+        // ボードタブの場合、表示中の個別ボードIDも保存
+        let savedBoardId = null;
+        if (savedTabId === 'tab-board') {
+          const activeBoard = document.querySelector('#tab-board > div[style*="display: block"]');
+          if (activeBoard && activeBoard.id) {
+            savedBoardId = activeBoard.id.replace('tab-board-', '');
+          }
+        }
+
+        // 左ナビのアクティブ状態を保存
+        const activeNavLink = document.querySelector('nav.left a.active');
+        const savedNavDataBoardId = activeNavLink ? activeNavLink.dataset.boardId : null;
+        const savedNavId = activeNavLink ? activeNavLink.id : null;
+
+        // データを更新
+        cachedTables.forEach(({ tableName }, index) => {
+          const freshData = freshResults[index]?.data || freshResults[index] || [];
+          App.state.data[tableName] = freshData;
+        });
+
+        // UIを更新
+        if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+          App.utils.navigation.renderBoardsNavigation();
+        }
+
+        // 左ナビのアクティブ状態を復元
+        if (savedNavDataBoardId) {
+          const navLink = document.querySelector(`a[data-board-id="${savedNavDataBoardId}"]`);
+          if (navLink) navLink.classList.add('active');
+        } else if (savedNavId) {
+          const navLink = document.getElementById(savedNavId);
+          if (navLink) navLink.classList.add('active');
+        }
+
+        if (App.pages && App.pages.boards && App.pages.boards.initialize) {
+          App.pages.boards.initialize();
+        }
+
+        // ボードタブの表示状態を復元
+        if (savedTabId === 'tab-board' && savedBoardId) {
+          const boardContainer = document.getElementById('tab-board');
+          if (boardContainer) {
+            boardContainer.style.display = 'block';
+            // 全ての個別ボードを非表示にしてから対象を表示
+            Array.from(boardContainer.children).forEach(child => {
+              if (child.id && child.id.startsWith('tab-board-')) {
+                child.style.display = 'none';
+              }
+            });
+            const targetBoard = document.getElementById('tab-board-' + savedBoardId);
+            if (targetBoard) {
+              targetBoard.style.display = 'block';
+              // カンバンを再描画
+              if (App.pages.boards && App.pages.boards.renderKanban) {
+                App.pages.boards.renderKanban(savedBoardId);
+              }
+            }
+          }
+        }
+
+        console.log('バックグラウンド更新完了');
+      } catch (error) {
+        console.error('バックグラウンド更新エラー:', error);
+      }
+    }, 100); // 100ms後に実行（メインUIの表示を優先）
   }
 
   // グローバルショートカットキーの設定
@@ -243,17 +406,6 @@
   // ============================================
   // ヘルパー関数
   // ============================================
-  function formatDate(dateString) {
-    if (!dateString) return '-';
-    try {
-      const dt = new Date(dateString);
-      const offset = dt.getTimezoneOffset() * 60000;
-      const localDate = new Date(dt.getTime() - offset);
-      return localDate.toISOString().slice(0, 10);
-    } catch (e) {
-      return dateString;
-    }
-  }
 
   function formatDateTimeForDisplay(dateString) {
     if (!dateString) return '-';

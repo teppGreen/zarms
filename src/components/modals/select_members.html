@@ -64,8 +64,9 @@
                 // membersDataをロード
                 if (!App.state.data.members || App.state.data.members.length === 0) {
                     showLoading();
-                    callGAS('getItems', TABLE_NAMES.MEMBERS)
-                        .then(members => {
+                    callGAS('getItems', App.state.userId, TABLE_NAMES.MEMBERS)
+                        .then(result => {
+                            const members = result?.data || result || [];
                             App.state.data.members = members;
                             this.allMembers = members;
                             this.render();
