@@ -58,10 +58,19 @@
       ]);
 
       // App.stateに保存
+      console.log('Boards fetched:', boards);
       App.state.data.boards = boards || [];
       App.state.data.members = members || [];
       App.state.data.tasks = tasks || [];
       App.state.data.directories = directories || [];
+
+      // ナビゲーションとボードページを更新
+      if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+        App.utils.navigation.renderBoardsNavigation();
+      }
+      if (App.pages && App.pages.boards && App.pages.boards.initialize) {
+        App.pages.boards.initialize();
+      }
 
       hideLoading();
     } catch (error) {
@@ -100,12 +109,29 @@
       App.state.data.tasks = tasks || [];
       App.state.data.directories = directories || [];
 
+      // ナビゲーションとボードページを更新
+      if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+        App.utils.navigation.renderBoardsNavigation();
+      }
+      if (App.pages && App.pages.boards && App.pages.boards.initialize) {
+        App.pages.boards.initialize();
+      }
+
       // 現在表示中のページを再描画
       const currentTab = document.querySelector('main > div[style*="display: block"]');
       if (currentTab && currentTab.id) {
-        const tabName = currentTab.id.replace('tab-', '');
-        if (App.pages[tabName] && App.pages[tabName].loadData) {
-          App.pages[tabName].loadData();
+        let tabName = currentTab.id.replace('tab-', '');
+
+        // ボードタブの場合はID抽出
+        if (tabName.startsWith('board-')) {
+          const boardId = tabName.replace('board-', '');
+          if (App.pages.boards && App.pages.boards.loadData) {
+            App.pages.boards.loadData(boardId);
+          }
+        } else {
+          if (App.pages[tabName] && App.pages[tabName].loadData) {
+            App.pages[tabName].loadData();
+          }
         }
       }
 
