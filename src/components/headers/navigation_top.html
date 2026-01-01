@@ -1,4 +1,4 @@
-<nav class="top surface-container">
+<nav class="top surface-container right-margin">
 
     <nav class="min">
         <button id="new-button" class="large circle primary"
@@ -115,68 +115,6 @@
                     case 'knowledges-nav': App.modals.new_knowledge.open(); break;
                     default: App.utils.header.toggleNewButtonDropdown(event);
                 }
-            },
-
-            /**
-             * 勤怠ボタンクリック（打刻）
-             */
-            handleTimetrackClick: function () {
-                showLoading();
-
-                // 現在のユーザーの最新の勤怠レコードを取得
-                callGAS('getItems', 'timetracks')
-                    .then(timetracks => {
-                        const currentUserEmail = templateVariables?.email;
-                        const currentUser = App.state.data.members.find(m => m.email === currentUserEmail);
-
-                        if (!currentUser) {
-                            alert('ユーザー情報が見つかりません');
-                            hideLoading();
-                            return;
-                        }
-
-                        // 最新の勤怠レコード（ended_atがnullのもの）を探す
-                        const activeTimetracks = timetracks.filter(t =>
-                            t.member_id === currentUser.id && !t.ended_at
-                        );
-
-                        if (activeTimetracks.length > 0) {
-                            // 終了打刻
-                            const activeRecord = activeTimetracks[0];
-                            const now = new Date().toISOString();
-
-                            callGAS('updateItem', 'timetracks', activeRecord.id, { ended_at: now })
-                                .then(() => {
-                                    hideLoading();
-                                    alert('退勤を記録しました');
-                                })
-                                .catch(error => {
-                                    hideLoading();
-                                    App.utils.error.handle(error);
-                                });
-                        } else {
-                            // 開始打刻
-                            const now = new Date().toISOString();
-                            const timetackData = {
-                                member_id: currentUser.id,
-                                started_at: now
-                            };
-
-                            callGAS('createItem', 'timetracks', timetackData)
-                                .then(() => {
-                                    hideLoading();
-                                    alert('出勤を記録しました');
-                                })
-                                .catch(error => {
-                                    hideLoading();
-                                    App.utils.error.handle(error);
-                                });
-                        }
-                    })
-                    .catch(error => {
-                        hideLoading();
-                        App.utils.error.handle(error);
-                    });
             },
 
             /**
@@ -479,12 +417,11 @@
                         }
 
                         if (matches) {
-                            const formattedDisplayId = formatDisplayId(config.tableName, item.display_id);
                             results.push({
                                 item: item,
                                 tableName: config.tableName,
                                 id: item.id,
-                                displayText: `[${config.tableName}] ${formattedDisplayId || item.id}: ${item.title || item.display_name || item.email || ''}`
+                                displayText: `[${config.tableName}] ${item.display_id || item.id}: ${item.title || item.display_name || item.email || ''}`
                             });
                         }
                     });

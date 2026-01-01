@@ -2,61 +2,194 @@
 // database.gs - データベース操作の抽象化
 // ============================================
 
+// ============================================
+// Caching Utility
+// ============================================
+const CacheManager = {
+    get: function (key, cachePublicRange) {
+        let cache;
+        if (cachePublicRange === `script`) {
+            cache = CacheService.getScriptCache();
+        } else if (cachePublicRange === `user`) {
+            cache = CacheService.getUserCache();
+        } else {
+            throw new Error(`Invalid cachePublicRange: ${cachePublicRange}`);
+        }
+        const cached = cache.get(key);
+        if (!cached) return null;
+        return JSON.parse(cached);
+    },
+    put: function (key, value, cachePublicRange, ttl = 21600) {
+        let cache;
+        if (cachePublicRange === `script`) {
+            cache = CacheService.getScriptCache();
+        } else if (cachePublicRange === `user`) {
+            cache = CacheService.getUserCache();
+        } else {
+            throw new Error(`Invalid cachePublicRange: ${cachePublicRange}`);
+        }
+        cache.put(key, JSON.stringify(value), ttl);
+    },
+    invalidate: function (key, cachePublicRange) {
+        let cache;
+        if (cachePublicRange === `script`) {
+            cache = CacheService.getScriptCache();
+        } else if (cachePublicRange === `user`) {
+            cache = CacheService.getUserCache();
+        } else {
+            throw new Error(`Invalid cachePublicRange: ${cachePublicRange}`);
+        }
+        cache.remove(key);
+    }
+};
+
+// ============================================
+// 汎用データ取得関数
+// ============================================
+
 /**
- * スプレッドシートオブジェクトを取得します。
- * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} スプレッドシートオブジェクト
+ * データを取得します（キャッシュ機能付き）
+ * @param {string} userId - ユーザーID
+ * @param {string} tableName - テーブル名
+ * @param {boolean} forceRefresh - キャッシュを無視して強制的に再取得するか
+ * @returns {Object} { data: データ配列, isCached: キャッシュから取得したか }
  */
-function getSpreadsheet() {
-    return SpreadsheetApp.openById(SPREADSHEET_ID);
+function getItems(userId, tableName, forceRefresh = false) {
+    const cacheKey = `user_items_${tableName}`;
+
+    if (!forceRefresh) {
+        const cachePublicRange = `script`;
+        const cached = CacheManager.get(cacheKey, cachePublicRange);
+        if (cached) {
+            return { data: cached, isCached: true };
+        }
+    }
+
+    // handleDatabaseProcessは { data: ..., isCached: ... } を返す
+    const result = handleDatabaseProcess(userId, tableName, 'select', {}, null, true);
+
+    // resultからdataを取得（後方互換性のため、resultが配列の場合も考慮）
+    const data = result?.data || result || [];
+
+    // Cache the result
+    CacheManager.put(cacheKey, data, 'script');
+
+    return { data: data, isCached: false };
+}
+
+// ============================================
+// メインデータベース処理関数
+// ============================================
+
+/**
+ * データベース処理を実行します（キャッシュ機能付き）
+ * @param {string} userId - ユーザーID
+ * @param {string} tableName - テーブル名
+ * @param {string} operation - 操作種別（select, insert, bulkinsert, update, remove）
+ * @param {Object} dataObject - データオブジェクト（クエリまたはデータ）
+ * @param {string} remark - ログ用の備考
+ * @param {boolean} forceRefresh - キャッシュを無視して強制的に再取得するか（selectのみ）
+ * @returns {Object|Array} 操作結果（selectの場合はキャッシュ情報も含む）
+ */
+function handleDatabaseProcess(userId, tableName, operation, dataObject, remark, forceRefresh = false) {
+    // キャッシュキーの生成（tableName + dataObject を結合）
+    const cacheKey = `db_${tableName}_${JSON.stringify(dataObject)}`;
+    const cachePublicRange = 'script';
+
+    // selectかつforceRefreshがfalseの場合、キャッシュを使用
+    if (operation === 'select' && !forceRefresh) {
+        const cached = CacheManager.get(cacheKey, cachePublicRange);
+        if (cached) {
+            return { data: cached, isCached: true };
+        }
+    }
+
+    const lock = LockService.getScriptLock();
+    lock.waitLock(60000);
+
+    try {
+        const ss = getSpreadsheet();
+        const targetSheet = getSheet(ss, tableName);
+        const logSheet = getSheet(ss, TABLE_NAMES.LOGS);
+        let result;
+
+        // 操作の実行
+        switch (operation) {
+            case 'select':
+                result = select(targetSheet, dataObject);
+                // selectの場合は常にキャッシュを作成
+                CacheManager.put(cacheKey, result, cachePublicRange);
+                return { data: result, isCached: false };
+            case 'insert':
+                result = insert(userId, targetSheet, dataObject);
+                createLog(userId, tableName, logSheet, operation, dataObject, remark);
+                // insert時は関連するselectキャッシュを無効化
+                invalidateTableCache(tableName);
+                break;
+            case 'bulkinsert':
+                result = bulkInsert(userId, targetSheet, dataObject);
+                createLog(userId, tableName, logSheet, operation, dataObject, remark);
+                // bulkinsert時は関連するselectキャッシュを無効化
+                invalidateTableCache(tableName);
+                break;
+            case 'update':
+                result = update(userId, targetSheet, dataObject);
+                createLog(userId, tableName, logSheet, operation, dataObject, remark);
+                // update時は関連するselectキャッシュを無効化
+                invalidateTableCache(tableName);
+                break;
+            case 'remove':
+                result = remove(targetSheet, dataObject);
+                createLog(userId, tableName, logSheet, operation, dataObject, remark);
+                // remove時は関連するselectキャッシュを無効化
+                invalidateTableCache(tableName);
+                break;
+        }
+
+        return result;
+    } finally {
+        lock.releaseLock();
+    }
 }
 
 /**
- * シート名からシートオブジェクトを取得します。
- * @param {string} sheetName - シート名
- * @returns {GoogleAppsScript.Spreadsheet.Sheet} シートオブジェクト
+ * 指定されたテーブルに関連するすべてのキャッシュを無効化
+ * @param {string} tableName - テーブル名
  */
-function getSheet(sheetName) {
-    const ss = getSpreadsheet();
+function invalidateTableCache(tableName) {
+    // 注意: CacheServiceには特定のプレフィックスで始まるキーを検索する機能がないため
+    // ここでは個別に無効化する必要があります
+    // より高度な実装が必要な場合は、キャッシュキーのリストを別途管理する必要があります
+    const cachePublicRange = 'script';
+    const generalCacheKey = `user_items_${tableName}`;
+    CacheManager.invalidate(generalCacheKey, cachePublicRange);
+}
+
+// ============================================
+// データベース処理の前工程で使用するヘルパー関数
+// ============================================
+
+function getSpreadsheet() {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    return ss;
+}
+
+function getSheet(ss, sheetName) {
     const sheet = ss.getSheetByName(sheetName);
-    if (!sheet) {
-        throw new Error(`シートが見つかりません: ${sheetName}`);
-    }
     return sheet;
 }
 
-/**
- * シートのヘッダー行を取得します。
- * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - シートオブジェクト
- * @returns {string[]} ヘッダーの配列
- */
 function getHeaders(sheet) {
     return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 }
 
-/**
- * シートからデータを条件に基づいて取得します (SSSQL.select wrapper)
- * @param {string} sheetName - シート名
- * @param {Object} query - クエリオブジェクト (columns, where, groupBy, orderBy)
- * @param {Object} [options] - オプション (withRowNum, asArray)
- * @returns {Object[]} データのオブジェクト配列
- */
-
-/**
- * UUIDを生成します。
- * @returns {string} UUID
- */
 function generateUuid() {
-    return Utilities.getUuid();
+    const uuid = Utilities.getUuid();
+    console.log('Generated UUID: ' + uuid);
+    return uuid;
 }
 
-/**
- * 指定されたカラムの次のシリアル番号を取得します。
- * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - シートオブジェクト
- * @param {string} columnName - カラム名
- * @returns {number} 次のシリアル番号
- */
 function getNextSerial(sheet, columnName) {
-    // SSSQLを使用して最大値を取得
     const result = SSSQL.select(sheet, {
         groupBy: [
             [],
@@ -72,130 +205,83 @@ function getNextSerial(sheet, columnName) {
     return 1;
 }
 
-/**
- * 新規データを準備します（ID生成、監査情報付与）
- * @param {string} userId - 操作ユーザーID
- * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - 対象シート
- * @param {Object} dataObject - 元データ
- * @returns {Object} 準備されたデータオブジェクト
- */
 function prepareNewData(userId, sheet, dataObject) {
     const headers = getHeaders(sheet);
     const newData = { ...dataObject };
 
-    // 監査情報の付与
     const now = new Date().toISOString();
-    newData['created_by'] = userId;
-    newData['created_at'] = now;
-    // ID生成ロジック
-    // 1. UUID (PK) の生成
-    // 'id'カラムが存在し、かつ値が未設定の場合
-    if (headers.includes('id') && !newData['id']) {
-        newData['id'] = generateUuid();
-    }
-
-    // 2. Serial ID (display_id) の生成
-    // 'display_id' カラムが存在する場合
-    if (headers.includes('display_id') && !newData['display_id']) {
-        newData['display_id'] = getNextSerial(sheet, 'display_id');
-    }
+    if (headers.includes(`created_by`)) newData[`created_by`] = userId;
+    if (headers.includes(`created_at`)) newData[`created_at`] = now;
+    if (headers.includes(`updated_by`)) newData[`updated_by`] = userId;
+    if (headers.includes(`updated_at`)) newData[`updated_at`] = now;
+    if (headers.includes(`id`)) newData[`id`] = generateUuid();
+    if (headers.includes(`display_id`)) newData[`display_id`] = getNextSerial(sheet, `display_id`);
 
     return newData;
 }
 
-// ============================================
-// SSSQL を使用した CRUD 操作
-// ============================================
+function prepareUpdateData(userId, sheet, dataObject) {
+    const headers = getHeaders(sheet);
+    const newData = { ...dataObject };
 
-function select(sheetName, query, options) {
-    const sheet = getSheet(sheetName);
-    return SSSQL.select(sheet, query, options);
+    const now = new Date().toISOString();
+    if (headers.includes(`updated_by`)) newData[`updated_by`] = userId;
+    if (headers.includes(`updated_at`)) newData[`updated_at`] = now;
+
+    return newData;
 }
 
-/**
- * シートに単一のデータを挿入します (SSSQL.insert wrapper)
- * @param {string} userId - 操作ユーザーID
- * @param {string} sheetName - シート名
- * @param {Object} record - 挿入するデータ
- * @returns {Object} 挿入されたデータ
- */
-function insert(userId, sheetName, record) {
-    const sheet = getSheet(sheetName);
-    const headers = getHeaders(sheet);
-
-    // データの準備（ID生成、監査情報付与）
-    const newData = prepareNewData(userId, sheetName, record, sheet);
-
-    // SSSQLを使用してデータを挿入
-    const result = SSSQL.insert(sheet, newData);
-
+function createLog(userId, tableName, sheet, operation, dataObject, remark) {
+    const newData = {
+        id: generateUuid(),
+        operation_type_key: operation.toUpperCase(),
+        table_name: tableName,
+        record_id: dataObject.id || ``,
+        data: JSON.stringify(dataObject),
+        remark: remark || ``,
+    };
+    const result = insert(userId, sheet, newData);
     return result;
 }
 
-/**
- * シートに複数のデータを一括挿入します (SSSQL.bulkInsert wrapper)
- * @param {string} userId - 操作ユーザーID
- * @param {string} sheetName - シート名
- * @param {Object[]} records - 挿入するデータの配列
- * @returns {Object[]} 挿入されたデータの配列
- */
-function bulkInsert(userId, sheetName, records) {
-    const sheet = getSheet(sheetName);
+// ============================================
+// CRUD操作
+// ============================================
 
-    // 各データの準備（ID生成、監査情報付与）
+function select(sheet, query) {
+    const result = SSSQL.select(sheet, query);
+    return result;
+}
+
+function insert(userId, sheet, record) {
+    const preparedData = prepareNewData(userId, sheet, record);
+    const result = SSSQL.insert(sheet, preparedData);
+    return result;
+}
+
+function bulkInsert(userId, sheet, records) {
     const preparedData = records.map(record =>
         prepareNewData(userId, sheet, record)
     );
-
-    // SSSQLを使用してデータを一括挿入
     const result = SSSQL.bulkInsert(sheet, preparedData);
-
     return result;
 }
 
-/**
- * 条件に一致するデータを更新します (SSSQL.update wrapper)
- * @param {string} userId - 操作ユーザーID
- * @param {string} sheetName - シート名
- * @param {Object} query - クエリオブジェクト (set, where)
- * @returns {Object[]} 更新結果 (before/after のペア)
- */
-function update(userId, sheetName, query) {
-    const sheet = getSheet(sheetName);
-
-    // 監査情報の付与 (query.set に追加)
-    const now = new Date().toISOString();
-    const updateSet = { ...query.set };
-    updateSet['updated_by'] = userId;
-    updateSet['updated_at'] = now;
-
-    const newQuery = { ...query, set: updateSet };
-
-    // SSSQLを使用してデータを更新
+function update(userId, sheet, query) {
+    let newSet = { ...query.set };
+    newSet = prepareUpdateData(userId, sheet, query.set);
+    const newQuery = { ...query, set: newSet };
     const result = SSSQL.update(sheet, newQuery);
-
     return result;
 }
 
-/**
- * 条件に一致するデータを削除します (SSSQL.remove wrapper)
- * @param {string} userId - 操作ユーザーID
- * @param {string} sheetName - シート名
- * @param {Object} query - クエリオブジェクト (where)
- * @returns {Object[]} 削除されたデータ
- */
-function remove(userId, sheetName, query) {
-    const sheet = getSheet(sheetName);
-
-    // SSSQLを使用してデータを削除
-    const deletedRecords = SSSQL.remove(sheet, query);
-
-    return deletedRecords;
+function remove(sheet, query) {
+    const result = SSSQL.remove(sheet, query);
+    return result;
 }
 
 // ============================================
-// ヘルパー関数: JSONシリアライズ対策
-// (Dateオブジェクトを自動的にISO文字列に変換する)
+// JSONシリアライズ対策
 // ============================================
 function sanitizeForClient(data) {
     if (data === null || data === undefined) {
