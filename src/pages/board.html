@@ -127,6 +127,16 @@
                         boards: kanbanData,
                         dragBoards: false,
                         dragItems: true,
+                        itemAddOptions: {
+                            enabled: true,
+                            content: '+',
+                            class: 'kanban-title-button btn-block',
+                            footer: false,
+                            buttonClick: function (el, boardId) {
+                                console.log('Add item button clicked for board:', boardId);
+                                // ココに処理を記述
+                            }
+                        },
                         click: function (el) {
                             // タスクカードクリック時にモーダルを開く
                             const taskId = el.dataset.eid;
@@ -146,17 +156,17 @@
                     // ここからDOM操作
                     const kanbanBoards = container.querySelectorAll('.kanban-board');
                     kanbanBoards.forEach(board => {
-                        board.classList.add('no-padding', 'surface', 'no-round', 'no-elevate');
+                        board.classList.add('no-padding', 'surface', 'no-round', 'no-elevate', 'large-height');
                     });
 
                     const kanbanBoardHeaders = container.querySelectorAll('.kanban-board-header');
                     kanbanBoardHeaders.forEach(header => {
-                        header.classList.add('small-padding', 'no-round');
+                        header.classList.add('small-padding', 'background', 'no-round');
                     });
 
                     const kanbanDrags = container.querySelectorAll('.kanban-drag');
                     kanbanDrags.forEach(drag => {
-                        drag.classList.add('small-padding', 'no-round', 'scroll');
+                        drag.classList.add('small-padding', 'surface-container', 'no-round', 'scroll');
                     });
 
                     const kanbanItems = container.querySelectorAll('.kanban-item');
@@ -174,7 +184,16 @@
                             // 要素を置換
                             item.parentNode.replaceChild(article, item);
                             // クラスを追加
-                            article.classList.add('no-margin', 'top-margin');
+                            article.classList.add('no-margin', 'top-margin', 'surface');
+
+                            // クリックイベントを追加
+                            article.addEventListener('click', function () {
+                                const taskId = this.dataset.eid;
+                                console.log('[Kanban] Task clicked (custom):', taskId);
+                                if (taskId && App.modals.taskDetail) {
+                                    App.modals.taskDetail.open(taskId);
+                                }
+                            });
                         }
                     });
 
