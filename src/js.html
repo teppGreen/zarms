@@ -109,10 +109,17 @@
       }
     }
     // メンバー詳細モーダル
+    // 注: 現在のコードベースでは App.overlays.memberDetail として参照されている箇所もあります
+    // TODO: 命名規則を統一する必要があります（App.modals vs App.overlays）
     else if (params.modal === 'member-detail' && params.member_id) {
       if (App.modals.memberDetail && App.modals.memberDetail.open) {
         setTimeout(() => {
           App.modals.memberDetail.open(params.member_id, true); // trueでURL更新をスキップ
+        }, INITIAL_DELAY_MS);
+      } else if (App.overlays.memberDetail && App.overlays.memberDetail.open) {
+        // フォールバック: overlays名前空間も確認
+        setTimeout(() => {
+          App.overlays.memberDetail.open(params.member_id, true);
         }, INITIAL_DELAY_MS);
       }
     }
@@ -151,8 +158,13 @@
         // skipUrlUpdate=trueでURL更新をスキップ
         if (modalId === 'modal-detail-task' && App.modals.taskDetail && App.modals.taskDetail.close) {
           App.modals.taskDetail.close(true); // trueでURL更新をスキップ
-        } else if (modalId === 'modal-detail-member' && App.modals.memberDetail && App.modals.memberDetail.close) {
-          App.modals.memberDetail.close(true); // trueでURL更新をスキップ
+        } else if (modalId === 'modal-detail-member') {
+          // 注: メンバー詳細は App.modals または App.overlays として参照されている可能性があります
+          if (App.modals.memberDetail && App.modals.memberDetail.close) {
+            App.modals.memberDetail.close(true);
+          } else if (App.overlays.memberDetail && App.overlays.memberDetail.close) {
+            App.overlays.memberDetail.close(true);
+          }
         } else {
           // フォールバック: ui関数（Beer CSSのモーダルトグル）またはネイティブのclose()を使用
           if (typeof ui === 'function') {
@@ -662,8 +674,14 @@
     getTabIdFromParams: function(params) {
       if (!params.tab) return null;
       
-      if (params.tab === 'board' && params.board_id) {
+      // boardタブの場合、board_idが有効な値であることを確認
+      if (params.tab === 'board' && params.board_id && params.board_id !== '') {
         return 'board-' + params.board_id;
+      }
+      
+      // board_idが無効な場合はnullを返す
+      if (params.tab === 'board' && (!params.board_id || params.board_id === '')) {
+        return null;
       }
       
       return params.tab;
