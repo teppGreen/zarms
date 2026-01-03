@@ -1,8 +1,7 @@
 <nav class="top surface-container right-margin">
 
     <nav class="min">
-        <button id="new-button" class="large circle primary"
-            onclick="App.utils.header.toggleNewButtonDropdown(event)">
+        <button id="new-button" class="large circle primary" onclick="App.utils.header.toggleNewButtonDropdown(event)">
             <i>add</i>
         </button>
         <menu id="new-button-dropdown" class="bottom transparent no-wrap">
@@ -39,34 +38,12 @@
 
     <button class="circle large transparent">
         <i>apps</i>
-        <menu class="left no-wrap padding">
-            <div class="grid no-space">
-                <div class="s4 center-align">
-                    <a class="button transparent circle large" href="https://github.com/teppgreen/zarms">
-                        <i>link</i>
-                    </a>
+        <menu id="apps-menu" class="left no-wrap no-padding">
+            <article class="background small-margin no-padding large-height scroll">
+                <div id="apps-grid" class="grid tiny-space">
+                    <!-- リンクはloadAllData実行時に動的に生成されます -->
                 </div>
-                <div class="s4 center-align">
-                    <a class="button transparent circle large" href="https://github.com/teppgreen/zarms">
-                        <i>link</i>
-                    </a>
-                </div>
-                <div class="s4 center-align">
-                    <a class="button transparent circle large" href="https://github.com/teppgreen/zarms">
-                        <i>link</i>
-                    </a>
-                </div>
-                <div class="s4 center-align">
-                    <a class="button transparent circle large" href="https://github.com/teppgreen/zarms">
-                        <i>link</i>
-                    </a>
-                </div>
-                <div class="s4 center-align">
-                    <a class="button transparent circle large" href="https://github.com/teppgreen/zarms">
-                        <i>link</i>
-                    </a>
-                </div>
-            </div>
+            </article>
         </menu>
     </button>
 </nav>
@@ -82,6 +59,41 @@
                 if (dropdown) {
                     dropdown.classList.remove('show');
                 }
+            },
+
+            /**
+             * linksテーブルのデータからアプリリンクを動的に生成します
+             */
+            renderAppLinks: function () {
+                const appsGrid = document.getElementById('apps-grid');
+                if (!appsGrid) {
+                    console.warn('apps-grid element not found');
+                    return;
+                }
+
+                // App.state.data.linksからデータを取得
+                const links = App.state.data.links || [];
+
+                if (links.length === 0) {
+                    appsGrid.innerHTML = '<div class="s12 center-align"><p class="small-text">リンクがありません</p></div>';
+                    return;
+                }
+
+                // リンクボタンを生成
+                const linksHtml = links.map(link => {
+
+                    return `
+                        <div class="s4 center-align small-margin">
+                            <button class="transparent small-round vertical" onclick="window.open('${link.url}')">
+                                <img class="responsive" src="https:/\/t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${link.url}&size=128"
+                                    alt="${link.name}">
+                                <span>${link.name}</span>
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+
+                appsGrid.innerHTML = linksHtml;
             },
 
             /**

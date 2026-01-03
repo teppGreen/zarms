@@ -23,30 +23,96 @@
 <body class="light">
     <main class="center-align middle-align surface-container">
         <article id="register-article" class="background no-elevate large-padding large-margin">
+            <!-- ローディング画面 -->
+            <div id="step-loading" class="grid medium-height right">
+                <div class="s12 m12 l6 large-padding large-width left-align">
+                    <div class="row tiny-space">
+                        <img class="large" src="https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8"
+                            alt="ZEN Boards">
+                    </div>
+                    <h2 class="bold small">サインイン</h2>
+                    <p>タスク管理ツール「ZEN Boards」へようこそ！<br>大学のGoogle アカウントを使用してください。</p>
+                </div>
+                <div class="s12 m12 l6 large-padding large-width left-align">
+                    <div class="row tiny-space">
+                        <i class="extra error-text"></i>
+                    </div>
+                    <p class="large-text bold">お待ちください</p>
+                    <p class="secondary-text">
+                        <i class="medium">help</i>
+                        <span>しばらく経っても画面が切り替わらない場合は、総務ユニットリーダーまでお問い合わせください。</span>
+                    </p>
+                    <div class="absolute right bottom large-padding">
+                        <nav>
+                            <button disabled class="primary extra">
+                                <progress class="circle small indeterminate"></progress>
+                                <span>次へ</span>
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ステップ0: アクセス権限エラー -->
+            <div id="step-access-error" class="grid medium-height right" style="display: none;">
+                <div class="s12 m12 l6 large-padding large-width left-align">
+                    <div class="row tiny-space">
+                        <img class="large" src="https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8"
+                            alt="ZEN Boards">
+                    </div>
+                    <h2 class="bold small">サインイン</h2>
+                    <p>タスク管理ツール「ZEN Boards」へようこそ！<br>大学のGoogle アカウントを使用してください。</p>
+                </div>
+                <div class="s12 m12 l6 large-padding large-width left-align">
+                    <div class="row tiny-space">
+                        <i class="extra error-text">lock</i>
+                    </div>
+                    <p class="large-text error-text bold">アクセス権限がありません</p>
+                    <p>ZEN Boardsは大学祭実行委員のみが使用できます。<br>大学のGoogle アカウント以外を使用することはできません。<br>間違いだと思われる場合は、総務ユニットリーダーまでお問い合わせください。</p>
+                    <p id="active-user-email" class="secondary-text small-text"></p>
+                    <div class="absolute right bottom large-padding">
+                        <nav>
+                            <button onclick="reloadPage(this)" class="primary extra">
+                                <i>refresh</i>
+                                <span>再読み込み</span>
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
             <!-- ステップ1: Slack URLの入力 -->
-            <div id="step-input" class="grid medium-height right">
+            <div id="step-input" class="grid medium-height right" style="display: none;">
                 <div class="s12 m12 l6 large-padding MEDIUM-width left-align">
                     <div class="row tiny-space">
                         <img class="large" src="https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8"
                             alt="ZEN Boards">
                     </div>
-                    <h2 class="bold small">ユーザー登録</h2>
-                    <p>タスク管理ツール「ZEN Boards」へようこそ！<br>利用を始めるには、ユーザー登録をしてください。</p>
+                    <h2 class="bold small">サインアップ</h2>
+                    <p>タスク管理ツール「ZEN Boards」へようこそ！<br>利用を始めるための準備をしましょう。</p>
                 </div>
                 <div class="s12 m12 l6 large-padding large-width left-align">
                     <div id="slack-profile-url-container" class="field label border">
                         <input type="url" id="slack-profile-url" value="https://zen-student.slack.com/team/"
                             onfocus="this.placeholder='https://zen-student.slack.com/team/U0123456789'"
                             onblur="this.placeholder=''">
-                        <label>あなたのSlackプロフィールURL</label>
+                        <label>あなたのSlack プロフィールURL</label>
                         <output>
                             パソコンで<a href="https://zen-student.slack.com/account/profile" tabindex="-1" target="_blank"
-                                class="link">Slackプロフィール</a>を開き、︙メニューからコピーしてください。
+                                class="link">Slack プロフィール</a>を開き、︙メニューからコピーしてください。
                         </output>
                     </div>
                     <div class="top-margin">
-                        <i class="small">contact_support</i>
-                        <span>不明点やうまくいかない場合は、総務ユニットリーダーまでお問い合わせください。</span>
+                        <label class="radio">
+                            <input type="radio" id="terms-agreement">
+                            <span><a class="link" href="https://sites.google.com/student.zen.ac.jp/zen-boards/terms" target="_blank">利用規約</a>に同意する<span>
+                        </label>
+                    </div>
+                    <div class="">
+                        <p class="secondary-text">
+                            <i class="medium">help</i>
+                            <span>問題が解決しない場合は、総務ユニットリーダーまでお問い合わせください。</span>
+                        </p>
                     </div>
                     <div class="absolute right bottom large-padding">
                         <nav>
@@ -65,8 +131,8 @@
                         <img class="large" src="https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8"
                             alt="ZEN Boards">
                     </div>
-                    <h2 class="bold small">ユーザー登録</h2>
-                    <p>タスク管理ツール「ZEN Boards」へようこそ！<br>利用を始めるには、ユーザー登録をしてください。</p>
+                    <h2 class="bold small">サインアップ</h2>
+                    <p>タスク管理ツール「ZEN Boards」へようこそ！<br>利用を始めるための準備をしましょう。</p>
                 </div>
                 <div class="s12 m12 l6 large-padding large-width left-align">
                     <div>
@@ -94,15 +160,15 @@
                         <img class="large" src="https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8"
                             alt="ZEN Boards">
                     </div>
-                    <h2 class="bold small">ユーザー登録</h2>
-                    <p>タスク管理ツール「ZEN Boards」へようこそ！<br>利用を始めるには、ユーザー登録をしてください。</p>
+                    <h2 class="bold small">サインアップ</h2>
+                    <p>タスク管理ツール「ZEN Boards」へようこそ！<br>利用を始めるための準備をしましょう。</p>
                 </div>
                 <div class="s12 m12 l6 large-padding large-width left-align">
                     <div class="row tiny-space">
                         <i class="extra error-text">error</i>
                     </div>
-                    <p class="large-text bold">あなたが誰なのかわかりませんでした</p>
-                    <p>あなたのSlackプロフィールURLを正しく入力してください。<br>再度試してもうまくいかない場合は、総務ユニットリーダーまでお問い合わせください。</p>
+                    <p class="large-text error-text bold">あなたが誰なのかわかりませんでした</p>
+                    <p>あなたのSlack プロフィールURLを正しく入力してください。<br>再度試してもうまくいかない場合は、総務ユニットリーダーまでお問い合わせください。</p>
                     <p class="secondary-text small-text">
                         入力されたURL: <a href="" target="_blank" tabindex="-1" id="error-url"></a><br>
                         正しいURLの例: https://zen-student.slack.com/team/U0123456789
@@ -124,7 +190,7 @@
                     src="https://docs.google.com/presentation/d/1OjZrQfKTWvSnDAzBrgWUN0oqtLJqKBN2_6zjIrrwIxA/preview"
                     style="width: 100%; height: 100%; border: none;"></iframe>
                 <div class="absolute center bottom large-padding large-margin">
-                    <button onclick="reloadPage(this)" class="large-margin primary large-elevate extra">
+                    <button onclick="reloadPage(this)" class="large-margin large-width primary large-elevate extra">
                         <i>play_circle</i>
                         <span class="large-text bold">利用を始める</span>
                     </button>
@@ -134,9 +200,12 @@
     </main>
 
     <script>
+        const { activeUserEmail, urlParams } = <?!= JSON.stringify(templateVariables) ?>;
+
         const SLACK_PROFILE_URL_REGEX = /^https:\/\/zen-student\.slack\.com\/team\/U0[A-Z1-9]{9}$/;
-        const DEFAULT_HELPER_TEXT = 'パソコンで<a href="https://zen-student.slack.com/account/profile" tabindex="-1" target="_blank" class="link">Slackプロフィール</a>を開き、︙メニューからコピーしてください。';
-        const ERROR_HELPER_TEXT = 'URLの形式が間違っています。パソコンで<a href="https://zen-student.slack.com/account/profile" tabindex="-1" target="_blank" class="link">Slackプロフィール</a>を開き、︙メニューからコピーしてください。';
+        const DEFAULT_HELPER_TEXT = 'パソコンで<a href="https://zen-student.slack.com/account/profile" tabindex="-1" target="_blank" class="link">Slack プロフィール</a>を開き、︙メニューからコピーしてください。';
+        const REQUIRED_HELPER_TEXT = `この項目は必須入力です。`;
+        const ERROR_HELPER_TEXT = `URLの形式が間違っています。`;
 
         let foundUser = null;
 
@@ -157,9 +226,51 @@
         // Initialize listeners
         setupInputListeners();
 
+        // ページ読み込み時にアクセス権限チェックを実行
+        window.onload = checkAccess();
+
+        function checkAccess() {
+            google.script.run
+                .withSuccessHandler(function () {
+                    // スプレッドシートのアクセス権限がある
+                    google.script.run
+                        .withSuccessHandler(function (activeUser) {
+                            google.script.run
+                                .withSuccessHandler(function (html) {
+                                    document.open();
+                                    document.write(html);
+                                    document.close();
+                                })
+                                .withFailureHandler(function (error) {
+                                    console.error("loadMainApp failed:", error);
+                                })
+                                .loadMainApp(activeUser, urlParams);
+                        })
+                        .withFailureHandler(function (error) {
+                            showInputStep();
+                        })
+                        .getMemberByEmail(activeUserEmail);
+                })
+                .withFailureHandler(function (error) {
+                    // アクセス失敗 -> ステップ0 (エラー) を表示
+                    console.error("Access check failed:", error);
+                    showAccessErrorStep();
+                })
+                .getSpreadsheet();
+        }
+
         function showStep(id) {
             const steps = document.querySelectorAll('#register-article > div');
             steps.forEach(step => step.style.display = step.id === id ? '' : 'none');
+        }
+
+        function showAccessErrorStep() {
+            document.getElementById('active-user-email').innerHTML = `
+                <span class="secondary-text small-text">
+                    サインイン中のアカウント: <a target="_blank" href="https://myaccount.google.com/?authuser=${activeUserEmail}">${activeUserEmail}</a><br>
+                    サインイン可能なドメイン: student.zen.ac.jp または zen.ac.jp
+                </span>`;
+            showStep('step-access-error');
         }
 
         function showInputStep(retry = false) {
@@ -207,9 +318,15 @@
         }
 
         function searchUser() {
+            const termsAgreement = document.getElementById('terms-agreement');
             const input = document.getElementById('slack-profile-url');
             const slackUrl = input.value;
             const output = input.parentNode.querySelector('output');
+
+            if (!termsAgreement.checked) {
+                alert('利用規約に同意してください');
+                return;
+            }
 
             if (!slackUrl) {
                 input.parentNode.classList.add('invalid');

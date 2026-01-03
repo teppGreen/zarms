@@ -3,19 +3,22 @@
 // ============================================
 
 const scriptProperties = PropertiesService.getScriptProperties();
+const FAVICON_FILE_ID = scriptProperties.getProperty('FAVICON_FILE_ID');
 let SPREADSHEET_ID = scriptProperties.getProperty('SPREADSHEET_ID');
 if (!SPREADSHEET_ID) {
-    try {
-        SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
-    } catch (e) {
-        console.warn('Failed to get active spreadsheet ID. Please set SPREADSHEET_ID in Script Properties.', e);
-    }
+  try {
+    SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
+  } catch (e) {
+    console.warn('Failed to get active spreadsheet ID. Please set SPREADSHEET_ID in Script Properties.', e);
+  }
 }
 
 const TABLE_NAMES = {
   LOGS: 'logs',
   BOARDS: 'boards',
+  COMMENTS: 'comments',
   DIRECTORIES: 'directories',
+  LINKS: 'links',
   MEMBERS: 'members',
   MEMBER_DIRECTORY_ASSIGNMENTS: 'member_directory_assignments',
   TASKS: 'tasks',
