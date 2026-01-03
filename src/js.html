@@ -87,10 +87,20 @@
     // タスク詳細モーダル
     if (params.modal === 'task-detail' && params.task_id) {
       if (App.modals.taskDetail && App.modals.taskDetail.open) {
-        // データが読み込まれるまで少し待つ
-        setTimeout(() => {
-          App.modals.taskDetail.open(params.task_id, true); // trueでURL更新をスキップ
-        }, 500);
+        // データが読み込まれるまで少し待つ、またはデータが利用可能になるまでリトライ
+        const attemptOpen = (retries = 0) => {
+          const boardTasks = App.pages.boards?.currentBoardTasks || [];
+          const task = boardTasks.find(t => t.id === params.task_id);
+          
+          if (task || retries >= 10) {
+            // タスクが見つかったか、リトライ回数上限に達した場合は開く
+            App.modals.taskDetail.open(params.task_id, true); // trueでURL更新をスキップ
+          } else {
+            // タスクが見つからない場合は少し待ってリトライ
+            setTimeout(() => attemptOpen(retries + 1), 200);
+          }
+        };
+        setTimeout(() => attemptOpen(), 500);
       }
     }
     // メンバー詳細モーダル
@@ -127,10 +137,31 @@
       }
       
       // モーダルの処理
-      // 既存のモーダルを全て閉じる
+      // 既存のモーダルを全て閉じる（各モーダルのcloseメソッドを使用）
       const openModals = document.querySelectorAll('dialog[open]');
       openModals.forEach(modal => {
-        modal.close();
+        const modalId = modal.id;
+        
+        // モーダルIDからモーダルオブジェクトを取得
+        if (modalId === 'modal-detail-task' && App.modals.taskDetail && App.modals.taskDetail.close) {
+          // URLを更新しないように、一時的にApp.utils.urlを無効化
+          const originalUpdateParams = App.utils.url.updateParams;
+          App.utils.url.updateParams = function() {}; // 何もしない
+          App.modals.taskDetail.close();
+          App.utils.url.updateParams = originalUpdateParams; // 復元
+        } else if (modalId === 'modal-detail-member' && App.modals.memberDetail && App.modals.memberDetail.close) {
+          const originalUpdateParams = App.utils.url.updateParams;
+          App.utils.url.updateParams = function() {};
+          App.modals.memberDetail.close();
+          App.utils.url.updateParams = originalUpdateParams;
+        } else {
+          // フォールバック: 通常の閉じる処理
+          if (typeof ui === 'function') {
+            ui(`#${modalId}`);
+          } else {
+            modal.close();
+          }
+        }
       });
       
       // パラメータにモーダルが指定されている場合は開く
