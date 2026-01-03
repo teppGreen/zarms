@@ -1,6 +1,5 @@
-<!-- jKanban ライブラリの読み込み -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jkanban@1.3.1/dist/jkanban.min.css">
-<script src="https://cdn.jsdelivr.net/npm/jkanban@1.3.1/dist/jkanban.min.js"></script>
+<!-- SortableJS ライブラリの読み込み -->
+<script src="https:\/\/cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <!-- ボードページのコンテナ（動的に生成される） -->
 <div id="tab-board" style="display: none;">
     <!-- 各ボードのタブが動的に生成される -->
@@ -10,10 +9,10 @@
     (function () {
         // 各ボードのページロジックを App.pages に登録
         App.pages.boards = {
-            kanbanInstances: {}, // jKanban インスタンスを保持
+            sortableInstances: {}, // SortableJS インスタンスを保持
             currentBoardId: null, // 現在表示中のボードID
 
-            // ステータスキーとjKanbanボードIDのマッピング
+            // ステータスキーとカラムIDのマッピング
             statusMapping: {
                 'draft-todo': 'TODO',
                 'in-progress': 'IN_PROGRESS',
@@ -48,10 +47,12 @@
                     pageDiv.style.display = 'none';
 
                     pageDiv.innerHTML = `
-                        <nav class="small-margin row align-center">
-                            <h5 class="bold max">${escapeHtml(board.name || '')}</h5>
+                        <nav id="board-tab-header-${board.id}" class="small-margin row">
+                            <h3 class="bold small">${escapeHtml(board.name)}</h5>
                             <div class="max"></div>
-                            <button class="border circle"><i>star</i></button>
+                            <button class="border circle">
+                                <i>star</i>
+                            </button>
                         </nav>
                         <div id="kanban-canvas-${board.id}" class="top-margin"></div>
                     `;
@@ -77,165 +78,173 @@
                 const tasks = App.state.data.tasks || [];
                 const boardTasks = tasks.filter(task => task.board_id === boardId);
 
-                // タスクをステータスごとに分類
-                const draftTodoTasks = boardTasks.filter(t => ['DRAFT', 'TODO'].includes(t.task_status_key));
-                const inProgressTasks = boardTasks.filter(t => t.task_status_key === 'IN_PROGRESS');
-                const inReviewTasks = boardTasks.filter(t => t.task_status_key === 'IN_REVIEW');
-                const doneTasks = boardTasks.filter(t => t.task_status_key === 'DONE');
-
-                // jKanban用のデータ構造を構築
-                // kanban-boardのclassに "small-padding surface" を追加
-                const kanbanData = [
+                const columns = [
                     {
                         id: 'draft-todo',
                         title: '未着手',
-                        class: '',
-                        item: draftTodoTasks.map(task => this.createTaskCard(task))
+                        filter: (t) => ['DRAFT', 'TODO'].includes(t.task_status_key)
                     },
                     {
                         id: 'in-progress',
                         title: '進行中',
-                        class: '',
-                        item: inProgressTasks.map(task => this.createTaskCard(task))
+                        filter: (t) => t.task_status_key === 'IN_PROGRESS'
                     },
                     {
                         id: 'in-review',
                         title: '確認中',
-                        class: '',
-                        item: inReviewTasks.map(task => this.createTaskCard(task))
+                        filter: (t) => t.task_status_key === 'IN_REVIEW'
                     },
                     {
                         id: 'done',
                         title: '完了',
-                        class: '',
-                        item: doneTasks.map(task => this.createTaskCard(task))
+                        filter: (t) => t.task_status_key === 'DONE'
                     }
                 ];
 
                 const containerId = `kanban-canvas-${boardId}`;
                 const container = document.getElementById(containerId);
 
-                if (container) {
-                    container.innerHTML = '';
-
-                    const self = this;
-
-                    // jKanbanインスタンスを作成
-                    const kanban = new jKanban({
-                        element: `#${containerId}`,
-                        responsivePercentage: true,
-                        boards: kanbanData,
-                        dragBoards: false,
-                        dragItems: true,
-                        itemAddOptions: {
-                            enabled: true,
-                            content: '+',
-                            class: 'kanban-title-button btn-block',
-                            footer: false,
-                            buttonClick: function (el, boardId) {
-                                console.log('Add item button clicked for board:', boardId);
-                                // ココに処理を記述
-                            }
-                        },
-                        click: function (el) {
-                            // タスクカードクリック時にモーダルを開く
-                            const taskId = el.dataset.eid;
-                            console.log('[Kanban] Task clicked:', taskId);
-                            if (taskId && App.modals.taskDetail) {
-                                App.modals.taskDetail.open(taskId);
-                            }
-                        },
-                        dropEl: function (el, target, source, sibling) {
-                            // タスクのドロップ時にステータスを更新
-                            self.handleTaskDrop(el, target, source);
-                        }
-                    });
-
-                    this.kanbanInstances[boardId] = kanban;
-
-                    // ここからDOM操作
-                    const kanbanBoards = container.querySelectorAll('.kanban-board');
-                    kanbanBoards.forEach(board => {
-                        board.classList.add('no-padding', 'surface', 'no-round', 'no-elevate', 'large-height');
-                    });
-
-                    const kanbanBoardHeaders = container.querySelectorAll('.kanban-board-header');
-                    kanbanBoardHeaders.forEach(header => {
-                        header.classList.add('small-padding', 'background', 'no-round');
-                    });
-
-                    const kanbanDrags = container.querySelectorAll('.kanban-drag');
-                    kanbanDrags.forEach(drag => {
-                        drag.classList.add('small-padding', 'surface-container', 'no-round', 'scroll');
-                    });
-
-                    const kanbanItems = container.querySelectorAll('.kanban-item');
-                    kanbanItems.forEach(item => {
-                        if (item.tagName.toLowerCase() === 'div') {
-                            const article = document.createElement('article');
-                            // 属性を全てコピー
-                            Array.from(item.attributes).forEach(attr => {
-                                article.setAttribute(attr.name, attr.value);
-                            });
-                            // コンテンツを移動
-                            while (item.firstChild) {
-                                article.appendChild(item.firstChild);
-                            }
-                            // 要素を置換
-                            item.parentNode.replaceChild(article, item);
-                            // クラスを追加
-                            article.classList.add('no-margin', 'top-margin', 'surface');
-
-                            // クリックイベントを追加
-                            article.addEventListener('click', function () {
-                                const taskId = this.dataset.eid;
-                                console.log('[Kanban] Task clicked (custom):', taskId);
-                                if (taskId && App.modals.taskDetail) {
-                                    App.modals.taskDetail.open(taskId);
-                                }
-                            });
-                        }
-                    });
-
-                    // ここまでDOM操作
+                if (!container) {
+                    hideLoading();
+                    return;
                 }
+
+                // 既存のSortableインスタンスを破棄
+                Object.values(this.sortableInstances || {}).forEach(instance => {
+                    if (instance && typeof instance.destroy === 'function') {
+                        instance.destroy();
+                    }
+                });
+                this.sortableInstances = {};
+
+                const html = [
+                    '<div class="grid no-space">',
+                    columns.map(column => {
+                        const columnTasks = boardTasks.filter(column.filter);
+                        return `
+                            <div class="s12 m3 l3">
+                                <article class="kanban-column background no-round no-elevate no-scroll no-padding">
+                                    <div class="row no-round left-margin right-margin">
+                                        <span class="bold">${column.title}</span>
+                                        <div class="max"></div>
+                                        <span class="tiny">${columnTasks.length}</span>
+                                    </div>
+                                    <div class="scroll large-height no-padding kanban-column-items" data-status-id="${column.id}" data-board-id="${boardId}" id="kanban-${boardId}-${column.id}-list"">
+                                        ${columnTasks.map(task => this.createTaskCard(task)).join('')}
+                                    </div>
+                                </article>
+                            </div>`;
+                    }).join(''),
+                    '</div>'
+                ].join('');
+
+                container.innerHTML = html;
+
+                this.bindCardClick(container);
+                this.setupSortable(boardId);
+                this.updateColumnCounts(container);
+            },
+            /**
+             * SortableJSを初期化
+             */
+            setupSortable: function (boardId) {
+                const container = document.getElementById(`kanban-canvas-${boardId}`);
+                if (!container) return;
+
+                const groupName = `kanban-${boardId}`;
+                const columns = container.querySelectorAll('.kanban-column-items');
+
+                columns.forEach(column => {
+                    const listId = column.id;
+
+                    if (this.sortableInstances[listId]) {
+                        this.sortableInstances[listId].destroy();
+                    }
+
+                    this.sortableInstances[listId] = Sortable.create(column, {
+                        group: groupName,
+                        animation: 150,
+                        ghostClass: 'surface-container',
+                        dragClass: 'surface',
+                        onEnd: (evt) => this.onDragEnd(evt, boardId)
+                    });
+                });
             },
 
             /**
-             * タスクドロップ時の処理
-             * @param {HTMLElement} el - ドロップされた要素
-             * @param {HTMLElement} target - ドロップ先のボード要素
-             * @param {HTMLElement} source - ドラッグ元のボード要素
+             * ドラッグ終了時の処理
              */
-            handleTaskDrop: function (el, target, source) {
-                const taskId = el.dataset.eid;
-                if (!taskId) {
-                    console.error('[Kanban] No task ID found on dropped element');
+            onDragEnd: function (evt, boardId) {
+                const taskId = evt?.item?.dataset?.eid;
+                const targetStatusId = evt?.to?.dataset?.statusId;
+                const sourceStatusId = evt?.from?.dataset?.statusId;
+
+                if (!taskId || !targetStatusId) {
                     return;
                 }
 
-                // ドロップ先のボードIDを取得（jKanbanのboard要素からdata-idを取得）
-                const targetBoard = target.closest('[data-id]');
-                if (!targetBoard) {
-                    console.error('[Kanban] Could not find target board');
+                if (targetStatusId === sourceStatusId) {
+                    this.updateColumnCounts(document.getElementById(`kanban-canvas-${boardId}`));
                     return;
                 }
 
-                const targetBoardId = targetBoard.dataset.id;
-                const newStatusKey = this.statusMapping[targetBoardId];
+                this.handleTaskDrop(taskId, targetStatusId, boardId, () => {
+                    this.renderKanban(boardId);
+                });
+            },
 
+            /**
+             * カードクリック時の処理
+             */
+            bindCardClick: function (container) {
+                if (!container) return;
+
+                const cards = container.querySelectorAll('.kanban-card');
+                cards.forEach(card => {
+                    card.addEventListener('click', () => {
+                        const taskId = card.dataset.eid;
+                        if (taskId && App.modals.taskDetail) {
+                            App.modals.taskDetail.open(taskId);
+                        }
+                    });
+                });
+            },
+
+            /**
+             * カラムの件数を再計算
+             */
+            updateColumnCounts: function (container) {
+                if (!container) return;
+                const columns = container.querySelectorAll('.kanban-column-items');
+                columns.forEach(column => {
+                    const count = column.querySelectorAll('.kanban-card').length;
+                    const chip = column.closest('article')?.querySelector('.chip');
+                    if (chip) {
+                        chip.textContent = count;
+                    }
+                });
+            },
+
+
+            /**
+             * タスクドロップ時の処理
+             */
+            handleTaskDrop: function (taskId, targetStatusId, boardId, rollback) {
+                if (!taskId || !targetStatusId) {
+                    return;
+                }
+
+                const newStatusKey = this.statusMapping[targetStatusId];
                 if (!newStatusKey) {
-                    console.error('[Kanban] Unknown board ID:', targetBoardId);
+                    if (typeof rollback === 'function') rollback();
                     return;
                 }
-
-                console.log(`[Kanban] Task ${taskId} moved to ${targetBoardId} (${newStatusKey})`);
 
                 // 現在のタスクを取得して元のステータスを保存
                 const tasks = App.state.data.tasks || [];
                 const task = tasks.find(t => t.id === taskId);
                 if (!task) {
-                    console.error('[Kanban] Task not found:', taskId);
+                    if (typeof rollback === 'function') rollback();
                     return;
                 }
 
@@ -243,7 +252,7 @@
 
                 // 同じステータスへのドロップは無視
                 if (oldStatusKey === newStatusKey) {
-                    console.log('[Kanban] Same status, no update needed');
+                    this.updateColumnCounts(document.getElementById(`kanban-canvas-${boardId}`));
                     return;
                 }
 
@@ -257,44 +266,44 @@
                 }, `タスクステータスを更新`)
                     .then(result => {
                         if (!result || (Array.isArray(result) && result.length === 0)) {
-                            console.error('[Kanban] Task status update failed');
                             // ロールバック
                             updateLocalData(TABLE_NAMES.TASKS, taskId, { task_status_key: oldStatusKey });
-                            this.renderKanban(this.currentBoardId);
+                            if (typeof rollback === 'function') rollback();
                             alert('ステータスの更新に失敗しました');
                         } else {
-                            console.log('[Kanban] Task status updated successfully');
+                            this.updateColumnCounts(document.getElementById(`kanban-canvas-${boardId}`));
                         }
                     })
                     .catch(error => {
-                        console.error('[Kanban] Task status update error:', error);
                         // ロールバック
                         updateLocalData(TABLE_NAMES.TASKS, taskId, { task_status_key: oldStatusKey });
-                        this.renderKanban(this.currentBoardId);
+                        if (typeof rollback === 'function') rollback();
                         App.utils.error.handle(error);
                     });
             },
 
             createTaskCard: function (task) {
-                return {
-                    id: task.id,
-                    title: `
-                    <div>
-                      <div class="tiny-space row">
-                        <span class="bold">${task.name || ''}</span>
-                        <span>${task.display_id ? `#${task.display_id}` : ''}</span>
-                      </div>
-                      <div class="tiny-space row">
-                        <i class="tiny">${task.assignee_image_url ? `<img src="${task.assignee_image_url}" alt="${task.assignee_name || ''}">` : 'person'}</i>
-                        <span class="small-text">${escapeHtml(task.assignee_name || '')}</span>
-                      </div>
-                      <div class="tiny-space row">
-                        <i class="tiny">schedule</i>
-                        <span class="small-text">${formatDateTimeForDisplay(task.starts_at) || ''} - ${formatDateTimeForDisplay(task.ends_at) || ''}</span>
-                      </div>
+                const displayId = task.display_id ? `#${task.display_id}` : '';
+                const assigneeIcon = task.assignee_image_url
+                    ? `<img src="${task.assignee_image_url}" alt="${escapeHtml(task.assignee_name || '')}" class="circle tiny">`
+                    : '<i class="tiny">person</i>';
+
+                return `
+                <article class="kanban-card small-margin small-padding" data-eid="${task.id}" role="button">
+                    <div class="tiny-space row">
+                        <span class="bold">${escapeHtml(task.name || '')}</span>
+                        <span class="small-text">${displayId}</span>
                     </div>
-                  `
-                };
+                    <div class="tiny-space row align-center">
+                        ${assigneeIcon}
+                        <span class="small-text">${escapeHtml(task.assignee_name || '')}</span>
+                    </div>
+                    <div class="tiny-space row align-center">
+                        <i class="tiny">schedule</i>
+                        <span class="small-text">${formatDateTimeForDisplay(task.starts_at, 'MM/dd(E)') || ''} ${(task.starts_at || task.ends_at) ? ' - ' : ''} ${formatDateTimeForDisplay(task.ends_at, 'MM/dd(E)') || ''}</span>
+                    </div>
+                </article>
+                `;
             }
         };
 
@@ -302,7 +311,5 @@
         window.addEventListener('load', () => {
             setTimeout(() => App.pages.boards.initialize(), 100);
         });
-
-        // ナビゲーションから各ボードページを呼び出すためのラッパー関数は不要になったため削除
     })();
 </script>
