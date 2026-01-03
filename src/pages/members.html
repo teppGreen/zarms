@@ -21,10 +21,34 @@
 <script>
     (function () {
         App.pages.members = {
-            loadData: function () {
-                this.renderMembers();
-                this.renderDirectories();
-                hideLoading();
+            loadData: async function () {
+                try {
+                    showLoading();
+
+                    // membersデータがまだ取得されていない場合のみ取得
+                    if (!App.state.data.members || App.state.data.members.length === 0) {
+                        const membersResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {});
+                        const members = membersResult?.data || membersResult || [];
+                        App.state.data.members = members;
+                        console.log('Members data loaded:', members.length);
+                    }
+
+                    // directoriesデータがまだ取得されていない場合のみ取得
+                    if (!App.state.data.directories || App.state.data.directories.length === 0) {
+                        const directoriesResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {});
+                        const directories = directoriesResult?.data || directoriesResult || [];
+                        App.state.data.directories = directories;
+                        console.log('Directories data loaded:', directories.length);
+                    }
+
+                    this.renderMembers();
+                    this.renderDirectories();
+                    hideLoading();
+                } catch (error) {
+                    console.error('Error loading members page data:', error);
+                    hideLoading();
+                    App.utils.error.handle(error);
+                }
             },
 
             renderMembers: function () {

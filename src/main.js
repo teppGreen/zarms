@@ -4,48 +4,48 @@
 
 // Webアプリのエントリーポイント
 function doGet(e) {
-  try {
-    // Spreadsheetにアクセスできるか確認（これが権限チェック）
-    getSpreadsheet();
+  // 現在のユーザーを取得
+  const activeUserEmail = Session.getActiveUser().getEmail();
 
-    // 現在のユーザーを取得
-    const activeUserEmail = Session.getActiveUser().getEmail();
-    const activeUser = getMemberByEmail(activeUserEmail);
+  // テスト用
+  // const activeUser = getMemberByEmail(activeUserEmail);
+  // const template = HtmlService.createTemplateFromFile('index');
+  // template.templateVariables = {
+  //   urlParams: e.parameter,
+  //   activeUser: activeUser,
+  //   TABLE_NAMES: TABLE_NAMES,
+  //   DIRECTORY_TYPES: DIRECTORY_TYPES,
+  //   TASK_STATUS: TASK_STATUS
+  // };
 
-    // ユーザーが見つからない場合はユーザー登録画面を表示
-    if (!activeUser) {
-      return HtmlService.createTemplateFromFile('register')
-        .evaluate()
-        .setTitle('ユーザー登録 | ZEN Boards')
-        .setFaviconUrl('https://drive.google.com/uc?id=17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8' + '&.png')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    }
+  const template = HtmlService.createTemplateFromFile('register');
+  template.templateVariables = {
+    urlParams: e.parameter,
+    activeUserEmail: activeUserEmail
+  };
 
-    const template = HtmlService.createTemplateFromFile('index');
-    template.templateVariables = {
-      urlParam: e.parameter,
-      TABLE_NAMES: TABLE_NAMES,
-      DIRECTORY_TYPES: DIRECTORY_TYPES,
-      TASK_STATUS: TASK_STATUS,
-      activeUser: activeUser
-    };
+  return template.evaluate()
+    .setTitle('ZEN Boards')
+    .setFaviconUrl('https://drive.google.com/uc?id=' + FAVICON_FILE_ID + '&.png')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
 
-    return template.evaluate()
-      .setTitle('ZEN Boards')
-      .setFaviconUrl('https://drive.google.com/uc?id=17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8' + '&.png')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-  } catch (error) {
-    console.error('doGet error:', error);
-    return HtmlService.createTemplateFromFile('error')
-      .evaluate()
-      .setTitle('エラー | ZEN Boards')
-      .setFaviconUrl('https://drive.google.com/uc?id=17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8' + '&.png')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  }
+function loadMainApp(urlParams, activeUser) {
+  const template = HtmlService.createTemplateFromFile('index');
+  template.templateVariables = {
+    urlParams: urlParams,
+    activeUser: activeUser,
+    TABLE_NAMES: TABLE_NAMES,
+    DIRECTORY_TYPES: DIRECTORY_TYPES,
+    TASK_STATUS: TASK_STATUS
+  };
+
+  return template.evaluate().getContent();
 }
 
 // ============================================
-// 認証・ユーザー管理
+// 認証
+// 認証時のデータベース取得関数だけバックエンドで定義
 // ============================================
 
 /**
@@ -53,23 +53,17 @@ function doGet(e) {
  * @returns {Object|null} ユーザー情報（id, email, display_nameなど）またはnull
  */
 function getMemberByEmail(email) {
-  try {
-    // membersテーブルからemailが一致するレコードを検索
-    const result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
-      where: { email: ["=", email] }
-    }, null, true);
+  // membersテーブルからemailが一致するレコードを検索
+  const result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
+    where: { email: ["=", email] }
+  }, null, true);
 
-    const members = result?.data || result || [];
+  const members = result?.data || result || [];
 
-    if (members.length === 0) {
-      console.warn(`User with email ${email} not found in members table`);
-      return null;
-    }
-
+  if (members.length === 0) {
+    throw new Error('User not found');
+  } else {
     return members[0];
-  } catch (error) {
-    console.error('getActiveUser error:', error);
-    return null;
   }
 }
 

@@ -232,11 +232,10 @@ function select(sheetName, query = {}) {
 
                     // 日付データの処理
                     if (cell.f && cell.f.startsWith('Date(')) {
-                        // GVizの日付形式をJavaScript Dateに変換
                         const dateMatch = cell.f.match(/Date\((\d+),\s*(\d+),\s*(\d+)\)/);
                         if (dateMatch) {
                             const [, year, month, day] = dateMatch;
-                            value = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                            value = new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).toISOString();
                         }
                     }
 
@@ -251,6 +250,94 @@ function select(sheetName, query = {}) {
         throw error;
     }
 }
+
+// ============================================
+// Select with JOIN Operation using Google Visualization API
+// ============================================
+
+/**
+ * Google Visualization APIを使用してJOIN処理を含むデータを取得
+ * VLOOKUPとARRAYFORMULAを使用したJOIN実装
+ * 参考: https://qiita.com/sakaimo/items/b572b2e35a7f72fa710b
+ * 
+ * @param {string} sheetName - メインテーブルのシート名
+ * @param {Object} query - SSSQL形式のクエリオブジェクト
+ * @param {Array} joins - JOIN設定の配列
+ *   例: [{
+ *     targetTable: 'members',
+ *     joinType: 'LEFT',
+ *     columns: ['display_name', 'profile_photo_url'],
+ *     localKey: 'processed_by',
+ *     foreignKey: 'id',
+ *     alias: 'processed_by_'
+ *   }]
+ * @returns {Array} JOIN済みデータ配列
+ */
+function selectWithJoin(sheetName, query = {}, joins = []) {
+    try {
+        // JOIN設定がない場合は通常のselectを使用
+        if (!joins || joins.length === 0) {
+            return select(sheetName, query);
+        }
+
+        // まず通常のselectでメインデータを取得
+        const mainData = select(sheetName, query);
+
+        if (mainData.length === 0) {
+            return [];
+        }
+
+        // 各JOIN設定を処理
+        joins.forEach(joinConfig => {
+            const {
+                targetTable,
+                columns,
+                localKey,
+                foreignKey,
+                alias
+            } = joinConfig;
+
+            // JOINターゲットテーブルの全データを取得（キャッシュから取得される可能性が高い）
+            const targetData = select(targetTable, {});
+
+            // ターゲットデータをMapに変換（高速検索用）
+            const targetMap = new Map();
+            targetData.forEach(row => {
+                const key = row[foreignKey];
+                if (key) {
+                    targetMap.set(key, row);
+                }
+            });
+
+            // メインデータにJOIN結果を追加
+            mainData.forEach(mainRow => {
+                const joinKey = mainRow[localKey];
+                const targetRow = targetMap.get(joinKey);
+
+                if (targetRow) {
+                    // 指定されたカラムをエイリアス付きで追加
+                    columns.forEach(col => {
+                        const aliasedKey = alias ? `${alias}${col}` : `${targetTable}_${col}`;
+                        mainRow[aliasedKey] = targetRow[col];
+                    });
+                } else {
+                    // LEFT JOIN: マッチしない場合はnullを設定
+                    columns.forEach(col => {
+                        const aliasedKey = alias ? `${alias}${col}` : `${targetTable}_${col}`;
+                        mainRow[aliasedKey] = null;
+                    });
+                }
+            });
+        });
+
+        return mainData;
+
+    } catch (error) {
+        console.error(`Error in selectWithJoin operation for ${sheetName}:`, error);
+        throw error;
+    }
+}
+
 
 // ============================================
 // Helper Functions for Sheets API Operations
@@ -641,7 +728,7 @@ function handleDatabaseProcess(userId, tableName, operation, dataObject, remark,
 // Helper Functions
 // ============================================
 
-function getSpreadsheet() {
+function getSpreadsheet() { //ページ読み込み時の権限チェックに使用中。データベース操作時には使っていない。
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     return ss;
 }

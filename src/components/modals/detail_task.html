@@ -69,6 +69,14 @@
         </div>
       </div>
     </div>
+
+    <!-- Comments Section -->
+    <div class="padding">
+      <h6>コメント</h6>
+      <div id="task-comments-list" class="scroll medium-height">
+        <!-- コメントが動的に生成される -->
+      </div>
+    </div>
   </div>
 </dialog>
 
@@ -91,23 +99,63 @@
         }
 
         this.currentId = taskId;
-        showLoading();
 
-        // tasks データから取得（App.state.data.tasksに既にロード済み）
-        const tasks = App.state.data.tasks || [];
-        const task = tasks.find(t => t.id === taskId);
+        // tasks データから取得（ボードページでJOIN済み）
+        const boardTasks = App.pages.boards?.currentBoardTasks || [];
+        let task = boardTasks.find(t => t.id === taskId);
 
         if (!task) {
           console.error('[TaskDetail] Task not found:', taskId);
-          hideLoading();
           alert('タスクが見つかりません');
           return;
         }
 
         this.currentItem = task;
         this.render(task);
-        hideLoading();
+
+        // コメント読み込み中表示
+        const commentsList = document.getElementById('task-comments-list');
+        if (commentsList) {
+          commentsList.innerHTML = '<div class="padding center"><span class="loader"></span></div>';
+        }
+
+        // モーダルを即座に開く
         ui('#modal-detail-task');
+
+        // コメントを非同期で取得（作成者情報とJOIN）
+        const query = {
+          where: {
+            related_table: ["=", "tasks"],
+            related_id: ["=", taskId]
+          }
+        };
+
+        const joins = [
+          {
+            targetTable: 'members',
+            joinType: 'LEFT',
+            columns: ['display_name', 'profile_photo_url'],
+            localKey: 'created_by',
+            foreignKey: 'id',
+            alias: 'creator_'
+          }
+        ];
+
+        callGAS('selectWithJoin', TABLE_NAMES.COMMENTS, query, joins)
+          .then(commentsResult => {
+            // モーダルが閉じられた、または別のタスクが開かれている場合は中断
+            if (this.currentId !== taskId) return;
+
+            const comments = commentsResult?.data || commentsResult || [];
+            console.log(`Task ${taskId} comments loaded with JOINs:`, comments.length);
+            this.renderComments(comments);
+          })
+          .catch(error => {
+            console.error('[TaskDetail] Error loading comments:', error);
+            if (this.currentId === taskId && commentsList) {
+              commentsList.innerHTML = '<p class="error-text padding">コメントの読み込みに失敗しました</p>';
+            }
+          });
       },
 
       /**
@@ -134,6 +182,51 @@
 
         const displayId = document.getElementById('task-display-id');
         if (displayId) displayId.textContent = '';
+
+        // コメントリストをクリア
+        const commentsList = document.getElementById('task-comments-list');
+        if (commentsList) commentsList.innerHTML = '';
+      },
+
+      /**
+       * コメントを描画
+       * @param {Array} comments - コメント配列（JOIN済み）
+       */
+      renderComments: function (comments) {
+        const container = document.getElementById('task-comments-list');
+        if (!container) return;
+
+        if (!comments || comments.length === 0) {
+          container.innerHTML = '<p class="small-text padding">コメントはありません</p>';
+          return;
+        }
+
+        const html = comments.map(comment => {
+          const creatorName = comment.creator_display_name || '不明';
+          const creatorPhoto = comment.creator_profile_photo_url;
+          const creatorIcon = creatorPhoto
+            ? `<img src="${creatorPhoto}" alt="${escapeHtml(creatorName)}" class="circle tiny">`
+            : '<i class="tiny">account_circle</i>';
+
+          const createdAt = formatDateTimeForDisplay(comment.created_at, 'yyyy/MM/dd HH:mm');
+
+          return `
+            <article class="small-padding border round small-margin">
+              <div class="row small-margin">
+                ${creatorIcon}
+                <div class="max">
+                  <span class="bold small-text">${escapeHtml(creatorName)}</span>
+                  <span class="small-text" style="opacity: 0.7;"> · ${createdAt}</span>
+                </div>
+              </div>
+              <div class="small-padding">
+                <p class="small-text">${escapeHtml(comment.content || '')}</p>
+              </div>
+            </article>
+          `;
+        }).join('');
+
+        container.innerHTML = html;
       },
 
       /**
