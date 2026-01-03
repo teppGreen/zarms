@@ -136,6 +136,7 @@
           if (currentParams.board_id) {
             newParams.board_id = currentParams.board_id;
           } else if (this.currentItem && this.currentItem.board_id) {
+            // currentItemからboard_idを取得（nullチェック付き）
             newParams.board_id = this.currentItem.board_id;
           }
           
@@ -180,13 +181,14 @@
 
       /**
        * モーダルを閉じる
+       * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
        */
-      close: function () {
+      close: function (skipUrlUpdate = false) {
         ui('#modal-detail-task');
         this.reset();
         
-        // URLパラメータからモーダル関連のパラメータを削除
-        if (App.utils.url && App.utils.url.updateParams) {
+        // URLパラメータからモーダル関連のパラメータを削除（skipUrlUpdateがfalseの場合のみ）
+        if (!skipUrlUpdate && App.utils.url && App.utils.url.updateParams) {
           const currentParams = App.utils.url.getParams();
           const newParams = {
             tab: currentParams.tab || 'home'

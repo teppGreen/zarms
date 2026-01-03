@@ -84,6 +84,11 @@
   function openModalFromParams(params) {
     console.log('[openModalFromParams] Opening modal from params:', params);
     
+    // 定数定義
+    const MAX_RETRY_ATTEMPTS = 10; // 最大リトライ回数
+    const RETRY_DELAY_MS = 200;     // リトライ間隔（ミリ秒）
+    const INITIAL_DELAY_MS = 500;   // 初期待機時間（ミリ秒）
+    
     // タスク詳細モーダル
     if (params.modal === 'task-detail' && params.task_id) {
       if (App.modals.taskDetail && App.modals.taskDetail.open) {
@@ -92,15 +97,15 @@
           const boardTasks = App.pages.boards?.currentBoardTasks || [];
           const task = boardTasks.find(t => t.id === params.task_id);
           
-          if (task || retries >= 10) {
+          if (task || retries >= MAX_RETRY_ATTEMPTS) {
             // タスクが見つかったか、リトライ回数上限に達した場合は開く
             App.modals.taskDetail.open(params.task_id, true); // trueでURL更新をスキップ
           } else {
             // タスクが見つからない場合は少し待ってリトライ
-            setTimeout(() => attemptOpen(retries + 1), 200);
+            setTimeout(() => attemptOpen(retries + 1), RETRY_DELAY_MS);
           }
         };
-        setTimeout(() => attemptOpen(), 500);
+        setTimeout(() => attemptOpen(), INITIAL_DELAY_MS);
       }
     }
     // メンバー詳細モーダル
@@ -108,7 +113,7 @@
       if (App.modals.memberDetail && App.modals.memberDetail.open) {
         setTimeout(() => {
           App.modals.memberDetail.open(params.member_id, true); // trueでURL更新をスキップ
-        }, 500);
+        }, INITIAL_DELAY_MS);
       }
     }
   }
@@ -142,24 +147,18 @@
       openModals.forEach(modal => {
         const modalId = modal.id;
         
-        // モーダルIDからモーダルオブジェクトを取得
+        // モーダルIDからモーダルオブジェクトを取得してcloseメソッドを呼び出す
+        // skipUrlUpdate=trueでURL更新をスキップ
         if (modalId === 'modal-detail-task' && App.modals.taskDetail && App.modals.taskDetail.close) {
-          // URLを更新しないように、一時的にApp.utils.urlを無効化
-          const originalUpdateParams = App.utils.url.updateParams;
-          App.utils.url.updateParams = function() {}; // 何もしない
-          App.modals.taskDetail.close();
-          App.utils.url.updateParams = originalUpdateParams; // 復元
+          App.modals.taskDetail.close(true); // trueでURL更新をスキップ
         } else if (modalId === 'modal-detail-member' && App.modals.memberDetail && App.modals.memberDetail.close) {
-          const originalUpdateParams = App.utils.url.updateParams;
-          App.utils.url.updateParams = function() {};
-          App.modals.memberDetail.close();
-          App.utils.url.updateParams = originalUpdateParams;
+          App.modals.memberDetail.close(true); // trueでURL更新をスキップ
         } else {
-          // フォールバック: 通常の閉じる処理
+          // フォールバック: ui関数（Beer CSSのモーダルトグル）またはネイティブのclose()を使用
           if (typeof ui === 'function') {
-            ui(`#${modalId}`);
+            ui(`#${modalId}`); // Beer CSSのモーダルトグル関数
           } else {
-            modal.close();
+            modal.close(); // ネイティブのdialog要素のclose()メソッド
           }
         }
       });
