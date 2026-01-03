@@ -2,147 +2,262 @@
 <html lang="ja">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://cdn.jsdelivr.net/npm/beercss@3.13.1/dist/cdn/beer.min.css" rel="stylesheet">
-  <script type="module" src="https://cdn.jsdelivr.net/npm/beercss@3.13.1/dist/cdn/beer.min.js"></script>
-  <script type="module"
-    src="https://cdn.jsdelivr.net/npm/material-dynamic-colors@1.1.2/dist/cdn/material-dynamic-colors.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/beercss@3.13.1/dist/cdn/beer.min.css" rel="stylesheet">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/beercss@3.13.1/dist/cdn/beer.min.js"></script>
+    <script type="module"
+        src="https://cdn.jsdelivr.net/npm/material-dynamic-colors@1.1.2/dist/cdn/material-dynamic-colors.min.js"></script>
 
-  <script src="https://www.gstatic.com/charts/loader.js"></script>
-  <script src="https://apis.google.com/js/api.js"></script>
-  <script src="https://apis.google.com/js/picker.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wdth,wght,GRAD,ROND@6..144,-10..0,25..151,1..1000,0..100,0..100&family=Noto+Sans+JP:wght@100..900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap"
-    rel="stylesheet">
-  <?!= include('css'); ?>
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://apis.google.com/js/picker.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wdth,wght,GRAD,ROND@6..144,-10..0,25..151,1..1000,0..100,0..100&family=Noto+Sans+JP:wght@100..900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap"
+        rel="stylesheet">
+    <?!= include('css'); ?>
 </head>
 
 <body class="light">
-    <main class="center-align middle-align" style="height: 100vh;">
-        <article class="surface round padding large-width">
+    <main class="center-align middle-align surface-container">
+        <article id="register-article" class="background no-elevate large-padding large-margin">
             <!-- ステップ1: Slack URLの入力 -->
-            <div id="step-input" style="display: block;">
-                <i class="extra large-text">person_add</i>
-                <h3>ユーザー登録</h3>
-                <p>ZEN Boardsへようこそ。<br>初回利用のため、ユーザー登録が必要です。</p>
-
-                <div class="field label border">
-                    <input type="url" id="slack-profile-url" placeholder="https:\/\/...">
-                    <label>SlackプロフィールURL</label>
+            <div id="step-input" class="grid medium-height right">
+                <div class="s12 m12 l6 large-padding MEDIUM-width left-align">
+                    <div class="row tiny-space">
+                        <img class="large" src="https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8"
+                            alt="ZEN Boards">
+                    </div>
+                    <h2 class="bold small">ユーザー登録</h2>
+                    <p>タスク管理ツール「ZEN Boards」へようこそ！<br>利用を始めるには、ユーザー登録をしてください。</p>
                 </div>
-
-                <div class="space"></div>
-                <button onclick="searchUser()" class="responsive">次へ</button>
+                <div class="s12 m12 l6 large-padding large-width left-align">
+                    <div id="slack-profile-url-container" class="field label border">
+                        <input type="url" id="slack-profile-url" value="https://zen-student.slack.com/team/"
+                            onfocus="this.placeholder='https://zen-student.slack.com/team/U0123456789'"
+                            onblur="this.placeholder=''">
+                        <label>あなたのSlackプロフィールURL</label>
+                        <output>
+                            パソコンで<a href="https://zen-student.slack.com/account/profile" tabindex="-1" target="_blank"
+                                class="link">Slackプロフィール</a>を開き、︙メニューからコピーしてください。
+                        </output>
+                    </div>
+                    <div class="top-margin">
+                        <i class="small">contact_support</i>
+                        <span>不明点やうまくいかない場合は、総務ユニットリーダーまでお問い合わせください。</span>
+                    </div>
+                    <div class="absolute right bottom large-padding">
+                        <nav>
+                            <button onclick="searchUser()" class="primary extra">
+                                <span>次へ</span>
+                            </button>
+                        </nav>
+                    </div>
+                </div>
             </div>
 
             <!-- ステップ2: 確認画面 -->
-            <div id="step-confirm" style="display: none;">
-                <div id="user-info"></div>
-                <div class="space"></div>
-                <nav class="center-align">
-                    <button onclick="showInputStep()" class="border">いいえ</button>
-                    <button onclick="registerUser()" class="responsive">はい</button>
-                </nav>
+            <div id="step-confirm" class="grid medium-height right" style="display: none;">
+                <div class="s12 m12 l6 large-padding large-width left-align">
+                    <div class="row tiny-space">
+                        <img class="large" src="https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8"
+                            alt="ZEN Boards">
+                    </div>
+                    <h2 class="bold small">ユーザー登録</h2>
+                    <p>タスク管理ツール「ZEN Boards」へようこそ！<br>利用を始めるには、ユーザー登録をしてください。</p>
+                </div>
+                <div class="s12 m12 l6 large-padding large-width left-align">
+                    <div>
+                        <div id="user-profile-photo" class="small-height small-width"></div>
+                        <div id="user-name"></div>
+                        <div id="user-name-warning" class="top-margin"></div>
+                    </div>
+                    <div class="absolute right bottom large-padding">
+                        <nav id="confirm-nav">
+                            <button onclick="showInputStep(true)" class="border extra">
+                                <span>いいえ</span>
+                            </button>
+                            <button onclick="registerUser()" class="primary extra">
+                                <span>はい</span>
+                            </button>
+                        </nav>
+                    </div>
+                </div>
             </div>
 
             <!-- ステップ3: エラー表示 -->
-            <div id="step-error" style="display: none;">
-                <i class="extra large-text">error</i>
-                <h4>該当するユーザーが見つかりません</h4>
-                <p>お手数をおかけしますが、<br>総務ユニットリーダーにお問い合わせください。</p>
-                <div class="space"></div>
-                <button onclick="showInputStep()" class="border">戻る</button>
+            <div id="step-error" class="grid medium-height right" style="display: none;">
+                <div class="s12 m12 l6 large-padding large-width left-align">
+                    <div class="row tiny-space">
+                        <img class="large" src="https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8"
+                            alt="ZEN Boards">
+                    </div>
+                    <h2 class="bold small">ユーザー登録</h2>
+                    <p>タスク管理ツール「ZEN Boards」へようこそ！<br>利用を始めるには、ユーザー登録をしてください。</p>
+                </div>
+                <div class="s12 m12 l6 large-padding large-width left-align">
+                    <div class="row tiny-space">
+                        <i class="extra error-text">error</i>
+                    </div>
+                    <p class="large-text bold">あなたが誰なのかわかりませんでした</p>
+                    <p>あなたのSlackプロフィールURLを正しく入力してください。<br>再度試してもうまくいかない場合は、総務ユニットリーダーまでお問い合わせください。</p>
+                    <p class="secondary-text small-text">
+                        入力されたURL: <a href="" target="_blank" tabindex="-1" id="error-url"></a><br>
+                        正しいURLの例: https://zen-student.slack.com/team/U0123456789
+                    </p>
+                    <div class="absolute right bottom large-padding">
+                        <nav>
+                            <button onclick="showInputStep(true)" class="primary extra">
+                                <span>戻る</span>
+                            </button>
+                        </nav>
+                    </div>
+                </div>
             </div>
 
-            <!-- ローディング -->
-            <div id="loading" style="display: none;">
-                <progress class="circle"></progress>
-                <p>処理中...</p>
+            <!-- ステップ4: チュートリアル -->
+            <div id="step-tutorial"
+                style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; background: black;">
+                <iframe
+                    src="https://docs.google.com/presentation/d/1OjZrQfKTWvSnDAzBrgWUN0oqtLJqKBN2_6zjIrrwIxA/preview"
+                    style="width: 100%; height: 100%; border: none;"></iframe>
+                <div class="absolute center bottom large-padding large-margin">
+                    <button onclick="reloadPage(this)" class="large-margin primary large-elevate extra">
+                        <i>play_circle</i>
+                        <span class="large-text bold">利用を始める</span>
+                    </button>
+                </div>
             </div>
         </article>
     </main>
 
     <script>
+        const SLACK_PROFILE_URL_REGEX = /^https:\/\/zen-student\.slack\.com\/team\/U0[A-Z1-9]{9}$/;
+        const DEFAULT_HELPER_TEXT = 'パソコンで<a href="https://zen-student.slack.com/account/profile" tabindex="-1" target="_blank" class="link">Slackプロフィール</a>を開き、︙メニューからコピーしてください。';
+        const ERROR_HELPER_TEXT = 'URLの形式が間違っています。パソコンで<a href="https://zen-student.slack.com/account/profile" tabindex="-1" target="_blank" class="link">Slackプロフィール</a>を開き、︙メニューからコピーしてください。';
+
         let foundUser = null;
 
-        function showLoading() {
-            document.getElementById('step-input').style.display = 'none';
-            document.getElementById('step-confirm').style.display = 'none';
-            document.getElementById('step-error').style.display = 'none';
-            document.getElementById('loading').style.display = 'block';
+        function setupInputListeners() {
+            const input = document.getElementById('slack-profile-url');
+            if (input) {
+                input.addEventListener('focus', function () {
+                    this.parentNode.classList.remove('invalid');
+                    const output = this.parentNode.querySelector('output');
+                    if (output) {
+                        output.classList.remove('invalid');
+                        output.innerHTML = DEFAULT_HELPER_TEXT;
+                    }
+                });
+            }
         }
 
-        function hideLoading() {
-            document.getElementById('loading').style.display = 'none';
+        // Initialize listeners
+        setupInputListeners();
+
+        function showStep(id) {
+            const steps = document.querySelectorAll('#register-article > div');
+            steps.forEach(step => step.style.display = step.id === id ? '' : 'none');
         }
 
-        function showInputStep() {
-            document.getElementById('step-input').style.display = 'block';
-            document.getElementById('step-confirm').style.display = 'none';
-            document.getElementById('step-error').style.display = 'none';
-            document.getElementById('loading').style.display = 'none';
+        function showInputStep(retry = false) {
+            showStep('step-input');
+            if (retry) {
+                document.getElementById('slack-profile-url').value = '';
+            }
         }
 
         function showConfirmStep() {
-            document.getElementById('step-input').style.display = 'none';
-            document.getElementById('step-confirm').style.display = 'block';
-            document.getElementById('step-error').style.display = 'none';
-            document.getElementById('loading').style.display = 'none';
+            showStep('step-confirm');
+
+            // ローディング表示を初期化
+            document.getElementById('user-profile-photo').innerHTML = '<div class="shape loading-indicator max rotate"></div>';
+            document.getElementById('user-name').innerHTML = '<p class="large-text">検索中です。しばらくお待ちください。</p>';
+            document.getElementById('user-name-warning').innerHTML = '';
+            document.getElementById('confirm-nav').style.display = 'none';
         }
 
         function showErrorStep() {
-            document.getElementById('step-input').style.display = 'none';
-            document.getElementById('step-confirm').style.display = 'none';
-            document.getElementById('step-error').style.display = 'block';
-            document.getElementById('loading').style.display = 'none';
+            showStep('step-error');
+
+            const slackProfileUrl = document.getElementById('slack-profile-url').value;
+            document.getElementById('error-url').innerHTML = slackProfileUrl;
+            document.getElementById('error-url').href = slackProfileUrl;
+        }
+
+        function showTutorialStep() {
+            showStep('step-tutorial');
+        }
+
+        function reloadPage(btn) {
+            if (btn) {
+                const icon = btn.querySelector('i');
+                if (icon) {
+                    icon.outerHTML = '<progress class="circle indeterminate small"></progress>';
+                }
+                btn.disabled = true;
+            }
+            google.script.run
+                .withSuccessHandler(function (url) {
+                    window.open(url, '_top');
+                })
+                .getScriptUrl();
         }
 
         function searchUser() {
-            const slackUrl = document.getElementById('slack-profile-url').value;
+            const input = document.getElementById('slack-profile-url');
+            const slackUrl = input.value;
+            const output = input.parentNode.querySelector('output');
 
             if (!slackUrl) {
-                alert('SlackプロフィールURLを入力してください');
+                input.parentNode.classList.add('invalid');
+                if (output) {
+                    output.classList.add('invalid');
+                    output.innerHTML = DEFAULT_HELPER_TEXT;
+                }
                 return;
             }
 
-            showLoading();
+            if (!SLACK_PROFILE_URL_REGEX.test(slackUrl)) {
+                input.parentNode.classList.add('invalid');
+                if (output) {
+                    output.classList.add('invalid');
+                    output.innerHTML = ERROR_HELPER_TEXT;
+                }
+                return;
+            }
+
+            showConfirmStep();
 
             google.script.run
                 .withSuccessHandler(function (user) {
-                    hideLoading();
-
                     if (user) {
                         foundUser = user;
                         displayUserInfo(user);
-                        showConfirmStep();
+                        document.getElementById('confirm-nav').style.display = 'flex';
                     } else {
                         showErrorStep();
                     }
                 })
                 .withFailureHandler(function (error) {
-                    hideLoading();
                     alert('エラーが発生しました: ' + error.message);
+                    showInputStep();
                 })
                 .findUserBySlackUrl(slackUrl);
         }
 
         function displayUserInfo(user) {
-            const container = document.getElementById('user-info');
-
-            let html = '<h4>確認</h4><p>あなたは以下のユーザーですか？</p>';
-
-            if (user.profile_photo_url) {
-                html += `<img src="${user.profile_photo_url}" class="circle large" alt="${user.display_name}">`;
-            } else {
-                html += '<i class="extra large-text">account_circle</i>';
-            }
-
-            html += `<h5>${user.display_name || '名前未設定'}</h5>`;
-
-            container.innerHTML = html;
+            document.getElementById('user-profile-photo').innerHTML = `
+                <div class="shape sunny max rotate">    
+                    <img src="${user.profile_photo_url}" class="responsive" alt="${user.display_name}">
+                </div>
+            `;
+            document.getElementById('user-name').innerHTML = `
+                <p class="large-text">はじめまして！あなたは<strong>${user.display_name}</strong>さんですか？</p>
+            `;
+            document.getElementById('user-name-warning').innerHTML = ``;
         }
 
         function registerUser() {
@@ -151,21 +266,25 @@
                 return;
             }
 
-            showLoading();
+            // ステップ4の画面を表示
+            showTutorialStep();
 
             google.script.run
                 .withSuccessHandler(function (success) {
-                    if (success) {
-                        // 登録完了後、システムを再読み込み
-                        window.location.href = window.location.origin + window.location.pathname + '?registered=true';
-                    } else {
-                        hideLoading();
+                    if (!success) {
+                        // 登録失敗時はアラートを出してステップ2に戻る（もしくはエラー画面）
                         alert('登録に失敗しました');
+                        showConfirmStep();
+                        displayUserInfo(foundUser);
+                        document.getElementById('confirm-nav').style.display = 'flex';
                     }
+                    // 成功時は何もしない（ユーザーがボタンを押すのを待つ）
                 })
                 .withFailureHandler(function (error) {
-                    hideLoading();
                     alert('エラーが発生しました: ' + error.message);
+                    showConfirmStep();
+                    displayUserInfo(foundUser);
+                    document.getElementById('confirm-nav').style.display = '';
                 })
                 .registerUserEmail(foundUser.id);
         }

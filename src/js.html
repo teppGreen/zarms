@@ -407,7 +407,7 @@
   // ヘルパー関数
   // ============================================
 
-  function formatDateTimeForDisplay(dateString) {
+  function formatDateTimeForDisplay(dateString, format = 'yyyy/MM/dd(E) HH:mm') {
     if (!dateString) return '-';
     try {
       const dt = new Date(dateString);
@@ -419,7 +419,15 @@
       const hours = String(dt.getHours()).padStart(2, '0');
       const minutes = String(dt.getMinutes()).padStart(2, '0');
       const seconds = String(dt.getSeconds()).padStart(2, '0');
-      return `${year}/${month}/${day}(${weekday}) ${hours}:${minutes}`;
+
+      return format
+        .replace(/yyyy/g, year)
+        .replace(/MM/g, month)
+        .replace(/dd/g, day)
+        .replace(/E/g, weekday)
+        .replace(/HH/g, hours)
+        .replace(/mm/g, minutes)
+        .replace(/ss/g, seconds);
     } catch (e) {
       return dateString;
     }

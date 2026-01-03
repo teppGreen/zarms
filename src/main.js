@@ -14,7 +14,8 @@ function doGet(e) {
 
     // ユーザーが見つからない場合はユーザー登録画面を表示
     if (!activeUser) {
-      return HtmlService.createHtmlOutputFromFile('register')
+      return HtmlService.createTemplateFromFile('register')
+        .evaluate()
         .setTitle('ユーザー登録 | ZEN Boards')
         .setFaviconUrl('https://drive.google.com/uc?id=17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8' + '&.png')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -35,7 +36,8 @@ function doGet(e) {
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
   } catch (error) {
     console.error('doGet error:', error);
-    return HtmlService.createHtmlOutputFromFile('error')
+    return HtmlService.createTemplateFromFile('error')
+      .evaluate()
       .setTitle('エラー | ZEN Boards')
       .setFaviconUrl('https://drive.google.com/uc?id=17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8' + '&.png')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -133,4 +135,9 @@ function registerUserEmail(userId) {
  */
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function getScriptUrl() {
+  var url = ScriptApp.getService().getUrl();
+  return url;
 }
