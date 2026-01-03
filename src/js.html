@@ -44,7 +44,10 @@
     // データ読み込み前にホームページを表示（ユーザーがタブを切り替えられるようにする）
     // URLパラメータがある場合はそれを使用、ない場合はhomeを表示
     let initialTab = 'home';
+    let hasUrlParams = false;
+    
     if (urlParams.tab) {
+      hasUrlParams = true;
       if (urlParams.tab === 'board' && urlParams.board_id) {
         initialTab = 'board-' + urlParams.board_id;
       } else if (urlParams.tab !== 'board') {
@@ -54,6 +57,12 @@
 
     if (App.utils.navigation && App.utils.navigation.switchTab) {
       App.utils.navigation.switchTab(initialTab, true); // trueでURL更新をスキップ
+    }
+
+    // URLパラメータがない場合は、初期状態をURLに反映（replaceStateで履歴に追加しない）
+    if (!hasUrlParams && App.utils.url && App.utils.url.updateParams) {
+      const params = App.utils.url.getParamsFromTabId(initialTab);
+      App.utils.url.updateParams(params, true); // trueでreplaceState
     }
 
     // 全データを読み込み
@@ -80,7 +89,7 @@
       if (App.modals.taskDetail && App.modals.taskDetail.open) {
         // データが読み込まれるまで少し待つ
         setTimeout(() => {
-          App.modals.taskDetail.open(params.task_id);
+          App.modals.taskDetail.open(params.task_id, true); // trueでURL更新をスキップ
         }, 500);
       }
     }
@@ -88,7 +97,7 @@
     else if (params.modal === 'member-detail' && params.member_id) {
       if (App.modals.memberDetail && App.modals.memberDetail.open) {
         setTimeout(() => {
-          App.modals.memberDetail.open(params.member_id);
+          App.modals.memberDetail.open(params.member_id, true); // trueでURL更新をスキップ
         }, 500);
       }
     }
