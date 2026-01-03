@@ -132,7 +132,8 @@
     window.addEventListener('popstate', function(event) {
       console.log('[popstate] Browser back/forward button pressed', event.state);
       
-      const params = event.state || App.utils.url.getParams();
+      // event.stateがnullの場合は、URLから直接パラメータを取得
+      const params = event.state || App.utils.url.getParams() || {};
       
       // タブを切り替え
       if (params.tab) {
@@ -145,6 +146,11 @@
         
         if (App.utils.navigation && App.utils.navigation.switchTab) {
           App.utils.navigation.switchTab(tabId, true); // URL更新をスキップ
+        }
+      } else {
+        // パラメータがない場合はホームに戻る
+        if (App.utils.navigation && App.utils.navigation.switchTab) {
+          App.utils.navigation.switchTab('home', true);
         }
       }
       
@@ -669,18 +675,17 @@
     /**
      * URLパラメータからタブIDを取得
      * @param {Object} params - パラメータオブジェクト
-     * @returns {string} タブID（例: 'home', 'board-UUID'）
+     * @returns {string|null} タブID（例: 'home', 'board-UUID'）またはnull
      */
     getTabIdFromParams: function(params) {
       if (!params.tab) return null;
       
       // boardタブの場合、board_idが有効な値であることを確認
-      if (params.tab === 'board' && params.board_id && params.board_id !== '') {
-        return 'board-' + params.board_id;
-      }
-      
-      // board_idが無効な場合はnullを返す
-      if (params.tab === 'board' && (!params.board_id || params.board_id === '')) {
+      if (params.tab === 'board') {
+        if (params.board_id && params.board_id !== '') {
+          return 'board-' + params.board_id;
+        }
+        // board_idが無効な場合はnullを返す
         return null;
       }
       
