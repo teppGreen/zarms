@@ -89,8 +89,9 @@
       /**
        * タスク詳細モーダルを開く
        * @param {string} taskId - タスクID
+       * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
        */
-      open: function (taskId) {
+      open: function (taskId, skipUrlUpdate = false) {
         console.log('[TaskDetail] open called with id:', taskId);
 
         if (!taskId) {
@@ -121,6 +122,25 @@
 
         // モーダルを即座に開く
         ui('#modal-detail-task');
+
+        // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
+        if (!skipUrlUpdate && App.utils.url && App.utils.url.updateParams) {
+          const currentParams = App.utils.url.getParams();
+          const newParams = {
+            tab: currentParams.tab || 'home',
+            modal: 'task-detail',
+            task_id: taskId
+          };
+          
+          // ボードIDが存在する場合は追加
+          if (currentParams.board_id) {
+            newParams.board_id = currentParams.board_id;
+          } else if (task.board_id) {
+            newParams.board_id = task.board_id;
+          }
+          
+          App.utils.url.updateParams(newParams, false);
+        }
 
         // コメントを非同期で取得（作成者情報とJOIN）
         const query = {
@@ -164,6 +184,21 @@
       close: function () {
         ui('#modal-detail-task');
         this.reset();
+        
+        // URLパラメータからモーダル関連のパラメータを削除
+        if (App.utils.url && App.utils.url.updateParams) {
+          const currentParams = App.utils.url.getParams();
+          const newParams = {
+            tab: currentParams.tab || 'home'
+          };
+          
+          // ボードIDが存在する場合は保持
+          if (currentParams.board_id) {
+            newParams.board_id = currentParams.board_id;
+          }
+          
+          App.utils.url.updateParams(newParams, false);
+        }
       },
 
       /**

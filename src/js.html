@@ -30,22 +30,105 @@
   // 初期化
   async function initializeApp() {
     setupGlobalShortcuts();
+    setupBrowserHistoryHandlers();
 
     // ユーザーIDを設定（templateVariablesから取得）
     if (activeUser && activeUser.id) {
       App.state.userId = activeUser.id;
     }
 
+    // URLパラメータを取得
+    const urlParams = templateVariables.urlParams || {};
+    console.log('[initializeApp] URL params:', urlParams);
+
     // データ読み込み前にホームページを表示（ユーザーがタブを切り替えられるようにする）
+    // URLパラメータがある場合はそれを使用、ない場合はhomeを表示
+    let initialTab = 'home';
+    if (urlParams.tab) {
+      if (urlParams.tab === 'board' && urlParams.board_id) {
+        initialTab = 'board-' + urlParams.board_id;
+      } else if (urlParams.tab !== 'board') {
+        initialTab = urlParams.tab;
+      }
+    }
+
     if (App.utils.navigation && App.utils.navigation.switchTab) {
-      App.utils.navigation.switchTab('home');
+      App.utils.navigation.switchTab(initialTab, true); // trueでURL更新をスキップ
     }
 
     // 全データを読み込み
     await loadAllData();
 
+    // モーダルパラメータがある場合は該当のモーダルを開く
+    if (urlParams.modal) {
+      openModalFromParams(urlParams);
+    }
+
     // 自動更新を開始
     startAutoRefresh();
+  }
+
+  /**
+   * URLパラメータからモーダルを開く
+   * @param {Object} params - URLパラメータ
+   */
+  function openModalFromParams(params) {
+    console.log('[openModalFromParams] Opening modal from params:', params);
+    
+    // タスク詳細モーダル
+    if (params.modal === 'task-detail' && params.task_id) {
+      if (App.modals.taskDetail && App.modals.taskDetail.open) {
+        // データが読み込まれるまで少し待つ
+        setTimeout(() => {
+          App.modals.taskDetail.open(params.task_id);
+        }, 500);
+      }
+    }
+    // メンバー詳細モーダル
+    else if (params.modal === 'member-detail' && params.member_id) {
+      if (App.modals.memberDetail && App.modals.memberDetail.open) {
+        setTimeout(() => {
+          App.modals.memberDetail.open(params.member_id);
+        }, 500);
+      }
+    }
+  }
+
+  /**
+   * ブラウザ履歴の戻る/進むボタンへの対応
+   */
+  function setupBrowserHistoryHandlers() {
+    window.addEventListener('popstate', function(event) {
+      console.log('[popstate] Browser back/forward button pressed', event.state);
+      
+      const params = event.state || App.utils.url.getParams();
+      
+      // タブを切り替え
+      if (params.tab) {
+        let tabId = 'home';
+        if (params.tab === 'board' && params.board_id) {
+          tabId = 'board-' + params.board_id;
+        } else if (params.tab !== 'board') {
+          tabId = params.tab;
+        }
+        
+        if (App.utils.navigation && App.utils.navigation.switchTab) {
+          App.utils.navigation.switchTab(tabId, true); // URL更新をスキップ
+        }
+      }
+      
+      // モーダルの処理
+      // 既存のモーダルを全て閉じる
+      const openModals = document.querySelectorAll('dialog[open]');
+      openModals.forEach(modal => {
+        modal.close();
+      });
+      
+      // パラメータにモーダルが指定されている場合は開く
+      if (params.modal) {
+        openModalFromParams(params);
+      }
+    });
   }
 
   // 初回ロード: 最小限のデータのみ取得
@@ -488,6 +571,83 @@
     if (!url) return '';
     return String(url).replace(/\//g, '\\/');
   }
+
+  // ============================================
+  // URL Management Utilities
+  // ============================================
+  App.utils.url = {
+    /**
+     * URLパラメータを取得
+     * @returns {Object} パラメータオブジェクト
+     */
+    getParams: function() {
+      const params = {};
+      const urlParams = new URLSearchParams(window.location.search);
+      for (const [key, value] of urlParams) {
+        params[key] = value;
+      }
+      return params;
+    },
+
+    /**
+     * URLパラメータを更新（ブラウザ履歴にpush）
+     * @param {Object} params - パラメータオブジェクト
+     * @param {boolean} replace - trueの場合はreplaceState、falseの場合はpushState
+     */
+    updateParams: function(params, replace = false) {
+      const url = new URL(window.location);
+      
+      // 既存のパラメータをクリア
+      url.search = '';
+      
+      // 新しいパラメータを設定
+      Object.keys(params).forEach(key => {
+        if (params[key] !== null && params[key] !== undefined && params[key] !== '') {
+          url.searchParams.set(key, params[key]);
+        }
+      });
+
+      // 履歴に追加または置き換え
+      if (replace) {
+        window.history.replaceState(params, '', url.toString());
+      } else {
+        window.history.pushState(params, '', url.toString());
+      }
+    },
+
+    /**
+     * URLパラメータからタブIDを取得
+     * @param {Object} params - パラメータオブジェクト
+     * @returns {string} タブID（例: 'home', 'board-UUID'）
+     */
+    getTabIdFromParams: function(params) {
+      if (!params.tab) return null;
+      
+      if (params.tab === 'board' && params.board_id) {
+        return 'board-' + params.board_id;
+      }
+      
+      return params.tab;
+    },
+
+    /**
+     * タブIDからURLパラメータを生成
+     * @param {string} tabId - タブID（例: 'home', 'board-UUID'）
+     * @returns {Object} パラメータオブジェクト
+     */
+    getParamsFromTabId: function(tabId) {
+      const params = {};
+      
+      if (tabId.startsWith('board-')) {
+        params.tab = 'board';
+        params.board_id = tabId.replace('board-', '');
+      } else {
+        params.tab = tabId;
+      }
+      
+      return params;
+    }
+  };
 
   // ============================================
   // UI Utilities

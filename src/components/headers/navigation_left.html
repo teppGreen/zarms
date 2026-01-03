@@ -28,9 +28,10 @@
             /**
              * タブを切り替える
              * @param {string} tabName - タブID（例: 'home', 'members', 'board-UUID'）
+             * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
              */
-            switchTab: function (tabName) {
-                console.log(`switchTab called with: ${tabName}`);
+            switchTab: function (tabName, skipUrlUpdate = false) {
+                console.log(`switchTab called with: ${tabName}, skipUrlUpdate: ${skipUrlUpdate}`);
                 const isBoardTab = tabName.startsWith('board-');
 
                 // 現在のタブを取得して処理（必要なら）
@@ -99,6 +100,12 @@
                             this.switchTab('home');
                         }
                     }
+                }
+
+                // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
+                if (!skipUrlUpdate && App.utils.url && App.utils.url.updateParams) {
+                    const params = App.utils.url.getParamsFromTabId(tabName);
+                    App.utils.url.updateParams(params, false);
                 }
             },
 
