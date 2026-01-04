@@ -485,6 +485,35 @@
     document.body.style.cursor = '';
   }
 
+   /**
+   * スナックバーを表示する
+   * @param {string} text - 表示するテキスト
+   * @param {string} [color=''] - 色 (例: 'error', 'primary')。デフォルトは空欄
+   * @param {string} [position='top'] - 位置 ('top', 'bottom')。デフォルトは 'top'
+   * @param {number} [seconds=5] - 表示時間(秒)。デフォルトは 5秒
+   */
+  function showSnackbar(text, color = '', position = 'top', seconds = 5) {
+    const snackbar = document.getElementById('global-snackbar');
+    if (!snackbar) return;
+    // クラスをリセット (snackbarクラスは必須、activeは後で追加)
+    // 色と位置のクラスを追加
+    snackbar.className = `snackbar ${position} ${color}`;
+    // テキストを設定
+    snackbar.textContent = text;
+    // 表示 (activeクラスを追加)
+    snackbar.classList.add('active');
+    // 既存のタイマーがあればクリア
+    if (snackbar.dataset.timerId) {
+      clearTimeout(parseInt(snackbar.dataset.timerId));
+    }
+    // 指定時間後に非表示
+    const timerId = setTimeout(() => {
+      snackbar.classList.remove('active');
+      snackbar.dataset.timerId = '';
+    }, seconds * 1000);
+    snackbar.dataset.timerId = timerId;
+  }
+
   function openModal(id) {
     const modal = document.getElementById(id);
     if (modal) {
