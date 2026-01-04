@@ -19,6 +19,7 @@
 
     <!-- 動的ボードリスト -->
     <nav id="boards-nav" class="scroll surface-container no-padding left max">
+        <a class="shimmer-loading"></a>
     </nav>
 </nav>
 
@@ -28,9 +29,10 @@
             /**
              * タブを切り替える
              * @param {string} tabName - タブID（例: 'home', 'members', 'board-UUID'）
+             * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
              */
-            switchTab: function (tabName) {
-                console.log(`switchTab called with: ${tabName}`);
+            switchTab: async function (tabName, skipUrlUpdate = false) {
+                console.log(`switchTab called with: ${tabName}, skipUrlUpdate: ${skipUrlUpdate}`);
                 const isBoardTab = tabName.startsWith('board-');
 
                 // 現在のタブを取得して処理（必要なら）
@@ -78,7 +80,7 @@
                         if (targetBoardPage) {
                             targetBoardPage.style.display = 'block';
                             if (App.pages.boards && App.pages.boards.loadData) {
-                                App.pages.boards.loadData(boardId);
+                                await App.pages.boards.loadData(boardId);
                             }
                         } else {
                             console.error('Target board page not found:', targetBoardPageId);
@@ -91,14 +93,20 @@
 
                     if (targetPage) {
                         targetPage.style.display = 'block';
-                        this.loadTabData(tabName);
+                        await this.loadTabData(tabName);
                     } else {
-                        console.error('Target page not found:', targetPageId);
+                        alert(`開こうとしたページが見つかりません。削除された可能性があります。\nページID: ${targetPageId}`);
                         // フォールバック: Homeへ
                         if (tabName !== 'home') {
-                            this.switchTab('home');
+                            await this.switchTab('home');
                         }
                     }
+                }
+
+                // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
+                if (!skipUrlUpdate && App.utils.url && App.utils.url.updateParams) {
+                    const params = App.utils.url.getParamsFromTabId(tabName);
+                    App.utils.url.updateParams(params, false);
                 }
             },
 
@@ -118,12 +126,12 @@
             /**
              * 通常タブデータを読み込む
              */
-            loadTabData: function (tabName) {
+            loadTabData: async function (tabName) {
                 console.log(`loadTabData called for: ${tabName}`);
                 showLoading();
 
                 if (App.pages[tabName] && App.pages[tabName].loadData) {
-                    App.pages[tabName].loadData();
+                    await App.pages[tabName].loadData();
                 } else {
                     hideLoading();
                 }
