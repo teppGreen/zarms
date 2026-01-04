@@ -107,7 +107,7 @@
 
         if (!task) {
           console.error('[TaskDetail] Task not found:', taskId);
-          alert('タスクが見つかりません');
+          alert(`開こうとしたタスクが見つかりませんでした。削除されたかIDが間違っている可能性があります。\nタスクID: ${taskId}`);
           return;
         }
 
@@ -132,13 +132,16 @@
             task_id: taskId
           };
           
-          // ボードIDが存在する場合は追加
-          if (currentParams.board_id) {
-            newParams.board_id = currentParams.board_id;
-          } else if (this.currentItem && this.currentItem.board_id && this.currentItem.board_id !== '') {
-            // currentItemからboard_idを取得（nullチェックと空文字列チェック付き）
-            // board_idが有効な値（null/undefined/空文字でない）の場合のみ追加
-            newParams.board_id = this.currentItem.board_id;
+           // タブがボードの場合のみ、board_id をURLに含める
+          if (newParams.tab === 'board') {
+            // ボードIDが存在する場合は追加
+            if (currentParams.board_id) {
+              newParams.board_id = currentParams.board_id;
+            } else if (this.currentItem && this.currentItem.board_id && this.currentItem.board_id !== '') {
+              // currentItemからboard_idを取得（nullチェックと空文字列チェック付き）
+              // board_idが有効な値（null/undefined/空文字でない）の場合のみ追加
+              newParams.board_id = this.currentItem.board_id;
+            }
           }
           
           App.utils.url.updateParams(newParams, false);

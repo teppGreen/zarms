@@ -47,10 +47,13 @@
     let hasUrlParams = false;
     
     if (urlParams.tab) {
-      hasUrlParams = true;
-      if (urlParams.tab === 'board' && urlParams.board_id) {
-        initialTab = 'board-' + urlParams.board_id;
-      } else if (urlParams.tab !== 'board') {
+      if (urlParams.tab === 'board') {
+        if (urlParams.board_id) {
+          hasUrlParams = true;
+          initialTab = 'board-' + urlParams.board_id;
+        }
+      } else {
+        hasUrlParams = true;
         initialTab = urlParams.tab;
       }
     }
@@ -174,9 +177,16 @@
         } else {
           // フォールバック: ui関数（Beer CSSのモーダルトグル）またはネイティブのclose()を使用
           if (typeof ui === 'function') {
-            ui(`#${modalId}`); // Beer CSSのモーダルトグル関数
-          } else {
-            modal.close(); // ネイティブのdialog要素のclose()メソッド
+            // 第二引数にオプションを渡し、URL更新をスキップするよう示す
+            ui(`#${modalId}`, { skipUrlUpdate: true }); // Beer CSSのモーダルトグル関数
+          } else if (typeof modal.close === 'function') {
+            // 一部のカスタム実装では close(true) でURL更新をスキップできる可能性がある
+            try {
+              modal.close(true);
+            } catch (e) {
+              // ネイティブのdialog要素のclose()は引数を無視するため、安全にフォールバック
+              modal.close();
+            }
           }
         }
       });
