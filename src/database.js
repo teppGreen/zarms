@@ -54,19 +54,9 @@ const CacheManager = {
  * @returns {Object} { columnName: columnId, ... } のマッピングオブジェクト
  */
 function getHeadersMap(sheetName) {
-    const cacheKey = `headers_${sheetName}`;
-    const cachePublicRange = 'script';
-
-    // キャッシュから取得を試行
-    const cached = CacheManager.get(cacheKey, cachePublicRange);
-    if (cached) {
-        return cached;
-    }
 
     try {
-        // Sheets APIを使ってヘッダー行を取得
-        const response = Sheets.Spreadsheets.Values.get(SPREADSHEET_ID, `${sheetName}!1:1`);
-        const headers = response.values ? response.values[0] : [];
+        const headers = getHeadersFromSheetsAPI(sheetName);
 
         // ヘッダー名を列IDにマッピング
         const headersMap = {};
@@ -82,9 +72,6 @@ function getHeadersMap(sheetName) {
                 headersMap[header] = firstLetter + secondLetter;
             }
         });
-
-        // キャッシュに保存（1時間）
-        CacheManager.put(cacheKey, headersMap, cachePublicRange, 3600);
 
         return headersMap;
     } catch (error) {
@@ -349,21 +336,9 @@ function selectWithJoin(sheetName, query = {}, joins = []) {
  * @returns {Array} ヘッダー配列
  */
 function getHeadersFromSheetsAPI(sheetName) {
-    const cacheKey = `raw_headers_${sheetName}`;
-    const cachePublicRange = 'script';
-
-    // キャッシュから取得を試行
-    const cached = CacheManager.get(cacheKey, cachePublicRange);
-    if (cached) {
-        return cached;
-    }
-
     try {
         const response = Sheets.Spreadsheets.Values.get(SPREADSHEET_ID, `${sheetName}!1:1`);
         const headers = response.values ? response.values[0] : [];
-
-        // キャッシュに保存（1時間）
-        CacheManager.put(cacheKey, headers, cachePublicRange, 3600);
 
         return headers;
     } catch (error) {

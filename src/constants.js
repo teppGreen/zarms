@@ -40,7 +40,6 @@ const DIRECTORY_TYPES = {
 };
 
 const TASK_STATUS = {
-  DRAFT: '下書き',
   TODO: '未着手',
   IN_PROGRESS: '進行中',
   IN_REVIEW: '確認中',

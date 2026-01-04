@@ -61,24 +61,28 @@
                 this.multiSelect = options.multiSelect || false;
                 this.selectedIds = options.preSelected || [];
 
-                // membersDataをロード
-                if (!App.state.data.members || App.state.data.members.length === 0) {
-                    showLoading();
-                    callGAS('getItems', App.state.userId, TABLE_NAMES.MEMBERS)
-                        .then(result => {
-                            const members = result?.data || result || [];
-                            App.state.data.members = members;
-                            this.allMembers = members;
-                            this.render();
-                            hideLoading();
-                            ui('#modal-select-members');
-                        })
-                        .catch(App.utils.error.handle);
-                } else {
-                    this.allMembers = App.state.data.members;
-                    this.render();
-                    ui('#modal-select-members');
-                }
+                // membersDataをロード（毎回取得）
+                showLoading();
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {})
+                    .then(async result => {
+                        let members = result?.data || result || [];
+
+                        // isCachedチェック: キャッシュデータの場合は即座に最新データを取得
+                        if (result?.isCached === true) {
+                            console.log('Members (modal): キャッシュデータ検出。即座に最新データを取得中...');
+                            const freshResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {}, null, true);
+                            members = freshResult?.data || freshResult || [];
+                        }
+
+                        this.allMembers = members;
+                        this.render();
+                        hideLoading();
+                        ui('#modal-select-members');
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        App.utils.error.handle(error);
+                    });
             },
 
             render: function () {

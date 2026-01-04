@@ -70,24 +70,28 @@
                 const searchInput = document.getElementById('directory-search-input');
                 if (searchInput) searchInput.value = '';
 
-                // directoriesDataをロード
-                if (!App.state.data.directories || App.state.data.directories.length === 0) {
-                    showLoading();
-                    callGAS('getItems', App.state.userId, TABLE_NAMES.DIRECTORIES)
-                        .then(result => {
-                            const directories = result?.data || result || [];
-                            App.state.data.directories = directories;
-                            this.allDirectories = directories;
-                            this.render();
-                            hideLoading();
-                            ui('#modal-select-directories');
-                        })
-                        .catch(App.utils.error.handle);
-                } else {
-                    this.allDirectories = App.state.data.directories;
-                    this.render();
-                    ui('#modal-select-directories');
-                }
+                // directoriesDataをロード（毎回取得）
+                showLoading();
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {})
+                    .then(async result => {
+                        let directories = result?.data || result || [];
+
+                        // isCachedチェック: キャッシュデータ検出。即座に最新データを取得中...');
+                        if (result?.isCached === true) {
+                            console.log('Directories (modal): キャッシュデータ検出。即座に最新データを取得中...');
+                            const freshResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {}, null, true);
+                            directories = freshResult?.data || freshResult || [];
+                        }
+
+                        this.allDirectories = directories;
+                        this.render();
+                        hideLoading();
+                        ui('#modal-select-directories');
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        App.utils.error.handle(error);
+                    });
             },
 
             render: function () {

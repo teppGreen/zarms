@@ -200,7 +200,7 @@
     </main>
 
     <script>
-        const { activeUserEmail, urlParams } = <?!= JSON.stringify(templateVariables) ?>;
+        const { activeUserEmail, urlParams, scriptUrl } = <?!= JSON.stringify(templateVariables) ?>;
 
         const SLACK_PROFILE_URL_REGEX = /^https:\/\/zen-student\.slack\.com\/team\/U0[A-Z1-9]{9}$/;
         const DEFAULT_HELPER_TEXT = 'パソコンで<a href="https://zen-student.slack.com/account/profile" tabindex="-1" target="_blank" class="link">Slack プロフィール</a>を開き、︙メニューからコピーしてください。';
@@ -310,11 +310,7 @@
                 }
                 btn.disabled = true;
             }
-            google.script.run
-                .withSuccessHandler(function (url) {
-                    window.open(url, '_top');
-                })
-                .getScriptUrl();
+            window.open(scriptUrl, '_top');
         }
 
         function searchUser() {

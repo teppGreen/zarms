@@ -14,7 +14,7 @@
 
             // ステータスキーとカラムIDのマッピング
             statusMapping: {
-                'draft-todo': 'TODO',
+                'todo': 'TODO',
                 'in-progress': 'IN_PROGRESS',
                 'in-review': 'IN_REVIEW',
                 'done': 'DONE'
@@ -22,8 +22,7 @@
 
             // 逆マッピング（ステータスキーからボードIDへ）
             reverseStatusMapping: {
-                'DRAFT': 'draft-todo',
-                'TODO': 'draft-todo',
+                'TODO': 'todo',
                 'IN_PROGRESS': 'in-progress',
                 'IN_REVIEW': 'in-review',
                 'DONE': 'done'
@@ -56,9 +55,30 @@
                     }
                 });
 
-                // 新しいボードを追加
+                // 各ボードをループ
                 boards.forEach(board => {
                     let pageDiv = document.getElementById(`tab-board-${board.id}`);
+                    const headerHtml = `
+                        <nav id="board-tab-header-${board.id}" class="small-margin row">
+                            <h3 class="bold small">${escapeHtml(board.name)}</h5>
+                            <div class="max"></div>
+                            <button class="circle transparent" onclick="ui('#modal-filter-task')">
+                                <i>filter_list</i>
+                                <div class="tooltip bottom">フィルタ</div>
+                            </button>
+                            <button class="circle transparent" id="btn-share-${board.id}">
+                                <i>share</i>
+                                <div class="tooltip bottom">共有</div>
+                            </button>
+                            <button class="circle transparent" id="btn-archive-${board.id}">
+                                <i>${board.is_active ? 'archive' : 'unarchive'}</i>
+                                <div class="tooltip bottom">${board.is_active ? 'アーカイブ' : 'アーカイブ解除'}</div>
+                            </button>
+                            <button class="circle transparent" id="btn-star-${board.id}">
+                                <i>star_border</i>
+                            </button>
+                        </nav>
+                    `;
 
                     if (!pageDiv) {
                         // 新しいボード用のページコンテナを作成
@@ -68,34 +88,35 @@
                         pageDiv.style.display = 'none';
 
                         pageDiv.innerHTML = `
-                            <nav id="board-tab-header-${board.id}" class="small-margin row">
-                                <h3 class="bold small">${escapeHtml(board.name)}</h5>
-                                <div class="max"></div>
-                                <button class="border circle">
-                                    <i>star</i>
-                                </button>
-                            </nav>
+                            ${headerHtml}
                             <div id="kanban-canvas-${board.id}" class="top-margin"></div>
                         `;
 
                         container.appendChild(pageDiv);
                     } else {
-                        // 既存のボードの場合、タイトルのみ更新
-                        const header = pageDiv.querySelector('h3');
-                        if (header) {
-                            header.textContent = board.name;
+                        // 既存のボードであってもnav要素を置換
+                        const existingNav = pageDiv.querySelector('nav');
+                        if (existingNav) {
+                            existingNav.outerHTML = headerHtml;
                         }
                     }
+                    // イベントを（再）登録
+                    this.setupHeaderEvents(board);
                 });
             },
 
-            loadData: async function (boardId) {
+            loadData: async function (boardId, isRefresh = false) {
                 if (!boardId) {
                     hideLoading();
                     return;
                 }
 
                 this.currentBoardId = boardId;
+
+                // 読み込み中アニメーションを表示
+                if (!isRefresh) {
+                    this.renderKanban(boardId, true);
+                }
 
                 try {
                     // タスクをmembersとJOINして取得
@@ -104,6 +125,14 @@
                     };
 
                     const joins = [
+                        {
+                            targetTable: 'members',
+                            joinType: 'LEFT',
+                            columns: ['display_name', 'profile_photo_url'],
+                            localKey: 'created_by',
+                            foreignKey: 'id',
+                            alias: 'created_by_'
+                        },
                         {
                             targetTable: 'members',
                             joinType: 'LEFT',
@@ -131,16 +160,35 @@
                     ];
 
                     const result = await callGAS('selectWithJoin', TABLE_NAMES.TASKS, query, joins);
-                    const tasks = result?.data || result || [];
+                    let tasks = result?.data || result || [];
 
                     // ボード固有のタスクキャッシュに保存
                     this.currentBoardTasks = tasks;
 
                     console.log(`Board ${boardId} tasks loaded with JOINs:`, tasks.length);
 
-                    // カンバンを表示
-                    this.renderKanban(boardId);
+                    // カンバンを表示（まずキャッシュデータで描画）
+                    this.renderKanban(boardId, false);
                     hideLoading();
+
+                    // isCachedチェック: キャッシュデータの場合はバックグラウンドで最新データを取得
+                    if (result?.isCached === true) {
+                        console.log(`Board ${boardId}: キャッシュデータ検出。バックグラウンドで最新データを取得中...`);
+                        setTimeout(async () => {
+                            try {
+                                const freshResult = await callGAS('selectWithJoin', TABLE_NAMES.TASKS, query, joins, true); // forceRefresh = true
+                                const freshTasks = freshResult?.data || freshResult || [];
+
+                                this.currentBoardTasks = freshTasks;
+                                console.log(`Board ${boardId} tasks refreshed:`, freshTasks.length);
+
+                                // 最新データでカンバンを再描画
+                                this.renderKanban(boardId, false);
+                            } catch (error) {
+                                console.error(`Board ${boardId} background refresh error:`, error);
+                            }
+                        }, 100); // 100ms後に実行（メインUIの表示を優先）
+                    }
                 } catch (error) {
                     console.error('Error loading board tasks:', error);
                     hideLoading();
@@ -148,15 +196,20 @@
                 }
             },
 
-            renderKanban: function (boardId) {
-                // ローカルキャッシュから取得（loadDataでJOIN済み）
-                const boardTasks = this.currentBoardTasks || [];
+            renderKanban: function (boardId, isLoading = false) {
+                const containerId = `kanban-canvas-${boardId}`;
+                const container = document.getElementById(containerId);
+
+                if (!container) {
+                    hideLoading();
+                    return;
+                }
 
                 const columns = [
                     {
-                        id: 'draft-todo',
+                        id: 'todo',
                         title: '未着手',
-                        filter: (t) => ['DRAFT', 'TODO'].includes(t.task_status_key)
+                        filter: (t) => t.task_status_key === 'TODO'
                     },
                     {
                         id: 'in-progress',
@@ -175,14 +228,6 @@
                     }
                 ];
 
-                const containerId = `kanban-canvas-${boardId}`;
-                const container = document.getElementById(containerId);
-
-                if (!container) {
-                    hideLoading();
-                    return;
-                }
-
                 // 既存のSortableインスタンスを破棄
                 Object.values(this.sortableInstances || {}).forEach(instance => {
                     if (instance && typeof instance.destroy === 'function') {
@@ -191,20 +236,35 @@
                 });
                 this.sortableInstances = {};
 
+                // ローカルキャッシュから取得（loadDataでJOIN済み）
+                const boardTasks = this.currentBoardTasks || [];
+
                 const html = [
                     '<div class="grid no-space">',
                     columns.map(column => {
-                        const columnTasks = boardTasks.filter(column.filter);
+                        let itemsHtml = '';
+                        let countText = '-';
+
+                        if (isLoading) {
+                            itemsHtml = Array(4).fill(0).map((_, i) =>
+                                `<article class="shimmer-loading small-margin no-elevate" style="height: 100px; animation-delay: ${i * 0.1}s;"></article>`
+                            ).join('');
+                        } else {
+                            const columnTasks = boardTasks.filter(column.filter);
+                            itemsHtml = columnTasks.map(task => this.createTaskCard(task)).join('');
+                            countText = columnTasks.length;
+                        }
+
                         return `
                             <div class="s12 m3 l3">
                                 <article class="kanban-column background no-round no-elevate no-scroll no-padding">
                                     <div class="row no-round left-margin right-margin">
                                         <span class="bold">${column.title}</span>
                                         <div class="max"></div>
-                                        <span class="tiny">${columnTasks.length}</span>
+                                        <span class="tiny">${countText}</span>
                                     </div>
-                                    <div class="scroll large-height no-padding kanban-column-items" data-status-id="${column.id}" data-board-id="${boardId}" id="kanban-${boardId}-${column.id}-list"">
-                                        ${columnTasks.map(task => this.createTaskCard(task)).join('')}
+                                    <div class="scroll large-height no-padding kanban-column-items" data-status-id="${column.id}" data-board-id="${boardId}" id="kanban-${boardId}-${column.id}-list">
+                                        ${itemsHtml}
                                     </div>
                                 </article>
                             </div>`;
@@ -214,9 +274,10 @@
 
                 container.innerHTML = html;
 
-                this.bindCardClick(container);
-                this.setupSortable(boardId);
-                this.updateColumnCounts(container);
+                if (!isLoading) {
+                    this.bindCardClick(container);
+                    this.setupSortable(boardId);
+                }
             },
             /**
              * SortableJSを初期化
@@ -258,7 +319,6 @@
                 }
 
                 if (targetStatusId === sourceStatusId) {
-                    this.updateColumnCounts(document.getElementById(`kanban-canvas-${boardId}`));
                     return;
                 }
 
@@ -285,22 +345,6 @@
             },
 
             /**
-             * カラムの件数を再計算
-             */
-            updateColumnCounts: function (container) {
-                if (!container) return;
-                const columns = container.querySelectorAll('.kanban-column-items');
-                columns.forEach(column => {
-                    const count = column.querySelectorAll('.kanban-card').length;
-                    const chip = column.closest('article')?.querySelector('.chip');
-                    if (chip) {
-                        chip.textContent = count;
-                    }
-                });
-            },
-
-
-            /**
              * タスクドロップ時の処理
              */
             handleTaskDrop: function (taskId, targetStatusId, boardId, rollback) {
@@ -315,9 +359,12 @@
                 }
 
                 // 現在のタスクを取得して元のステータスを保存
-                const tasks = App.state.data.tasks || [];
-                const task = tasks.find(t => t.id === taskId);
+                // ボード固有のデータ(this.currentBoardTasks)を優先して検索
+                const boardTasks = this.currentBoardTasks || [];
+                const task = boardTasks.find(t => t.id === taskId);
+
                 if (!task) {
+                    console.error('Task not found in current board tasks:', taskId);
                     if (typeof rollback === 'function') rollback();
                     return;
                 }
@@ -326,11 +373,13 @@
 
                 // 同じステータスへのドロップは無視
                 if (oldStatusKey === newStatusKey) {
-                    this.updateColumnCounts(document.getElementById(`kanban-canvas-${boardId}`));
                     return;
                 }
 
                 // Optimistic UI update
+                // 1. ボード固有のデータを直接更新
+                task.task_status_key = newStatusKey;
+                // 2. グローバルデータもあれば更新
                 updateLocalData(TABLE_NAMES.TASKS, taskId, { task_status_key: newStatusKey });
 
                 // DB更新
@@ -341,45 +390,251 @@
                     .then(result => {
                         if (!result || (Array.isArray(result) && result.length === 0)) {
                             // ロールバック
+                            task.task_status_key = oldStatusKey;
                             updateLocalData(TABLE_NAMES.TASKS, taskId, { task_status_key: oldStatusKey });
                             if (typeof rollback === 'function') rollback();
                             alert('ステータスの更新に失敗しました');
                         } else {
-                            this.updateColumnCounts(document.getElementById(`kanban-canvas-${boardId}`));
+                            this.loadData(boardId, true);
                         }
                     })
                     .catch(error => {
                         // ロールバック
+                        task.task_status_key = oldStatusKey;
                         updateLocalData(TABLE_NAMES.TASKS, taskId, { task_status_key: oldStatusKey });
                         if (typeof rollback === 'function') rollback();
                         App.utils.error.handle(error);
                     });
             },
 
+
+
+            setupHeaderEvents: function (board) {
+                // Share Button
+                const btnShare = document.getElementById(`btn-share-${board.id}`);
+                if (btnShare) {
+                    btnShare.addEventListener('click', () => {
+                        const url = `${scriptUrl}?tab=board&board_id=${board.id}`;
+                        const text = `[ボード#${board.display_id}] ${board.name} | ZEN Boards`;
+
+                        const htmlContent = `<a href="${url}">[ボード#${board.display_id}] ${escapeHtml(board.name)} | ZEN Boards</a>`;
+                        const textContent = `[ボード#${board.display_id}] ${board.name} | ZEN Boards\n${url}`;
+
+                        const blobHtml = new Blob([htmlContent], { type: "text/html" });
+                        const blobText = new Blob([textContent], { type: "text/plain" });
+
+                        const data = [new ClipboardItem({
+                            ["text/html"]: blobHtml,
+                            ["text/plain"]: blobText
+                        })];
+
+                        navigator.clipboard.write(data).then(() => {
+                            ui('#toast-share-success', { timeout: 2000 });
+                        }).catch(err => {
+                            console.error('Clipboard write failed', err);
+                            navigator.clipboard.writeText(textContent).then(() => {
+                                ui('#toast-share-success', { timeout: 2000 });
+                            });
+                        });
+                    });
+                }
+
+                // Archive Button
+                const btnArchive = document.getElementById(`btn-archive-${board.id}`);
+                if (btnArchive) {
+                    btnArchive.addEventListener('click', async () => {
+                        const isArchiving = board.is_active;
+                        const confirmMsg = isArchiving ? 'このボードをアーカイブしますか？' : 'このボードのアーカイブを解除しますか？';
+                        if (!confirm(confirmMsg)) return;
+
+                        try {
+                            const newStatus = !isArchiving;
+                            const actionName = isArchiving ? 'ボードをアーカイブ' : 'ボードのアーカイブを解除';
+
+                            await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'update', {
+                                where: { id: ["=", board.id] },
+                                set: { is_active: newStatus }
+                            }, actionName);
+
+                            refreshData();
+                        } catch (e) {
+                            console.error(e);
+                            alert('処理に失敗しました。時間をおいて再度お試しください。');
+                        }
+                    });
+                }
+
+                // Star Button
+                this.updateStarButton(board.id);
+                const btnStar = document.getElementById(`btn-star-${board.id}`);
+                if (btnStar) {
+                    btnStar.addEventListener('click', async () => {
+                        console.log('[btnStar] Clicked for board:', board.id);
+                        console.log('[btnStar] Initial classList:', btnStar.classList.toString());
+
+                        // 1. ボタンのactiveクラスを切り替え (Optimistic UI)
+                        const isActive = btnStar.classList.toggle('active');
+                        console.log('[btnStar] After toggle - isActive:', isActive);
+                        console.log('[btnStar] After toggle - classList:', btnStar.classList.toString());
+
+                        // アイコンも連動して切り替え
+                        const icon = btnStar.querySelector('i');
+                        if (icon) {
+                            icon.textContent = isActive ? 'star' : 'star_border';
+                            if (isActive) {
+                                icon.classList.add('fill');
+                            } else {
+                                icon.classList.remove('fill');
+                            }
+                        }
+
+                        // 2. ユーザープロパティ保存
+                        // 共通の getUserProperty を使用
+                        const starred = App.state.getUserProperty('starred_boards', []);
+                        console.log('[btnStar] Current starred_boards:', JSON.stringify(starred));
+
+                        const index = starred.indexOf(board.id);
+                        console.log('[btnStar] Index of board.id in starred:', index);
+
+                        if (isActive) {
+                            console.log('[btnStar] Adding board to starred (isActive=true)');
+                            if (index === -1) {
+                                starred.push(board.id);
+                                console.log('[btnStar] Board added to starred array');
+                            } else {
+                                console.log('[btnStar] Board already in starred array, skipping');
+                            }
+                        } else {
+                            console.log('[btnStar] Removing board from starred (isActive=false)');
+                            if (index !== -1) {
+                                starred.splice(index, 1);
+                                console.log('[btnStar] Board removed from starred array');
+                            } else {
+                                console.log('[btnStar] Board not in starred array, skipping');
+                            }
+                        }
+
+                        console.log('[btnStar] Updated starred_boards:', JSON.stringify(starred));
+
+                        if (App.state.saveUserProperty) {
+                            console.log('[btnStar] Saving user property...');
+                            // 共通の saveUserProperty を使用 (await可能、自動文字列化)
+                            await App.state.saveUserProperty('starred_boards', starred);
+                            console.log('[btnStar] User property saved successfully');
+                        } else {
+                            console.warn('[btnStar] App.state.saveUserProperty is not available');
+                        }
+
+                        // 3. ナビゲーション再描画
+                        if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+                            console.log('[btnStar] Re-rendering boards navigation...');
+                            App.utils.navigation.renderBoardsNavigation();
+                            console.log('[btnStar] Boards navigation re-rendered');
+                        } else {
+                            console.warn('[btnStar] App.utils.navigation.renderBoardsNavigation is not available');
+                        }
+                    });
+                }
+            },
+
+            updateStarButton: function (boardId) {
+                console.log('[updateStarButton] Called for board:', boardId);
+                const btnStar = document.getElementById(`btn-star-${boardId}`);
+                if (!btnStar) {
+                    console.warn('[updateStarButton] Star button not found for board:', boardId);
+                    return;
+                }
+
+                // 共通の getUserProperty を使用
+                const starred = App.state.getUserProperty('starred_boards', []);
+                console.log('[updateStarButton] Current starred_boards:', JSON.stringify(starred));
+                const isStarred = starred.includes(boardId);
+                console.log('[updateStarButton] Is board starred?', isStarred);
+
+                // activeクラスの制御
+                if (isStarred) {
+                    btnStar.classList.add('active');
+                    console.log('[updateStarButton] Added active class');
+                } else {
+                    btnStar.classList.remove('active');
+                    console.log('[updateStarButton] Removed active class');
+                }
+
+                const icon = btnStar.querySelector('i');
+                if (icon) {
+                    icon.textContent = isStarred ? 'star' : 'star_border';
+                    if (isStarred) {
+                        icon.classList.add('fill');
+                    } else {
+                        icon.classList.remove('fill');
+                    }
+                    console.log('[updateStarButton] Icon updated to:', icon.textContent);
+                }
+            },
+
             createTaskCard: function (task) {
                 const displayId = task.display_id ? `#${task.display_id}` : '';
 
-                // JOIN済みデータから担当者情報を取得（processed_byを優先）
-                const assigneeName = task.processed_by_display_name || '';
-                const assigneePhotoUrl = task.processed_by_profile_photo_url;
+                // JOIN済みデータから担当者情報を取得
+                const assigneeNames = [
+                    task.created_by_display_name, task.processed_by_display_name, task.reviewed_by_display_name, task.delivered_by_display_name
+                ];
+                const assigneePhotoUrls = [
+                    task.created_by_profile_photo_url, task.processed_by_profile_photo_url, task.reviewed_by_profile_photo_url, task.delivered_by_profile_photo_url
+                ]
+                const assigneeIcons = assigneePhotoUrls.map((url, index) => {
+                    let opacity;
+                    if (index === 1 && task.task_status_key === 'TODO') {
+                        opacity = 1;
+                    } else if (index === 1 && task.task_status_key === 'IN_PROGRESS') {
+                        opacity = 1;
+                    } else if (index === 2 && task.task_status_key === 'IN_REVIEW') {
+                        opacity = 1;
+                    } else if (index === 3 && task.task_status_key === 'DONE') {
+                        opacity = 1;
+                    } else {
+                        opacity = 0.5;
+                    }
 
-                const assigneeIcon = assigneePhotoUrl
-                    ? `<img src="${assigneePhotoUrl}" alt="${escapeHtml(assigneeName)}" class="circle tiny">`
-                    : '<i class="tiny">person</i>';
+                    let iconSrc, buttonClass;
+                    if (url) {
+                        iconSrc = `<img src="${url}" title="${escapeHtml(assigneeNames[index])}" class="responsive">`;
+                        buttonClass = 'circle transparent small';
+                    } else {
+                        iconSrc = `<i title="${escapeHtml(assigneeNames[index])}">person</i>`;
+                        buttonClass = 'circle tertiary small';
+                    }
+
+                    return `
+                        <button class="${buttonClass}" style="opacity: ${opacity};">
+                            ${iconSrc}
+                        </button>
+                    `;
+                });
+
+                let datetimeSpan;
+                if (!task.starts_at && !task.ends_at) {
+                    datetimeSpan = `
+                        <i class="error-text tiny">warning</i>
+                        <span class="error-text">終了日時を設定してください</span>
+                    `;
+                } else {
+                    datetimeSpan = `
+                        <span>${formatDateTimeForDisplay(task.starts_at, 'MM/dd(E)') || ''} - ${formatDateTimeForDisplay(task.ends_at, 'MM/dd(E) HH:mm') || ''}</span>
+                    `;
+                }
+
 
                 return `
-                <article class="kanban-card small-margin small-padding" data-eid="${task.id}" role="button">
+                <article class="kanban-card small-margin padding" data-eid="${task.id}" role="button">
+                    <div>
+                        <span>${displayId} <strong>${escapeHtml(task.name || '')}</strong></span>
+                    </div>
+                    <div>
+                        ${datetimeSpan}
+                    </div>
                     <div class="tiny-space row">
-                        <span class="bold">${escapeHtml(task.name || '')}</span>
-                        <span class="small-text">${displayId}</span>
-                    </div>
-                    <div class="tiny-space row align-center">
-                        ${assigneeIcon}
-                        <span class="small-text">${escapeHtml(assigneeName)}</span>
-                    </div>
-                    <div class="tiny-space row align-center">
-                        <i class="tiny">schedule</i>
-                        <span class="small-text">${formatDateTimeForDisplay(task.starts_at, 'MM/dd(E)') || ''} ${(task.starts_at || task.ends_at) ? ' - ' : ''} ${formatDateTimeForDisplay(task.ends_at, 'MM/dd(E)') || ''}</span>
+                        ${assigneeIcons.join('')}
                     </div>
                 </article>
                 `;

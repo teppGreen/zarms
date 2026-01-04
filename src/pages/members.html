@@ -25,25 +25,60 @@
                 try {
                     showLoading();
 
-                    // membersデータがまだ取得されていない場合のみ取得
-                    if (!App.state.data.members || App.state.data.members.length === 0) {
-                        const membersResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {});
-                        const members = membersResult?.data || membersResult || [];
-                        App.state.data.members = members;
-                        console.log('Members data loaded:', members.length);
-                    }
+                    // membersデータを取得
+                    let membersResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {});
+                    let members = membersResult?.data || membersResult || [];
 
-                    // directoriesデータがまだ取得されていない場合のみ取得
-                    if (!App.state.data.directories || App.state.data.directories.length === 0) {
-                        const directoriesResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {});
-                        const directories = directoriesResult?.data || directoriesResult || [];
-                        App.state.data.directories = directories;
-                        console.log('Directories data loaded:', directories.length);
-                    }
+                    // directoriesデータを取得
+                    let directoriesResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {});
+                    let directories = directoriesResult?.data || directoriesResult || [];
 
-                    this.renderMembers();
-                    this.renderDirectories();
+                    console.log('Members data loaded:', members.length);
+                    console.log('Directories data loaded:', directories.length);
+
+                    // まずキャッシュデータで描画
+                    this.renderMembers(members);
+                    this.renderDirectories(directories);
                     hideLoading();
+
+                    // isCachedチェック: キャッシュデータの場合はバックグラウンドで最新データを取得
+                    if (membersResult?.isCached === true || directoriesResult?.isCached === true) {
+                        console.log('Members/Directories: キャッシュデータ検出。バックグラウンドで最新データを取得中...');
+                        setTimeout(async () => {
+                            try {
+                                const promises = [];
+
+                                if (membersResult?.isCached === true) {
+                                    promises.push(
+                                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {}, null, true)
+                                    );
+                                } else {
+                                    promises.push(Promise.resolve(membersResult));
+                                }
+
+                                if (directoriesResult?.isCached === true) {
+                                    promises.push(
+                                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {}, null, true)
+                                    );
+                                } else {
+                                    promises.push(Promise.resolve(directoriesResult));
+                                }
+
+                                const [freshMembersResult, freshDirectoriesResult] = await Promise.all(promises);
+                                const freshMembers = freshMembersResult?.data || freshMembersResult || [];
+                                const freshDirectories = freshDirectoriesResult?.data || freshDirectoriesResult || [];
+
+                                console.log('Members data refreshed:', freshMembers.length);
+                                console.log('Directories data refreshed:', freshDirectories.length);
+
+                                // 最新データで再描画
+                                this.renderMembers(freshMembers);
+                                this.renderDirectories(freshDirectories);
+                            } catch (error) {
+                                console.error('Background refresh error (members/directories):', error);
+                            }
+                        }, 100); // 100ms後に実行（メインUIの表示を優先）
+                    }
                 } catch (error) {
                     console.error('Error loading members page data:', error);
                     hideLoading();
@@ -51,8 +86,7 @@
                 }
             },
 
-            renderMembers: function () {
-                const members = App.state.data.members || [];
+            renderMembers: function (members = []) {
                 const container = document.getElementById('members-list');
 
                 if (members.length === 0) {
@@ -81,8 +115,7 @@
                 container.innerHTML = html;
             },
 
-            renderDirectories: function () {
-                const directories = App.state.data.directories || [];
+            renderDirectories: function (directories = []) {
                 const container = document.getElementById('directories-tree');
 
                 if (directories.length === 0) {
