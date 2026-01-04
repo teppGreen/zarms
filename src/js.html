@@ -37,6 +37,9 @@
       App.state.userId = activeUser.id;
     }
 
+    // 全データを読み込み
+    await loadAllData();
+
     // URLパラメータを取得
     const urlParams = templateVariables.urlParams || {};
     console.log('[initializeApp] URL params:', urlParams);
@@ -45,7 +48,7 @@
     // URLパラメータがある場合はそれを使用、ない場合はhomeを表示
     let initialTab = 'home';
     let hasUrlParams = false;
-    
+
     if (urlParams.tab) {
       if (urlParams.tab === 'board') {
         if (urlParams.board_id) {
@@ -58,18 +61,7 @@
       }
     }
 
-    if (App.utils.navigation && App.utils.navigation.switchTab) {
-      App.utils.navigation.switchTab(initialTab, true); // trueでURL更新をスキップ
-    }
-
-    // URLパラメータがない場合は、初期状態をURLに反映（replaceStateで履歴に追加しない）
-    if (!hasUrlParams && App.utils.url && App.utils.url.updateParams) {
-      const params = App.utils.url.getParamsFromTabId(initialTab);
-      App.utils.url.updateParams(params, true); // trueでreplaceState
-    }
-
-    // 全データを読み込み
-    await loadAllData();
+    await App.utils.navigation.switchTab(initialTab, true); // trueでURL更新をスキップ
 
     // モーダルパラメータがある場合は該当のモーダルを開く
     if (urlParams.modal) {
@@ -86,45 +78,22 @@
    */
   function openModalFromParams(params) {
     console.log('[openModalFromParams] Opening modal from params:', params);
-    
-    // 定数定義
-    const MAX_RETRY_ATTEMPTS = 10; // 最大リトライ回数
-    const RETRY_DELAY_MS = 200;     // リトライ間隔（ミリ秒）
-    const INITIAL_DELAY_MS = 500;   // 初期待機時間（ミリ秒）
-    
+
     // タスク詳細モーダル
     if (params.modal === 'task-detail' && params.task_id) {
-      if (App.modals.taskDetail && App.modals.taskDetail.open) {
-        // データが読み込まれるまで少し待つ、またはデータが利用可能になるまでリトライ
-        const attemptOpen = (retries = 0) => {
-          const boardTasks = App.pages.boards?.currentBoardTasks || [];
-          const task = boardTasks.find(t => t.id === params.task_id);
-          
-          if (task || retries >= MAX_RETRY_ATTEMPTS) {
-            // タスクが見つかったか、リトライ回数上限に達した場合は開く
-            App.modals.taskDetail.open(params.task_id, true); // trueでURL更新をスキップ
-          } else {
-            // タスクが見つからない場合は少し待ってリトライ
-            setTimeout(() => attemptOpen(retries + 1), RETRY_DELAY_MS);
-          }
-        };
-        setTimeout(() => attemptOpen(), INITIAL_DELAY_MS);
+      const boardTasks = App.pages.boards?.currentBoardTasks || [];
+      const task = boardTasks.find(t => t.id === params.task_id);
+
+      if (task) {
+        App.modals.taskDetail.open(params.task_id, true); // trueでURL更新をスキップ
+      } else {
+        console.error('Task not found for ID:', params.task_id);
+        console.log(`App.pages.boards?.currentBoardTasks:`, App.pages.boards?.currentBoardTasks);
       }
     }
     // メンバー詳細モーダル
-    // 注: 現在のコードベースでは App.overlays.memberDetail として参照されている箇所もあります
-    // TODO: 命名規則を統一する必要があります（App.modals vs App.overlays）
     else if (params.modal === 'member-detail' && params.member_id) {
-      if (App.modals.memberDetail && App.modals.memberDetail.open) {
-        setTimeout(() => {
-          App.modals.memberDetail.open(params.member_id, true); // trueでURL更新をスキップ
-        }, INITIAL_DELAY_MS);
-      } else if (App.overlays.memberDetail && App.overlays.memberDetail.open) {
-        // フォールバック: overlays名前空間も確認
-        setTimeout(() => {
-          App.overlays.memberDetail.open(params.member_id, true);
-        }, INITIAL_DELAY_MS);
-      }
+      App.modals.memberDetail.open(params.member_id, true); // trueでURL更新をスキップ
     }
   }
 
@@ -132,12 +101,17 @@
    * ブラウザ履歴の戻る/進むボタンへの対応
    */
   function setupBrowserHistoryHandlers() {
-    window.addEventListener('popstate', function(event) {
-      console.log('[popstate] Browser back/forward button pressed', event.state);
-      
-      // event.stateがnullの場合は、URLから直接パラメータを取得
+    const handleHistoryChange = async function (event) {
+      console.log('[history] Browser back/forward button pressed or history changed', event.state);
+
+      // event.stateがnullの場合は、URLから直接パラメータを取得（初回はキャッシュがあればそれを使用）
       const params = event.state || App.utils.url.getParams() || {};
-      
+
+      // 履歴変更があった場合はキャッシュを更新
+      if (App.utils.url.setParams) {
+        App.utils.url.setParams(params);
+      }
+
       // タブを切り替え
       if (params.tab) {
         let tabId = 'home';
@@ -146,23 +120,23 @@
         } else if (params.tab !== 'board') {
           tabId = params.tab;
         }
-        
+
         if (App.utils.navigation && App.utils.navigation.switchTab) {
-          App.utils.navigation.switchTab(tabId, true); // URL更新をスキップ
+          await App.utils.navigation.switchTab(tabId, true); // URL更新をスキップ
         }
       } else {
         // パラメータがない場合はホームに戻る
         if (App.utils.navigation && App.utils.navigation.switchTab) {
-          App.utils.navigation.switchTab('home', true);
+          await App.utils.navigation.switchTab('home', true);
         }
       }
-      
+
       // モーダルの処理
       // 既存のモーダルを全て閉じる（各モーダルのcloseメソッドを使用）
       const openModals = document.querySelectorAll('dialog[open]');
       openModals.forEach(modal => {
         const modalId = modal.id;
-        
+
         // モーダルIDからモーダルオブジェクトを取得してcloseメソッドを呼び出す
         // skipUrlUpdate=trueでURL更新をスキップ
         if (modalId === 'modal-detail-task' && App.modals.taskDetail && App.modals.taskDetail.close) {
@@ -190,12 +164,19 @@
           }
         }
       });
-      
+
       // パラメータにモーダルが指定されている場合は開く
       if (params.modal) {
         openModalFromParams(params);
       }
-    });
+    };
+
+    window.addEventListener('popstate', handleHistoryChange);
+
+    // google.script.history が利用可能な場合はリスナーを追加
+    if (typeof google !== 'undefined' && google.script && google.script.history) {
+      google.script.history.setChangeHandler(handleHistoryChange);
+    }
   }
 
   // 初回ロード: 最小限のデータのみ取得
@@ -238,30 +219,34 @@
 
             // ナビゲーションを更新
             if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+              // 現在のアクティブなボードIDを取得
+              const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#boards-nav a.active');
+              const activeBoardId = activeLink ? activeLink.dataset.boardId : null;
+
               App.utils.navigation.renderBoardsNavigation();
+
+              // アクティブ状態を復元（ボードIDがある場合のみ）
+              if (activeBoardId) {
+                const newActiveLink = document.querySelector(`a[data-board-id="${activeBoardId}"]`);
+                if (newActiveLink) {
+                  newActiveLink.classList.add('active');
+                }
+              }
             }
-            if (App.pages && App.pages.boards && App.pages.boards.initialize) {
-              App.pages.boards.initialize();
-            }
+            App.pages.boards.initialize();
             console.log('バックグラウンド更新完了');
           } catch (error) {
             console.error('バックグラウンド更新エラー:', error);
           }
-        }, 100);
+        }, 60);
       }
 
       // ナビゲーションとボードページを更新
-      if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
-        App.utils.navigation.renderBoardsNavigation();
-      }
-      if (App.pages && App.pages.boards && App.pages.boards.initialize) {
-        App.pages.boards.initialize();
-      }
+      App.utils.navigation.renderBoardsNavigation();
+      App.pages.boards.initialize();
 
       // アプリリンクを描画
-      if (App.utils.header && App.utils.header.renderAppLinks) {
-        App.utils.header.renderAppLinks();
-      }
+      App.utils.header.renderAppLinks();
 
       hideLoading();
     } catch (error) {
@@ -327,14 +312,10 @@
       // 5. すべてのデータ更新が完了してから、DOM更新を一括実行
 
       // ボードページを更新
-      if (App.pages && App.pages.boards && App.pages.boards.initialize) {
-        App.pages.boards.initialize();
-      }
+      App.pages.boards.initialize();
 
       // ナビゲーションを更新
-      if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
-        App.utils.navigation.renderBoardsNavigation();
-      }
+      App.utils.navigation.renderBoardsNavigation();
 
       // 左ナビのアクティブ状態を復元
       if (savedNavDataBoardId) {
@@ -450,9 +431,7 @@
           if (navLink) navLink.classList.add('active');
         }
 
-        if (App.pages && App.pages.boards && App.pages.boards.initialize) {
-          App.pages.boards.initialize();
-        }
+        App.pages.boards.initialize();
 
         // ボードタブの表示状態を復元
         if (savedTabId === 'tab-board' && savedBoardId) {
@@ -643,17 +622,40 @@
   // URL Management Utilities
   // ============================================
   App.utils.url = {
+    _cachedParams: null,
+
     /**
      * URLパラメータを取得
      * @returns {Object} パラメータオブジェクト
      */
-    getParams: function() {
-      const params = {};
-      const urlParams = new URLSearchParams(window.location.search);
-      for (const [key, value] of urlParams) {
-        params[key] = value;
+    getParams: function () {
+      // キャッシュがあればそれを使用
+      if (this._cachedParams) {
+        return { ...this._cachedParams };
       }
+
+      let params = {};
+
+      // 初回ロード時: templateVariablesからの取得を優先
+      if (typeof templateVariables !== 'undefined' && templateVariables.urlParams) {
+        params = { ...templateVariables.urlParams };
+      } else {
+        const urlParams = new URLSearchParams(window.location.search);
+        for (const [key, value] of urlParams) {
+          params[key] = value;
+        }
+      }
+
+      this._cachedParams = params;
       return params;
+    },
+
+    /**
+     * キャッシュされたパラメータを強制的に設定（履歴変更時など）
+     * @param {Object} params 
+     */
+    setParams: function (params) {
+      this._cachedParams = { ...params };
     },
 
     /**
@@ -661,24 +663,43 @@
      * @param {Object} params - パラメータオブジェクト
      * @param {boolean} replace - trueの場合はreplaceState、falseの場合はpushState
      */
-    updateParams: function(params, replace = false) {
-      const url = new URL(window.location);
-      
-      // 既存のパラメータをクリア
-      url.search = '';
-      
-      // 新しいパラメータを設定
+    updateParams: function (params, replace = false) {
+      // null, undefined, 空文字をフィルタリング
+      const cleanParams = {};
       Object.keys(params).forEach(key => {
         if (params[key] !== null && params[key] !== undefined && params[key] !== '') {
-          url.searchParams.set(key, params[key]);
+          cleanParams[key] = params[key];
         }
+      });
+
+      // キャッシュを更新
+      this._cachedParams = cleanParams;
+
+      // google.script.history が利用可能な場合はそれを使用
+      if (typeof google !== 'undefined' && google.script && google.script.history) {
+        if (replace) {
+          google.script.history.replace(cleanParams, cleanParams);
+        } else {
+          google.script.history.push(cleanParams, cleanParams);
+        }
+        return;
+      }
+
+      const url = new URL(window.location);
+
+      // 既存のパラメータをクリア
+      url.search = '';
+
+      // 新しいパラメータを設定
+      Object.keys(cleanParams).forEach(key => {
+        url.searchParams.set(key, cleanParams[key]);
       });
 
       // 履歴に追加または置き換え
       if (replace) {
-        window.history.replaceState(params, '', url.toString());
+        window.history.replaceState(cleanParams, '', url.toString());
       } else {
-        window.history.pushState(params, '', url.toString());
+        window.history.pushState(cleanParams, '', url.toString());
       }
     },
 
@@ -687,9 +708,9 @@
      * @param {Object} params - パラメータオブジェクト
      * @returns {string|null} タブID（例: 'home', 'board-UUID'）またはnull
      */
-    getTabIdFromParams: function(params) {
+    getTabIdFromParams: function (params) {
       if (!params.tab) return null;
-      
+
       // boardタブの場合、board_idが有効な値であることを確認
       if (params.tab === 'board') {
         if (params.board_id && params.board_id !== '') {
@@ -698,7 +719,7 @@
         // board_idが無効な場合はnullを返す
         return null;
       }
-      
+
       return params.tab;
     },
 
@@ -707,16 +728,16 @@
      * @param {string} tabId - タブID（例: 'home', 'board-UUID'）
      * @returns {Object} パラメータオブジェクト
      */
-    getParamsFromTabId: function(tabId) {
+    getParamsFromTabId: function (tabId) {
       const params = {};
-      
+
       if (tabId.startsWith('board-')) {
         params.tab = 'board';
         params.board_id = tabId.replace('board-', '');
       } else {
         params.tab = tabId;
       }
-      
+
       return params;
     }
   };
