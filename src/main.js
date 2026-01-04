@@ -20,6 +20,7 @@ function doGet(e) {
 
   const template = HtmlService.createTemplateFromFile('register');
   template.templateVariables = {
+    scriptUrl: getScriptUrl(),
     urlParams: e.parameter,
     activeUserEmail: activeUserEmail
   };
@@ -38,7 +39,8 @@ function loadMainApp(urlParams, activeUser) {
     activeUser: activeUser,
     TABLE_NAMES: TABLE_NAMES,
     DIRECTORY_TYPES: DIRECTORY_TYPES,
-    TASK_STATUS: TASK_STATUS
+    TASK_STATUS: TASK_STATUS,
+    userProperties: PropertiesService.getUserProperties().getProperties()
   };
 
   return template.evaluate().getContent();
@@ -114,6 +116,22 @@ function registerUserEmail(userId) {
     return result ? true : false;
   } catch (error) {
     console.error('registerUserEmail error:', error);
+    return false;
+  }
+}
+
+/**
+ * ユーザープロパティを保存します
+ * @param {string} key - プロパティキー
+ * @param {string} value - プロパティ値
+ * @returns {boolean} 成功フラグ
+ */
+function saveUserProperty(key, value) {
+  try {
+    PropertiesService.getUserProperties().setProperty(key, value);
+    return true;
+  } catch (error) {
+    console.error('saveUserProperty error:', error);
     return false;
   }
 }

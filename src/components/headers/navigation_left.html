@@ -1,6 +1,6 @@
 <nav id="left-nav" class="m l left no-wrap small-padding small-width max no-scroll surface-container">
     <header class="row padding no-margin">
-        <h1 style="font-family: 'Google Sans Flex', sans-serif; font-weight: 600; font-size: 1.5rem;">ZEN Boards</h1>
+        <h1 class="font-title" style="font-size: 1.5rem;">ZEN Boards</h1>
     </header>
 
     <a id="home-nav" onclick="App.utils.navigation.switchTab('home')">
@@ -15,11 +15,9 @@
         <i>assignment</i>
         <span>マイボード</span>
     </a>
-    <hr class="small-margin">
 
     <!-- 動的ボードリスト -->
     <nav id="boards-nav" class="scroll surface-container no-padding left max">
-        <a class="shimmer-loading"></a>
     </nav>
 </nav>
 
@@ -80,7 +78,10 @@
                         if (targetBoardPage) {
                             targetBoardPage.style.display = 'block';
                             if (App.pages.boards && App.pages.boards.loadData) {
-                                await App.pages.boards.loadData(boardId);
+                                // 既に描画済み（キャンバスにコンテンツがある）場合はtrueを渡してローディング表示をスキップ
+                                const canvas = document.getElementById('kanban-canvas-' + boardId);
+                                const isRendered = canvas && canvas.children.length > 0;
+                                await App.pages.boards.loadData(boardId, isRendered);
                             }
                         } else {
                             console.error('Target board page not found:', targetBoardPageId);
@@ -141,34 +142,157 @@
              * 動的にボードリストを生成
              */
             renderBoardsNavigation: function () {
+                console.log('[renderBoardsNavigation] Start. UserProperties:', App.state.userProperties);
+
+                // 現在のアクティブなボードIDを保存
+                const activeLink = document.querySelector('#boards-nav a.active');
+                const activeBoardId = activeLink ? activeLink.dataset.boardId : null;
+                console.log('[renderBoardsNavigation] Current active board ID:', activeBoardId);
+
                 const boards = App.state.data.boards || [];
-                console.log('Rendering boards navigation. Boards data:', boards);
-
-                // TODO: ユーザープロパティからstarredBoardsを取得
-                const starredBoards = [];
-
+                console.log('[renderBoardsNavigation] Total boards:', boards.length);
+                let starredBoardIndex = [];
+                let activeBoardIndex = [];
+                let archiveBoardIndex = [];
                 const boardsNavigation = document.getElementById('boards-nav');
-                const divider = `<hr class="small-margin">`;
 
-                let html = '';
+                let html = '<hr class="small-margin">';
 
-                boards.forEach(board => {
-                    console.log(`Processing board: ${board.name}, is_active: ${board.is_active} (${typeof board.is_active})`);
-                    const isStarred = starredBoards.includes(board.id);
-                    const boardTabName = 'board-' + board.id;
+                // ユーザープロパティからstarred_boardsを取得してパース
+                // 共通の getUserProperty を使用
+                const starredBoards = App.state.getUserProperty('starred_boards', []);
+                console.log('[renderBoardsNavigation] Starred boards:', JSON.stringify(starredBoards));
+                console.log('[renderBoardsNavigation] Starred boards type:', typeof starredBoards, 'isArray:', Array.isArray(starredBoards));
 
-                    const boardLink = `
-                        <a onclick="App.utils.navigation.switchTab('${boardTabName}')" data-board-id="${board.id}">
-                            <i>${board.is_active ? (isStarred ? 'folder_special' : 'folder') : 'folder_off'}</i>
-                            <span>${escapeHtml(board.name || '')}</span>
-                        </a>
-                    `;
+                // 1. Starred Boards (Active only)
+                if (Array.isArray(starredBoards) && starredBoards.length > 0) {
+                    console.log('[renderBoardsNavigation] Rendering starred boards section...');
+                    let hasRenderedStarred = false;
+                    starredBoards.forEach(starredId => {
+                        console.log('[renderBoardsNavigation] Processing starred board ID:', starredId);
+                        const boardIndex = boards.findIndex(b => b.id === starredId);
+                        if (boardIndex !== -1) {
+                            const board = boards[boardIndex];
+                            console.log('[renderBoardsNavigation] Found board:', board.name, 'is_active:', board.is_active);
+                            // is_activeがTRUEの場合のみ描画
+                            if (board.is_active) {
+                                html += this.createBoardLink(board, true);
+                                starredBoardIndex.push(boardIndex);
+                                hasRenderedStarred = true;
+                                console.log('[renderBoardsNavigation] Rendered starred board:', board.name);
+                            }
+                        } else {
+                            console.warn('[renderBoardsNavigation] Starred board not found in boards array:', starredId);
+                        }
+                    });
+                    console.log('[renderBoardsNavigation] Starred boards rendered count:', starredBoardIndex.length);
 
-                    html += boardLink;
+                }
+                
+                if(!starredBoardIndex.length){
+                    console.log('[renderBoardsNavigation] No starred boards, showing placeholder');
+                    html += `<p class="left-padding top-margin bottom-margin secondary-text left-align middle-align row tiny-space">
+                        <i class="medium">folder_special</i>
+                        <span class="small-text no-line">スターを付けたボードは<br>ここに表示されます</span>
+                    </p>`;
+                }
+
+                html += `<hr class="small-margin">`;
+
+                // 2. Active Boards (Non-starred)
+                console.log('[renderBoardsNavigation] Rendering active boards section...');
+                boards.forEach((board, index) => {
+                    // 既に描画済みのindexはスキップ
+                    if (starredBoardIndex.includes(index)) return;
+
+                    if (board.is_active) {
+                        html += this.createBoardLink(board, false);
+                        activeBoardIndex.push(index);
+                    }
                 });
+                console.log('[renderBoardsNavigation] Active boards rendered count:', activeBoardIndex.length);
+
+                if (!activeBoardIndex.length) {
+                    html += `<p class="left-padding top-margin bottom-margin secondary-text left-align middle-align row tiny-space">
+                        <i class="medium">folder</i>
+                        <span class="small-text no-line">アクティブなボードは<br>ここに表示されます</span>
+                    </p>`;
+                }
+
+
+                html += `<hr class="small-margin">`;
+
+                // 3. Inactive Boards (Archive)
+                console.log('[renderBoardsNavigation] Rendering archived boards section...');
+                boards.forEach((board, index) => {
+                    if (!board.is_active) {
+                        html += this.createBoardLink(board, false);
+                        archiveBoardIndex.push(index);
+                    }
+                });
+                console.log('[renderBoardsNavigation] Archived boards rendered count:', archiveBoardIndex.length);
+
+                if (!archiveBoardIndex.length) {
+                    html += `<p class="left-padding top-margin bottom-margin secondary-text left-align middle-align row tiny-space">
+                        <i class="medium">folder_off</i>
+                        <span class="small-text no-line">アーカイブしたボードは<br>ここに表示されます</span>
+                    </p>`;
+                }
 
                 boardsNavigation.innerHTML = html;
+                console.log('[renderBoardsNavigation] Navigation HTML updated');
+
+                // アクティブ状態を復元
+                if (activeBoardId) {
+                    const newActiveLink = boardsNavigation.querySelector(`a[data-board-id="${activeBoardId}"]`);
+                    if (newActiveLink) {
+                        newActiveLink.classList.add('active');
+                        console.log('[renderBoardsNavigation] Restored active class to:', activeBoardId);
+                    } else {
+                        console.warn('[renderBoardsNavigation] Could not find link to restore active class for:', activeBoardId);
+                    }
+                }
+                console.log('[renderBoardsNavigation] End.');
+            },
+
+            createBoardLink: function (board, isStarred) {
+                const boardTabName = 'board-' + board.id;
+                // アイコン: Inactiveならfolder_off, Activeならstarred状態に合わせて変更
+                const icon = !board.is_active ? 'folder_off' : (isStarred ? 'folder_special' : 'folder');
+                // text class: Inactiveなら薄くするなどのスタイルがあれば適用(ここではopacity-textを使用してみる)
+                const textClass = !board.is_active ? 'secondary-text' : '';
+
+                return `
+                        <a onclick="App.utils.navigation.switchTab('${boardTabName}')" data-board-id="${board.id}">
+                            <i class="${textClass}">${icon}</i>
+                            <span class="${textClass}">${escapeHtml(board.name || '')}</span>
+                        </a>
+                    `;
+            },
+
+            /**
+             * 初期ロード時のシマーエフェクトを描画
+             */
+            renderLoadingPlaceholders: function () {
+                const nav = document.getElementById('boards-nav');
+                if (!nav) return;
+
+                let html = '<hr class="small-margin">';
+                for (let i = 0; i < 9; i++) {
+                    const delay = i * 0.1;
+                    html += `
+                        <a class="shimmer-loading" style="animation-delay: ${delay}s">
+                            <i></i>
+                            <span>　　　　　　　　</span>
+                        </a>
+                    `;
+                    if (i === 2 || i === 5) html += `<hr class="small-margin">`;
+                }
+                nav.innerHTML = html;
             }
         };
+
+        // 初期表示時にプレースホルダーを描画
+        App.utils.navigation.renderLoadingPlaceholders();
     })();
 </script>
