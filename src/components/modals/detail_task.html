@@ -131,8 +131,8 @@
             modal: 'task-detail',
             task_id: taskId
           };
-          
-           // タブがボードの場合のみ、board_id をURLに含める
+
+          // タブがボードの場合のみ、board_id をURLに含める
           if (newParams.tab === 'board') {
             // ボードIDが存在する場合は追加
             if (currentParams.board_id) {
@@ -143,7 +143,7 @@
               newParams.board_id = this.currentItem.board_id;
             }
           }
-          
+
           App.utils.url.updateParams(newParams, false);
         }
 
@@ -190,19 +190,19 @@
       close: function (skipUrlUpdate = false) {
         ui('#modal-detail-task');
         this.reset();
-        
+
         // URLパラメータからモーダル関連のパラメータを削除（skipUrlUpdateがfalseの場合のみ）
         if (!skipUrlUpdate && App.utils.url && App.utils.url.updateParams) {
           const currentParams = App.utils.url.getParams();
           const newParams = {
             tab: currentParams.tab || 'home'
           };
-          
+
           // ボードIDが存在する場合は保持
           if (currentParams.board_id) {
             newParams.board_id = currentParams.board_id;
           }
-          
+
           App.utils.url.updateParams(newParams, false);
         }
       },
