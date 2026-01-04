@@ -89,8 +89,9 @@
       /**
        * タスク詳細モーダルを開く
        * @param {string} taskId - タスクID
+       * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
        */
-      open: function (taskId) {
+      open: function (taskId, skipUrlUpdate = false) {
         console.log('[TaskDetail] open called with id:', taskId);
 
         if (!taskId) {
@@ -106,7 +107,7 @@
 
         if (!task) {
           console.error('[TaskDetail] Task not found:', taskId);
-          alert('タスクが見つかりません');
+          alert(`開こうとしたタスクが見つかりませんでした。削除されたかIDが間違っている可能性があります。\nタスクID: ${taskId}`);
           return;
         }
 
@@ -121,6 +122,30 @@
 
         // モーダルを即座に開く
         ui('#modal-detail-task');
+
+        // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
+        if (!skipUrlUpdate && App.utils.url && App.utils.url.updateParams) {
+          const currentParams = App.utils.url.getParams();
+          const newParams = {
+            tab: currentParams.tab || 'home',
+            modal: 'task-detail',
+            task_id: taskId
+          };
+
+          // タブがボードの場合のみ、board_id をURLに含める
+          if (newParams.tab === 'board') {
+            // ボードIDが存在する場合は追加
+            if (currentParams.board_id) {
+              newParams.board_id = currentParams.board_id;
+            } else if (this.currentItem && this.currentItem.board_id && this.currentItem.board_id !== '') {
+              // currentItemからboard_idを取得（nullチェックと空文字列チェック付き）
+              // board_idが有効な値（null/undefined/空文字でない）の場合のみ追加
+              newParams.board_id = this.currentItem.board_id;
+            }
+          }
+
+          App.utils.url.updateParams(newParams, false);
+        }
 
         // コメントを非同期で取得（作成者情報とJOIN）
         const query = {
@@ -160,10 +185,26 @@
 
       /**
        * モーダルを閉じる
+       * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
        */
-      close: function () {
+      close: function (skipUrlUpdate = false) {
         ui('#modal-detail-task');
         this.reset();
+
+        // URLパラメータからモーダル関連のパラメータを削除（skipUrlUpdateがfalseの場合のみ）
+        if (!skipUrlUpdate && App.utils.url && App.utils.url.updateParams) {
+          const currentParams = App.utils.url.getParams();
+          const newParams = {
+            tab: currentParams.tab || 'home'
+          };
+
+          // ボードIDが存在する場合は保持
+          if (currentParams.board_id) {
+            newParams.board_id = currentParams.board_id;
+          }
+
+          App.utils.url.updateParams(newParams, false);
+        }
       },
 
       /**
