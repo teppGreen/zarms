@@ -1,150 +1,155 @@
 <!-- タスク詳細モーダル -->
-<dialog id="modal-detail-task" class="modal large background padding">
-  <!-- Header -->
-  <header class="fixed row align-center padding">
-    <div class="max row align-center">
-      <h5 id="task-display-id" class="font-number bold no-margin"></h5>
-      <div class="field transparent max no-margin margin-left">
-        <input type="text" id="task-name-input" class="font-title bold" style="font-size: 1.5rem;" placeholder="タスク名">
-      </div>
-    </div>
-    <button class="circle transparent" id="task-copy-link-btn">
-      <i>share</i>
-    </button>
-    <button class="circle transparent" onclick="App.modals.taskDetail.close()">
-      <i>close</i>
-    </button>
-  </header>
+<dialog id="modal-detail-task" class="transparent page bottom no-padding" style="position: absolute;">
 
-  <div class="grid padding tiny-space no-margin">
-    <!-- Left Column: Status & Avatars -->
-    <div class="s12 m4 l4">
-      <!-- Status -->
-      <div class="grid">
-        <div class="s6 padding-small">
-          <div class="field label border small">
-            <select id="task-status-select" class="transparent">
-              <option value="TODO">未着手</option>
-              <option value="IN_PROGRESS">進行中</option>
-              <option value="IN_REVIEW">確認中</option>
-              <option value="DONE">完了</option>
-            </select>
-            <label>ステータス</label>
-          </div>
-        </div>
-        <div class="s6 padding-small">
-          <div class="field label border small">
-            <select id="task-priority-select">
-              <option value="LOW">低</option>
-              <option value="MEDIUM">中</option>
-              <option value="HIGH">高</option>
-            </select>
-            <label>優先度</label>
-          </div>
-        </div>
-
-        <!-- Avatars Flow -->
-        <div class="s12 top-margin bottom-margin">
-          <!-- Created By -->
-          <div class="row small-margin">
-            <div class="" onclick="App.modals.taskDetail.selectMember('created_by')">
-              <button id="avatar-created-by" class="no-margin circle transparent large">
-              </button>
-            </div>
-            <p class="no-line">
-              <span class="small-text">作成者<br></span>
-              <span id="label-created-by"></span>
-            </p>
-          </div>
-
-          <i class="extra secondary-text left-margin right-margin">arrow_downward</i>
-
-          <!-- Processed By -->
-          <div class="row small-margin">
-            <div class="" onclick="App.modals.taskDetail.selectMember('processed_by')">
-              <button id="avatar-processed-by" class="no-margin circle transparent large">
-              </button>
-            </div>
-            <p class="no-line">
-              <span class="small-text">進行者<br></span>
-              <span id="label-processed-by"></span>
-            </p>
-          </div>
-
-          <i class="extra secondary-text left-margin right-margin">arrow_downward</i>
-
-          <!-- Reviewed By -->
-          <div class="row small-margin">
-            <div class="" onclick="App.modals.taskDetail.selectMember('reviewed_by')">
-              <button id="avatar-reviewed-by" class="no-margin circle transparent large">
-              </button>
-            </div>
-            <p class="no-line">
-              <span class="small-text">確認者<br></span>
-              <span id="label-reviewed-by"></span>
-            </p>
-          </div>
-
-          <i class="extra secondary-text left-margin right-margin">arrow_downward</i>
-
-          <!-- Received By -->
-          <div class="row small-margin">
-            <div class="" onclick="App.modals.taskDetail.selectMember('received_by')">
-              <button id="avatar-received-by" class="no-margin circle transparent large">
-              </button>
-            </div>
-            <p class="no-line">
-              <span class="small-text">受領者<br></span>
-              <span id="label-received-by"></span>
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Middle Column: Details -->
-    <div class="s12 m4 l4">
-      <div class="grid tiny-space">
-        <div class="s12 padding-small">
-          <div class="field label border small">
-            <input type="datetime-local" id="task-starts-at-input">
-            <label>開始日時：「進行中」に変更する期限</label>
-          </div>
-        </div>
-        <div class="s12 padding-small">
-          <div class="field label border small">
-            <input type="datetime-local" id="task-ends-at-input">
-            <label>終了日時：「完了」に変更する期限</label>
-          </div>
-        </div>
-        <div class="s12 padding-small">
-          <div class="field label border small no-wrap">
-            <select id="task-board-select">
-              <!-- 動的に生成 -->
-            </select>
-            <label>ボード</label>
-          </div>
-        </div>
-        <div class="s12 field label border">
-          <textarea id="task-description-input" rows="10"></textarea>
-          <label>説明</label>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right Column: Comments -->
-    <div class="s12 m4 l4 surface-variant small-round padding scroll" id="task-comments-list">
-      <!-- コメントが動的に生成される -->
-    </div>
+  <div class="small-margin" onclick="App.modals.taskDetail.close()">
+    <i class="center extra center">keyboard_arrow_down</i>
   </div>
 
-  <!-- Footer -->
-  <footer class="fixed">
-    <nav class="right-align padding">
-      <button class="border round text-primary" onclick="App.modals.taskDetail.discard()">変更を破棄</button>
-      <button class="primary round" onclick="App.modals.taskDetail.save()">変更を保存</button>
-    </nav>
-  </footer>
+  <div class="background padding">
+    <!-- Header -->
+    <header class="row align-center small-padding">
+      <div class="max row align-center">
+        <h5 id="task-display-id" class="font-number bold no-margin"></h5>
+        <div class="field transparent max no-margin margin-left">
+          <input type="text" id="task-name-input" class="font-title bold" style="font-size: 1.5rem;" placeholder="タスク名">
+        </div>
+      </div>
+      <button class="circle transparent" id="task-copy-link-btn">
+        <i>share</i>
+      </button>
+    </header>
+
+    <div class="grid small-padding tiny-space no-margin">
+      <!-- Left Column: Status & Avatars -->
+      <div class="s12 m4 l4">
+        <!-- Status -->
+        <div class="grid">
+          <div class="s6 padding-small">
+            <div class="field label border small">
+              <select id="task-status-select" class="transparent">
+                <option value="TODO">未着手</option>
+                <option value="IN_PROGRESS">進行中</option>
+                <option value="IN_REVIEW">確認中</option>
+                <option value="DONE">完了</option>
+              </select>
+              <label>ステータス</label>
+            </div>
+          </div>
+          <div class="s6 padding-small">
+            <div class="field label border small">
+              <select id="task-priority-select">
+                <option value="LOW">低</option>
+                <option value="MEDIUM">中</option>
+                <option value="HIGH">高</option>
+              </select>
+              <label>優先度</label>
+            </div>
+          </div>
+
+          <!-- Avatars Flow -->
+          <div class="s12 top-margin">
+            <!-- Created By -->
+            <div class="row small-margin">
+              <div class="" onclick="App.modals.taskDetail.selectMember('created_by')">
+                <button id="avatar-created-by" class="no-margin circle transparent large">
+                  <!-- ボタンのクラスとコンテンツ（画像またはアイコン）はrenderMemberAvatarで設定される -->
+                </button>
+              </div>
+              <p class="no-line">
+                <span class="small-text">作成者<br></span>
+                <span id="label-created-by"></span>
+              </p>
+            </div>
+
+            <i class="extra secondary-text left-margin right-margin">arrow_downward</i>
+
+            <!-- Processed By -->
+            <div class="row small-margin">
+              <div class="" onclick="App.modals.taskDetail.selectMember('processed_by')">
+                <button id="avatar-processed-by" class="no-margin circle transparent large">
+                </button>
+              </div>
+              <p class="no-line">
+                <span class="small-text">進行者<br></span>
+                <span id="label-processed-by"></span>
+              </p>
+            </div>
+
+            <i class="extra secondary-text left-margin right-margin">arrow_downward</i>
+
+            <!-- Reviewed By -->
+            <div class="row small-margin">
+              <div class="" onclick="App.modals.taskDetail.selectMember('reviewed_by')">
+                <button id="avatar-reviewed-by" class="no-margin circle transparent large">
+                </button>
+              </div>
+              <p class="no-line">
+                <span class="small-text">確認者<br></span>
+                <span id="label-reviewed-by"></span>
+              </p>
+            </div>
+
+            <i class="extra secondary-text left-margin right-margin">arrow_downward</i>
+
+            <!-- Received By -->
+            <div class="row small-margin">
+              <div class="" onclick="App.modals.taskDetail.selectMember('received_by')">
+                <button id="avatar-received-by" class="no-margin circle transparent large">
+                </button>
+              </div>
+              <p class="no-line">
+                <span class="small-text">受領者<br></span>
+                <span id="label-received-by"></span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle Column: Details -->
+      <div class="s12 m4 l4">
+        <div class="grid tiny-space">
+          <div class="s12 padding-small">
+            <div class="field label border small">
+              <input type="datetime-local" id="task-starts-at-input">
+              <label>開始日時：「進行中」に変更する期限</label>
+            </div>
+          </div>
+          <div class="s12 padding-small">
+            <div class="field label border small">
+              <input type="datetime-local" id="task-ends-at-input">
+              <label>終了日時：「完了」に変更する期限</label>
+            </div>
+          </div>
+          <div class="s12 padding-small">
+            <div class="field label border small no-wrap">
+              <select id="task-board-select">
+                <!-- 動的に生成 -->
+              </select>
+              <label>ボード</label>
+            </div>
+          </div>
+          <div class="s12 field label border">
+            <textarea id="task-description-input" rows="12"></textarea>
+            <label>説明</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Comments -->
+      <div class="s12 m4 l4 surface-variant small-round padding scroll" id="task-comments-list">
+        <!-- コメントが動的に生成される -->
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="small-padding">
+      <nav class="right-align">
+        <button class="border round large text-primary" onclick="App.modals.taskDetail.discard()">変更を破棄</button>
+        <button class="primary round large" onclick="App.modals.taskDetail.save()">変更を保存</button>
+      </nav>
+    </footer>
+  </div>
 </dialog>
 
 <script>
@@ -186,7 +191,10 @@
         this.render(task);
 
         // モーダルを即座に開く
-        ui('#modal-detail-task');
+        const modal = document.getElementById('modal-detail-task');
+        const overlay = document.getElementById('overlay');
+        if (modal) modal.classList.add('active');
+        if (overlay) overlay.classList.add('active');
 
         // 入力フィールドの変更を監視
         this.bindChangeListeners();
@@ -539,7 +547,7 @@
         html += `
           <button class="no-margin responsive primary round max margin-bottom" onclick="App.modals.taskDetail.openNewComment()">
             <i>add_comment</i>
-            <span>新規コメント作成</span>
+            <span>新しいコメントを追加</span>
           </button>
         `;
 
@@ -689,7 +697,7 @@
 
         // クラスとコンテンツを設定
         // 画像がある場合は transparent、ない場合は tertiary クラスを使用
-        const baseClass = 'circle large';
+        const baseClass = 'no-margin circle large';
         if (photoUrl) {
           avatarBtn.className = `${baseClass} transparent`;
           avatarBtn.innerHTML = `<img src="${photoUrl}" class="responsive" alt="${escapeHtml(displayName || '未設定')}">`;
