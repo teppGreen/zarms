@@ -16,24 +16,6 @@
                 oninput="App.modals.selectMembers.filterResults()">
         </div>
 
-        <!-- フィルタ -->
-        <div class="row">
-            <div class="field label border s12 m6">
-                <select id="member-role-filter" onchange="App.modals.selectMembers.filterResults()">
-                    <option value="">すべて</option>
-                    <!-- ENUMから動的に生成 -->
-                </select>
-                <label>システム権限</label>
-            </div>
-            <div class="field label border s12 m6">
-                <label class="checkbox">
-                    <input type="checkbox" id="member-active-filter" checked
-                        onchange="App.modals.selectMembers.filterResults()">
-                    <span>有効なメンバーのみ</span>
-                </label>
-            </div>
-        </div>
-
         <div class="space"></div>
 
         <!-- 結果リスト -->
@@ -86,43 +68,27 @@
             },
 
             render: function () {
-                // ロールフィルタのオプションを生成
-                const roleFilter = document.getElementById('member-role-filter');
-                const configData = App.state.data.config;
-                if (roleFilter && configData['SYSTEM_ROLE']) {
-                    const options = configData['SYSTEM_ROLE'].map(opt =>
-                        `<option value="${escapeHtml(opt.config_key)}">${escapeHtml(opt.config_value)}</option>`
-                    ).join('');
-                    roleFilter.innerHTML = '<option value="">すべて</option>' + options;
-                }
-
                 this.filterResults();
             },
 
             filterResults: function () {
                 const searchInput = document.getElementById('member-search-input');
-                const roleFilter = document.getElementById('member-role-filter');
-                const activeFilter = document.getElementById('member-active-filter');
                 const container = document.getElementById('member-results-container');
 
                 if (!container) return;
 
                 const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
-                const selectedRole = roleFilter ? roleFilter.value : '';
-                const activeOnly = activeFilter ? activeFilter.checked : true;
+                const activeOnly = true;
 
                 // フィルタリング
                 let filtered = this.allMembers.filter(member => {
                     const matchesSearch = !searchTerm ||
                         (member.display_name && member.display_name.toLowerCase().includes(searchTerm)) ||
-                        (member.email && member.email.toLowerCase().includes(searchTerm)) ||
-                        (member.first_name && member.first_name.toLowerCase().includes(searchTerm)) ||
-                        (member.last_name && member.last_name.toLowerCase().includes(searchTerm));
+                        (member.email && member.email.toLowerCase().includes(searchTerm));
 
-                    const matchesRole = !selectedRole || member.system_role_key === selectedRole;
                     const matchesActive = !activeOnly || member.is_active === true || member.is_active === 'TRUE' || member.is_active === 'true';
 
-                    return matchesSearch && matchesRole && matchesActive;
+                    return matchesSearch && matchesActive;
                 });
 
                 // 表示

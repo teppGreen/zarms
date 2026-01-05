@@ -1,0 +1,127 @@
+<!-- 新規コメント作成モーダル -->
+<dialog id="modal-new-comment" class="modal">
+    <div class="row no-space align-center">
+        <div class="max">
+            <h5 class="bold mb-0">新規コメント作成</h5>
+        </div>
+        <button class="circle transparent" onclick="App.modals.newComment.close()">
+            <i>close</i>
+        </button>
+    </div>
+
+    <div class="padding">
+        <!-- コメント内容 -->
+        <div class="field label border textarea">
+            <textarea id="new-comment-content" rows="8"></textarea>
+            <label>コメント内容</label>
+        </div>
+    </div>
+
+    <nav class="right-align">
+        <button class="border" onclick="App.modals.newComment.close()">キャンセル</button>
+        <button onclick="App.modals.newComment.save()">作成</button>
+    </nav>
+</dialog>
+
+<script>
+    (function () {
+        App.modals.newComment = {
+            taskId: null,
+            boardId: null,
+
+            /**
+             * 新規コメントモーダルを開く
+             * @param {string} taskId - タスクID
+             * @param {string} boardId - ボードID
+             */
+            open: function (taskId, boardId) {
+                if (!taskId) {
+                    console.error('[NewComment] Invalid task ID');
+                    return;
+                }
+
+                this.taskId = taskId;
+                this.boardId = boardId;
+
+                // フィールドをクリア
+                const contentField = document.getElementById('new-comment-content');
+                if (contentField) contentField.value = '';
+
+                // モーダルを開く
+                ui('#modal-new-comment');
+            },
+
+            /**
+             * モーダルを閉じる
+             */
+            close: function () {
+                ui('#modal-new-comment');
+                this.reset();
+            },
+
+            /**
+             * モーダルをリセット
+             */
+            reset: function () {
+                this.taskId = null;
+                this.boardId = null;
+
+                const contentField = document.getElementById('new-comment-content');
+                if (contentField) contentField.value = '';
+            },
+
+            /**
+             * コメントを保存
+             */
+            save: function () {
+                const contentField = document.getElementById('new-comment-content');
+                const content = contentField ? contentField.value.trim() : '';
+
+                if (!content) {
+                    alert('コメント内容を入力してください');
+                    return;
+                }
+
+                if (!this.taskId) {
+                    console.error('[NewComment] No task ID set');
+                    alert('タスクIDが設定されていません');
+                    return;
+                }
+
+                showLoading();
+
+                // コメントを保存
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'insert', {
+                    values: {
+                        content: content,
+                        related_table: 'tasks',
+                        related_id: this.taskId
+                    }
+                }, 'コメントを作成')
+                    .then(result => {
+                        hideLoading();
+
+                        if (!result || (Array.isArray(result) && result.length === 0)) {
+                            alert('コメントの作成に失敗しました');
+                            return;
+                        }
+
+                        showSnackbar('コメントを作成しました', 'success');
+
+                        // タスク詳細モーダルのコメントリストを再読み込み
+                        if (App.modals.taskDetail && App.modals.taskDetail.currentId === this.taskId) {
+                            App.modals.taskDetail.loadComments(this.taskId);
+                        }
+
+                        // モーダルを閉じる
+                        this.close();
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        console.error('[NewComment] Save error:', error);
+                        App.utils.error.handle(error);
+                    });
+            }
+        };
+    })();
+</script>
