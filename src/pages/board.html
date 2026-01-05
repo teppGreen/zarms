@@ -76,6 +76,7 @@
                             </button>
                             <button class="circle transparent" id="btn-star-${board.id}">
                                 <i>star_border</i>
+                                <div class="tooltip bottom">スター</div>
                             </button>
                         </nav>
                     `;
@@ -153,9 +154,9 @@
                             targetTable: 'members',
                             joinType: 'LEFT',
                             columns: ['display_name', 'profile_photo_url'],
-                            localKey: 'delivered_by',
+                            localKey: 'received_by',
                             foreignKey: 'id',
-                            alias: 'delivered_by_'
+                            alias: 'received_by_'
                         }
                     ];
 
@@ -429,11 +430,11 @@
                         })];
 
                         navigator.clipboard.write(data).then(() => {
-                            ui('#toast-share-success', { timeout: 2000 });
+                            showSnackbar('このボードへのリンクをコピーしました。', 'success');
                         }).catch(err => {
                             console.error('Clipboard write failed', err);
                             navigator.clipboard.writeText(textContent).then(() => {
-                                ui('#toast-share-success', { timeout: 2000 });
+                                showSnackbar('何らかの理由でこのボードへのリンクをコピーできませんでした。', 'error');
                             });
                         });
                     });
@@ -444,7 +445,7 @@
                 if (btnArchive) {
                     btnArchive.addEventListener('click', async () => {
                         const isArchiving = board.is_active;
-                        const confirmMsg = isArchiving ? 'このボードをアーカイブしますか？' : 'このボードのアーカイブを解除しますか？';
+                        const confirmMsg = isArchiving ? 'このボードをアーカイブしますか？\n他の人の画面でも、アーカイブ済のボードとして表示されるようになります。ボードには引き続きアクセスできます。' : 'このボードのアーカイブを解除しますか？';
                         if (!confirm(confirmMsg)) return;
 
                         try {
@@ -578,10 +579,10 @@
 
                 // JOIN済みデータから担当者情報を取得
                 const assigneeNames = [
-                    task.created_by_display_name, task.processed_by_display_name, task.reviewed_by_display_name, task.delivered_by_display_name
+                    task.created_by_display_name, task.processed_by_display_name, task.reviewed_by_display_name, task.received_by_display_name
                 ];
                 const assigneePhotoUrls = [
-                    task.created_by_profile_photo_url, task.processed_by_profile_photo_url, task.reviewed_by_profile_photo_url, task.delivered_by_profile_photo_url
+                    task.created_by_profile_photo_url, task.processed_by_profile_photo_url, task.reviewed_by_profile_photo_url, task.received_by_profile_photo_url
                 ]
                 const assigneeIcons = assigneePhotoUrls.map((url, index) => {
                     let opacity;
