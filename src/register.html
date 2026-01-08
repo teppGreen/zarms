@@ -53,6 +53,35 @@
                 </div>
             </div>
 
+            <!-- ステップ: メンテナンス画面 -->
+            <div id="step-maintenance" class="grid right" style="display: none;">
+                <div class="s12 m12 l6 large-padding medium-height large-width left-align">
+                    <div class="row tiny-space">
+                        <img class="large" src="https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8"
+                            alt="ZEN Boards">
+                    </div>
+                    <h2 class="bold small">メンテナンス中</h2>
+                    <p>現在、システムメンテナンスを行っております。<br>毎日午前2時〜午前5時の間はご利用いただけません。何卒ご了承ください。</p>
+                </div>
+                <div class="s12 m12 l6 large-padding medium-height large-width left-align">
+                    <div class="row tiny-space">
+                        <i class="extra error-text">build</i>
+                    </div>
+                    <p class="large-text bold">メンテナンス中です</p>
+                    <p class="secondary-text">
+                        <span>ご不便をおかけしますが、メンテナンス終了までしばらくお待ちください。</span>
+                    </p>
+                    <div class="absolute right bottom large-padding">
+                        <nav>
+                            <button onclick="location.reload()" class="primary extra">
+                                <i>refresh</i>
+                                <span>再読み込み</span>
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
             <!-- ステップ0: アクセス権限エラー -->
             <div id="step-access-error" class="grid right" style="display: none;">
                 <div class="s12 m12 l6 large-padding medium-height large-width left-align">
@@ -68,7 +97,8 @@
                         <i class="extra error-text">lock</i>
                     </div>
                     <p class="large-text error-text bold">アクセス権限がありません</p>
-                    <p>ZEN Boardsは大学祭実行委員のみが使用できます。<br>大学のGoogle アカウント以外を使用することはできません。<br>間違いだと思われる場合は、総務ユニットリーダーまでお問い合わせください。</p>
+                    <p>ZEN Boardsは大学祭実行委員のみが使用できます。<br>大学のGoogle
+                        アカウント以外を使用することはできません。<br>間違いだと思われる場合は、総務ユニットリーダーまでお問い合わせください。</p>
                     <p id="active-user-email" class="secondary-text small-text"></p>
                     <div class="absolute right bottom large-padding">
                         <nav>
@@ -105,7 +135,8 @@
                     <div class="top-margin">
                         <label class="radio">
                             <input type="radio" id="terms-agreement">
-                            <span><a class="link" href="https://sites.google.com/student.zen.ac.jp/zen-boards/terms" target="_blank">利用規約</a>に同意する<span>
+                            <span><a class="link" href="https://sites.google.com/student.zen.ac.jp/zen-boards/terms"
+                                    target="_blank">利用規約</a>に同意する<span>
                         </label>
                     </div>
                     <div class="">
@@ -198,6 +229,22 @@
             </div>
         </article>
     </main>
+    <dialog class="max active large-padding s" id="display-size-warning">
+        <div class="row center tiny-space">
+            <img class="large center-align" src="https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8"
+                alt="ZEN Boards">
+            <h1 class="font-title bold" style="font-size: 1.5rem;">ZEN Boards</h1>
+        </div>
+        <h5>この画面サイズでの動作はサポートされていません</h5>
+        <div>
+            <p>
+                画面の幅を大きくしてください。スマホからアクセスしている場合は、パソコンから再度アクセスをお願いいたします。
+            </p>
+        </div>
+        <nav class="right-align">
+            <button class="error" data-ui="#display-size-warning">このまま続ける</button>
+        </nav>
+    </dialog>
 
     <script>
         const { activeUserEmail, urlParams, scriptUrl } = <?!= JSON.stringify(templateVariables) ?>;
@@ -226,8 +273,24 @@
         // Initialize listeners
         setupInputListeners();
 
-        // ページ読み込み時にアクセス権限チェックを実行
-        window.onload = checkAccess();
+        function checkMaintenance() {
+            return false; //開発中なのでメンテナンスはしない
+
+            const now = new Date();
+            const jstHours = (now.getUTCHours() + 9) % 24;
+            return jstHours >= 2 && jstHours < 5;
+        }
+
+        function showMaintenanceStep() {
+            showStep('step-maintenance');
+        }
+
+        // ページ読み込み時にメンテナンス時間をチェック、問題なければアクセス権限チェックを実行
+        if (checkMaintenance()) {
+            showMaintenanceStep();
+        } else {
+            checkAccess();
+        }
 
         function checkAccess() {
             google.script.run
@@ -244,7 +307,7 @@
                                 .withFailureHandler(function (error) {
                                     console.error("loadMainApp failed:", error);
                                 })
-                                .loadMainApp(urlParams,activeUser);
+                                .loadMainApp(urlParams, activeUser);
                         })
                         .withFailureHandler(function (error) {
                             showInputStep();

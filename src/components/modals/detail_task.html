@@ -1,5 +1,5 @@
 <!-- タスク詳細モーダル -->
-<dialog id="modal-detail-task" class="transparent page bottom no-padding" style="position: absolute;">
+<dialog id="modal-detail-task" class="transparent bottom no-padding" style="position: absolute;">
 
   <div class="small-margin" onclick="App.modals.taskDetail.close()">
     <i class="center extra center">keyboard_arrow_down</i>
@@ -111,13 +111,13 @@
         <div class="grid tiny-space">
           <div class="s12 padding-small">
             <div class="field label border small">
-              <input type="datetime-local" id="task-starts-at-input">
+              <input type="datetime-local" id="task-starts-at-input" placeholder=" ">
               <label>開始日時：「進行中」に変更する期限</label>
             </div>
           </div>
           <div class="s12 padding-small">
             <div class="field label border small">
-              <input type="datetime-local" id="task-ends-at-input">
+              <input type="datetime-local" id="task-ends-at-input" placeholder=" ">
               <label>終了日時：「完了」に変更する期限</label>
             </div>
           </div>
@@ -130,7 +130,7 @@
             </div>
           </div>
           <div class="s12 field label border">
-            <textarea id="task-description-input" rows="12"></textarea>
+            <textarea id="task-description-input" rows="12" placeholder=" "></textarea>
             <label>説明</label>
           </div>
         </div>
@@ -165,7 +165,91 @@
        * @param {string} taskId - タスクID
        * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
        */
-      open: function (taskId, skipUrlUpdate = false) {
+      create: function () {
+        const userId = App.state.userId;
+        const taskId = crypto.randomUUID();
+
+        // 現在のボードIDを取得（あれば）
+        let boardId = '';
+        // 現在表示中のタブを特定
+        const currentTab = document.querySelector('main > div[style*="display: block"]');
+        const tabId = currentTab.id; // 例: 'tab-home', 'tab-members', 'tab-board'
+
+        // タブ種別に応じて必要なデータのみを取得
+        if (tabId === 'tab-board') {
+          const activeBoardDiv = document.querySelector('#tab-board > div[style*="display: block"]');
+          if (activeBoardDiv && activeBoardDiv.id) {
+            boardId = activeBoardDiv.id.replace('tab-board-', '');
+          }
+        }
+
+        const defaultTask = {
+          id: taskId,
+          display_id: '##', // サーバーレスポンス待ち
+          name: `新しいタスク(${formatDateTimeForDisplay(new Date().toString(), 'yyyyMMddHHmmss')})`,
+          description: '',
+          task_status_key: 'TODO',
+          priority_key: 'MEDIUM',
+          board_id: boardId,
+          created_by: activeUser.id,
+          processed_by: activeUser.id, // 作成者がデフォルト
+          reviewed_by: activeUser.id, // 作成者がデフォルト
+          received_by: activeUser.id, // 作成者がデフォルト
+          // Display fields for UI
+          created_by_display_name: activeUser.display_name,
+          created_by_profile_photo_url: activeUser.profile_photo_url,
+          reviewed_by_display_name: activeUser.display_name,
+          reviewed_by_profile_photo_url: activeUser.profile_photo_url,
+          received_by_display_name: activeUser.display_name,
+          received_by_profile_photo_url: activeUser.profile_photo_url,
+          processed_by_display_name: null,
+          processed_by_profile_photo_url: null
+        };
+
+        // ローカルデータに追加
+        if (!App.state.data.tasks) {
+          App.state.data.tasks = [];
+        }
+        App.state.data.tasks.push(defaultTask);
+
+        // カレントボードタスクにも追加
+        if (App.pages.boards && App.pages.boards.currentBoardId && App.pages.boards.cachedBoardTasks) {
+          const currentBoardId = App.pages.boards.currentBoardId;
+          const cache = App.pages.boards.cachedBoardTasks[currentBoardId];
+          if (Array.isArray(cache)) {
+            cache.push(defaultTask);
+          }
+        }
+
+        // モーダルを開く
+        this.open(taskId, false, true);
+
+        // サーバーに保存
+        callGAS('handleDatabaseProcess', userId, TABLE_NAMES.TASKS, 'insert', defaultTask)
+          .then(result => {
+            if (result && result.data && result.data.display_id) {
+              // サーバー生成のdisplay_idで更新
+              defaultTask.display_id = result.data.display_id;
+
+              // モーダルが開いていればUI更新
+              if (this.currentId === taskId) {
+                const displayIdEl = document.getElementById('task-display-id');
+                if (displayIdEl) displayIdEl.textContent = `#${defaultTask.display_id}`;
+                this.setupLinkCopyButton(defaultTask);
+                // オリジナルデータも更新（dirtyチェック用）
+                if (this.originalData) {
+                  this.originalData.display_id = result.data.display_id;
+                }
+              }
+            }
+          })
+          .catch(err => {
+            console.error('Failed to create task on server:', err);
+            showSnackbar('タスクの作成に失敗しました', 'error');
+          });
+      },
+
+      open: async function (taskId, skipUrlUpdate = false, defaultDirty = false) {
         console.log('[TaskDetail] open called with id:', taskId);
 
         if (!taskId) {
@@ -173,11 +257,13 @@
           return;
         }
 
+        this.reset();
+
         this.currentId = taskId;
-        this.isDirty = false;
 
         // tasks データから取得（ボードページでJOIN済み）
-        const boardTasks = App.pages.boards?.currentBoardTasks || [];
+        const currentBoardId = App.pages.boards?.currentBoardId;
+        const boardTasks = (currentBoardId && App.pages.boards?.cachedBoardTasks?.[currentBoardId]) || [];
         let task = boardTasks.find(t => t.id === taskId);
 
         if (!task) {
@@ -188,16 +274,17 @@
 
         this.currentItem = task;
         this.originalData = { ...task }; // 元のデータを保存
-        this.render(task);
 
-        // モーダルを即座に開く
+        // モーダルを先に開く（BeerCSSのlabelスタイルが正しく適用されるように）
         const modal = document.getElementById('modal-detail-task');
         const overlay = document.getElementById('overlay');
-        if (modal) modal.classList.add('active');
         if (overlay) overlay.classList.add('active');
+        if (modal) modal.classList.add('active');
 
-        // 入力フィールドの変更を監視
+        this.render(task);
+        this.isDirty = defaultDirty;
         this.bindChangeListeners();
+
 
         // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
         if (!skipUrlUpdate && App.utils.url && App.utils.url.updateParams) {
@@ -237,7 +324,7 @@
           commentsList.innerHTML = '<div class="padding center"><span class="loader"></span></div>';
         }
 
-        // コメントを非同期で取得（作成者情報とJOIN）
+        // コメントを非同期で取得
         const query = {
           where: {
             related_table: ["=", "tasks"],
@@ -245,24 +332,14 @@
           }
         };
 
-        const joins = [
-          {
-            targetTable: 'members',
-            joinType: 'LEFT',
-            columns: ['display_name', 'profile_photo_url'],
-            localKey: 'created_by',
-            foreignKey: 'id',
-            alias: 'creator_'
-          }
-        ];
-
-        callGAS('selectWithJoin', TABLE_NAMES.COMMENTS, query, joins)
-          .then(commentsResult => {
+        // JOINなしで取得
+        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query)
+          .then(result => {
             // モーダルが閉じられた、または別のタスクが開かれている場合は中断
             if (this.currentId !== taskId) return;
 
-            const comments = commentsResult?.data || commentsResult || [];
-            console.log(`Task ${taskId} comments loaded with JOINs:`, comments.length);
+            const comments = result?.data || result || [];
+            console.log(`Task ${taskId} comments loaded:`, comments.length);
             this.renderComments(comments);
           })
           .catch(error => {
@@ -292,9 +369,11 @@
           if (el) {
             el.addEventListener('input', () => {
               this.isDirty = true;
+              console.log('Dirty flag set to true');
             });
             el.addEventListener('change', () => {
               this.isDirty = true;
+              console.log('Dirty flag set to true');
             });
           }
         });
@@ -308,7 +387,7 @@
         // 変更がある場合は確認
         if (this.isDirty) {
           if (!confirm('変更が保存されていません。破棄してもよろしいですか？')) {
-            return;
+            return false;
           }
         }
 
@@ -369,6 +448,10 @@
           return;
         }
 
+        // 参照を保持（モーダルを閉じた後も使用するため）
+        const currentItem = this.currentItem;
+        const originalData = { ...this.originalData };
+
         // フィールドから値を取得
         const nameInput = document.getElementById('task-name-input');
         const descInput = document.getElementById('task-description-input');
@@ -382,27 +465,27 @@
         let hasChanges = false;
 
         // 各フィールドの変更をチェック
-        if (nameInput && nameInput.value !== this.originalData.name) {
+        if (nameInput && nameInput.value !== originalData.name) {
           updates.name = nameInput.value;
           hasChanges = true;
         }
 
-        if (descInput && descInput.value !== this.originalData.description) {
+        if (descInput && descInput.value !== originalData.description) {
           updates.description = descInput.value;
           hasChanges = true;
         }
 
-        if (statusSelect && statusSelect.value !== this.originalData.task_status_key) {
+        if (statusSelect && statusSelect.value !== originalData.task_status_key) {
           updates.task_status_key = statusSelect.value;
           hasChanges = true;
         }
 
-        if (prioritySelect && prioritySelect.value !== this.originalData.priority_key) {
+        if (prioritySelect && prioritySelect.value !== originalData.priority_key) {
           updates.priority_key = prioritySelect.value;
           hasChanges = true;
         }
 
-        if (boardSelect && boardSelect.value !== this.originalData.board_id) {
+        if (boardSelect && boardSelect.value !== originalData.board_id) {
           updates.board_id = boardSelect.value;
           hasChanges = true;
         }
@@ -410,7 +493,7 @@
         // 日付フィールドの処理
         if (startsAtInput) {
           const newStartsAt = startsAtInput.value ? new Date(startsAtInput.value).toISOString() : null;
-          const oldStartsAt = this.originalData.starts_at;
+          const oldStartsAt = originalData.starts_at;
           if (newStartsAt !== oldStartsAt) {
             updates.starts_at = newStartsAt;
             hasChanges = true;
@@ -419,7 +502,7 @@
 
         if (endsAtInput) {
           const newEndsAt = endsAtInput.value ? new Date(endsAtInput.value).toISOString() : null;
-          const oldEndsAt = this.originalData.ends_at;
+          const oldEndsAt = originalData.ends_at;
           if (newEndsAt !== oldEndsAt) {
             updates.ends_at = newEndsAt;
             hasChanges = true;
@@ -429,22 +512,25 @@
         // メンバーフィールドの変更をチェック
         const memberRoles = ['processed_by', 'reviewed_by', 'received_by'];
         memberRoles.forEach(role => {
-          if (this.currentItem[role] !== this.originalData[role]) {
-            updates[role] = this.currentItem[role];
+          if (currentItem[role] !== originalData[role]) {
+            updates[role] = currentItem[role];
             hasChanges = true;
           }
         });
 
         if (!hasChanges) {
-          showSnackbar('変更がありません', 'info');
+          this.close();
           return;
         }
 
-        showLoading();
-
         // Optimistic UI update
-        Object.assign(this.currentItem, updates);
+        Object.assign(currentItem, updates);
         updateLocalData(TABLE_NAMES.TASKS, id, updates);
+
+        // 先にモーダルを閉じる
+        this.isDirty = false;
+        this.close();
+        showSnackbar('変更を保存しています。画面を閉じないでください。', 'info');
 
         // DB更新
         callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
@@ -452,53 +538,69 @@
           set: updates
         }, 'タスクを更新')
           .then(result => {
-            hideLoading();
-
             if (!result || (Array.isArray(result) && result.length === 0)) {
               console.error('[TaskDetail] Update returned failure');
-              alert('更新に失敗しました');
+              showSnackbar('更新に失敗しました', 'error');
               // Rollback
-              Object.assign(this.currentItem, this.originalData);
-              rollbackLocalData(TABLE_NAMES.TASKS, id, this.originalData);
-            } else {
-              console.log('[TaskDetail] Update successful');
-              showSnackbar('変更を保存しました', 'success');
+              Object.assign(currentItem, originalData);
+              rollbackLocalData(TABLE_NAMES.TASKS, id, originalData);
 
-              // 元のデータを更新
-              this.originalData = { ...this.currentItem };
+              // カンバン再描画して元に戻す
+              if (originalData.board_id && App.pages.boards && App.pages.boards.renderKanban) {
+                App.pages.boards.renderKanban(originalData.board_id);
+              }
+              return;
+            }
+
+            console.log('[TaskDetail] Update successful');
+            showSnackbar('変更を保存しました。', 'success');
+
+            // もしこのタスクのモーダルが再度開かれていたら、内部状態を更新
+            if (this.currentId === id) {
+              this.originalData = { ...currentItem };
               this.isDirty = false;
+            }
 
-              // メンバーフィールドが更新された場合はボードデータを再読み込み
-              const memberFieldsUpdated = ['processed_by', 'reviewed_by', 'received_by'].some(role => updates.hasOwnProperty(role));
-              const boardId = this.currentItem.board_id;
+            // メンバーフィールドが更新された場合はボードデータを再読み込み
+            const memberFieldsUpdated = ['processed_by', 'reviewed_by', 'received_by'].some(role => updates.hasOwnProperty(role));
+            const boardId = currentItem.board_id;
 
-              if (memberFieldsUpdated && boardId && App.pages.boards && App.pages.boards.loadData) {
-                // JOINデータを含むボードデータを再読み込み
-                App.pages.boards.loadData(boardId, true).then(() => {
-                  // 更新されたタスクデータを取得
-                  const updatedTask = App.pages.boards.currentBoardTasks.find(t => t.id === id);
+            if (memberFieldsUpdated && boardId && App.pages.boards && App.pages.boards.loadData) {
+              // JOINデータを含むボードデータを再読み込み
+              App.pages.boards.loadData(boardId, true).then(() => {
+                // currentItemは参照なので、loadDataでリストが書き換わると参照が切れる可能性があるが、
+                // IDで最新のものを探し直すことができる
+                if (this.currentId === id) {
+                  const updatedTask = App.pages.boards.cachedBoardTasks[boardId]?.find(t => t.id === id);
                   if (updatedTask) {
                     this.currentItem = updatedTask;
                     this.originalData = { ...updatedTask };
                     // アバターを再描画
+                    const members = App.state.data.members || [];
+                    const getMember = (id) => members.find(m => m.id === id);
                     ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
-                      this.renderMemberAvatar(role, updatedTask[`${role}_display_name`], updatedTask[`${role}_profile_photo_url`]);
+                      const member = getMember(updatedTask[role]);
+                      this.renderMemberAvatar(role, member?.display_name, member?.profile_photo_url);
                     });
                   }
-                });
-              } else if (boardId && App.pages.boards && App.pages.boards.renderKanban) {
-                // メンバーフィールド以外の更新の場合はカンバンのみ再描画
-                App.pages.boards.renderKanban(boardId);
-              }
+                }
+              });
+            } else if (boardId && App.pages.boards && App.pages.boards.renderKanban) {
+              // メンバーフィールド以外の更新の場合はカンバンのみ再描画（Optimistic UIの確認）
+              App.pages.boards.renderKanban(boardId);
             }
           })
           .catch(error => {
-            hideLoading();
             console.error('[TaskDetail] Update exception:', error);
             App.utils.error.handle(error);
             // Rollback
-            Object.assign(this.currentItem, this.originalData);
-            rollbackLocalData(TABLE_NAMES.TASKS, id, this.originalData);
+            Object.assign(currentItem, originalData);
+            rollbackLocalData(TABLE_NAMES.TASKS, id, originalData);
+
+            // カンバン再描画して元に戻す
+            if (originalData.board_id && App.pages.boards && App.pages.boards.renderKanban) {
+              App.pages.boards.renderKanban(originalData.board_id);
+            }
           });
       },
 
@@ -513,8 +615,11 @@
 
         // 入力フィールドをクリア
         const fields = [
+          'task-status-select',
+          'task-priority-select',
           'task-name-input',
           'task-description-input',
+          'task-board-select',
           'task-starts-at-input',
           'task-ends-at-input'
         ];
@@ -557,9 +662,13 @@
           return;
         }
 
+        const members = App.state.data.members || [];
+
         html += comments.map(comment => {
-          const creatorName = comment.creator_display_name || '不明';
-          const creatorPhoto = comment.creator_profile_photo_url;
+          const creator = members.find(m => m.id === comment.created_by);
+          const creatorName = creator ? creator.display_name : (comment.creator_display_name || '不明'); // Fallback if still available somewhere
+          const creatorPhoto = creator ? creator.profile_photo_url : comment.creator_profile_photo_url;
+
           const creatorIcon = creatorPhoto
             ? `<img src="${creatorPhoto}" alt="${escapeHtml(creatorName)}" class="circle tiny">`
             : '<i class="tiny">account_circle</i>';
@@ -595,13 +704,13 @@
         // Modal Title (Task Name)
         const modalTitle = document.getElementById('task-modal-title');
         if (modalTitle) {
-          modalTitle.textContent = task.name || 'タスク詳細';
+          modalTitle.textContent = task.name;
         }
 
         // Display ID
         const displayIdEl = document.getElementById('task-display-id');
         if (displayIdEl) {
-          displayIdEl.textContent = `#${task.display_id}` || '';
+          displayIdEl.textContent = `#${task.display_id}`;
         }
 
         // Link Copy Button
@@ -613,31 +722,53 @@
 
         // Description
         const descInput = document.getElementById('task-description-input');
-        if (descInput) descInput.value = task.description || '';
+        if (descInput) {
+          descInput.value = task.description || '';
+          // BeerCSSのラベル位置を更新するためにchangeイベントを発火
+          descInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
 
         // Status
         const statusSelect = document.getElementById('task-status-select');
-        if (statusSelect) statusSelect.value = task.task_status_key || 'TODO';
+        if (statusSelect) statusSelect.value = task.task_status_key;
 
         // Priority
         const prioritySelect = document.getElementById('task-priority-select');
-        if (prioritySelect) prioritySelect.value = task.priority_key || 'MEDIUM';
+        if (prioritySelect) prioritySelect.value = task.priority_key;
 
         // Board
         this.renderBoardOptions(task.board_id);
 
         // Member Avatars
-        this.renderMemberAvatar('created_by', task.created_by_display_name, task.created_by_profile_photo_url);
-        this.renderMemberAvatar('processed_by', task.processed_by_display_name, task.processed_by_profile_photo_url);
-        this.renderMemberAvatar('reviewed_by', task.reviewed_by_display_name, task.reviewed_by_profile_photo_url);
-        this.renderMemberAvatar('received_by', task.received_by_display_name, task.received_by_profile_photo_url);
+        const members = App.state.data.members || [];
+        const getMember = (id) => members.find(m => m.id === id);
+
+        const createdBy = getMember(task.created_by);
+        this.renderMemberAvatar('created_by', createdBy?.display_name, createdBy?.profile_photo_url);
+
+        const processedBy = getMember(task.processed_by);
+        this.renderMemberAvatar('processed_by', processedBy?.display_name, processedBy?.profile_photo_url);
+
+        const reviewedBy = getMember(task.reviewed_by);
+        this.renderMemberAvatar('reviewed_by', reviewedBy?.display_name, reviewedBy?.profile_photo_url);
+
+        const receivedBy = getMember(task.received_by);
+        this.renderMemberAvatar('received_by', receivedBy?.display_name, receivedBy?.profile_photo_url);
 
         // Dates
         const endsAtInput = document.getElementById('task-ends-at-input');
-        if (endsAtInput) endsAtInput.value = formatDateTimeForInput(task.ends_at) || '';
+        if (endsAtInput) {
+          endsAtInput.value = formatDateTimeForInput(task.ends_at) || '';
+          // BeerCSSのラベル位置を更新するためにchangeイベントを発火
+          endsAtInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
 
         const startsAtInput = document.getElementById('task-starts-at-input');
-        if (startsAtInput) startsAtInput.value = formatDateTimeForInput(task.starts_at) || '';
+        if (startsAtInput) {
+          startsAtInput.value = formatDateTimeForInput(task.starts_at) || '';
+          // BeerCSSのラベル位置を更新するためにchangeイベントを発火
+          startsAtInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
       },
 
       /**
@@ -756,6 +887,7 @@
 
         // Dirty フラグを立てる
         this.isDirty = true;
+        console.log('updatedMemberField: Dirty flag set to true');
 
         // メンバー情報を取得してアバターを更新
         const members = App.state.data.members || [];
@@ -786,9 +918,11 @@
         const boardSelect = document.getElementById('task-board-select');
         if (!boardSelect) return;
 
+        boardSelect.innerHTML = `<option value="null">マイボード</option>`;
+
         const boards = App.state.data.boards || [];
-        boardSelect.innerHTML = boards.map(board =>
-          `<option value="${escapeHtml(board.id)}" ${board.id === selectedBoardId ? 'selected' : ''}>${escapeHtml(board.name || '')}</option>`
+        boardSelect.innerHTML += boards.map(board =>
+          `<option value="${escapeHtml(board.id)}" ${(board.id === selectedBoardId && selectedBoardId) ? 'selected' : ''}>${escapeHtml(board.name || '')}</option>`
         ).join('');
       },
 

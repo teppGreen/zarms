@@ -113,7 +113,13 @@ function parseWhereClause(whereClause, headersMap) {
             escapedValue = `'${value.toISOString()}'`;
         }
 
-        conditions.push(`${columnId} ${operator} ${escapedValue}`);
+        // boolean型かつ等価比較の場合、文字列(TRUE/FALSE)としても検索する（GVizの型推論対策）
+        if (typeof value === 'boolean' && operator === '=') {
+            const stringValue = value ? "'TRUE'" : "'FALSE'";
+            conditions.push(`(${columnId} ${operator} ${value} OR ${columnId} ${operator} ${stringValue})`);
+        } else {
+            conditions.push(`${columnId} ${operator} ${escapedValue}`);
+        }
     }
 
     return conditions.join(' AND ');
@@ -149,6 +155,7 @@ function select(sheetName, query = {}) {
         if (query.orderBy) {
             const orderClauses = [];
             for (const [field, direction] of Object.entries(query.orderBy)) {
+                console.log(`クエリ処理中: ${field}, ${direction}`);
                 const columnId = headersMap[field];
                 if (!columnId) {
                     throw new Error(`Field '${field}' not found in headers map`);
@@ -394,7 +401,7 @@ function insert(userId, sheetName, record) {
         // キャッシュの無効化
         invalidateTableCache(sheetName);
 
-        return { success: true, updatedRange: response.updates.updatedRange };
+        return { success: true, updatedRange: response.updates.updatedRange, data: preparedData };
     } finally {
         lock.releaseLock();
     }
@@ -692,6 +699,7 @@ function handleDatabaseProcess(userId, tableName, operation, dataObject, remark,
                 throw new Error(`Unsupported operation: ${operation}`);
         }
 
+        console.log(`[handleDatabaseProcess] result: ${JSON.stringify(result)}`);
         return result;
     } catch (error) {
         console.error(`Database operation error (${operation} on ${tableName}):`, error);
@@ -753,9 +761,10 @@ function prepareNewData(userId, sheetName, dataObject) {
     if (headers.includes(`created_at`)) newData[`created_at`] = now;
     if (headers.includes(`updated_by`)) newData[`updated_by`] = userId;
     if (headers.includes(`updated_at`)) newData[`updated_at`] = now;
-    if (headers.includes(`id`)) newData[`id`] = generateUuid();
+    if (headers.includes(`id`) && !dataObject.id) newData[`id`] = generateUuid();
     if (headers.includes(`display_id`)) newData[`display_id`] = getNextSerial(sheetName, `display_id`);
 
+    console.log(`[prepareNewData] newData: ${JSON.stringify(newData)}`);
     return newData;
 }
 

@@ -11,6 +11,8 @@
         App.pages.boards = {
             sortableInstances: {}, // SortableJS インスタンスを保持
             currentBoardId: null, // 現在表示中のボードID
+            lastRenderTimes: {}, // ボードごとの最終レンダリング時刻
+            cachedBoardTasks: {}, // ボードごとのタスクデータキャッシュ
 
             // ステータスキーとカラムIDのマッピング
             statusMapping: {
@@ -42,8 +44,9 @@
                     .filter(child => child.id && child.id.startsWith('tab-board-'))
                     .map(child => child.id.replace('tab-board-', ''));
 
-                // 新しいボードリストのIDを取得
+                // 新しいボードリストのIDを取得（'my-board'を含める）
                 const newBoardIds = boards.map(board => board.id);
+                newBoardIds.push('my-board');
 
                 // 削除されたボードを削除
                 existingBoardIds.forEach(boardId => {
@@ -60,8 +63,16 @@
                     let pageDiv = document.getElementById(`tab-board-${board.id}`);
                     const headerHtml = `
                         <nav id="board-tab-header-${board.id}" class="small-margin row">
-                            <h3 class="bold small">${escapeHtml(board.name)}</h5>
-                            <div class="max"></div>
+                            <div class="field transparent max no-margin margin-left">
+                                <input type="text" 
+                                       value="${escapeHtml(board.name)}" 
+                                       class="font-title bold" 
+                                       style="font-size: 1.5rem;" 
+                                       placeholder="000_ユニット名_用途"
+                                       onfocus="if(this.value.trim() !== '') this.dataset.originalValue = this.value"
+                                       onblur="App.pages.boards.updateBoardName('${board.id}', this.value, this)">
+                            </div>
+                            <div class="medium"></div>
                             <button class="circle transparent" onclick="ui('#modal-filter-task')">
                                 <i>filter_list</i>
                                 <div class="tooltip bottom">フィルタ</div>
@@ -104,6 +115,44 @@
                     // イベントを（再）登録
                     this.setupHeaderEvents(board);
                 });
+
+                // マイボード用のコンテナ生成
+                this.initializeMyBoard(container);
+            },
+
+            initializeMyBoard: function (container) {
+                const boardId = 'my-board';
+                let pageDiv = document.getElementById(`tab-board-${boardId}`);
+
+                // マイボード用のヘッダー（アーカイブ・スターなし）
+                const headerHtml = `
+                    <nav id="board-tab-header-${boardId}" class="small-margin row">
+                        <h3 class="bold small">マイボード</h3>
+                        <div class="max"></div>
+                        <button class="circle transparent" onclick="ui('#modal-filter-task')">
+                            <i>filter_list</i>
+                            <div class="tooltip bottom">フィルタ</div>
+                        </button>
+                    </nav>
+                `;
+
+                if (!pageDiv) {
+                    pageDiv = document.createElement('div');
+                    pageDiv.id = `tab-board-${boardId}`;
+                    pageDiv.className = '';
+                    pageDiv.style.display = 'none';
+
+                    pageDiv.innerHTML = `
+                        ${headerHtml}
+                        <div id="kanban-canvas-${boardId}" class="top-margin"></div>
+                    `;
+                    container.appendChild(pageDiv);
+                } else {
+                    const existingNav = pageDiv.querySelector('nav');
+                    if (existingNav) {
+                        existingNav.outerHTML = headerHtml;
+                    }
+                }
             },
 
             loadData: async function (boardId, isRefresh = false) {
@@ -120,53 +169,44 @@
                 }
 
                 try {
-                    // タスクをmembersとJOINして取得
-                    const query = {
-                        where: { board_id: ["=", boardId] }
-                    };
+                    let query;
+                    // マイボードの場合の特殊処理
+                    if (boardId === 'my-board') {
+                        // board_id が null のものを取得
+                        query = {
+                            // where: { board_id: ["is", null] }
+                        };
+                    } else {
+                        // 通常のボード
+                        query = {
+                            where: { board_id: ["=", boardId] }
+                        };
+                    }
 
-                    const joins = [
-                        {
-                            targetTable: 'members',
-                            joinType: 'LEFT',
-                            columns: ['display_name', 'profile_photo_url'],
-                            localKey: 'created_by',
-                            foreignKey: 'id',
-                            alias: 'created_by_'
-                        },
-                        {
-                            targetTable: 'members',
-                            joinType: 'LEFT',
-                            columns: ['display_name', 'profile_photo_url'],
-                            localKey: 'processed_by',
-                            foreignKey: 'id',
-                            alias: 'processed_by_'
-                        },
-                        {
-                            targetTable: 'members',
-                            joinType: 'LEFT',
-                            columns: ['display_name', 'profile_photo_url'],
-                            localKey: 'reviewed_by',
-                            foreignKey: 'id',
-                            alias: 'reviewed_by_'
-                        },
-                        {
-                            targetTable: 'members',
-                            joinType: 'LEFT',
-                            columns: ['display_name', 'profile_photo_url'],
-                            localKey: 'received_by',
-                            foreignKey: 'id',
-                            alias: 'received_by_'
-                        }
-                    ];
-
-                    const result = await callGAS('selectWithJoin', TABLE_NAMES.TASKS, query, joins);
+                    // JOINは使わず、単純なSELECTを実行
+                    const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query);
                     let tasks = result?.data || result || [];
 
-                    // ボード固有のタスクキャッシュに保存
-                    this.currentBoardTasks = tasks;
+                    // マイボードの場合、フロントエンドでさらにフィルタリング
+                    if (boardId === 'my-board') {
+                        const myUserId = App.state.userId;
+                        if (myUserId) {
+                            tasks = tasks.filter(t =>
+                                t.created_by === myUserId ||
+                                t.reviewed_by === myUserId ||
+                                t.processed_by === myUserId ||
+                                t.received_by === myUserId
+                            );
+                        } else {
+                            // ユーザーIDが取得できない場合は何も表示しない（安全策）
+                            tasks = [];
+                        }
+                    }
 
-                    console.log(`Board ${boardId} tasks loaded with JOINs:`, tasks.length);
+                    // ボード固有のタスクキャッシュに保存
+                    this.cachedBoardTasks[boardId] = tasks;
+
+                    console.log(`Board ${boardId} tasks loaded:`, tasks.length);
 
                     // カンバンを表示（まずキャッシュデータで描画）
                     this.renderKanban(boardId, false);
@@ -177,10 +217,25 @@
                         console.log(`Board ${boardId}: キャッシュデータ検出。バックグラウンドで最新データを取得中...`);
                         setTimeout(async () => {
                             try {
-                                const freshResult = await callGAS('selectWithJoin', TABLE_NAMES.TASKS, query, joins, true); // forceRefresh = true
-                                const freshTasks = freshResult?.data || freshResult || [];
+                                const freshResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query, null, true); // forceRefresh = true
+                                let freshTasks = freshResult?.data || freshResult || [];
 
-                                this.currentBoardTasks = freshTasks;
+                                // マイボードの場合のフィルタリング（再取得時）
+                                if (boardId === 'my-board') {
+                                    const myUserId = App.state.userId;
+                                    if (myUserId) {
+                                        freshTasks = freshTasks.filter(t =>
+                                            t.created_by === myUserId ||
+                                            t.reviewed_by === myUserId ||
+                                            t.processed_by === myUserId ||
+                                            t.received_by === myUserId
+                                        );
+                                    } else {
+                                        freshTasks = [];
+                                    }
+                                }
+
+                                this.cachedBoardTasks[boardId] = freshTasks;
                                 console.log(`Board ${boardId} tasks refreshed:`, freshTasks.length);
 
                                 // 最新データでカンバンを再描画
@@ -238,7 +293,12 @@
                 this.sortableInstances = {};
 
                 // ローカルキャッシュから取得（loadDataでJOIN済み）
-                const boardTasks = this.currentBoardTasks || [];
+                const boardTasks = this.cachedBoardTasks[boardId] || [];
+
+                // 最終レンダリング時刻を更新
+                if (!isLoading) {
+                    this.lastRenderTimes[boardId] = Date.now();
+                }
 
                 const html = [
                     '<div class="grid no-space">',
@@ -360,8 +420,8 @@
                 }
 
                 // 現在のタスクを取得して元のステータスを保存
-                // ボード固有のデータ(this.currentBoardTasks)を優先して検索
-                const boardTasks = this.currentBoardTasks || [];
+                // ボード固有のデータ(this.cachedBoardTasks)を優先して検索
+                const boardTasks = this.cachedBoardTasks[boardId] || [];
                 const task = boardTasks.find(t => t.id === taskId);
 
                 if (!task) {
@@ -410,13 +470,121 @@
 
 
 
+
+            /**
+             * 新しいボードを作成
+             */
+            createBoard: async function () {
+                // ドロップダウンを閉じる
+                if (App.utils.header && App.utils.header.closeNewButtonDropdown) {
+                    App.utils.header.closeNewButtonDropdown();
+                }
+
+                showLoading();
+                try {
+                    const cleanItem = {
+                        name: `新しいボード(${formatDateTimeForDisplay(new Date().toString(), 'yyyyMMddHHmmss')})`,
+                        is_active: true
+                    };
+
+                    const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'insert', cleanItem);
+                    // insert returns the inserted object(s). If array, take first.
+                    const newBoard = result?.data || null;
+
+                    if (!newBoard || !newBoard.id) {
+                        throw new Error('ボードの作成に失敗しました (No data returned)');
+                    }
+
+                    // ローカルデータを更新
+                    App.state.data.boards.push(newBoard);
+
+                    // 初期化（新しいタブのDOM作成）
+                    this.initialize();
+
+                    // ナビゲーション再描画
+                    if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+                        App.utils.navigation.renderBoardsNavigation();
+                    }
+
+                    // タブ切り替え
+                    if (App.utils.navigation && App.utils.navigation.switchTab) {
+                        await App.utils.navigation.switchTab(`board-${newBoard.id}`);
+                    }
+
+                    // フォーカス
+                    // 少し待ってからフォーカス（遷移アニメーションなどのため）
+                    setTimeout(() => {
+                        // headerのIDは initialize メソッドで tab-board-${board.id} 内の nav に設定されているか確認
+                        // initialize内: nav id="board-tab-header-${board.id}"
+                        const input = document.querySelector(`#board-tab-header-${newBoard.id} input[type="text"]`);
+                        if (input) {
+                            input.dataset.originalValue = input.value;
+                            input.value = '';
+                            input.focus();
+                            input.select();
+                        }
+                    }, 100);
+                } catch (error) {
+                    console.error('Failed to create board:', error);
+                    App.utils.error.handle(error);
+                } finally {
+                    hideLoading();
+                }
+            },
+
+            /**
+             * ボード名を更新
+             */
+            updateBoardName: async function (boardId, newName, inputElement) {
+                if (!boardId) return;
+
+                if (!newName || newName.trim() === "") {
+                    if (inputElement && inputElement.dataset.originalValue) {
+                        inputElement.value = inputElement.dataset.originalValue;
+                    }
+                    return;
+                }
+
+                // 見た目を更新 (Optimistic)
+                const board = App.state.data.boards.find(b => b.id === boardId);
+                if (board) {
+                    const oldName = board.name;
+                    if (oldName === newName) return; // 変更なし
+
+                    board.name = newName;
+
+                    // 左側のナビゲーションを再描画
+                    if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+                        App.utils.navigation.renderBoardsNavigation();
+                        // アクティブ状態を復元（renderBoardsNavigationの実装によってはリセットされるため）
+                        const activeLink = document.querySelector(`a[data-board-id="${boardId}"]`);
+                        if (activeLink) activeLink.classList.add('active');
+                    }
+
+                    try {
+                        await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'update', {
+                            where: { id: ["=", boardId] },
+                            set: { name: newName }
+                        }, 'ボード名を更新');
+                    } catch (error) {
+                        console.error('Failed to update board name:', error);
+                        // ロールバック
+                        board.name = oldName;
+                        if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+                            App.utils.navigation.renderBoardsNavigation();
+                        }
+                        alert('ボード名の更新に失敗しました');
+                    }
+                }
+            },
+
             setupHeaderEvents: function (board) {
                 // Share Button
                 const btnShare = document.getElementById(`btn-share-${board.id}`);
                 if (btnShare) {
                     btnShare.addEventListener('click', () => {
                         const url = `${scriptUrl}?tab=board&board_id=${board.id}`;
-                        const text = `[ボード#${board.display_id}] ${board.name} | ZEN Boards`;
+                        const text = `[ボード] ${board.name} | ZEN Boards`;
 
                         const htmlContent = `<a href="${url}">[ボード#${board.display_id}] ${escapeHtml(board.name)} | ZEN Boards</a>`;
                         const textContent = `[ボード#${board.display_id}] ${board.name} | ZEN Boards\n${url}`;
@@ -577,13 +745,27 @@
             createTaskCard: function (task) {
                 const displayId = task.display_id ? `#${task.display_id}` : '';
 
-                // JOIN済みデータから担当者情報を取得
+                // App.state.data.members からメンバー情報を取得
+                const allMembers = App.state.data.members || [];
+                const createdBy = allMembers.find(m => m.id === task.created_by);
+                const processedBy = allMembers.find(m => m.id === task.processed_by);
+                const reviewedBy = allMembers.find(m => m.id === task.reviewed_by);
+                const receivedBy = allMembers.find(m => m.id === task.received_by);
+
                 const assigneeNames = [
-                    task.created_by_display_name, task.processed_by_display_name, task.reviewed_by_display_name, task.received_by_display_name
+                    createdBy ? createdBy.display_name : '',
+                    processedBy ? processedBy.display_name : '',
+                    reviewedBy ? reviewedBy.display_name : '',
+                    receivedBy ? receivedBy.display_name : ''
                 ];
+
                 const assigneePhotoUrls = [
-                    task.created_by_profile_photo_url, task.processed_by_profile_photo_url, task.reviewed_by_profile_photo_url, task.received_by_profile_photo_url
-                ]
+                    createdBy ? createdBy.profile_photo_url : null,
+                    processedBy ? processedBy.profile_photo_url : null,
+                    reviewedBy ? reviewedBy.profile_photo_url : null,
+                    receivedBy ? receivedBy.profile_photo_url : null
+                ];
+
                 const assigneeIcons = assigneePhotoUrls.map((url, index) => {
                     let opacity;
                     if (index === 1 && task.task_status_key === 'TODO') {
