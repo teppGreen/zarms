@@ -1,33 +1,33 @@
-<dialog id="modal-select-members" class="modal">
-    <div class="row no-space align-center">
-        <div class="max">
-            <h5 class="bold mb-0">メンバーを選択</h5>
+<dialog id="modal-select-members" class="modal padding small-width no-scroll">
+    <header class="fixed small-padding">
+        <div class="row no-space align-center">
+            <div class="max">
+                <h5 class="bold">メンバーを選択</h5>
+            </div>
+            <button class="circle transparent" onclick="ui('#modal-select-members')">
+                <i>close</i>
+            </button>
         </div>
-        <button class="circle transparent" onclick="ui('#modal-select-members')">
-            <i>close</i>
-        </button>
-    </div>
 
-    <div class="padding">
         <!-- 検索バー -->
         <div class="field round border prefix">
             <i>search</i>
             <input type="text" id="member-search-input" placeholder="名前またはメールで検索..."
                 oninput="App.modals.selectMembers.filterResults()">
         </div>
+    </header>
 
-        <div class="space"></div>
-
-        <!-- 結果リスト -->
-        <div id="member-results-container" style="max-height: 400px; overflow-y: auto;">
-            <!-- 動的に生成 -->
-        </div>
+    <!-- 結果リスト -->
+    <div id="member-results-container" class="scroll medium-height small-padding no-round small-line">
+        <!-- 動的に生成 -->
     </div>
 
-    <nav class="right-align">
-        <button class="border" onclick="ui('#modal-select-members')">キャンセル</button>
-        <button onclick="App.modals.selectMembers.confirm()">選択</button>
-    </nav>
+    <footer class="fixed small-padding">
+        <nav class="right-align">
+            <button class="border" onclick="ui('#modal-select-members')">キャンセル</button>
+            <button onclick="App.modals.selectMembers.confirm()">選択</button>
+        </nav>
+    </footer>
 </dialog>
 
 <script>
@@ -38,33 +38,31 @@
             allMembers: [],
             multiSelect: false,
 
-            open: function (options = {}) {
+            open: async function (options = {}) {
                 this.callback = options.callback || null;
                 this.multiSelect = options.multiSelect || false;
                 this.selectedIds = options.preSelected || [];
 
-                // membersDataをロード（毎回取得）
-                showLoading();
-                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {})
-                    .then(async result => {
-                        let members = result?.data || result || [];
+                // App.state.data.members から直接ロード
+                this.allMembers = App.state.data.members || [];
+                this.render();
+                await ui('#modal-select-members');
 
-                        // isCachedチェック: キャッシュデータの場合は即座に最新データを取得
-                        if (result?.isCached === true) {
-                            console.log('Members (modal): キャッシュデータ検出。即座に最新データを取得中...');
-                            const freshResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {}, null, true);
-                            members = freshResult?.data || freshResult || [];
-                        }
+                // フォーカスを確実に行うための再試行ロジック
+                const tryFocus = (count = 0) => {
+                    const input = document.getElementById('member-search-input');
+                    // offsetParent !== null は要素が表示されているかどうかの簡易チェック
+                    if (input && input.offsetParent !== null) {
+                        input.focus();
+                        input.select(); // 全選択
+                    } else if (count < 10) {
+                        // まだ表示されていない場合は少し待って再試行
+                        setTimeout(() => tryFocus(count + 1), 50);
+                    }
+                };
 
-                        this.allMembers = members;
-                        this.render();
-                        hideLoading();
-                        ui('#modal-select-members');
-                    })
-                    .catch(error => {
-                        hideLoading();
-                        App.utils.error.handle(error);
-                    });
+                // 初回実行
+                tryFocus();
             },
 
             render: function () {
@@ -99,24 +97,18 @@
 
                 container.innerHTML = filtered.map(member => {
                     const isSelected = this.selectedIds.includes(member.id);
-                    const iconUrl = member.icon_gfile_id ?
-                        `https:/\/drive.google.com/thumbnail?id=${member.icon_gfile_id}&sz=w32` :
-                        '';
-
                     return `
-          <label class="checkbox row middle-align no-space">
-            <input type="${this.multiSelect ? 'checkbox' : 'radio'}" 
-                   name="member-select" 
-                   value="${escapeHtml(member.email)}" 
-                   ${isSelected ? 'checked' : ''}
-                   onchange="App.modals.selectMembers.toggleSelection('${member.id}', this.checked)">
-            ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" class="avatar" alt="">` : ''}
-            <span class="max">
-              <strong>${escapeHtml(member.display_name || member.email)}</strong>
-              ${member.email ? `<br><span class="small-text">${escapeHtml(member.id)}</span>` : ''}
-            </span>
-          </label>
-        `;
+                        <div><label class="${this.multiSelect ? 'checkbox' : 'radio'} row middle-align small-space">
+                            <input type="${this.multiSelect ? 'checkbox' : 'radio'}" 
+                                name="member-select" 
+                                value="${member.id}" 
+                                ${isSelected ? 'checked' : ''}
+                                onchange="App.modals.selectMembers.toggleSelection('${member.id}', this.checked)">
+                            <span class="small-margin">
+                                <strong>${member.display_name || member.email}</strong>
+                            </span>
+                        </label></div>
+                    `;
                 }).join('');
             },
 

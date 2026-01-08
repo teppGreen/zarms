@@ -6,13 +6,13 @@
         </button>
         <menu id="new-button-dropdown" class="bottom transparent no-wrap">
             <li>
-                <button class="fill large-elevate" onclick="App.modals.new_task.open()">
+                <button class="fill large-elevate" onclick="App.modals.taskDetail.create()">
                     <i>check_circle</i>
                     <span>新しいタスク</span>
                 </button>
             </li>
             <li>
-                <button class="fill large-elevate" onclick="App.modals.new_creative.open()">
+                <button class="fill large-elevate" onclick="App.pages.boards.createBoard()">
                     <i>folder</i>
                     <span>新しいボード</span>
                 </button>
@@ -128,22 +128,7 @@
                     default: App.utils.header.toggleNewButtonDropdown(event);
                 }
             },
-
-            /**
-             * プロフィール表示
-             */
-            handleUserProfile: function () {
-                if (templateVariables?.activeUser && App.overlays.memberDetail) {
-                    App.overlays.memberDetail.open(templateVariables.activeUser.email);
-                } else {
-                    alert('プロフィールを開けません');
-                }
-            },
         };
-
-        // 下位互換性のための関数エイリアス
-        window.handleHeaderCloseClick = App.utils.header.handleHeaderCloseClick;
-
     })();
 
     (function () {
@@ -180,10 +165,6 @@
                 // 1. "P0001-W0001" 形式の対応 (最後のIDをターゲットにする)
                 const parts = searchValue.split('-');
                 const targetCode = parts[parts.length - 1];
-
-                if (typeof handleHeaderCloseClick === 'function') {
-                    handleHeaderCloseClick();
-                }
 
                 // 検索実行
                 App.utils.search.showIdSearchLoading();
@@ -506,9 +487,5 @@
                 }
             }
         };
-
-        // 下位互換性のためのグローバル関数
-        window.openDetailModalFromSearch = App.utils.search.openDetailModalFromSearch;
-
     })();
 </script>

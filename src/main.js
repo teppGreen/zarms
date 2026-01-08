@@ -59,7 +59,7 @@ function getMemberByEmail(email) {
   // membersテーブルからemailが一致するレコードを検索
   const result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
     where: { email: ["=", email] }
-  }, null, true);
+  }, null, false);
 
   const members = result?.data || result || [];
 
@@ -79,7 +79,7 @@ function findUserBySlackUrl(slackProfileUrl) {
   try {
     const result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
       where: { slack_profile_url: ["=", slackProfileUrl] }
-    }, null, true);
+    }, null, false);
 
     const members = result?.data || result || [];
 

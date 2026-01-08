@@ -1,4 +1,4 @@
-<nav id="left-nav" class="m l left no-wrap small-padding small-width max no-scroll surface-container">
+<nav id="left-nav" class="m l left no-wrap small-padding max no-scroll surface-container">
     <header class="row padding no-margin">
         <h1 class="font-title" style="font-size: 1.5rem;">ZEN Boards</h1>
     </header>
@@ -11,10 +11,14 @@
         <i>groups</i>
         <span>メンバー</span>
     </a>
-    <a id="my-board-nav" onclick="App.utils.navigation.switchTab('')">
+    <a id="my-board-nav" onclick="App.utils.navigation.switchTab('board-my-board')">
         <i>assignment</i>
         <span>マイボード</span>
     </a>
+
+    <nav class="surface-container no-padding">
+        <hr class="small-margin">
+    </nav>
 
     <!-- 動的ボードリスト -->
     <nav id="boards-nav" class="scroll surface-container no-padding left max">
@@ -31,24 +35,22 @@
              */
             switchTab: async function (tabName, skipUrlUpdate = false) {
                 console.log(`switchTab called with: ${tabName}, skipUrlUpdate: ${skipUrlUpdate}`);
-                const isBoardTab = tabName.startsWith('board-');
+                let isBoardTab = tabName.startsWith('board-');
 
                 // 現在のタブを取得して処理（必要なら）
                 const currentTab = Array.from(document.querySelectorAll('main > div')).find(el => el.style.display !== 'none');
                 console.log(`Current tab:`, currentTab);
 
-                // Overlayが開いている場合はリセット (汎用化)
-                if (currentTab && typeof currentTab.id === 'string' && currentTab.id.startsWith('detail-')) {
-                    // モーダルやオーバーレイのリセット処理があればここで
-                    // 現状はHTML構造が変わったため（overlays -> modals）、一旦スキップまたは必要に応じて実装
-                }
+                await App.utils.ui.closeTopModal();
 
                 // 左navのアクティブ状態管理
                 const sidebarLinks = document.querySelectorAll('nav.left a');
                 sidebarLinks.forEach(item => item.classList.remove('active'));
 
                 let activeLink;
-                if (isBoardTab) {
+                if (tabName === 'board-my-board') {
+                    activeLink = document.getElementById('my-board-nav');
+                } else if (isBoardTab) {
                     const boardId = tabName.replace('board-', '');
                     activeLink = document.querySelector(`a[data-board-id="${boardId}"]`);
                 } else {
@@ -81,6 +83,18 @@
                                 // 既に描画済み（キャンバスにコンテンツがある）場合はtrueを渡してローディング表示をスキップ
                                 const canvas = document.getElementById('kanban-canvas-' + boardId);
                                 const isRendered = canvas && canvas.children.length > 0;
+
+                                // 前回レンダリングから60秒未満の場合は再ロードをスキップ
+                                const lastRender = App.pages.boards.lastRenderTimes?.[boardId] || 0;
+                                const now = Date.now();
+                                let isThrottled = false;
+                                if (now - lastRender < 60000) {
+                                    console.log(`[switchTab] Throttling loadData for board ${boardId}. Last render was ${now - lastRender}ms ago.`);
+                                    App.pages.boards.currentBoardId = boardId;
+                                    isThrottled = true;
+                                    return;
+                                }
+
                                 await App.pages.boards.loadData(boardId, isRendered);
                             }
                         } else {
@@ -151,12 +165,11 @@
 
                 const boards = App.state.data.boards || [];
                 console.log('[renderBoardsNavigation] Total boards:', boards.length);
+                let html = '';
                 let starredBoardIndex = [];
                 let activeBoardIndex = [];
                 let archiveBoardIndex = [];
                 const boardsNavigation = document.getElementById('boards-nav');
-
-                let html = '<hr class="small-margin">';
 
                 // ユーザープロパティからstarred_boardsを取得してパース
                 // 共通の getUserProperty を使用
@@ -188,8 +201,8 @@
                     console.log('[renderBoardsNavigation] Starred boards rendered count:', starredBoardIndex.length);
 
                 }
-                
-                if(!starredBoardIndex.length){
+
+                if (!starredBoardIndex.length) {
                     console.log('[renderBoardsNavigation] No starred boards, showing placeholder');
                     html += `<p class="left-padding top-margin bottom-margin secondary-text left-align middle-align row tiny-space">
                         <i class="medium">folder_special</i>
@@ -255,6 +268,46 @@
                 console.log('[renderBoardsNavigation] End.');
             },
 
+            formatBoardName: function (name) {
+                if (!name) return '';
+
+                const getWeight = (c) => (c.match(/[ -~]/) || c.match(/[\uFF61-\uFF9F]/)) ? 0.5 : 1;
+
+                let totalWeight = 0;
+                for (let c of name) {
+                    totalWeight += getWeight(c);
+                }
+
+                let processingName = name;
+                // 合計19文字以上（19含む）なら17文字で切って…をつける
+                if (totalWeight >= 19) {
+                    let w = 0;
+                    let cutIdx = 0;
+                    for (let i = 0; i < name.length; i++) {
+                        let cw = getWeight(name[i]);
+                        if (w + cw > 17) break;
+                        w += cw;
+                        cutIdx = i + 1;
+                    }
+                    processingName = name.substring(0, cutIdx) + '…';
+                }
+
+                let html = '';
+                let lineWeight = 0;
+                for (let c of processingName) {
+                    let w = getWeight(c);
+                    // 9文字（weight 9）を超えたら改行
+                    if (lineWeight + w > 9) {
+                        html += '<br>';
+                        lineWeight = 0;
+                    }
+                    html += escapeHtml(c);
+                    lineWeight += w;
+                }
+
+                return html;
+            },
+
             createBoardLink: function (board, isStarred) {
                 const boardTabName = 'board-' + board.id;
                 // アイコン: Inactiveならfolder_off, Activeならstarred状態に合わせて変更
@@ -265,7 +318,7 @@
                 return `
                         <a onclick="App.utils.navigation.switchTab('${boardTabName}')" data-board-id="${board.id}">
                             <i class="${textClass}">${icon}</i>
-                            <span class="${textClass}">${escapeHtml(board.name || '')}</span>
+                            <span class="${textClass}">${this.formatBoardName(board.name || '')}</span>
                         </a>
                     `;
             },
@@ -277,7 +330,7 @@
                 const nav = document.getElementById('boards-nav');
                 if (!nav) return;
 
-                let html = '<hr class="small-margin">';
+                let html = '';
                 for (let i = 0; i < 9; i++) {
                     const delay = i * 0.1;
                     html += `

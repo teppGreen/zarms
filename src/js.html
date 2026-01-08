@@ -129,14 +129,15 @@
 
     // タスク詳細モーダル
     if (params.modal === 'task-detail' && params.task_id) {
-      const boardTasks = App.pages.boards?.currentBoardTasks || [];
+      const currentBoardId = App.pages.boards?.currentBoardId;
+      const boardTasks = (currentBoardId && App.pages.boards?.cachedBoardTasks?.[currentBoardId]) || [];
       const task = boardTasks.find(t => t.id === params.task_id);
 
       if (task) {
         App.modals.taskDetail.open(params.task_id, true); // trueでURL更新をスキップ
       } else {
         console.error('Task not found for ID:', params.task_id);
-        console.log(`App.pages.boards?.currentBoardTasks:`, App.pages.boards?.currentBoardTasks);
+        console.log(`App.pages.boards?.cachedBoardTasks:`, App.pages.boards?.cachedBoardTasks);
       }
     }
     // メンバー詳細モーダル
@@ -180,38 +181,12 @@
       }
 
       // モーダルの処理
-      // 既存のモーダルを全て閉じる（各モーダルのcloseメソッドを使用）
-      const openModals = document.querySelectorAll('dialog[open]');
-      openModals.forEach(modal => {
-        const modalId = modal.id;
-
-        // モーダルIDからモーダルオブジェクトを取得してcloseメソッドを呼び出す
-        // skipUrlUpdate=trueでURL更新をスキップ
-        if (modalId === 'modal-detail-task' && App.modals.taskDetail && App.modals.taskDetail.close) {
-          App.modals.taskDetail.close(true); // trueでURL更新をスキップ
-        } else if (modalId === 'modal-detail-member') {
-          // 注: メンバー詳細は App.modals または App.overlays として参照されている可能性があります
-          if (App.modals.memberDetail && App.modals.memberDetail.close) {
-            App.modals.memberDetail.close(true);
-          } else if (App.overlays.memberDetail && App.overlays.memberDetail.close) {
-            App.overlays.memberDetail.close(true);
-          }
-        } else {
-          // フォールバック: ui関数（Beer CSSのモーダルトグル）またはネイティブのclose()を使用
-          if (typeof ui === 'function') {
-            // 第二引数にオプションを渡し、URL更新をスキップするよう示す
-            ui(`#${modalId}`, { skipUrlUpdate: true }); // Beer CSSのモーダルトグル関数
-          } else if (typeof modal.close === 'function') {
-            // 一部のカスタム実装では close(true) でURL更新をスキップできる可能性がある
-            try {
-              modal.close(true);
-            } catch (e) {
-              // ネイティブのdialog要素のclose()は引数を無視するため、安全にフォールバック
-              modal.close();
-            }
-          }
-        }
-      });
+      // 既存のモーダルを閉じる（優先度順に、全て閉じる）
+      // URL状態と同期させるため、開いているモーダルがなくなるまで処理する
+      let safetyCounter = 0;
+      while (App.utils.ui.closeTopModal(true) && safetyCounter < 10) {
+        safetyCounter++;
+      }
 
       // パラメータにモーダルが指定されている場合は開く
       if (params.modal) {
@@ -230,28 +205,40 @@
   // 初回ロード: 最小限のデータのみ取得
   async function loadAllData() {
     try {
-      // boards と links テーブルから並列でデータ取得
-      const [boardsResult, linksResult] = await Promise.all([
+      // boards, links, members テーブルから並列でデータ取得
+      const [boardsResult, linksResult, membersResult, directoriesResult] = await Promise.all([
         callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {
-          columns: ['id', 'display_id', 'name', 'description', 'is_active']
+          columns: ['id', 'display_id', 'name', 'description', 'is_active'],
+          orderBy: { name: 'asc' }
         }),
-        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LINKS, 'select', {})
+        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LINKS, 'select', {}),
+        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {
+          // where: { is_active: ["=", true] } // 全部FALSEになっちゃう不具合　一旦コメントアウト
+        }),
+        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {
+          // where: { is_active: ["=", true] }
+        })
       ]);
 
       // 結果からデータを取得（キャッシュ情報を含む可能性がある）
       let boards = boardsResult?.data || boardsResult || [];
       let links = linksResult?.data || linksResult || [];
+      let members = membersResult?.data || membersResult || [];
+      let directories = directoriesResult?.data || directoriesResult || [];
 
       // App.stateに保存
       console.log('Boards fetched (minimal):', boards);
       console.log('Links fetched:', links);
+      console.log('Members fetched:', members);
+      console.log('Directories fetched:', directories);
+
       App.state.data.boards = boards;
       App.state.data.links = links;
+      App.state.data.members = members;
+      App.state.data.directories = directories;
 
-      // members, tasks, directoriesは各タブを開いた時に取得するため、ここでは空配列で初期化
-      App.state.data.members = [];
+      // tasks, directoriesは各タブを開いた時に取得するため、ここでは空配列で初期化
       App.state.data.tasks = [];
-      App.state.data.directories = [];
 
       // ナビゲーションとボードページを更新（キャッシュデータで先に描画）
       App.utils.navigation.renderBoardsNavigation();
@@ -272,7 +259,8 @@
             if (boardsResult?.isCached === true) {
               promises.push(
                 callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {
-                  columns: ['id', 'display_id', 'name', 'description', 'is_active']
+                  columns: ['id', 'display_id', 'name', 'description', 'is_active'],
+                  orderBy: { name: 'asc' }
                 }, null, true)
               );
             } else {
@@ -350,7 +338,8 @@
       console.log('[refreshData] 自動更新開始 (コンテキスト対応)');
 
       const boardsResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {
-        columns: ['id', 'display_id', 'name', 'description', 'is_active']
+        columns: ['id', 'display_id', 'name', 'description', 'is_active'],
+        orderBy: { name: 'asc' }
       }, null, true);
 
       App.state.set('boards', boardsResult?.data || []);
@@ -432,16 +421,7 @@
 
       // Esc: モーダルを閉じる
       if (e.key === 'Escape') {
-        const openModals = document.querySelectorAll('dialog[open]');
-        if (openModals.length > 0) {
-          openModals.forEach(modal => {
-            if (typeof ui === 'function') {
-              ui(`#${modal.id}`);
-            } else {
-              modal.close();
-            }
-          });
-        }
+        App.utils.ui.closeTopModal(false);
       }
     });
   }
@@ -469,7 +449,26 @@
     return new Promise((resolve, reject) => {
       google.script.run
         .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
+        .withFailureHandler((error) => {
+          const errorMsg = String(error);
+          // Google Sheets APIのQuota exceededエラーを判定
+          if (errorMsg.includes("Quota exceeded for quota metric 'Read requests'") &&
+            errorMsg.includes("sheets.googleapis.com")) {
+            console.warn(`[callGAS] Quota limit reached for ${functionName}. Retrying in 60 seconds...`);
+            showSnackbar(`アクセスが集中しているため、処理を完了できませんでした。\n自動的に再試行しますので、画面を閉じずにお待ちください。`, 'error', 'top', 60);
+
+            // 60秒待機してから再試行
+            setTimeout(() => {
+              console.log(`[callGAS] Retrying ${functionName}...`);
+              callGAS(functionName, ...args)
+                .then(resolve)
+                .catch(reject);
+            }, 60000);
+          } else {
+            // その他のエラーは通常通りreject
+            reject(error);
+          }
+        })
       [functionName](...args);
     });
   }
@@ -485,13 +484,13 @@
     document.body.style.cursor = '';
   }
 
-   /**
-   * スナックバーを表示する
-   * @param {string} text - 表示するテキスト
-   * @param {string} [color=''] - 色 (例: 'error', 'primary')。デフォルトは空欄
-   * @param {string} [position='top'] - 位置 ('top', 'bottom')。デフォルトは 'top'
-   * @param {number} [seconds=5] - 表示時間(秒)。デフォルトは 5秒
-   */
+  /**
+  * スナックバーを表示する
+  * @param {string} text - 表示するテキスト
+  * @param {string} [color=''] - 色 (例: 'error', 'primary')。デフォルトは空欄
+  * @param {string} [position='top'] - 位置 ('top', 'bottom')。デフォルトは 'top'
+  * @param {number} [seconds=5] - 表示時間(秒)。デフォルトは 5秒
+  */
   function showSnackbar(text, color = '', position = 'top', seconds = 5) {
     const snackbar = document.getElementById('global-snackbar');
     if (!snackbar) return;
@@ -753,6 +752,58 @@
         el.style.pointerEvents = readonly ? 'not-allowed' : '';
         el.style.opacity = readonly ? '0.7' : '';
       });
+    },
+
+    /**
+     * 最も優先度の高いモーダルを1つ閉じる
+     * 優先順位: 'modal-select-' > 'modal-detail-' > その他
+     * @param {boolean} skipUrlUpdate - URL更新をスキップするかどうか
+     * @returns {boolean} モーダルを閉じた場合はtrue
+     */
+    closeTopModal: function (skipUrlUpdate = false) {
+      const openModals = Array.from(document.querySelectorAll('dialog[open], dialog.active'));
+      if (openModals.length === 0) return false;
+
+      // 優先順位でソート
+      openModals.sort((a, b) => {
+        const getPriority = (id) => {
+          if (id.startsWith('modal-select-')) return 2;
+          if (id.startsWith('modal-detail-')) return 1;
+          return 0;
+        };
+        // 降順ソート (Priorityが高い順)
+        return getPriority(b.id) - getPriority(a.id);
+      });
+
+      const targetModal = openModals[0];
+      const modalId = targetModal.id;
+      console.log(`[closeTopModal] Closing ${modalId}, skipUrlUpdate: ${skipUrlUpdate}`);
+
+      // 各種具体的なモーダル閉じる処理
+      if (modalId.startsWith('modal-detail-task') && App.modals.taskDetail && App.modals.taskDetail.close) {
+        App.modals.taskDetail.close(skipUrlUpdate);
+      } else if (modalId === 'modal-detail-member') {
+        if (App.modals.memberDetail && App.modals.memberDetail.close) {
+          App.modals.memberDetail.close(skipUrlUpdate);
+        } else {
+          // 汎用的な閉じる処理
+          if (typeof ui === 'function') {
+            // Beer CSS
+            ui(`#${modalId}`, { skipUrlUpdate });
+          } else if (typeof targetModal.close === 'function') {
+            try {
+              targetModal.close();
+            } catch (e) {
+              targetModal.removeAttribute('open');
+              targetModal.classList.remove('active');
+            }
+          } else {
+            targetModal.classList.remove('active');
+            targetModal.removeAttribute('open');
+          }
+        }
+        return true;
+      }
     }
   };
 
@@ -817,5 +868,9 @@
     Object.keys(oldData).forEach(key => {
       item[key] = oldData[key];
     });
+  }
+
+  async function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 </script>

@@ -1,7 +1,7 @@
 <div id="tab-members" style="display: none;">
-    <div class="grid">
+    <div class="grid no-scroll">
         <!-- 左側: Members (75%) -->
-        <div class="s12 m9 scroll">
+        <div class="s12 m9 scroll no-round large-height scroll">
             <h5>メンバー</h5>
             <div id="members-list" class="grid">
                 <!-- Memberカードが動的に生成される -->
@@ -9,8 +9,8 @@
         </div>
 
         <!-- 右側: Directories (25%) -->
-        <div class="s12 m3 scroll">
-            <h6>組織</h6>
+        <div class="s12 m3 scroll no-round large-height scroll">
+            <h5>組織</h5>
             <div id="directories-tree">
                 <!-- ツリー構造が動的に生成される -->
             </div>
@@ -21,69 +21,36 @@
 <script>
     (function () {
         App.pages.members = {
+            memberAssignments: [],
+            expandedNodes: {},
+            selectedDirectoryId: null,
+
             loadData: async function () {
+                showLoading();
+
+                // membersデータを取得
+                let members = App.state.data.members || [];
+                members = members.filter(member => member.is_active === true);
+
+                // directoriesデータを取得
+                let directories = App.state.data.directories || [];
+
+                // member_assignmentsデータを取得
                 try {
-                    showLoading();
-
-                    // membersデータを取得
-                    let membersResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {});
-                    let members = membersResult?.data || membersResult || [];
-
-                    // directoriesデータを取得
-                    let directoriesResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {});
-                    let directories = directoriesResult?.data || directoriesResult || [];
-
-                    console.log('Members data loaded:', members.length);
-                    console.log('Directories data loaded:', directories.length);
-
-                    // まずキャッシュデータで描画
-                    this.renderMembers(members);
-                    this.renderDirectories(directories);
-                    hideLoading();
-
-                    // isCachedチェック: キャッシュデータの場合はバックグラウンドで最新データを取得
-                    if (membersResult?.isCached === true || directoriesResult?.isCached === true) {
-                        console.log('Members/Directories: キャッシュデータ検出。バックグラウンドで最新データを取得中...');
-                        setTimeout(async () => {
-                            try {
-                                const promises = [];
-
-                                if (membersResult?.isCached === true) {
-                                    promises.push(
-                                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {}, null, true)
-                                    );
-                                } else {
-                                    promises.push(Promise.resolve(membersResult));
-                                }
-
-                                if (directoriesResult?.isCached === true) {
-                                    promises.push(
-                                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {}, null, true)
-                                    );
-                                } else {
-                                    promises.push(Promise.resolve(directoriesResult));
-                                }
-
-                                const [freshMembersResult, freshDirectoriesResult] = await Promise.all(promises);
-                                const freshMembers = freshMembersResult?.data || freshMembersResult || [];
-                                const freshDirectories = freshDirectoriesResult?.data || freshDirectoriesResult || [];
-
-                                console.log('Members data refreshed:', freshMembers.length);
-                                console.log('Directories data refreshed:', freshDirectories.length);
-
-                                // 最新データで再描画
-                                this.renderMembers(freshMembers);
-                                this.renderDirectories(freshDirectories);
-                            } catch (error) {
-                                console.error('Background refresh error (members/directories):', error);
-                            }
-                        }, 100); // 100ms後に実行（メインUIの表示を優先）
-                    }
-                } catch (error) {
-                    console.error('Error loading members page data:', error);
-                    hideLoading();
-                    App.utils.error.handle(error);
+                    const res = await callGAS('handleDatabaseProcess', App.state.userId, 'member_assignments', 'select', {});
+                    this.memberAssignments = res.data || res || [];
+                    console.log('Member assignments loaded:', this.memberAssignments.length);
+                } catch (e) {
+                    console.error('Error loading member_assignments:', e);
+                    this.memberAssignments = [];
                 }
+
+                console.log('Members data loaded:', members.length);
+                console.log('Directories data loaded:', directories.length);
+
+                this.renderMembers(members);
+                this.renderDirectories(directories);
+                hideLoading();
             },
 
             renderMembers: function (members = []) {
@@ -103,9 +70,9 @@
                 ${member.profile_photo_url
                             ? `<img src="${escapeHtml(member.profile_photo_url)}" class="circle small" alt="${escapeHtml(member.display_name)}">`
                             : '<i class="extra">account_circle</i>'}
-                <div class="max">
-                  <h6 class="small">${escapeHtml(member.display_name || '')}</h6>
-                  <p class="small-text">${escapeHtml(member.email || '')}</p>
+                <div class="max no-line">
+                  <span class="small">${member.display_name || ''}</span>
+                  <span class="small-text">${member.email || ''}</span>
                 </div>
               </div>
             </article>
@@ -125,7 +92,7 @@
 
                 // ツリー構造を構築
                 const tree = this.buildTree(directories);
-                container.innerHTML = this.renderTree(tree, 0);
+                container.innerHTML = this.renderTree(tree);
             },
 
             buildTree: function (flatData) {
@@ -154,23 +121,40 @@
                 return rootNodes;
             },
 
-            renderTree: function (nodes, level) {
-                let html = '<ul class="no-space">';
+            renderTree: function (nodes) {
+                if (!nodes || nodes.length === 0) return '';
+
+                let html = '<ul class="no-space" style="list-style: none; padding-left: 0;">';
 
                 nodes.forEach(node => {
                     const hasChildren = node.children && node.children.length > 0;
-                    const indent = level * 16;
+                    const isExpanded = this.expandedNodes[node.id];
+                    const isSelected = this.selectedDirectoryId === node.id;
+
+                    // トグルアイコン
+                    let toggleIcon = 'remove';
+                    if (hasChildren) {
+                        toggleIcon = isExpanded ? 'expand_more' : 'chevron_right';
+                    }
+
+                    const activeClass = isSelected ? 'surface-variant' : '';
 
                     html += `
-            <li style="padding-left: ${indent}px;">
-              <div class="row small-space small-padding">
-                <i class="tiny">${hasChildren ? 'folder' : 'folder_open'}</i>
-                <span class="small-text">${escapeHtml(node.name || '')}</span>
+            <li class="${activeClass}" style="list-style: none;">
+              <div class="row small-space small-padding align-center">
+                <button class="circle transparent small" 
+                        onclick="event.stopPropagation(); App.pages.members.toggleNode('${node.id}')"
+                        ${hasChildren ? '' : 'disabled'}>
+                    <i>${toggleIcon}</i>
+                </button>
+                <div class="max pointer" onclick="App.pages.members.selectDirectory('${node.id}')">
+                    <span class="small-text ${isSelected ? 'bold' : ''}">${escapeHtml(node.name || '')}</span>
+                </div>
               </div>
-          `;
+            `;
 
-                    if (hasChildren) {
-                        html += this.renderTree(node.children, level + 1);
+                    if (hasChildren && isExpanded) {
+                        html += `<div style="padding-left: 24px;">${this.renderTree(node.children)}</div>`;
                     }
 
                     html += '</li>';
@@ -178,6 +162,40 @@
 
                 html += '</ul>';
                 return html;
+            },
+
+            toggleNode: function (nodeId) {
+                const currentState = this.expandedNodes[nodeId];
+                this.expandedNodes[nodeId] = !currentState;
+                // ツリー再描画（現在のデータを使用）
+                const directories = App.state.data.directories || [];
+                this.renderDirectories(directories);
+            },
+
+            selectDirectory: function (directoryId) {
+                if (this.selectedDirectoryId === directoryId) {
+                    // 選択解除
+                    this.selectedDirectoryId = null;
+                    this.renderMembers(App.state.data.members || []);
+                } else {
+                    // 選択
+                    this.selectedDirectoryId = directoryId;
+
+                    // フィルタリング
+                    const assignments = this.memberAssignments.filter(a =>
+                        a.related_table === 'directories' && a.related_id === directoryId
+                    );
+                    const memberIds = assignments.map(a => a.member_id);
+
+                    const allMembers = App.state.data.members || [];
+                    const filteredMembers = allMembers.filter(m => memberIds.includes(m.id));
+
+                    this.renderMembers(filteredMembers);
+                }
+
+                // ツリー再描画（選択状態の更新のため）
+                const directories = App.state.data.directories || [];
+                this.renderDirectories(directories);
             }
         };
     })();
