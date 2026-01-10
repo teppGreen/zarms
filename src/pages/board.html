@@ -13,6 +13,23 @@
             currentBoardId: null, // 現在表示中のボードID
             lastRenderTimes: {}, // ボードごとの最終レンダリング時刻
             cachedBoardTasks: {}, // ボードごとのタスクデータキャッシュ
+            // マイボードのフィルタ設定
+            myBoardFilters: {
+                title: '',
+                titleMatchMode: 'contains',
+                members: {
+                    created_by: [],  // Array of member IDs, will be initialized with current user
+                    processed_by: [],
+                    reviewed_by: [],
+                    received_by: []
+                },
+                dateRanges: {
+                    starts_at: { from: null, to: null },
+                    ends_at: { from: null, to: null }
+                },
+                boards: [],  // Array of board IDs to filter by
+                isOverdue: false
+            },
 
             // ステータスキーとカラムIDのマッピング
             statusMapping: {
@@ -28,6 +45,26 @@
                 'IN_PROGRESS': 'in-progress',
                 'IN_REVIEW': 'in-review',
                 'DONE': 'done'
+            },
+
+            /**
+             * マイボードフィルタを初期化（初回のみ）
+             */
+            initializeMyBoardFilters: function () {
+                const userId = App.state.userId;
+                if (!userId) return;
+
+                // すでに初期化済みの場合はスキップ
+                const hasMembers = Object.values(this.myBoardFilters.members).some(arr => arr.length > 0);
+                if (hasMembers) return;
+
+                // デフォルト: 全てのロールに現在のユーザーを設定
+                this.myBoardFilters.members = {
+                    created_by: [userId],
+                    processed_by: [userId],
+                    reviewed_by: [userId],
+                    received_by: [userId]
+                };
             },
 
             /**
@@ -62,34 +99,31 @@
                 boards.forEach(board => {
                     let pageDiv = document.getElementById(`tab-board-${board.id}`);
                     const headerHtml = `
-                        <nav id="board-tab-header-${board.id}" class="small-margin row">
-                            <div class="field transparent max no-margin margin-left">
-                                <input type="text" 
-                                       value="${escapeHtml(board.name)}" 
-                                       class="font-title bold" 
-                                       style="font-size: 1.5rem;" 
-                                       placeholder="000_ユニット名_用途"
-                                       onfocus="if(this.value.trim() !== '') this.dataset.originalValue = this.value"
-                                       onblur="App.pages.boards.updateBoardName('${board.id}', this.value, this)">
-                            </div>
-                            <div class="medium"></div>
-                            <button class="circle transparent" onclick="ui('#modal-filter-task')">
-                                <i>filter_list</i>
-                                <div class="tooltip bottom">フィルタ</div>
-                            </button>
-                            <button class="circle transparent" id="btn-share-${board.id}">
-                                <i>share</i>
-                                <div class="tooltip bottom">共有</div>
-                            </button>
-                            <button class="circle transparent" id="btn-archive-${board.id}">
-                                <i>${board.is_active ? 'archive' : 'unarchive'}</i>
-                                <div class="tooltip bottom">${board.is_active ? 'アーカイブ' : 'アーカイブ解除'}</div>
-                            </button>
-                            <button class="circle transparent" id="btn-star-${board.id}">
-                                <i>star_border</i>
-                                <div class="tooltip bottom">スター</div>
-                            </button>
-                        </nav>
+                        <header class="small-margin no-padding">
+                            <nav id="board-tab-header-${board.id}" class="no-margin no-padding row">
+                                <div class="field transparent max no-margin bold">
+                                    <input type="text" 
+                                    value="${escapeHtml(board.name)}" 
+                                    style="font-size: 1.75rem;" 
+                                    placeholder="000_ユニット名_用途"
+                                    onfocus="if(this.value.trim() !== '') this.dataset.originalValue = this.value"
+                                    onblur="App.pages.boards.updateBoardName('${board.id}', this.value, this)">
+                                </div>
+                                <div class="medium"></div>
+                                <button class="circle transparent" id="btn-share-${board.id}">
+                                    <i>share</i>
+                                    <div class="tooltip bottom">共有</div>
+                                </button>
+                                <button class="circle transparent" id="btn-archive-${board.id}">
+                                    <i>${board.is_active ? 'archive' : 'unarchive'}</i>
+                                    <div class="tooltip bottom">${board.is_active ? 'アーカイブ' : 'アーカイブ解除'}</div>
+                                </button>
+                                <button class="circle transparent" id="btn-star-${board.id}">
+                                    <i>star_border</i>
+                                    <div class="tooltip bottom">スター</div>
+                                </button>
+                            </nav>
+                        </header>
                     `;
 
                     if (!pageDiv) {
@@ -107,9 +141,9 @@
                         container.appendChild(pageDiv);
                     } else {
                         // 既存のボードであってもnav要素を置換
-                        const existingNav = pageDiv.querySelector('nav');
-                        if (existingNav) {
-                            existingNav.outerHTML = headerHtml;
+                        const existingHeader = pageDiv.querySelector('header');
+                        if (existingHeader) {
+                            existingHeader.outerHTML = headerHtml;
                         }
                     }
                     // イベントを（再）登録
@@ -126,14 +160,16 @@
 
                 // マイボード用のヘッダー（アーカイブ・スターなし）
                 const headerHtml = `
-                    <nav id="board-tab-header-${boardId}" class="small-margin row">
+                <header class="small-margin">
+                    <nav id="board-tab-header-${boardId}" class="no-padding no-margin row">
                         <h3 class="bold small">マイボード</h3>
                         <div class="max"></div>
-                        <button class="circle transparent" onclick="ui('#modal-filter-task')">
+                        <button class="circle transparent" onclick="if(App.modals.filterTask){ App.modals.filterTask.syncUI(); } ui('#modal-filter-task')">
                             <i>filter_list</i>
                             <div class="tooltip bottom">フィルタ</div>
                         </button>
                     </nav>
+                </header>
                 `;
 
                 if (!pageDiv) {
@@ -148,9 +184,9 @@
                     `;
                     container.appendChild(pageDiv);
                 } else {
-                    const existingNav = pageDiv.querySelector('nav');
-                    if (existingNav) {
-                        existingNav.outerHTML = headerHtml;
+                    const existingHeader = pageDiv.querySelector('header');
+                    if (existingHeader) {
+                        existingHeader.outerHTML = headerHtml;
                     }
                 }
             },
@@ -184,23 +220,12 @@
                     }
 
                     // JOINは使わず、単純なSELECTを実行
-                    const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query);
+                    const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query, null, isRefresh);
                     let tasks = result?.data || result || [];
 
                     // マイボードの場合、フロントエンドでさらにフィルタリング
                     if (boardId === 'my-board') {
-                        const myUserId = App.state.userId;
-                        if (myUserId) {
-                            tasks = tasks.filter(t =>
-                                t.created_by === myUserId ||
-                                t.reviewed_by === myUserId ||
-                                t.processed_by === myUserId ||
-                                t.received_by === myUserId
-                            );
-                        } else {
-                            // ユーザーIDが取得できない場合は何も表示しない（安全策）
-                            tasks = [];
-                        }
+                        tasks = this.filterMyBoardTasks(tasks);
                     }
 
                     // ボード固有のタスクキャッシュに保存
@@ -222,17 +247,7 @@
 
                                 // マイボードの場合のフィルタリング（再取得時）
                                 if (boardId === 'my-board') {
-                                    const myUserId = App.state.userId;
-                                    if (myUserId) {
-                                        freshTasks = freshTasks.filter(t =>
-                                            t.created_by === myUserId ||
-                                            t.reviewed_by === myUserId ||
-                                            t.processed_by === myUserId ||
-                                            t.received_by === myUserId
-                                        );
-                                    } else {
-                                        freshTasks = [];
-                                    }
+                                    freshTasks = this.filterMyBoardTasks(freshTasks);
                                 }
 
                                 this.cachedBoardTasks[boardId] = freshTasks;
@@ -411,6 +426,13 @@
             handleTaskDrop: function (taskId, targetStatusId, boardId, rollback) {
                 if (!taskId || !targetStatusId) {
                     return;
+                }
+
+                // refreshDataが実行中の場合は中止する
+                if (typeof refreshDataAbortController !== 'undefined' && refreshDataAbortController) {
+                    console.log('[handleTaskDrop] refreshDataを中止します');
+                    refreshDataAbortController.aborted = true;
+                    refreshDataAbortController = null;
                 }
 
                 const newStatusKey = this.statusMapping[targetStatusId];
@@ -740,6 +762,88 @@
                     }
                     console.log('[updateStarButton] Icon updated to:', icon.textContent);
                 }
+            },
+
+            /**
+             * マイボードのタスクをフィルタリング
+             */
+            filterMyBoardTasks: function (tasks) {
+                const filters = this.myBoardFilters;
+
+                return tasks.filter(t => {
+                    // Title Filter
+                    if (filters.title) {
+                        const title = (t.name || '').toLowerCase();
+                        const keyword = filters.title.toLowerCase();
+                        if (filters.titleMatchMode === 'starts_with') {
+                            if (!title.startsWith(keyword)) return false;
+                        } else if (filters.titleMatchMode === 'ends_with') {
+                            if (!title.endsWith(keyword)) return false;
+                        } else if (filters.titleMatchMode === 'not_contains') {
+                            if (title.includes(keyword)) return false;
+                        } else {
+                            // contains
+                            if (!title.includes(keyword)) return false;
+                        }
+                    }
+
+                    // Member Filter - check if task member is in selected members for any role
+                    let memberMatch = false;
+                    const roles = ['created_by', 'processed_by', 'reviewed_by', 'received_by'];
+
+                    for (const role of roles) {
+                        const selectedMembers = filters.members[role] || [];
+                        if (selectedMembers.length > 0 && selectedMembers.includes(t[role])) {
+                            memberMatch = true;
+                            break;
+                        }
+                    }
+
+                    // If no members selected for any role, show all tasks
+                    const hasAnyMemberFilter = roles.some(role => (filters.members[role] || []).length > 0);
+                    if (hasAnyMemberFilter && !memberMatch) return false;
+
+                    // Date Range Filters
+                    // Start Date Range
+                    if (filters.dateRanges?.starts_at?.from) {
+                        if (!t.starts_at || new Date(t.starts_at) < new Date(filters.dateRanges.starts_at.from)) {
+                            return false;
+                        }
+                    }
+                    if (filters.dateRanges?.starts_at?.to) {
+                        if (!t.starts_at || new Date(t.starts_at) > new Date(filters.dateRanges.starts_at.to)) {
+                            return false;
+                        }
+                    }
+
+                    // End Date Range
+                    if (filters.dateRanges?.ends_at?.from) {
+                        if (!t.ends_at || new Date(t.ends_at) < new Date(filters.dateRanges.ends_at.from)) {
+                            return false;
+                        }
+                    }
+                    if (filters.dateRanges?.ends_at?.to) {
+                        if (!t.ends_at || new Date(t.ends_at) > new Date(filters.dateRanges.ends_at.to)) {
+                            return false;
+                        }
+                    }
+
+                    // Board Filter
+                    if (filters.boards && filters.boards.length > 0) {
+                        if (!filters.boards.includes(t.board_id)) {
+                            return false;
+                        }
+                    }
+
+                    // Overdue Filter
+                    if (filters.isOverdue) {
+                        if (t.task_status_key === 'DONE') return false;
+                        if (!t.ends_at) return false;
+                        if (new Date(t.ends_at) > new Date()) return false;
+                    }
+
+                    return true;
+                });
             },
 
             createTaskCard: function (task) {

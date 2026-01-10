@@ -1,41 +1,41 @@
-<dialog id="modal-select-members" class="modal padding no-scroll">
-    <header class="fixed small-padding no-margin">
+<dialog id="modal-select-boards" class="modal padding no-scroll">
+    <header class="fixed small-padding">
         <div class="row no-space align-center">
             <div class="max">
-                <h5 class="bold">メンバーを選択</h5>
+                <h5 class="bold">ボードを選択</h5>
             </div>
-            <button class="circle transparent" onclick="ui('#modal-select-members')">
+            <button class="circle transparent" onclick="ui('#modal-select-boards')">
                 <i>close</i>
             </button>
         </div>
 
         <!-- 検索バー -->
-        <div class="field small-round border prefix">
+        <div class="field round border prefix">
             <i>search</i>
-            <input type="text" id="member-search-input" placeholder="名前またはメールで検索..."
-                oninput="App.modals.selectMembers.filterResults()">
+            <input type="text" id="board-search-input" placeholder="ボード名で検索..."
+                oninput="App.modals.selectBoards.filterResults()">
         </div>
     </header>
 
     <!-- 結果リスト -->
-    <article id="member-results-container" class="scroll medium small-padding no-round small-line background no-elevate">
+    <article id="board-results-container" class="scroll medium small-padding no-round small-line background no-elevate">
         <!-- 動的に生成 -->
     </article>
 
     <footer class="fixed small-padding">
         <nav class="right-align">
-            <button class="border" onclick="ui('#modal-select-members')">キャンセル</button>
-            <button onclick="App.modals.selectMembers.confirm()">選択</button>
+            <button class="border" onclick="ui('#modal-select-boards')">キャンセル</button>
+            <button onclick="App.modals.selectBoards.confirm()">選択</button>
         </nav>
     </footer>
 </dialog>
 
 <script>
     (function () {
-        App.modals.selectMembers = {
+        App.modals.selectBoards = {
             callback: null,
             selectedIds: [],
-            allMembers: [],
+            allBoards: [],
             multiSelect: false,
 
             open: async function (options = {}) {
@@ -43,14 +43,14 @@
                 this.multiSelect = options.multiSelect || false;
                 this.selectedIds = options.preSelected || [];
 
-                // App.state.data.members から直接ロード
-                this.allMembers = App.state.data.members || [];
+                // App.state.data.boards から直接ロード
+                this.allBoards = App.state.data.boards || [];
                 this.render();
-                await ui('#modal-select-members');
+                await ui('#modal-select-boards');
 
                 // フォーカスを確実に行うための再試行ロジック
                 const tryFocus = (count = 0) => {
-                    const input = document.getElementById('member-search-input');
+                    const input = document.getElementById('board-search-input');
                     // offsetParent !== null は要素が表示されているかどうかの簡易チェック
                     if (input && input.offsetParent !== null) {
                         input.focus();
@@ -70,8 +70,8 @@
             },
 
             filterResults: function () {
-                const searchInput = document.getElementById('member-search-input');
-                const container = document.getElementById('member-results-container');
+                const searchInput = document.getElementById('board-search-input');
+                const container = document.getElementById('board-results-container');
 
                 if (!container) return;
 
@@ -79,33 +79,32 @@
                 const activeOnly = true;
 
                 // フィルタリング
-                let filtered = this.allMembers.filter(member => {
+                let filtered = this.allBoards.filter(board => {
                     const matchesSearch = !searchTerm ||
-                        (member.display_name && member.display_name.toLowerCase().includes(searchTerm)) ||
-                        (member.email && member.email.toLowerCase().includes(searchTerm));
+                        (board.name && board.name.toLowerCase().includes(searchTerm));
 
-                    const matchesActive = !activeOnly || member.is_active === true || member.is_active === 'TRUE' || member.is_active === 'true';
+                    const matchesActive = !activeOnly || board.is_active === true || board.is_active === 'TRUE' || board.is_active === 'true';
 
                     return matchesSearch && matchesActive;
                 });
 
                 // 表示
                 if (filtered.length === 0) {
-                    container.innerHTML = '<p class="padding">該当するメンバーが見つかりません</p>';
+                    container.innerHTML = '<p class="padding">該当するボードが見つかりません</p>';
                     return;
                 }
 
-                container.innerHTML = filtered.map(member => {
-                    const isSelected = this.selectedIds.includes(member.id);
+                container.innerHTML = filtered.map(board => {
+                    const isSelected = this.selectedIds.includes(board.id);
                     return `
                         <div><label class="${this.multiSelect ? 'checkbox' : 'radio'} row middle-align small-space">
                             <input type="${this.multiSelect ? 'checkbox' : 'radio'}" 
-                                name="member-select" 
-                                value="${member.id}" 
+                                name="board-select" 
+                                value="${board.id}" 
                                 ${isSelected ? 'checked' : ''}
-                                onchange="App.modals.selectMembers.toggleSelection('${member.id}', this.checked)">
+                                onchange="App.modals.selectBoards.toggleSelection('${board.id}', this.checked)">
                             <span class="small-margin">
-                                <strong>${member.display_name || member.email}</strong>
+                                <strong>${escapeHtml(board.name)}</strong>
                             </span>
                         </label></div>
                     `;
@@ -128,7 +127,7 @@
                 if (this.callback) {
                     this.callback(this.selectedIds);
                 }
-                ui('#modal-select-members');
+                ui('#modal-select-boards');
             }
         };
     })();

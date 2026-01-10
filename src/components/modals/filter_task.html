@@ -1,0 +1,469 @@
+<!-- タスクフィルタモーダル -->
+<dialog id="modal-filter-task" class="padding no-scroll">
+    <header class="fixed row align-center small-padding no-margin">
+        <nav class="no-margin no-padding">
+            <h5 class="bold">フィルタ設定</h5>
+            <div class="max"></div>
+            <button class="circle transparent" onclick="ui('#modal-filter-task')">
+                <i>close</i>
+            </button>
+        </nav>
+    </header>
+
+    <article class="large-width medium-height scroll no-elevate small-padding">
+        <div class="grid small-padding tiny-space no-margin">
+            <!-- Title Filter -->
+            <div class="s12 m12 l12">
+                <span class="bold small-text">タスク名</span>
+                <div class="grid tiny-space">
+                    <div class="s8 field border small prefix">
+                        <i class="">search</i>
+                        <input type="text" id="filter-title-input" placeholder="キーワード">
+                    </div>
+                    <div class="s4 field border small">
+                        <select id="filter-title-match-select">
+                            <option value="contains">含む</option>
+                            <option value="not_contains">含まない</option>
+                            <option value="starts_with">前方一致</option>
+                            <option value="ends_with">後方一致</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Member Filters -->
+            <div class="s12 m12 l12">
+                <span class="bold small-text">担当者</span>
+                <!-- Created By -->
+                <div class="small-margin">
+                    <div class="row tiny-space">
+                        <span class="small">作成者</span>
+                        <button class="chip fill" onclick="App.modals.filterTask.selectMembers('created_by')">
+                            <i>person_edit</i>
+                            <span>選択</span>
+                        </button>
+                        <div id="filter-members-created-by" class="row wrap top-align">
+                            <!-- Chips will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Processed By -->
+                <div class="small-margin">
+                    <div class="row tiny-space">
+                        <span class="small">進行者</span>
+                        <button class="chip fill" onclick="App.modals.filterTask.selectMembers('processed_by')">
+                            <i>person_edit</i>
+                            <span>選択</span>
+                        </button>
+                        <div id="filter-members-processed-by" class="row wrap top-align">
+                            <!-- Chips will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reviewed By -->
+                <div class="small-margin">
+                    <div class="row tiny-space">
+                        <span class="small">確認者</span>
+                        <button class="chip fill" onclick="App.modals.filterTask.selectMembers('reviewed_by')">
+                            <i>person_edit</i>
+                            <span>選択</span>
+                        </button>
+                        <div id="filter-members-reviewed-by" class="row wrap top-align">
+                            <!-- Chips will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Received By -->
+                <div class="small-margin">
+                    <div class="row tiny-space">
+                        <span class="small">受領者</span>
+                        <button class="chip fill" onclick="App.modals.filterTask.selectMembers('received_by')">
+                            <i>person_edit</i>
+                            <span>選択</span>
+                        </button>
+                        <div id="filter-members-received-by" class="row wrap top-align">
+                            <!-- Chips will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Date Filters -->
+            <div class="s12 m12 l12">
+                <span class="bold small-text">開始日時の範囲</span>
+
+                <!-- Start Date Range -->
+                <div class="grid no-space small-margin">
+                    <div class="s5 field border small">
+                        <input type="datetime-local" id="filter-starts-at-from">
+                    </div>
+                    <div class="s2 middle-align center-align">
+                        <span>〜</span>
+                    </div>
+                    <div class="s5 field border small">
+                        <input type="datetime-local" id="filter-starts-at-to">
+                    </div>
+                </div>
+                <span class="bold small-text">終了日時の範囲</span>
+
+                <!-- End Date Range -->
+                <div class="grid no-space small-margin">
+                    <div class="s5 field border small">
+                        <input type="datetime-local" id="filter-ends-at-from">
+                    </div>
+                    <div class="s2">
+                        <span>〜</span>
+                    </div>
+                    <div class="s5 field border small">
+                        <input type="datetime-local" id="filter-ends-at-to">
+                    </div>
+                </div>
+
+                <div class="small-margin">
+                    <label class="radio">
+                        <input type="radio" id="filter-is-overdue">
+                        <span>締切超過のみ表示</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Board Filter -->
+            <div class="s12 m12 l12 top-margin">
+                <span class="bold small-text">ボード</span>
+                <div class="row tiny-space">
+                    <button class="small-round border small" onclick="App.modals.filterTask.selectBoards()">
+                        <i>edit</i>
+                        <span>選択</span>
+                    </button>
+                    <div id="filter-boards" class="row wrap top-align">
+                        <!-- Board chips will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <footer class="fixed small-padding">
+        <nav class="right-align">
+            <button class="border round text-primary" onclick="App.modals.filterTask.resetDefaults()">デフォルトに戻す</button>
+            <button class="primary round" onclick="App.modals.filterTask.apply()">適用</button>
+        </nav>
+    </footer>
+</dialog>
+
+<script>
+    (function () {
+        App.modals.filterTask = {
+            currentRole: null, // 現在選択中のロール
+
+            /**
+             * メンバー選択モーダルを開く
+             */
+            selectMembers: function (role) {
+                this.currentRole = role;
+                const currentFilters = App.pages.boards?.myBoardFilters;
+                const preSelected = currentFilters?.members?.[role] || [];
+
+                App.modals.selectMembers.open({
+                    multiSelect: true,
+                    preSelected: preSelected,
+                    callback: (selectedIds) => {
+                        this.updateMemberSelection(role, selectedIds);
+                    }
+                });
+            },
+
+            /**
+             * ボード選択モーダルを開く
+             */
+            selectBoards: function () {
+                const currentFilters = App.pages.boards?.myBoardFilters;
+                const preSelected = currentFilters?.boards || [];
+
+                App.modals.selectBoards.open({
+                    multiSelect: true,
+                    preSelected: preSelected,
+                    callback: (selectedIds) => {
+                        this.updateBoardSelection(selectedIds);
+                    }
+                });
+            },
+
+            /**
+             * 選択されたボードを更新
+             */
+            updateBoardSelection: function (boardIds) {
+                if (!App.pages.boards?.myBoardFilters) return;
+
+                App.pages.boards.myBoardFilters.boards = boardIds;
+                this.renderBoardChips();
+            },
+
+            /**
+             * ボードチップを描画
+             */
+            renderBoardChips: function () {
+                const container = document.getElementById('filter-boards');
+                if (!container) return;
+
+                const filters = App.pages.boards?.myBoardFilters;
+                const boardIds = filters?.boards || [];
+                const allBoards = App.state.data.boards || [];
+
+                if (boardIds.length === 0) {
+                    container.innerHTML = '<span class="small-text" style="opacity: 0.6;">未選択（全てのボード）</span>';
+                    return;
+                }
+
+                const html = boardIds.map(id => {
+                    const board = allBoards.find(b => b.id === id);
+                    const name = board ? board.name : '不明';
+                    return `
+                        <div class="chip small">
+                            <span>${escapeHtml(name)}</span>
+                            <i data-board-id="${id}" class="filter-board-chip-remove">close</i>
+                        </div>
+                    `;
+                }).join('');
+
+                container.innerHTML = html;
+            },
+
+            /**
+             * ボードを削除
+             */
+            removeBoard: function (boardId) {
+                if (!App.pages.boards?.myBoardFilters) return;
+
+                const filters = App.pages.boards.myBoardFilters;
+                if (!filters.boards) filters.boards = [];
+                filters.boards = filters.boards.filter(id => id !== boardId);
+
+                // チップを再描画
+                this.renderBoardChips();
+            },
+
+            /**
+             * 選択されたメンバーを更新
+             */
+            updateMemberSelection: function (role, memberIds) {
+                if (!App.pages.boards?.myBoardFilters) return;
+
+                App.pages.boards.myBoardFilters.members[role] = memberIds;
+                this.renderMemberChips(role);
+            },
+
+            /**
+             * メンバーチップを描画
+             */
+            renderMemberChips: function (role) {
+                const container = document.getElementById(`filter-members-${role.replace('_', '-')}`);
+                if (!container) return;
+
+                const filters = App.pages.boards?.myBoardFilters;
+                const memberIds = filters?.members?.[role] || [];
+                const allMembers = App.state.data.members || [];
+
+                if (memberIds.length === 0) {
+                    container.innerHTML = '<span class="small-text" style="opacity: 0.6;">未選択</span>';
+                    return;
+                }
+
+                const html = memberIds.map(id => {
+                    const member = allMembers.find(m => m.id === id);
+                    const name = member ? member.display_name : '不明';
+                    return `
+                        <div class="chip small">
+                            <span>${escapeHtml(name)}</span>
+                            <i data-role="${role}" data-member-id="${id}" class="filter-chip-remove">close</i>
+                        </div>
+                    `;
+                }).join('');
+
+                container.innerHTML = html;
+            },
+
+            /**
+             * メンバーを削除
+             */
+            removeMember: function (role, memberId) {
+                if (!App.pages.boards?.myBoardFilters) return;
+
+                const filters = App.pages.boards.myBoardFilters;
+                filters.members[role] = filters.members[role].filter(id => id !== memberId);
+
+                // チップを再描画
+                this.renderMemberChips(role);
+            },
+
+            /**
+             * フィルタ設定を適用
+             */
+            apply: function () {
+                const titleInput = document.getElementById('filter-title-input');
+                const titleMatchSelect = document.getElementById('filter-title-match-select');
+                const startsAtFrom = document.getElementById('filter-starts-at-from');
+                const startsAtTo = document.getElementById('filter-starts-at-to');
+                const endsAtFrom = document.getElementById('filter-ends-at-from');
+                const endsAtTo = document.getElementById('filter-ends-at-to');
+                const overdue = document.getElementById('filter-is-overdue');
+
+                const filters = {
+                    title: titleInput ? titleInput.value : '',
+                    titleMatchMode: titleMatchSelect ? titleMatchSelect.value : 'contains',
+                    members: App.pages.boards?.myBoardFilters?.members || {
+                        created_by: [App.state.userId],
+                        processed_by: [App.state.userId],
+                        reviewed_by: [App.state.userId],
+                        received_by: [App.state.userId]
+                    },
+                    dateRanges: {
+                        starts_at: {
+                            from: startsAtFrom?.value ? new Date(startsAtFrom.value).toISOString() : null,
+                            to: startsAtTo?.value ? new Date(startsAtTo.value).toISOString() : null
+                        },
+                        ends_at: {
+                            from: endsAtFrom?.value ? new Date(endsAtFrom.value).toISOString() : null,
+                            to: endsAtTo?.value ? new Date(endsAtTo.value).toISOString() : null
+                        }
+                    },
+                    boards: App.pages.boards?.myBoardFilters?.boards || [],
+                    isOverdue: overdue ? overdue.checked : false
+                };
+
+                // ボードページにフィルタ設定を保存
+                if (App.pages.boards) {
+                    App.pages.boards.myBoardFilters = filters;
+                    // 再読み込み
+                    App.pages.boards.loadData('my-board');
+                }
+
+                // モーダルを閉じる
+                ui('#modal-filter-task');
+            },
+
+            /**
+             * デフォルトに戻す
+             */
+            resetDefaults: function () {
+                const titleInput = document.getElementById('filter-title-input');
+                const titleMatchSelect = document.getElementById('filter-title-match-select');
+                const startsAtFrom = document.getElementById('filter-starts-at-from');
+                const startsAtTo = document.getElementById('filter-starts-at-to');
+                const endsAtFrom = document.getElementById('filter-ends-at-from');
+                const endsAtTo = document.getElementById('filter-ends-at-to');
+                const overdue = document.getElementById('filter-is-overdue');
+
+                if (titleInput) titleInput.value = '';
+                if (titleMatchSelect) titleMatchSelect.value = 'contains';
+                if (startsAtFrom) startsAtFrom.value = '';
+                if (startsAtTo) startsAtTo.value = '';
+                if (endsAtFrom) endsAtFrom.value = '';
+                if (endsAtTo) endsAtTo.value = '';
+                if (overdue) overdue.checked = false;
+
+                // メンバーフィルタをデフォルトに戻す
+                if (App.pages.boards) {
+                    const userId = App.state.userId;
+                    App.pages.boards.myBoardFilters.members = {
+                        created_by: [userId],
+                        processed_by: [userId],
+                        reviewed_by: [userId],
+                        received_by: [userId]
+                    };
+                    App.pages.boards.myBoardFilters.boards = [];
+
+                    // チップを再描画
+                    ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
+                        this.renderMemberChips(role);
+                    });
+                    this.renderBoardChips();
+                }
+            },
+
+            /**
+             * 現在の設定をUIに反映
+             */
+            syncUI: function () {
+                if (!App.pages.boards || !App.pages.boards.myBoardFilters) return;
+
+                const filters = App.pages.boards.myBoardFilters;
+                const titleInput = document.getElementById('filter-title-input');
+                const titleMatchSelect = document.getElementById('filter-title-match-select');
+                const startsAtFrom = document.getElementById('filter-starts-at-from');
+                const startsAtTo = document.getElementById('filter-starts-at-to');
+                const endsAtFrom = document.getElementById('filter-ends-at-from');
+                const endsAtTo = document.getElementById('filter-ends-at-to');
+                const overdue = document.getElementById('filter-is-overdue');
+
+                if (titleInput) titleInput.value = filters.title || '';
+                if (titleMatchSelect) titleMatchSelect.value = filters.titleMatchMode || 'contains';
+
+                if (startsAtFrom && filters.dateRanges?.starts_at?.from) {
+                    startsAtFrom.value = formatDateTimeForInput(filters.dateRanges.starts_at.from);
+                }
+                if (startsAtTo && filters.dateRanges?.starts_at?.to) {
+                    startsAtTo.value = formatDateTimeForInput(filters.dateRanges.starts_at.to);
+                }
+                if (endsAtFrom && filters.dateRanges?.ends_at?.from) {
+                    endsAtFrom.value = formatDateTimeForInput(filters.dateRanges.ends_at.from);
+                }
+                if (endsAtTo && filters.dateRanges?.ends_at?.to) {
+                    endsAtTo.value = formatDateTimeForInput(filters.dateRanges.ends_at.to);
+                }
+
+                if (overdue) overdue.checked = filters.isOverdue;
+
+                // メンバーチップを描画
+                ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
+                    this.renderMemberChips(role);
+                });
+
+                // ボードチップを描画
+                this.renderBoardChips();
+            },
+
+            /**
+             * イベント委譲でチップ削除を処理（初期化時に1回だけ呼ぶ）
+             */
+            setupChipEventDelegation: function () {
+                // メンバーチップの削除イベント
+                ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
+                    const container = document.getElementById(`filter-members-${role.replace('_', '-')}`);
+                    if (container) {
+                        container.parentNode.addEventListener('click', (e) => {
+                            if (e.target.classList.contains('filter-chip-remove')) {
+                                const role = e.target.dataset.role;
+                                const memberId = e.target.dataset.memberId;
+
+                                // フィルタデータから削除（再描画も行われる）
+                                this.removeMember(role, memberId);
+                            }
+                        });
+                    }
+                });
+
+                // ボードチップの削除イベント
+                const boardContainer = document.getElementById('filter-boards');
+                if (boardContainer) {
+                    boardContainer.parentNode.addEventListener('click', (e) => {
+                        if (e.target.classList.contains('filter-board-chip-remove')) {
+                            const boardId = e.target.dataset.boardId;
+
+                            // フィルタデータから削除（再描画も行われる）
+                            this.removeBoard(boardId);
+                        }
+                    });
+                }
+            }
+        };
+
+        // モーダルが読み込まれたらイベント委譲を設定
+        document.addEventListener('DOMContentLoaded', () => {
+            App.modals.filterTask.setupChipEventDelegation();
+        });
+    })();
+</script>

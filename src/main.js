@@ -57,17 +57,23 @@ function loadMainApp(urlParams, activeUser) {
  */
 function getMemberByEmail(email) {
   // membersテーブルからemailが一致するレコードを検索
-  const result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
+  console.log('[getMemberByEmail]email', email);
+  let result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
     where: { email: ["=", email] }
   }, null, false);
 
-  const members = result?.data || result || [];
+  let members = result?.data || result || [];
 
   if (members.length === 0) {
-    throw new Error('User not found');
-  } else {
-    return members[0];
+    result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
+      where: { email: ["=", email] }
+    }, null, true); //キャッシュなしで再試行
+    members = result?.data || result || [];
+    if (members.length === 0) {
+      throw new Error('User not found');
+    }
   }
+  return members[0];
 }
 
 /**
