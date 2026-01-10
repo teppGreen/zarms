@@ -117,7 +117,7 @@
 
     // 自動更新を開始
     // TODO: 本番デプロイ時にコメントアウトを外すこと
-    // startAutoRefresh();
+    startAutoRefresh();
   }
 
   /**
@@ -244,6 +244,9 @@
       App.utils.navigation.renderBoardsNavigation();
       App.pages.boards.initialize();
 
+      // マイボードフィルタを初期化（デフォルト: 現在のユーザー）
+      App.pages.boards.initializeMyBoardFilters();
+
       // アプリリンクを描画
       App.utils.header.renderAppLinks();
 
@@ -322,6 +325,7 @@
 
   // 自動データ更新（1分ごと）
   let autoRefreshInterval = null;
+  let refreshDataAbortController = null;
 
   function startAutoRefresh() {
     // 既存のインターバルがあればクリア
@@ -334,13 +338,29 @@
   }
 
   async function refreshData() {
+    // 新しいAbortControllerを作成
+    refreshDataAbortController = { aborted: false };
+    const currentController = refreshDataAbortController;
+
     try {
       console.log('[refreshData] 自動更新開始 (コンテキスト対応)');
+
+      // 中止チェック
+      if (currentController.aborted) {
+        console.log('[refreshData] 処理が中止されました');
+        return;
+      }
 
       const boardsResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {
         columns: ['id', 'display_id', 'name', 'description', 'is_active'],
         orderBy: { name: 'asc' }
       }, null, true);
+
+      // 中止チェック
+      if (currentController.aborted) {
+        console.log('[refreshData] 処理が中止されました');
+        return;
+      }
 
       App.state.set('boards', boardsResult?.data || []);
       // ナビゲーションを更新
@@ -358,6 +378,12 @@
             newActiveLink.classList.add('active');
           }
         }
+      }
+
+      // 中止チェック
+      if (currentController.aborted) {
+        console.log('[refreshData] 処理が中止されました');
+        return;
       }
 
       // 現在表示中のタブを特定
@@ -384,6 +410,11 @@
         if (activeBoardDiv && activeBoardDiv.id) {
           const boardId = activeBoardDiv.id.replace('tab-board-', '');
           console.log('[refreshData] ボードページのデータを更新中 (boardId:', boardId, ')');
+          // 中止チェック
+          if (currentController.aborted) {
+            console.log('[refreshData] 処理が中止されました');
+            return;
+          }
           if (App.pages.boards && App.pages.boards.loadData) {
             await App.pages.boards.loadData(boardId, true); // isRefresh = true
           }
@@ -391,9 +422,23 @@
       }
       // homeタブなどでは何もしない（必要に応じて追加）
 
+      // 中止チェック
+      if (currentController.aborted) {
+        console.log('[refreshData] 処理が中止されました');
+        return;
+      }
+
       console.log('[refreshData] データ自動更新完了 (コンテキスト対応)');
     } catch (error) {
-      console.error('[refreshData] データ自動更新エラー:', error);
+      // 中止された場合はエラーログを出力しない
+      if (!currentController.aborted) {
+        console.error('[refreshData] データ自動更新エラー:', error);
+      }
+    } finally {
+      // 完了したらコントローラーをクリア
+      if (refreshDataAbortController === currentController) {
+        refreshDataAbortController = null;
+      }
     }
   }
 

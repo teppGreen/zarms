@@ -1,17 +1,27 @@
 <div id="tab-members" style="display: none;">
+    <header class="small-margin no-padding">
+        <nav class="no-margin no-padding">
+            <h3 class="bold small">メンバー</h3>
+            <div class="max"></div>
+            <button class="small-round" onclick="App.pages.members.copyMemberEmails()">
+                <i>stacked_email</i>
+                <span>全員のメールアドレスをコピー</span>
+            </button>
+        </nav>
+    </header>
     <div class="grid no-scroll">
         <!-- 左側: Members (75%) -->
-        <div class="s12 m9 scroll no-round large-height scroll">
-            <h5>メンバー</h5>
-            <div id="members-list" class="grid">
+        <div class="s12 m9 scroll no-round">
+
+            <div id="members-list" class="grid large-height scroll">
                 <!-- Memberカードが動的に生成される -->
             </div>
         </div>
 
         <!-- 右側: Directories (25%) -->
-        <div class="s12 m3 scroll no-round large-height scroll">
-            <h5>組織</h5>
-            <div id="directories-tree">
+        <div class="s12 m3 scroll no-round">
+            <header class="small-margin"></header>
+            <div id="directories-tree" class="large-height scroll">
                 <!-- ツリー構造が動的に生成される -->
             </div>
         </div>
@@ -22,8 +32,10 @@
     (function () {
         App.pages.members = {
             memberAssignments: [],
+            currentMembers: [],
             expandedNodes: {},
             selectedDirectoryId: null,
+            tree: [],
 
             loadData: async function () {
                 showLoading();
@@ -37,7 +49,11 @@
 
                 // member_assignmentsデータを取得
                 try {
-                    const res = await callGAS('handleDatabaseProcess', App.state.userId, 'member_assignments', 'select', {});
+                    const res = await callGAS('handleDatabaseProcess', App.state.userId, 'member_assignments', 'select', {
+                        where: {
+                            related_table: ["=", "directories"],
+                        }
+                    });
                     this.memberAssignments = res.data || res || [];
                     console.log('Member assignments loaded:', this.memberAssignments.length);
                 } catch (e) {
@@ -54,10 +70,14 @@
             },
 
             renderMembers: function (members = []) {
+                this.currentMembers = members;
                 const container = document.getElementById('members-list');
 
                 if (members.length === 0) {
-                    container.innerHTML = '<p class="padding">メンバーが登録されていません</p>';
+                    container.innerHTML = `<div class="s12 small-padding">
+                        <i>warning</i>
+                        <span>選択した組織のメンバーは登録されていません</span>
+                    </div>`;
                     return;
                 }
 
@@ -91,8 +111,8 @@
                 }
 
                 // ツリー構造を構築
-                const tree = this.buildTree(directories);
-                container.innerHTML = this.renderTree(tree);
+                this.tree = this.buildTree(directories);
+                container.innerHTML = this.renderTree(this.tree);
             },
 
             buildTree: function (flatData) {
@@ -172,6 +192,27 @@
                 this.renderDirectories(directories);
             },
 
+            findNode: function (nodes, id) {
+                for (const node of nodes) {
+                    if (node.id === id) return node;
+                    if (node.children && node.children.length > 0) {
+                        const found = this.findNode(node.children, id);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            },
+
+            collectIds: function (node) {
+                let ids = [node.id];
+                if (node.children && node.children.length > 0) {
+                    for (const child of node.children) {
+                        ids = ids.concat(this.collectIds(child));
+                    }
+                }
+                return ids;
+            },
+
             selectDirectory: function (directoryId) {
                 if (this.selectedDirectoryId === directoryId) {
                     // 選択解除
@@ -181,14 +222,19 @@
                     // 選択
                     this.selectedDirectoryId = directoryId;
 
+                    // ターゲットノードとその子孫のIDを取得
+                    const targetNode = this.findNode(this.tree, directoryId);
+                    const targetIds = targetNode ? this.collectIds(targetNode) : [directoryId];
+
                     // フィルタリング
                     const assignments = this.memberAssignments.filter(a =>
-                        a.related_table === 'directories' && a.related_id === directoryId
+                        targetIds.includes(a.related_id)
                     );
                     const memberIds = assignments.map(a => a.member_id);
+                    const uniqueMemberIds = [...new Set(memberIds)];
 
                     const allMembers = App.state.data.members || [];
-                    const filteredMembers = allMembers.filter(m => memberIds.includes(m.id));
+                    const filteredMembers = allMembers.filter(m => uniqueMemberIds.includes(m.id));
 
                     this.renderMembers(filteredMembers);
                 }
@@ -196,6 +242,30 @@
                 // ツリー再描画（選択状態の更新のため）
                 const directories = App.state.data.directories || [];
                 this.renderDirectories(directories);
+            },
+
+            copyMemberEmails: function () {
+                if (!this.currentMembers || this.currentMembers.length === 0) {
+                    showSnackbar('コピーするメールアドレスがありません', 'error');
+                    return;
+                }
+                const emails = this.currentMembers
+                    .map(m => m.email)
+                    .filter(email => email) // Filter out empty emails
+                    .join(',');
+
+                if (!emails) {
+                    showSnackbar('メールアドレスが見つかりませんでした', 'error');
+                    return;
+                }
+
+                // Copy to clipboard
+                navigator.clipboard.writeText(emails).then(() => {
+                    showSnackbar('表示中のメンバーのメールアドレスをコピーしました');
+                }).catch(err => {
+                    console.error('Failed to copy: ', err);
+                    showSnackbar('クリップボードに値をコピーできませんでした', 'error');
+                });
             }
         };
     })();
