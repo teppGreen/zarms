@@ -1,6 +1,6 @@
 <nav id="left-nav" class="m l left no-wrap small-padding max no-scroll surface-container">
     <header class="row padding no-margin">
-        <h1 class="font-title" style="font-size: 1.75rem;">ZEN Boards</h1>
+        <h1 class="font-title" style="font-size: 1.75rem;" onclick="App.utils.navigation.switchTab('home')">ZEN Boards</h1>
     </header>
 
     <a id="home-nav" onclick="App.utils.navigation.switchTab('home')">
@@ -35,6 +35,13 @@
              */
             switchTab: async function (tabName, skipUrlUpdate = false) {
                 console.log(`switchTab called with: ${tabName}, skipUrlUpdate: ${skipUrlUpdate}`);
+                
+                // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
+                if (!skipUrlUpdate) {
+                    const params = App.utils.url.getParamsFromTabId(tabName);
+                    App.utils.url.updateParams(params, false);
+                }
+
                 let isBoardTab = tabName.startsWith('board-');
 
                 // 現在のタブを取得して処理（必要なら）
@@ -116,12 +123,6 @@
                             await this.switchTab('home');
                         }
                     }
-                }
-
-                // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
-                if (!skipUrlUpdate && App.utils.url && App.utils.url.updateParams) {
-                    const params = App.utils.url.getParamsFromTabId(tabName);
-                    App.utils.url.updateParams(params, false);
                 }
             },
 
