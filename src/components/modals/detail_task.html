@@ -1,23 +1,21 @@
 <!-- タスク詳細モーダル -->
 <dialog id="modal-detail-task" class="transparent bottom no-padding" style="position: absolute;">
 
-  <div class="margin" onclick="App.modals.taskDetail.close()">
+  <div class="margin-bottom" onclick="App.modals.taskDetail.close()">
     <i class="center extra center">keyboard_arrow_down</i>
   </div>
 
   <div class="background padding">
     <!-- Header -->
-    <header class="row align-center small-padding bottom-margin">
-      <div class="max row align-center">
-        <h5 id="task-display-id" class="font-number bold no-margin"></h5>
-        <div class="field transparent max no-margin margin-left">
-          <input type="text" id="task-name-input" class="font-title bold" style="font-size: 1.5rem;" placeholder="タスク名">
-        </div>
+    <nav class="row align-center small-padding bottom-margin">
+      <h5 id="task-display-id" class="font-number bold no-margin"></h5>
+      <div class="field transparent max no-margin margin-left">
+        <input type="text" id="task-name-input" class="font-title bold" style="font-size: 1.5rem;" placeholder="タスク名">
       </div>
       <button class="circle transparent" id="task-copy-link-btn">
         <i>share</i>
       </button>
-    </header>
+    </nav>
 
     <div class="grid small-padding tiny-space no-margin">
       <!-- Left Column: Status & Avatars -->
@@ -130,25 +128,32 @@
             </div>
           </div>
           <div class="s12 field label border">
-            <textarea id="task-description-input" rows="10" placeholder=" "></textarea>
+            <textarea id="task-description-input" rows="12" placeholder=" "></textarea>
             <label>説明</label>
           </div>
         </div>
       </div>
 
       <!-- Right Column: Comments -->
-      <div class="s12 m4 l4 surface-variant small-round padding scroll" id="task-comments-list">
-        <!-- コメントが動的に生成される -->
+      <div class="s12 m4 l4 surface-variant small-round padding">
+        <div class="margin-bottom">
+          <button class="no-margin responsive primary round max"
+            onclick="App.modals.taskDetail.openNewComment()">
+            <i>add_comment</i>
+            <span>新しいコメントを作成</span>
+          </button>
+        </div>
+        <div class="scroll medium-height" id="task-comments-list">
+          <!-- コメントが動的に生成される -->
+        </div>
       </div>
     </div>
 
     <!-- Footer -->
-    <footer class="small-padding">
-      <nav class="right-align">
-        <button class="border round large text-primary" onclick="App.modals.taskDetail.discard()">変更を破棄</button>
-        <button class="primary round large" onclick="App.modals.taskDetail.save()">変更を保存</button>
-      </nav>
-    </footer>
+    <nav class="right-align small-padding no-margin">
+      <button class="border round large text-primary" onclick="App.modals.taskDetail.discard()">変更を破棄</button>
+      <button class="primary round large" onclick="App.modals.taskDetail.save()">変更を保存</button>
+    </nav>
   </div>
 </dialog>
 
@@ -648,13 +653,6 @@
         if (!container) return;
 
         let html = '';
-
-        html += `
-          <button class="no-margin responsive primary round max margin-bottom" onclick="App.modals.taskDetail.openNewComment()">
-            <i>add_comment</i>
-            <span>新しいコメントを追加</span>
-          </button>
-        `;
 
         if (!comments || comments.length === 0) {
           html += '<p class="small-text">コメントはありません</p>';
