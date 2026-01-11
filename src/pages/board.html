@@ -499,19 +499,19 @@
              * 新しいボードを作成
              */
             createBoard: async function () {
-                // ドロップダウンを閉じる
-                if (App.utils.header && App.utils.header.closeNewButtonDropdown) {
-                    App.utils.header.closeNewButtonDropdown();
-                }
+                const promptValue = prompt('新しいボードの名前', '000_ユニット名_用途');
 
-                if (!confirm('新しいボードを作成しますか？')) {
+                if (!promptValue) {
+                    return;
+                } else if(promptValue === '') {
+                    alert('ボード名を入力してください');
                     return;
                 }
 
                 showLoading();
                 try {
                     const cleanItem = {
-                        name: `新しいボード(${formatDateTimeForDisplay(new Date().toString(), 'yyyyMMddHHmmss')})`,
+                        name: promptValue,
                         is_active: true
                     };
 
@@ -538,20 +538,6 @@
                     if (App.utils.navigation && App.utils.navigation.switchTab) {
                         await App.utils.navigation.switchTab(`board-${newBoard.id}`);
                     }
-
-                    // フォーカス
-                    // 少し待ってからフォーカス（遷移アニメーションなどのため）
-                    setTimeout(() => {
-                        // headerのIDは initialize メソッドで tab-board-${board.id} 内の nav に設定されているか確認
-                        // initialize内: nav id="board-tab-header-${board.id}"
-                        const input = document.querySelector(`#board-tab-header-${newBoard.id} input[type="text"]`);
-                        if (input) {
-                            input.dataset.originalValue = input.value;
-                            input.value = '';
-                            input.focus();
-                            input.select();
-                        }
-                    }, 100);
                 } catch (error) {
                     console.error('Failed to create board:', error);
                     App.utils.error.handle(error);
