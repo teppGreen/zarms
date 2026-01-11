@@ -1,19 +1,20 @@
 <!-- タスク詳細モーダル -->
 <dialog id="modal-detail-task" class="transparent bottom no-padding" style="position: absolute;">
 
-  <div class="margin-bottom" onclick="App.modals.taskDetail.close()">
-    <i class="center extra center">keyboard_arrow_down</i>
+  <div class="bottom-margin" onclick="App.modals.taskDetail.close()" title="タスク詳細画面を閉じる">
+    <i class="center extra center" title="タスク詳細画面を閉じる">keyboard_arrow_down</i>
   </div>
 
   <div class="background padding">
     <!-- Header -->
     <nav class="row align-center small-padding bottom-margin">
       <h5 id="task-display-id" class="font-number bold no-margin"></h5>
-      <div class="field transparent max no-margin margin-left">
+      <div class="field transparent max no-margin">
         <input type="text" id="task-name-input" class="font-title bold" style="font-size: 1.5rem;" placeholder="タスク名">
       </div>
       <button class="circle transparent" id="task-copy-link-btn">
         <i>share</i>
+        <div class="tooltip">共有</div>
       </button>
     </nav>
 
@@ -22,7 +23,7 @@
       <div class="s12 m4 l4">
         <!-- Status -->
         <div class="grid">
-          <div class="s6 padding-small">
+          <div class="s12 padding-small">
             <div class="field label border small">
               <select id="task-status-select" class="transparent">
                 <option value="TODO">未着手</option>
@@ -33,7 +34,7 @@
               <label>ステータス</label>
             </div>
           </div>
-          <div class="s6 padding-small">
+          <div class="s12 padding-small">
             <div class="field label border small">
               <select id="task-priority-select">
                 <option value="LOW">低</option>
@@ -54,8 +55,11 @@
                 </button>
               </div>
               <p class="no-line">
-                <span class="small-text">作成者<br></span>
-                <span id="label-created-by"></span>
+                <span class="small-text" title="このタスクを作成した人&#13;&#10;ステータスを「未着手」に変更する人">作成者<br></span>
+                <span class="middle-align">
+                  <span id="label-created-by"></span>
+                  <!-- <a onclick="App.modals.taskDetail.selectMember('created_by')"><i class="tiny">edit</i></a> -->
+                </span>
               </p>
             </div>
 
@@ -68,8 +72,11 @@
                 </button>
               </div>
               <p class="no-line">
-                <span class="small-text">進行者<br></span>
-                <span id="label-processed-by"></span>
+                <span class="small-text" title="このタスクを進行する人&#13;&#10;ステータスを「進行中」「確認中」に変更する人">進行者<br></span>
+                <span class="middle-align">
+                  <span id="label-processed-by"></span>
+                  <a onclick="App.modals.taskDetail.selectMember('processed_by')"><i class="tiny">edit</i></a>
+                </span>
               </p>
             </div>
 
@@ -82,8 +89,11 @@
                 </button>
               </div>
               <p class="no-line">
-                <span class="small-text">確認者<br></span>
-                <span id="label-reviewed-by"></span>
+                <span class="small-text" title="このタスクが要件通り完了されたかを確認する人&#13;&#10;ステータスを「完了」に変更する人">確認者<br></span>
+                <span class="middle-align">
+                  <span id="label-reviewed-by"></span>
+                  <a onclick="App.modals.taskDetail.selectMember('reviewed_by')"><i class="tiny">edit</i></a>
+                </span>
               </p>
             </div>
 
@@ -96,8 +106,11 @@
                 </button>
               </div>
               <p class="no-line">
-                <span class="small-text">受領者<br></span>
-                <span id="label-received-by"></span>
+                <span class="small-text" title="このタスクに関連して成果物などが発生した際に、&#13;&#10;その成果物を受け取る人">受領者<br></span>
+                <span class="middle-align">
+                  <span id="label-received-by"></span>
+                  <a onclick="App.modals.taskDetail.selectMember('received_by')"><i class="tiny">edit</i></a>
+                </span>
               </p>
             </div>
           </div>
@@ -136,7 +149,7 @@
 
       <!-- Right Column: Comments -->
       <div class="s12 m4 l4 surface-variant small-round padding">
-        <div class="margin-bottom">
+        <div class="bottom-margin">
           <button class="no-margin responsive primary round max"
             onclick="App.modals.taskDetail.openNewComment()">
             <i>add_comment</i>
@@ -170,7 +183,18 @@
        * @param {string} taskId - タスクID
        * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
        */
-      create: function () {
+      create: async function () {
+        const promptValue = prompt('新しいタスクの名前','');
+
+        if(!promptValue) {
+          return;
+        } else if(promptValue === '') {
+          alert('タスク名を入力してください');
+          return;
+        }
+        
+        await delay(100);
+        
         const userId = App.state.userId;
         const taskId = crypto.randomUUID();
 
@@ -190,8 +214,8 @@
 
         const defaultTask = {
           id: taskId,
-          display_id: '##', // サーバーレスポンス待ち
-          name: `新しいタスク(${formatDateTimeForDisplay(new Date().toString(), 'yyyyMMddHHmmss')})`,
+          display_id: '#', // サーバーレスポンス待ち
+          name: promptValue,
           description: '',
           task_status_key: 'TODO',
           priority_key: 'MEDIUM',
