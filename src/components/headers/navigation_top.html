@@ -17,6 +17,12 @@
                     <span>新しいボード</span>
                 </button>
             </li>
+            <li>
+                <button class="fill large-elevate" onclick="App.modals.newComment.open()">
+                    <i>add_comment</i>
+                    <span>新しいコメント</span>
+                </button>
+            </li>
         </menu>
     </nav>
 
@@ -25,13 +31,10 @@
     <!-- 強化された検索バー -->
     <div class="medium-width field round surface prefix no-elevate" id="search-container">
         <i class="front" style="cursor: pointer;" onclick="App.utils.search.handleSearchClick()">search</i>
-        <input placeholder="タスクを検索する" id="search-input" onkeydown="App.utils.search.handleSearchKeydown(event)"
+        <input placeholder="タスク名を検索する" id="search-input" onkeydown="App.utils.search.handleSearchKeydown(event)"
             oninput="App.utils.search.handleSearchInput(event)" onfocus="App.utils.search.handleSearchFocus(event)"
             onblur="App.utils.search.handleSearchBlur(event)">
         <input type="hidden" id="search-target" value="all">
-        <menu id="search-results-menu" class="min">
-            <!-- Results will be injected here -->
-        </menu>
     </div>
 
     <div class="max"></div>
@@ -301,11 +304,9 @@
             handleSearchClick: async function () {
                 const input = document.getElementById('search-input');
                 const searchValue = input.value.trim();
+                input.blur();
 
                 if (!searchValue) return;
-
-                const resultsMenu = document.getElementById('search-results-menu');
-                resultsMenu.style.display = 'none';
 
                 // 1. マイボードタブに移動（既に移動している場合は無視）
                 if (App.utils.navigation && App.utils.navigation.switchTab) {
@@ -314,14 +315,12 @@
 
                 // 2. 検索バーに入力されたタイトルを「含む」タスクとしてフィルタ
                 if (App.pages.boards) {
+                    App.pages.boards.initializeMyBoardFilters(false);
                     App.pages.boards.myBoardFilters.title = searchValue;
                     App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
 
                     // 3. 検索（データ再読み込み）
                     await App.pages.boards.loadData('my-board', false);
-
-                    // 4. 描画（loadDataで自動的に描画されるが、念のため）
-                    // loadData内でrenderKanbanが呼ばれるため、ここでは不要
                 }
             },
 
