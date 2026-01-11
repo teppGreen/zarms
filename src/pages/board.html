@@ -14,22 +14,7 @@
             lastRenderTimes: {}, // ボードごとの最終レンダリング時刻
             cachedBoardTasks: {}, // ボードごとのタスクデータキャッシュ
             // マイボードのフィルタ設定
-            myBoardFilters: {
-                title: '',
-                titleMatchMode: 'contains',
-                members: {
-                    created_by: [],  // Array of member IDs, will be initialized with current user
-                    processed_by: [],
-                    reviewed_by: [],
-                    received_by: []
-                },
-                dateRanges: {
-                    starts_at: { from: null, to: null },
-                    ends_at: { from: null, to: null }
-                },
-                boards: [],  // Array of board IDs to filter by
-                isOverdue: false
-            },
+            myBoardFilters: {},
 
             // ステータスキーとカラムIDのマッピング
             statusMapping: {
@@ -50,20 +35,25 @@
             /**
              * マイボードフィルタを初期化（初回のみ）
              */
-            initializeMyBoardFilters: function () {
+            initializeMyBoardFilters: function (filterByActiveUser = true) {
                 const userId = App.state.userId;
                 if (!userId) return;
 
-                // すでに初期化済みの場合はスキップ
-                const hasMembers = Object.values(this.myBoardFilters.members).some(arr => arr.length > 0);
-                if (hasMembers) return;
-
-                // デフォルト: 全てのロールに現在のユーザーを設定
-                this.myBoardFilters.members = {
-                    created_by: [userId],
-                    processed_by: [userId],
-                    reviewed_by: [userId],
-                    received_by: [userId]
+                this.myBoardFilters = {
+                    title: '',
+                    titleMatchMode: 'contains',
+                    members: {
+                        crcreated_by: filterByActiveUser ? [userId] : [],
+                        processed_by: filterByActiveUser ? [userId] : [],
+                        reviewed_by: filterByActiveUser ? [userId] : [],
+                        received_by: filterByActiveUser ? [userId] : []
+                    },
+                    dateRanges: {
+                        starts_at: { from: null, to: null },
+                        ends_at: { from: null, to: null }
+                    },
+                    boards: [],  // Array of board IDs to filter by
+                    isOverdue: false
                 };
             },
 
@@ -164,9 +154,9 @@
                     <nav id="board-tab-header-${boardId}" class="no-padding no-margin row">
                         <h3 class="bold small">マイボード</h3>
                         <div class="max"></div>
-                        <button class="circle transparent" onclick="if(App.modals.filterTask){ App.modals.filterTask.syncUI(); } ui('#modal-filter-task')">
+                        <button class="round fill" onclick="if(App.modals.filterTask){ App.modals.filterTask.syncUI(); } ui('#modal-filter-task')">
                             <i>filter_list</i>
-                            <div class="tooltip bottom">フィルタ</div>
+                            <span>フィルタ</span>
                         </button>
                     </nav>
                 </header>
@@ -323,7 +313,7 @@
 
                         if (isLoading) {
                             itemsHtml = Array(4).fill(0).map((_, i) =>
-                                `<article class="shimmer-loading small-margin no-elevate" style="height: 100px; animation-delay: ${i * 0.1}s;"></article>`
+                                `<article class="shimmer-loading small-margin no-elevate" style="height: 100px; animation-delay: ${i * 0.1}s; cursor: not-allowed;"></article>`
                             ).join('');
                         } else {
                             const columnTasks = boardTasks.filter(column.filter);
@@ -333,16 +323,16 @@
 
                         return `
                             <div class="s12 m3 l3">
-                                <article class="kanban-column background no-round no-elevate no-scroll no-padding">
-                                    <div class="row no-round left-margin right-margin">
+                                <div class="grid no-space">
+                                    <div class="row s12 no-round left-margin right-margin">
                                         <span class="bold">${column.title}</span>
                                         <div class="max"></div>
                                         <span class="tiny">${countText}</span>
                                     </div>
-                                    <div class="scroll large-height no-padding kanban-column-items" data-status-id="${column.id}" data-board-id="${boardId}" id="kanban-${boardId}-${column.id}-list">
+                                    <div class="s12 scroll large-height no-padding kanban-column-items" data-status-id="${column.id}" data-board-id="${boardId}" id="kanban-${boardId}-${column.id}-list">
                                         ${itemsHtml}
                                     </div>
-                                </article>
+                                </div>
                             </div>`;
                     }).join(''),
                     '</div>'
@@ -500,6 +490,10 @@
                 // ドロップダウンを閉じる
                 if (App.utils.header && App.utils.header.closeNewButtonDropdown) {
                     App.utils.header.closeNewButtonDropdown();
+                }
+
+                if (!confirm('新しいボードを作成しますか？')) {
+                    return;
                 }
 
                 showLoading();
@@ -838,8 +832,9 @@
                     // Overdue Filter
                     if (filters.isOverdue) {
                         if (t.task_status_key === 'DONE') return false;
-                        if (!t.ends_at) return false;
+                        if (!t.ends_at && !t.starts_at) return false;
                         if (new Date(t.ends_at) > new Date()) return false;
+                        if (new Date(t.starts_at) > new Date()) return false;
                     }
 
                     return true;
@@ -914,7 +909,7 @@
 
 
                 return `
-                <article class="kanban-card small-margin padding" data-eid="${task.id}" role="button">
+                <article class="kanban-card small-margin padding" data-eid="${task.id}" role="button" style="cursor: move;">
                     <div>
                         <span>${displayId} <strong>${escapeHtml(task.name || '')}</strong></span>
                     </div>

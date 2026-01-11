@@ -1,25 +1,39 @@
 <!-- 新規コメント作成モーダル -->
-<dialog id="modal-new-comment" class="modal">
-    <div class="row no-space align-center">
-        <div class="max">
-            <h5 class="bold mb-0">新規コメント作成</h5>
+<dialog id="modal-new-comment" class="modal padding no-scroll">
+    <header class="fixed small-padding">
+        <div class="row no-space align-center">
+            <div class="max">
+                <h5 class="bold">新規コメント作成</h5>
+            </div>
+            <button class="circle transparent" onclick="App.modals.newComment.close()">
+                <i>close</i>
+            </button>
         </div>
-        <button class="circle transparent" onclick="App.modals.newComment.close()">
-            <i>close</i>
-        </button>
-    </div>
+    </header>
 
-    <div class="padding">
+    <article class="scroll medium small-padding no-round">
+        <!-- タスク選択フィールド -->
+        <div class="field label border">
+            <button id="select-task-button" class="transparent" onclick="App.modals.newComment.openTaskSelector()">
+                <i>task</i>
+                <span id="selected-task-name">タスクを選択してください</span>
+            </button>
+            <label>タスク</label>
+        </div>
+
         <!-- コメント内容 -->
-        <div class="field label border textarea">
+        <div class="field label border">
             <textarea id="new-comment-content" rows="8"></textarea>
+            <label>コメント</label>
         </div>
-    </div>
+    </article>
 
-    <nav class="right-align">
-        <button class="border" onclick="App.modals.newComment.close()">キャンセル</button>
-        <button onclick="App.modals.newComment.save()">作成</button>
-    </nav>
+    <footer class="fixed small-padding">
+        <nav class="right-align">
+            <button class="border" onclick="App.modals.newComment.close()">キャンセル</button>
+            <button onclick="App.modals.newComment.save()">作成</button>
+        </nav>
+    </footer>
 </dialog>
 
 <script>
@@ -27,27 +41,76 @@
         App.modals.newComment = {
             taskId: null,
             boardId: null,
+            selectedTaskId: null,
 
             /**
              * 新規コメントモーダルを開く
-             * @param {string} taskId - タスクID
-             * @param {string} boardId - ボードID
+             * @param {string} taskId - タスクID（オプション。指定された場合はそのタスクに紐付け）
+             * @param {string} boardId - ボードID（オプション）
              */
-            open: function (taskId, boardId) {
-                if (!taskId) {
-                    console.error('[NewComment] Invalid task ID');
-                    return;
-                }
-
+            open: function (taskId = null, boardId = null) {
                 this.taskId = taskId;
                 this.boardId = boardId;
+                this.selectedTaskId = taskId; // 初期選択タスク
 
                 // フィールドをクリア
                 const contentField = document.getElementById('new-comment-content');
                 if (contentField) contentField.value = '';
 
+                // タスク選択フィールドの表示を更新
+                this.updateTaskDisplay();
+
                 // モーダルを開く
                 ui('#modal-new-comment');
+
+                // コメント入力欄にフォーカス
+                setTimeout(() => {
+                    if (contentField) contentField.focus();
+                }, 100);
+            },
+
+            /**
+             * タスク選択モーダルを開く
+             */
+            openTaskSelector: function () {
+                if (!App.modals.selectTasks) {
+                    console.error('[NewComment] selectTasks modal not available');
+                    return;
+                }
+
+                App.modals.selectTasks.open({
+                    multiSelect: false,
+                    preSelected: this.selectedTaskId ? [this.selectedTaskId] : [],
+                    callback: (selectedIds) => {
+                        if (selectedIds && selectedIds.length > 0) {
+                            this.selectedTaskId = selectedIds[0];
+                            this.updateTaskDisplay();
+                        }
+                    }
+                });
+            },
+
+            /**
+             * 選択されたタスクの表示を更新
+             */
+            updateTaskDisplay: function () {
+                const taskNameSpan = document.getElementById('selected-task-name');
+                if (!taskNameSpan) return;
+
+                if (this.selectedTaskId) {
+                    // タスク情報を取得
+                    const allTasks = App.state.data.tasks || [];
+                    const task = allTasks.find(t => t.id === this.selectedTaskId);
+
+                    if (task) {
+                        const displayId = task.display_id ? `#${task.display_id}` : '';
+                        taskNameSpan.textContent = `${task.name || '無題のタスク'} ${displayId}`;
+                    } else {
+                        taskNameSpan.textContent = 'タスクを選択してください';
+                    }
+                } else {
+                    taskNameSpan.textContent = 'タスクを選択してください';
+                }
             },
 
             /**
@@ -55,7 +118,6 @@
              */
             close: function () {
                 ui('#modal-new-comment');
-                document.close();
                 this.reset();
             },
 
@@ -65,9 +127,13 @@
             reset: function () {
                 this.taskId = null;
                 this.boardId = null;
+                this.selectedTaskId = null;
 
                 const contentField = document.getElementById('new-comment-content');
                 if (contentField) contentField.value = '';
+
+                const taskNameSpan = document.getElementById('selected-task-name');
+                if (taskNameSpan) taskNameSpan.textContent = 'タスクを選択してください';
             },
 
             /**
@@ -78,46 +144,40 @@
                 const content = contentField ? contentField.value.trim() : '';
 
                 if (!content) {
-                    alert('コメント内容を入力してください');
+                    showSnackbar('コメント内容を入力してください', 'warning');
                     return;
                 }
 
-                if (!this.taskId) {
-                    console.error('[NewComment] No task ID set');
-                    alert('タスクIDが設定されていません');
+                if (!this.selectedTaskId) {
+                    showSnackbar('タスクを選択してください', 'warning');
                     return;
                 }
 
-                showLoading();
+                showSnackbar('コメントを作成しています...', 'info');
 
                 // コメントを保存
                 callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'insert', {
-                    values: {
-                        content: content,
-                        related_table: 'tasks',
-                        related_id: this.taskId
-                    }
+                    content: content,
+                    related_table: 'tasks',
+                    related_id: this.selectedTaskId
                 }, 'コメントを作成')
                     .then(result => {
-                        hideLoading();
-
                         if (!result || (Array.isArray(result) && result.length === 0)) {
-                            alert('コメントの作成に失敗しました');
+                            showSnackbar('コメントの作成に失敗しました', 'error');
                             return;
                         }
 
                         showSnackbar('コメントを作成しました', 'success');
 
-                        // タスク詳細モーダルのコメントリストを再読み込み
-                        if (App.modals.taskDetail && App.modals.taskDetail.currentId === this.taskId) {
-                            App.modals.taskDetail.loadComments(this.taskId);
+                        // タスク詳細モーダルが開いていて、同じタスクの場合はコメントリストを再読み込み
+                        if (App.modals.taskDetail && App.modals.taskDetail.currentId === this.selectedTaskId) {
+                            App.modals.taskDetail.loadComments(this.selectedTaskId);
                         }
 
                         // モーダルを閉じる
                         this.close();
                     })
                     .catch(error => {
-                        hideLoading();
                         console.error('[NewComment] Save error:', error);
                         App.utils.error.handle(error);
                     });

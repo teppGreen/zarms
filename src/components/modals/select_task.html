@@ -1,0 +1,136 @@
+<dialog id="modal-select-tasks" class="modal padding no-scroll">
+    <header class="fixed small-padding">
+        <div class="row no-space align-center">
+            <div class="max">
+                <h5 class="bold">タスクを選択</h5>
+            </div>
+            <button class="circle transparent" onclick="ui('#modal-select-tasks')">
+                <i>close</i>
+            </button>
+        </div>
+
+        <!-- 検索バー -->
+        <div class="field round border prefix">
+            <i>search</i>
+            <input type="text" id="task-search-input" placeholder="タスク名で検索..."
+                oninput="App.modals.selectTasks.filterResults()">
+        </div>
+    </header>
+
+    <!-- 結果リスト -->
+    <article id="task-results-container" class="scroll medium small-padding no-round small-line background no-elevate">
+        <!-- 動的に生成 -->
+    </article>
+
+    <footer class="fixed small-padding">
+        <nav class="right-align">
+            <button class="border" onclick="ui('#modal-select-tasks')">キャンセル</button>
+            <button onclick="App.modals.selectTasks.confirm()">選択</button>
+        </nav>
+    </footer>
+</dialog>
+
+<script>
+    (function () {
+        App.modals.selectTasks = {
+            callback: null,
+            selectedIds: [],
+            allTasks: [],
+            multiSelect: false,
+
+            open: async function (options = {}) {
+                this.callback = options.callback || null;
+                this.multiSelect = options.multiSelect || false;
+                this.selectedIds = options.preSelected || [];
+
+                // App.state.data.tasks から直接ロード
+                this.allTasks = App.state.data.tasks || [];
+                this.render();
+                await ui('#modal-select-tasks');
+
+                // フォーカスを確実に行うための再試行ロジック
+                const tryFocus = (count = 0) => {
+                    const input = document.getElementById('task-search-input');
+                    // offsetParent !== null は要素が表示されているかどうかの簡易チェック
+                    if (input && input.offsetParent !== null) {
+                        input.focus();
+                        input.select(); // 全選択
+                    } else if (count < 10) {
+                        // まだ表示されていない場合は少し待って再試行
+                        setTimeout(() => tryFocus(count + 1), 50);
+                    }
+                };
+
+                // 初回実行
+                tryFocus();
+            },
+
+            render: function () {
+                this.filterResults();
+            },
+
+            filterResults: function () {
+                const searchInput = document.getElementById('task-search-input');
+                const container = document.getElementById('task-results-container');
+
+                if (!container) return;
+
+                const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+
+                // フィルタリング
+                let filtered = this.allTasks.filter(task => {
+                    const matchesSearch = !searchTerm ||
+                        (task.name && task.name.toLowerCase().includes(searchTerm)) ||
+                        (task.display_id && task.display_id.toString().toLowerCase().includes(searchTerm));
+
+                    return matchesSearch;
+                });
+
+                // 表示
+                if (filtered.length === 0) {
+                    container.innerHTML = '<p class="padding">該当するタスクが見つかりません</p>';
+                    return;
+                }
+
+                container.innerHTML = filtered.map(task => {
+                    const isSelected = this.selectedIds.includes(task.id);
+                    const displayName = task.name || '無題のタスク';
+                    const displayId = task.display_id ? `#${task.display_id}` : '';
+
+                    return `
+                        <div><label class="${this.multiSelect ? 'checkbox' : 'radio'} row middle-align small-space">
+                            <input type="${this.multiSelect ? 'checkbox' : 'radio'}" 
+                                name="task-select" 
+                                value="${task.id}" 
+                                ${isSelected ? 'checked' : ''}
+                                onchange="App.modals.selectTasks.toggleSelection('${task.id}', this.checked)">
+                            <span class="small-margin">
+                                <strong>${escapeHtml(displayName)}</strong>
+                                ${displayId ? `<span class="small-text" style="opacity: 0.7;"> ${displayId}</span>` : ''}
+                            </span>
+                        </label></div>
+                    `;
+                }).join('');
+            },
+
+            toggleSelection: function (id, checked) {
+                if (this.multiSelect) {
+                    if (checked && !this.selectedIds.includes(id)) {
+                        this.selectedIds.push(id);
+                    } else if (!checked) {
+                        this.selectedIds = this.selectedIds.filter(sid => sid !== id);
+                    }
+                } else {
+                    this.selectedIds = checked ? [id] : [];
+                }
+            },
+
+            confirm: function () {
+                if (this.callback) {
+                    this.callback(this.selectedIds);
+                }
+                ui('#modal-select-tasks');
+            }
+        };
+    })();
+</script>
