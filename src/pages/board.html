@@ -43,7 +43,7 @@
                     title: '',
                     titleMatchMode: 'contains',
                     members: {
-                        crcreated_by: filterByActiveUser ? [userId] : [],
+                        created_by: filterByActiveUser ? [userId] : [],
                         processed_by: filterByActiveUser ? [userId] : [],
                         reviewed_by: filterByActiveUser ? [userId] : [],
                         received_by: filterByActiveUser ? [userId] : []
@@ -55,6 +55,14 @@
                     boards: [],  // Array of board IDs to filter by
                     isOverdue: false
                 };
+            },
+
+            /**
+             * フィルタをリセット
+             */
+            resetMyBoardFilters: function () {
+                this.initializeMyBoardFilters();
+                this.loadData('my-board', false);
             },
 
             /**
@@ -154,9 +162,13 @@
                     <nav id="board-tab-header-${boardId}" class="no-padding no-margin row">
                         <h3 class="bold small">マイボード</h3>
                         <div class="max"></div>
-                        <button class="round fill" onclick="if(App.modals.filterTask){ App.modals.filterTask.syncUI(); } ui('#modal-filter-task')">
+                        <a onclick="App.pages.boards.resetMyBoardFilters()">
+                            <span>フィルタをリセット</span>
+                            <div class="tooltip bottom">自分が担当者のタスクのみ表示</div>
+                        </a>
+                        <button class="circle transparent" onclick="if(App.modals.filterTask){ App.modals.filterTask.syncUI(); } ui('#modal-filter-task')">
                             <i>filter_list</i>
-                            <span>フィルタ</span>
+                            <div class="tooltip bottom">フィルタ</div>
                         </button>
                     </nav>
                 </header>
