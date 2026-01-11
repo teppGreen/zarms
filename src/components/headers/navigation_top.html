@@ -1,35 +1,74 @@
 <nav class="top surface-container right-margin">
 
     <nav class="min">
-        <button id="new-button" class="large circle primary" onclick="App.utils.header.toggleNewButtonDropdown(event)">
+        <!-- モバイル用 -->
+        <button id="new-button" class="s m large circle primary"
+            onclick="App.utils.header.toggleNewButtonDropdown(event)">
             <i>add</i>
         </button>
-        <menu id="new-button-dropdown" class="bottom transparent no-wrap">
+        <menu id="new-button-dropdown" class="s m bottom transparent no-wrap"
+            onclick="App.utils.header.closeNewButtonDropdown()">
             <li>
                 <button class="fill large-elevate" onclick="App.modals.taskDetail.create()">
-                    <i>check_circle</i>
-                    <span>新しいタスク</span>
+                    <i>add_task</i>
+                    <span>タスク</span>
+                    <div class="tooltip right round left-padding right-padding">
+                        <p>新しいタスクを作成します</p>
+                        <span><i class="tiny no-padding no-margin">keyboard_option_key</i>T</span>
+                    </div>
                 </button>
             </li>
             <li>
                 <button class="fill large-elevate" onclick="App.pages.boards.createBoard()">
-                    <i>folder</i>
-                    <span>新しいボード</span>
+                    <i>create_new_folder</i>
+                    <span>ボード</span>
+                    <div class="tooltip right round left-padding right-padding">
+                        <p>新しいボードを作成します</p>
+                        <span><i class="tiny no-padding no-margin">keyboard_option_key</i>B</span>
+                    </div>
                 </button>
             </li>
             <li>
                 <button class="fill large-elevate" onclick="App.modals.newComment.open()">
                     <i>add_comment</i>
-                    <span>新しいコメント</span>
+                    <span>コメント</span>
+                    <div class="tooltip right round left-padding right-padding">
+                        <p>新しいコメントを作成します</p>
+                        <span><i class="tiny no-padding no-margin">keyboard_option_key</i>C</span>
+                    </div>
                 </button>
             </li>
         </menu>
+
+        <!-- デスクトップ用 -->
+        <button class="l large round primary" onclick="App.modals.taskDetail.create()">
+            <i>add_task</i>
+            <span>タスク</span>
+            <div class="tooltip right round left-padding right-padding">
+                <p>新しいタスクを作成します</p>
+                <span><i class="tiny no-padding no-margin">keyboard_option_key</i>T</span>
+            </div>
+        </button>
+        <button class="l large round border" onclick="App.pages.boards.createBoard()">
+            <i>create_new_folder</i>
+            <span>ボード</span>
+            <div class="tooltip right round left-padding right-padding">
+                <p>新しいボードを作成します</p>
+                <span><i class="tiny no-padding no-margin">keyboard_option_key</i>B</span>
+            </div>
+        </button>
+        <button class="l large round border" onclick="App.modals.newComment.open()">
+            <i>add_comment</i>
+            <span>コメント</span>
+            <div class="tooltip right round left-padding right-padding">
+                <p>新しいコメントを作成します</p>
+                <span><i class="tiny no-padding no-margin">keyboard_option_key</i>C</span>
+            </div>
+        </button>
     </nav>
 
-    <div class="medium"></div>
-
-    <!-- 強化された検索バー -->
-    <div class="medium-width field round surface prefix no-elevate" id="search-container">
+    <!-- 検索バー -->
+    <div class="field medium-width round surface prefix no-elevate" id="search-container">
         <i class="front" style="cursor: pointer;" onclick="App.utils.search.handleSearchClick()">search</i>
         <input placeholder="タスク名を検索する" id="search-input" onkeydown="App.utils.search.handleSearchKeydown(event)"
             oninput="App.utils.search.handleSearchInput(event)" onfocus="App.utils.search.handleSearchFocus(event)"
@@ -40,11 +79,21 @@
     <div class="max"></div>
 
     <button class="circle large transparent">
+        <i>help</i>
+        <menu id="help-menu" class="left no-wrap">
+            <li><a href="https://sites.google.com/student.zen.ac.jp/zen-boards/help" target="_blank">ヘルプ</a></li>
+            <li><a href="https://docs.google.com/forms/d/e/1FAIpQLSes-123hjo8rrvF-suBIjNdUoEBHeHmJKj-u0MESHUQEa7IHg/viewform"
+                    target="_blank">質問・提案・報告</a></li>
+
+        </menu>
+    </button>
+
+    <button class="circle large transparent">
         <i>apps</i>
         <menu id="apps-menu" class="left no-wrap no-padding">
             <article class="background small-margin no-padding scroll">
                 <div id="apps-grid" class="grid tiny-space">
-                    <!-- リンクはloadAllData実行時に動的に生成されます -->
+                    <!-- リンクはloadAllData実行時に動的に生成される -->
                 </div>
             </article>
         </menu>
@@ -54,16 +103,6 @@
 <script>
     (function () {
         App.utils.header = {
-            /**
-             * 新規作成ボタンのドロップダウンを閉じます
-             */
-            closeNewButtonDropdown: function () {
-                const dropdown = document.getElementById('new-button-dropdown');
-                if (dropdown) {
-                    dropdown.classList.remove('show');
-                }
-            },
-
             /**
              * linksテーブルのデータからアプリリンクを動的に生成します
              */
@@ -111,24 +150,12 @@
             },
 
             /**
-             * メインの「+ 新規作成」ボタンがクリックされたときの処理
+             * 新規作成ボタンのドロップダウンを閉じます
              */
-            handleMainButtonClick: function (event) {
-                // アクティブなナビゲーションアイテムを確認してタブを判定
-                const activeNavItem = document.querySelector('.nav-item.active');
-                console.log('アクティブなナビゲーションアイテム:', activeNavItem);
-                if (!activeNavItem) {
-                    return;
-                }
-
-                const navItemId = activeNavItem.id;
-
-                switch (navItemId) {
-                    case 'creatives-nav': App.modals.new_creative.open(); break;
-                    case 'plans-nav': App.modals.new_plan.open(); break;
-                    case 'members-nav': App.modals.new_member.open(); break;
-                    case 'knowledges-nav': App.modals.new_knowledge.open(); break;
-                    default: App.utils.header.toggleNewButtonDropdown(event);
+            closeNewButtonDropdown: function () {
+                const dropdown = document.getElementById('new-button-dropdown');
+                if (dropdown) {
+                    dropdown.classList.remove('show');
                 }
             },
         };

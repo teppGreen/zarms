@@ -445,23 +445,31 @@
   // グローバルショートカットキーの設定
   function setupGlobalShortcuts() {
     document.addEventListener('keydown', (e) => {
-      // Cmd/Ctrl + K: 検索フォーカス
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      
+      // 検索
+      if (!e.isComposing && e.altKey && e.code === 'KeyF') {
         e.preventDefault();
         const searchInput = document.getElementById('search-input');
-        if (searchInput) {
-          searchInput.focus();
-          searchInput.select();
-        }
+        searchInput.focus();
+        searchInput.select();
       }
 
-      // Cmd/Ctrl + N: 新規作成メニュー
-      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+      // 新規タスク作成
+      if (!e.isComposing && e.altKey && e.code === 'KeyT') {
         e.preventDefault();
-        const newButton = document.getElementById('main-button');
-        if (newButton && typeof handleMainButtonClick === 'function') {
-          handleMainButtonClick({ target: newButton });
-        }
+        App.modals.taskDetail.create();
+      }
+
+      // 新規ボード作成
+      if (!e.isComposing && e.altKey && e.code === 'KeyB') {
+        e.preventDefault();
+        App.pages.boards.createBoard();
+      }
+
+      // 新規コメント作成
+      if (!e.isComposing && e.altKey && e.code === 'KeyC') {
+        e.preventDefault();
+        App.modals.newComment.open();
       }
 
       // Esc: モーダルを閉じる
@@ -556,17 +564,6 @@
       snackbar.dataset.timerId = '';
     }, seconds * 1000);
     snackbar.dataset.timerId = timerId;
-  }
-
-  function openModal(id) {
-    const modal = document.getElementById(id);
-    if (modal) {
-      modal.classList.add('active');
-    }
-    const overlay = document.getElementById('overlay');
-    if (overlay) {
-      overlay.classList.add('active');
-    }
   }
 
   function closeModal(id) {
@@ -701,25 +698,17 @@
         } else {
           google.script.history.push(cleanParams, cleanParams);
         }
-        return;
+        // return;
       }
 
-      const url = new URL(window.location);
-
-      // 既存のパラメータをクリア
-      url.search = '';
-
-      // 新しいパラメータを設定
-      Object.keys(cleanParams).forEach(key => {
-        url.searchParams.set(key, cleanParams[key]);
-      });
-
-      // 履歴に追加または置き換え
-      if (replace) {
-        window.history.replaceState(cleanParams, '', url.toString());
-      } else {
-        window.history.pushState(cleanParams, '', url.toString());
-      }
+      // const fbFormBaseUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSes-123hjo8rrvF-suBIjNdUoEBHeHmJKj-u0MESHUQEa7IHg/viewform';
+      // const fbFormLink = document.querySelector(`#help-menu a[href^="${fbFormBaseUrl}"]`);
+      // const fbFormParamId = 'entry.1584925863';
+      // if (fbFormLink) {
+      //   const paramsStr = JSON.stringify(cleanParams);
+      //   fbFormLink.href = paramsStr ? `${fbFormBaseUrl}?${fbFormParamId}=${paramsStr}` : fbFormBaseUrl;
+      // }
+      // console.log('updateParams', params, replace);
     },
 
     /**
