@@ -37,6 +37,7 @@ function loadMainApp(urlParams, activeUser) {
   template.templateVariables = {
     urlParams: urlParams,
     activeUser: activeUser,
+    isDevelopment: isDevelopment(),
     TABLE_NAMES: TABLE_NAMES,
     DIRECTORY_TYPES: DIRECTORY_TYPES,
     TASK_STATUS: TASK_STATUS,
@@ -157,6 +158,14 @@ function include(filename) {
 }
 
 function getScriptUrl() {
-  var url = ScriptApp.getService().getUrl();
+  const url = ScriptApp.getService().getUrl();
   return url;
+}
+
+function isDevelopment() {
+  const REGEX = /^https:\/\/script\.google\.com\/a\/.*\/dev.*$/;
+  const url = ScriptApp.getService().getUrl();
+  const result = REGEX.test(url);
+  console.log('[isDevelopment]', url, result);
+  return result;
 }

@@ -534,7 +534,7 @@ function remove(sheetName, query) {
     lock.waitLock(60000);
 
     try {
-        const headersMap = getHeadersMap(sheetName);
+        const headers = getHeadersFromSheetsAPI(sheetName);
 
         // 削除対象のレコードを検索
         const targetRecords = select(sheetName, { where: query.where });
