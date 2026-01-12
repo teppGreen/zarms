@@ -1,24 +1,15 @@
 <!-- 新規コメント作成モーダル -->
+ <!-- 将来的には、タスク追加画面単体で動作するようにしたい（タスクを選択する欄を作る） -->
 <dialog id="modal-new-comment" class="modal padding no-scroll">
-    <nav class="small-padding">
+    <nav class="small-padding bottom-margin">
         <h5 class="max bold">新規コメント作成</h5>
         <button class="circle transparent" onclick="App.modals.newComment.close()">
             <i>close</i>
         </button>
     </nav>
 
-    <div class="top-margin bottom-margin">
-        <button id="select-task-button" class="prefix small-round border" onclick="App.modals.newComment.openTaskSelector()">
-            <i class="front">task_alt</i>
-            <span id="selected-task-name">タスクを選択してください</span>
-        </button>
-    </div>
-
-    <div class="scroll large-width medium-height small-padding small-round">
-        <!-- コメント内容 -->
-        <div class="field background border">
-            <textarea id="new-comment-content" placeholder="コメントを入力"></textarea>
-        </div>
+    <div class="field border scroll large-width small-padding small-round background">
+        <textarea id="new-comment-content" rows="10" placeholder="コメント内容を入力..."></textarea>
     </div>
 
     <nav class="right-align small-padding">
@@ -31,25 +22,15 @@
     (function () {
         App.modals.newComment = {
             taskId: null,
-            boardId: null,
-            selectedTaskId: null,
 
             /**
              * 新規コメントモーダルを開く
-             * @param {string} taskId - タスクID（オプション。指定された場合はそのタスクに紐付け）
-             * @param {string} boardId - ボードID（オプション）
+             * @param {string} taskId - タスクID
              */
-            open: function (taskId = null, boardId = null) {
-                this.taskId = taskId;
-                this.boardId = boardId;
-                this.selectedTaskId = taskId; // 初期選択タスク
-
+            open: function (taskId) {
                 // フィールドをクリア
-                const contentField = document.getElementById('new-comment-content');
-                if (contentField) contentField.value = '';
-
-                // タスク選択フィールドの表示を更新
-                this.updateTaskDisplay();
+                this.reset();
+                this.taskId = taskId;
 
                 // モーダルを開く
                 ui('#modal-new-comment');
@@ -58,50 +39,6 @@
                 setTimeout(() => {
                     if (contentField) contentField.focus();
                 }, 100);
-            },
-
-            /**
-             * タスク選択モーダルを開く
-             */
-            openTaskSelector: function () {
-                if (!App.modals.selectTasks) {
-                    console.error('[NewComment] selectTasks modal not available');
-                    return;
-                }
-
-                App.modals.selectTasks.open({
-                    multiSelect: false,
-                    preSelected: this.selectedTaskId ? [this.selectedTaskId] : [],
-                    callback: (selectedIds) => {
-                        if (selectedIds && selectedIds.length > 0) {
-                            this.selectedTaskId = selectedIds[0];
-                            this.updateTaskDisplay();
-                        }
-                    }
-                });
-            },
-
-            /**
-             * 選択されたタスクの表示を更新
-             */
-            updateTaskDisplay: function () {
-                const taskNameSpan = document.getElementById('selected-task-name');
-                if (!taskNameSpan) return;
-
-                if (this.selectedTaskId) {
-                    // タスク情報を取得
-                    const allTasks = App.state.data.tasks || [];
-                    const task = allTasks.find(t => t.id === this.selectedTaskId);
-
-                    if (task) {
-                        const displayId = task.display_id ? `#${task.display_id}` : '';
-                        taskNameSpan.textContent = `${task.name || '無題のタスク'} ${displayId}`;
-                    } else {
-                        taskNameSpan.textContent = 'タスクを選択してください';
-                    }
-                } else {
-                    taskNameSpan.textContent = 'タスクを選択してください';
-                }
             },
 
             /**
@@ -116,15 +53,8 @@
              * モーダルをリセット
              */
             reset: function () {
-                this.taskId = null;
-                this.boardId = null;
-                this.selectedTaskId = null;
-
                 const contentField = document.getElementById('new-comment-content');
                 if (contentField) contentField.value = '';
-
-                const taskNameSpan = document.getElementById('selected-task-name');
-                if (taskNameSpan) taskNameSpan.textContent = 'タスクを選択してください';
             },
 
             /**
@@ -135,22 +65,18 @@
                 const content = contentField ? contentField.value.trim() : '';
 
                 if (!content) {
-                    showSnackbar('コメント内容を入力してください', 'warning');
+                    showSnackbar('コメントの内容を入力してください', 'warning');
                     return;
                 }
 
-                if (!this.selectedTaskId) {
-                    showSnackbar('タスクを選択してください', 'warning');
-                    return;
-                }
-
-                showSnackbar('コメントを作成しています...', 'info');
+                this.close();
+                showSnackbar('コメントを作成しています...', 'info', 'top', 0);
 
                 // コメントを保存
                 callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'insert', {
                     content: content,
                     related_table: 'tasks',
-                    related_id: this.selectedTaskId
+                    related_id: this.taskId
                 }, 'コメントを作成')
                     .then(result => {
                         if (!result || (Array.isArray(result) && result.length === 0)) {
@@ -161,12 +87,10 @@
                         showSnackbar('コメントを作成しました', 'success');
 
                         // タスク詳細モーダルが開いていて、同じタスクの場合はコメントリストを再読み込み
-                        if (App.modals.taskDetail && App.modals.taskDetail.currentId === this.selectedTaskId) {
-                            App.modals.taskDetail.loadComments(this.selectedTaskId);
+                        if (App.modals.taskDetail && App.modals.taskDetail.currentId === this.taskId) {
+                            App.modals.taskDetail.loadComments(this.taskId, true);
                         }
-
-                        // モーダルを閉じる
-                        this.close();
+                        
                     })
                     .catch(error => {
                         console.error('[NewComment] Save error:', error);

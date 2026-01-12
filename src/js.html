@@ -487,11 +487,11 @@
         App.pages.boards.createBoard();
       }
 
-      // 新規コメント作成
-      if (!e.isComposing && e.altKey && e.code === 'KeyC') {
-        e.preventDefault();
-        App.modals.newComment.open();
-      }
+      // // 新規コメント作成
+      // if (!e.isComposing && e.altKey && e.code === 'KeyC') {
+      //   e.preventDefault();
+      //   App.modals.newComment.open();
+      // }
 
       // Esc: モーダルを閉じる
       if (e.key === 'Escape') {
@@ -580,11 +580,13 @@
       clearTimeout(parseInt(snackbar.dataset.timerId));
     }
     // 指定時間後に非表示
-    const timerId = setTimeout(() => {
-      snackbar.classList.remove('active');
-      snackbar.dataset.timerId = '';
-    }, seconds * 1000);
-    snackbar.dataset.timerId = timerId;
+    if (seconds > 0) {
+      const timerId = setTimeout(() => {
+        snackbar.classList.remove('active');
+        snackbar.dataset.timerId = '';
+      }, seconds * 1000);
+      snackbar.dataset.timerId = timerId;
+    }
   }
 
   function closeModal(id) {

@@ -88,12 +88,14 @@
                     html += `
             <article class="s12 m6 l4 padding border round">
               <div class="row">
-                ${member.profile_photo_url
-                            ? `<img src="${escapeHtml(member.profile_photo_url)}" class="circle small" alt="${escapeHtml(member.display_name)}">`
-                            : '<i class="extra">account_circle</i>'}
+                <a href="${member.slack_profile_url}" target="_blank">
+                    ${member.profile_photo_url
+                        ? `<img src="${escapeHtml(member.profile_photo_url)}" class="circle small" alt="${escapeHtml(member.display_name)}">`
+                        : '<i class="extra">account_circle</i>'}
+                </a>
                 <div class="max no-line">
                   <span class="small">${member.display_name || ''}</span>
-                  <span class="small-text">${member.email || ''}</span>
+                  <span class="small-text"><a href="mailto:${member.email}">${member.email || ''}</a></span>
                 </div>
               </div>
             </article>
