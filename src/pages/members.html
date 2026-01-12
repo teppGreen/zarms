@@ -35,8 +35,12 @@
             selectedDirectoryId: null,
             tree: [],
 
-            loadData: async function () {
+            loadData: async function (firstLoad = false) {
                 showLoading();
+
+                if (!firstLoad) {
+                    return;
+                }
 
                 // membersデータを取得
                 let members = App.state.data.members || [];
@@ -45,13 +49,16 @@
                 // directoriesデータを取得
                 let directories = App.state.data.directories || [];
 
+                this.renderMembers(members);
+                this.renderDirectories(directories);
+
                 // member_assignmentsデータを取得
                 try {
                     const res = await callGAS('handleDatabaseProcess', App.state.userId, 'member_assignments', 'select', {
                         where: {
                             related_table: ["=", "directories"],
                         }
-                    });
+                    },null,true);
                     this.memberAssignments = res.data || res || [];
                     console.log('Member assignments loaded:', this.memberAssignments.length);
                 } catch (e) {
@@ -62,8 +69,6 @@
                 console.log('Members data loaded:', members.length);
                 console.log('Directories data loaded:', directories.length);
 
-                this.renderMembers(members);
-                this.renderDirectories(directories);
                 hideLoading();
             },
 

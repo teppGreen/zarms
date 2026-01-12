@@ -55,7 +55,8 @@
                 </button>
               </div>
               <p class="no-line">
-                <span class="small-text" title="このタスクを作成した人&#13;&#10;ステータスを「未着手」に変更する人" style="cursor: help;">作成者<br></span>
+                <span class="small-text" title="このタスクを作成した人&#13;&#10;ステータスを「未着手」に変更する人"
+                  style="cursor: help;">作成者<br></span>
                 <span class="middle-align">
                   <span id="label-created-by"></span>
                   <!-- <a onclick="App.modals.taskDetail.selectMember('created_by')"><i class="tiny">edit</i></a> -->
@@ -72,7 +73,8 @@
                 </button>
               </div>
               <p class="no-line">
-                <span class="small-text" title="このタスクを進行する人&#13;&#10;ステータスを「進行中」「確認中」に変更する人" style="cursor: help;">進行者<br></span>
+                <span class="small-text" title="このタスクを進行する人&#13;&#10;ステータスを「進行中」「確認中」に変更する人"
+                  style="cursor: help;">進行者<br></span>
                 <span class="middle-align">
                   <span id="label-processed-by"></span>
                   <a onclick="App.modals.taskDetail.selectMember('processed_by')"><i class="tiny">edit</i></a>
@@ -89,7 +91,8 @@
                 </button>
               </div>
               <p class="no-line">
-                <span class="small-text" title="このタスクが要件通り完了されたかを確認する人&#13;&#10;ステータスを「完了」に変更する人" style="cursor: help;">確認者<br></span>
+                <span class="small-text" title="このタスクが要件通り完了されたかを確認する人&#13;&#10;ステータスを「完了」に変更する人"
+                  style="cursor: help;">確認者<br></span>
                 <span class="middle-align">
                   <span id="label-reviewed-by"></span>
                   <a onclick="App.modals.taskDetail.selectMember('reviewed_by')"><i class="tiny">edit</i></a>
@@ -106,7 +109,8 @@
                 </button>
               </div>
               <p class="no-line">
-                <span class="small-text" title="このタスクに関連して成果物などが発生した際に、&#13;&#10;その成果物を受け取る人" style="cursor: help;">受領者<br></span>
+                <span class="small-text" title="このタスクに関連して成果物などが発生した際に、&#13;&#10;その成果物を受け取る人"
+                  style="cursor: help;">受領者<br></span>
                 <span class="middle-align">
                   <span id="label-received-by"></span>
                   <a onclick="App.modals.taskDetail.selectMember('received_by')"><i class="tiny">edit</i></a>
@@ -156,7 +160,9 @@
             <span>新しいコメントを作成</span>
           </button>
         </div>
-        <div class="scroll medium-height"><p>コメント機能は今後実装予定です</p></div>
+        <div class="scroll medium-height">
+          <p>コメント機能は今後実装予定です</p>
+        </div>
         <!-- <div class="scroll medium-height" id="task-comments-list"></div> -->
       </div>
     </div>
@@ -183,17 +189,17 @@
        * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
        */
       create: async function () {
-        const promptValue = prompt('新しいタスクの名前','');
+        const promptValue = prompt('新しいタスクの名前', '');
 
-        if(!promptValue) {
+        if (!promptValue) {
           return;
-        } else if(promptValue === '') {
+        } else if (promptValue === '') {
           alert('タスク名を入力してください');
           return;
         }
-        
+
         await delay(100);
-        
+
         const userId = App.state.userId;
         const taskId = crypto.randomUUID();
 
@@ -522,8 +528,8 @@
 
         // 日付フィールドの処理
         if (startsAtInput) {
-          const newStartsAt = startsAtInput.value ? new Date(startsAtInput.value).toISOString() : null;
-          const oldStartsAt = originalData.starts_at;
+          const newStartsAt = startsAtInput.value ? new Date(startsAtInput.value).toISOString() : '';
+          const oldStartsAt = originalData.starts_at || '';
           if (newStartsAt !== oldStartsAt) {
             updates.starts_at = newStartsAt;
             hasChanges = true;
@@ -531,8 +537,8 @@
         }
 
         if (endsAtInput) {
-          const newEndsAt = endsAtInput.value ? new Date(endsAtInput.value).toISOString() : null;
-          const oldEndsAt = originalData.ends_at;
+          const newEndsAt = endsAtInput.value ? new Date(endsAtInput.value).toISOString() : '';
+          const oldEndsAt = originalData.ends_at || '';
           if (newEndsAt !== oldEndsAt) {
             updates.ends_at = newEndsAt;
             hasChanges = true;

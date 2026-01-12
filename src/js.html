@@ -248,13 +248,16 @@
       // マイボードフィルタを初期化（デフォルト: 現在のユーザー）
       App.pages.boards.initializeMyBoardFilters();
 
+      // メンバー
+      App.pages.members.loadData(true);
+
       // アプリリンクを描画
       App.utils.header.renderAppLinks();
 
       hideLoading();
 
       // キャッシュからのデータだった場合、バックグラウンドで最新データを取得して再描画
-      if (boardsResult?.isCached === true || linksResult?.isCached === true) {
+      if (boardsResult?.isCached === true || linksResult?.isCached === true || membersResult?.isCached === true || directoriesResult?.isCached === true) {
         console.log('キャッシュデータを検出。バックグラウンドで最新データを取得中...');
         setTimeout(async () => {
           try {
@@ -279,12 +282,32 @@
               promises.push(Promise.resolve(linksResult));
             }
 
-            const [freshBoardsResult, freshLinksResult] = await Promise.all(promises);
+            if (membersResult?.isCached === true) {
+              promises.push(
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {}, null, true)
+              );
+            } else {
+              promises.push(Promise.resolve(membersResult));
+            }
+
+            if (directoriesResult?.isCached === true) {
+              promises.push(
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {}, null, true)
+              );
+            } else {
+              promises.push(Promise.resolve(directoriesResult));
+            }
+
+            const [freshBoardsResult, freshLinksResult, freshMembersResult, freshDirectoriesResult] = await Promise.all(promises);
             const freshBoards = freshBoardsResult?.data || freshBoardsResult || [];
             const freshLinks = freshLinksResult?.data || freshLinksResult || [];
+            const freshMembers = freshMembersResult?.data || freshMembersResult || [];
+            const freshDirectories = freshDirectoriesResult?.data || freshDirectoriesResult || [];
 
             App.state.data.boards = freshBoards;
             App.state.data.links = freshLinks;
+            App.state.data.members = freshMembers;
+            App.state.data.directories = freshDirectories;
 
             // ナビゲーションを更新
             if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
@@ -398,13 +421,7 @@
       console.log('[refreshData] 現在のタブ:', tabId);
 
       // タブ種別に応じて必要なデータのみを取得
-      if (tabId === 'tab-members') {
-        // メンバーページ: loadData関数を再利用
-        console.log('[refreshData] メンバーページのデータを更新中...');
-        if (App.pages.members && App.pages.members.loadData) {
-          await App.pages.members.loadData();
-        }
-      } else if (tabId === 'tab-board') {
+      if (tabId === 'tab-board') {
         App.pages.boards.initialize();
         // ボードページ: 表示中のボードのタスクのみを取得
         const activeBoardDiv = document.querySelector('#tab-board > div[style*="display: block"]');
