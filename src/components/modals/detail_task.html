@@ -162,16 +162,13 @@
       <!-- Right Column: Comments -->
       <div class="s12 m4 l4 surface-variant small-round padding">
         <div class="bottom-margin">
-          <button disabled class="no-margin responsive primary round max"
+          <button class="no-margin responsive primary round max"
             onclick="App.modals.taskDetail.openNewComment()">
             <i>add_comment</i>
             <span>新しいコメントを作成</span>
           </button>
         </div>
-        <div class="scroll medium-height">
-          <p>コメント機能は今後実装予定です</p>
-        </div>
-        <!-- <div class="scroll medium-height" id="task-comments-list"></div> -->
+        <div class="scroll medium-height" id="task-comments-list"></div>
       </div>
     </div>
 
@@ -367,10 +364,10 @@
        * コメントを読み込み
        * @param {string} taskId - タスクID
        */
-      loadComments: function (taskId) {
+      loadComments: function (taskId, skipLoadingCache = false) {
         const commentsList = document.getElementById('task-comments-list');
         if (commentsList) {
-          commentsList.innerHTML = '<div class="padding center"><span class="loader"></span></div>';
+          commentsList.innerHTML = '<div class="padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
         }
 
         // コメントを非同期で取得
@@ -378,18 +375,28 @@
           where: {
             related_table: ["=", "tasks"],
             related_id: ["=", taskId]
+          },
+          orderBy: {
+            created_at: "desc"
           }
         };
 
         // JOINなしで取得
-        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query)
-          .then(result => {
+        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, skipLoadingCache)
+          .then(results => {
             // モーダルが閉じられた、または別のタスクが開かれている場合は中断
             if (this.currentId !== taskId) return;
 
-            const comments = result?.data || result || [];
-            console.log(`Task ${taskId} comments loaded:`, comments.length);
+            const comments = results?.data || results || [];
             this.renderComments(comments);
+
+            if (results?.isCached) {
+              callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, true)
+                .then(results => {
+                  const refleshedComments = results?.data || results || [];
+                  this.renderComments(refleshedComments);
+                })
+            }
           })
           .catch(error => {
             console.error('[TaskDetail] Error loading comments:', error);
@@ -754,7 +761,7 @@
         let html = '';
 
         if (!comments || comments.length === 0) {
-          html += '<p class="small-text">コメントはありません</p>';
+          html += '<p>コメントはありません</p>';
           container.innerHTML = html;
           return;
         }
@@ -765,6 +772,7 @@
           const creator = members.find(m => m.id === comment.created_by);
           const creatorName = creator ? creator.display_name : (comment.creator_display_name || '不明'); // Fallback if still available somewhere
           const creatorPhoto = creator ? creator.profile_photo_url : comment.creator_profile_photo_url;
+          const creatorSlackProfileUrl = creator ? creator.slack_profile_url : comment.creator_slack_profile_url;
 
           const creatorIcon = creatorPhoto
             ? `<img src="${creatorPhoto}" alt="${escapeHtml(creatorName)}" class="circle tiny">`
@@ -773,16 +781,19 @@
           const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
 
           return `
-            <article class="small-padding border round small-margin surface">
-              <div class="row small-margin">
+            <article class="padding no-margin border small-round surface">
+              <div class="row tiny-space">
+                <a href="${creatorSlackProfileUrl}" target="_blank">
                 ${creatorIcon}
-                <div class="max">
+                </a>
+                <div class="max row tiny-space">
                   <span class="bold small-text">${escapeHtml(creatorName)}</span>
-                  <span class="small-text" style="opacity: 0.7;"> · ${createdAt}</span>
+                  <span class="small-text secondary-text">${createdAt}</span>
                 </div>
               </div>
-              <div class="small-padding">
-                <p class="small-text">${escapeHtml(comment.content || '')}</p>
+              <div class="tiny-space"></div>
+              <div class="">
+                <p class="small-text no-margin tiny-line">${escapeHtml(comment.content || '')}</p>
               </div>
             </article>
           `;
@@ -888,7 +899,7 @@
           const text = `[タスク#${task.display_id}] ${task.name} | ZEN Boards`;
 
           const htmlContent = `<a href="${url}">[タスク#${task.display_id}] ${escapeHtml(task.name)} | ZEN Boards</a>`;
-          const textContent = `[タスク#${task.display_id}] ${task.name} | ZEN Boards\n${url}`;
+          const textContent = `${text}\n${url}`;
 
           const blobHtml = new Blob([htmlContent], { type: "text/html" });
           const blobText = new Blob([textContent], { type: "text/plain" });
@@ -967,7 +978,7 @@
           // モーダルを閉じる
           this.close();
 
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise(resolve => setTimeout(resolve, 500));
           this.open(newTask.id, false, true);
 
           // サーバーに保存
