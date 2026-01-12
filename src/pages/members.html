@@ -110,7 +110,23 @@
 
                 // ツリー構造を構築
                 this.tree = this.buildTree(directories);
+
+                // 初回読み込み時のみ、3階層目まで展開する
+                if (Object.keys(this.expandedNodes).length === 0) {
+                    this.expandLevels(this.tree, 3);
+                }
+
                 container.innerHTML = this.renderTree(this.tree);
+            },
+
+            expandLevels: function (nodes, level) {
+                if (level <= 0 || !nodes) return;
+                nodes.forEach(node => {
+                    this.expandedNodes[node.id] = true;
+                    if (node.children && node.children.length > 0) {
+                        this.expandLevels(node.children, level - 1);
+                    }
+                });
             },
 
             buildTree: function (flatData) {

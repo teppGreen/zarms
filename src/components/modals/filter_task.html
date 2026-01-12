@@ -1,157 +1,133 @@
 <!-- タスクフィルタモーダル -->
 <dialog id="modal-filter-task" class="padding no-scroll">
-    <header class="fixed row align-center small-padding no-margin">
-        <nav class="no-margin no-padding">
-            <h5 class="bold">フィルタ設定</h5>
-            <div class="max"></div>
-            <button class="circle transparent" onclick="ui('#modal-filter-task')">
-                <i>close</i>
-            </button>
-        </nav>
-    </header>
+    <nav class="bottom-margin small-padding">
+        <h5 class="bold">タスクのフィルタ</h5>
+        <div class="max"></div>
+        <button class="circle transparent" onclick="ui('#modal-filter-task')">
+            <i>close</i>
+        </button>
+    </nav>
 
-    <article class="large-width medium-height scroll no-elevate small-padding">
-        <div class="grid small-padding tiny-space no-margin">
-            <!-- Title Filter -->
-            <div class="s12 m12 l12">
-                <span class="bold small-text">タスク名</span>
-                <div class="grid tiny-space">
-                    <div class="s8 field border small prefix">
-                        <i class="">search</i>
-                        <input type="text" id="filter-title-input" placeholder="キーワード">
-                    </div>
-                    <div class="s4 field border small">
-                        <select id="filter-title-match-select">
-                            <option value="contains">含む</option>
-                            <option value="not_contains">含まない</option>
-                            <option value="starts_with">前方一致</option>
-                            <option value="ends_with">後方一致</option>
-                        </select>
-                    </div>
+    <div class="grid large-width medium-height scroll padding tiny-space no-margin small-round background">
+        <!-- Title Filter -->
+        <div class="s12 m12 l12 extra-line">
+            <span class="bold small-text">タスク名</span>
+            <div class="grid tiny-space no-margin">
+                <div class="s8 field border small prefix">
+                    <i class="">search</i>
+                    <input type="text" id="filter-title-input" placeholder="キーワード">
                 </div>
-            </div>
-
-            <!-- Member Filters -->
-            <div class="s12 m12 l12">
-                <span class="bold small-text">担当者</span>
-                <!-- Created By -->
-                <div class="small-margin">
-                    <div class="row tiny-space">
-                        <span class="small">作成者</span>
-                        <button class="chip fill" onclick="App.modals.filterTask.selectMembers('created_by')">
-                            <i>person_edit</i>
-                            <span>選択</span>
-                        </button>
-                        <div id="filter-members-created-by" class="row wrap top-align">
-                            <!-- Chips will be rendered here -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Processed By -->
-                <div class="small-margin">
-                    <div class="row tiny-space">
-                        <span class="small">進行者</span>
-                        <button class="chip fill" onclick="App.modals.filterTask.selectMembers('processed_by')">
-                            <i>person_edit</i>
-                            <span>選択</span>
-                        </button>
-                        <div id="filter-members-processed-by" class="row wrap top-align">
-                            <!-- Chips will be rendered here -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Reviewed By -->
-                <div class="small-margin">
-                    <div class="row tiny-space">
-                        <span class="small">確認者</span>
-                        <button class="chip fill" onclick="App.modals.filterTask.selectMembers('reviewed_by')">
-                            <i>person_edit</i>
-                            <span>選択</span>
-                        </button>
-                        <div id="filter-members-reviewed-by" class="row wrap top-align">
-                            <!-- Chips will be rendered here -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Received By -->
-                <div class="small-margin">
-                    <div class="row tiny-space">
-                        <span class="small">受領者</span>
-                        <button class="chip fill" onclick="App.modals.filterTask.selectMembers('received_by')">
-                            <i>person_edit</i>
-                            <span>選択</span>
-                        </button>
-                        <div id="filter-members-received-by" class="row wrap top-align">
-                            <!-- Chips will be rendered here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Date Filters -->
-            <div class="s12 m12 l12">
-                <span class="bold small-text">開始日時の範囲</span>
-
-                <!-- Start Date Range -->
-                <div class="grid no-space small-margin">
-                    <div class="s5 field border small">
-                        <input type="datetime-local" id="filter-starts-at-from">
-                    </div>
-                    <div class="s2 middle-align center-align">
-                        <span>〜</span>
-                    </div>
-                    <div class="s5 field border small">
-                        <input type="datetime-local" id="filter-starts-at-to">
-                    </div>
-                </div>
-                <span class="bold small-text">終了日時の範囲</span>
-
-                <!-- End Date Range -->
-                <div class="grid no-space small-margin">
-                    <div class="s5 field border small">
-                        <input type="datetime-local" id="filter-ends-at-from">
-                    </div>
-                    <div class="s2">
-                        <span>〜</span>
-                    </div>
-                    <div class="s5 field border small">
-                        <input type="datetime-local" id="filter-ends-at-to">
-                    </div>
-                </div>
-
-                <div class="small-margin">
-                    <label class="radio">
-                        <input type="radio" id="filter-is-overdue">
-                        <span>締切超過のみ表示</span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Board Filter -->
-            <div class="s12 m12 l12 top-margin">
-                <span class="bold small-text">ボード</span>
-                <div class="row tiny-space">
-                    <button class="small-round border small" onclick="App.modals.filterTask.selectBoards()">
-                        <i>edit</i>
-                        <span>選択</span>
-                    </button>
-                    <div id="filter-boards" class="row wrap top-align">
-                        <!-- Board chips will be rendered here -->
-                    </div>
+                <div class="s4 field border small">
+                    <select id="filter-title-match-select">
+                        <option value="contains">含む</option>
+                        <option value="not_contains">含まない</option>
+                        <option value="starts_with">前方一致</option>
+                        <option value="ends_with">後方一致</option>
+                    </select>
                 </div>
             </div>
         </div>
-    </article>
 
-    <footer class="fixed small-padding">
-        <nav class="right-align">
-            <button class="border round text-primary" onclick="App.modals.filterTask.resetDefaults()">デフォルトに戻す</button>
-            <button class="primary round" onclick="App.modals.filterTask.apply()">適用</button>
-        </nav>
-    </footer>
+        <hr class="max">
+
+        <!-- Member Filters -->
+        <div class="s12 m12 l12 extra-line">
+            <span class="bold small-text">担当者</span>
+            <!-- Created By -->
+            <div class="row tiny-space no-margin">
+                <span class="small">作成者</span>
+                <button class="chip fill" onclick="App.modals.filterTask.selectMembers('created_by')">
+                    <i>person_edit</i>
+                    <span>選択</span>
+                </button>
+                <div id="filter-members-created-by" class="row wrap top-align">
+                    <!-- Chips will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Processed By -->
+            <div class="row tiny-space no-margin">
+                <span class="small">進行者</span>
+                <button class="chip fill" onclick="App.modals.filterTask.selectMembers('processed_by')">
+                    <i>person_edit</i>
+                    <span>選択</span>
+                </button>
+                <div id="filter-members-processed-by" class="row wrap top-align">
+                    <!-- Chips will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Reviewed By -->
+            <div class="row tiny-space no-margin">
+                <span class="small">確認者</span>
+                <button class="chip fill" onclick="App.modals.filterTask.selectMembers('reviewed_by')">
+                    <i>person_edit</i>
+                    <span>選択</span>
+                </button>
+                <div id="filter-members-reviewed-by" class="row wrap top-align">
+                    <!-- Chips will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Received By -->
+            <div class="row tiny-space no-margin">
+                <span class="small">受領者</span>
+                <button class="chip fill" onclick="App.modals.filterTask.selectMembers('received_by')">
+                    <i>person_edit</i>
+                    <span>選択</span>
+                </button>
+                <div id="filter-members-received-by" class="row wrap top-align">
+                    <!-- Chips will be rendered here -->
+                </div>
+            </div>
+        </div>
+
+        <hr class="max">
+
+        <!-- Date Filters -->
+        <div class="s12 m12 l12 extra-line">
+            <span class="bold small-text">期間</span>
+            <div class="grid no-margin no-space">
+                <div class="s5 field border small">
+                    <input type="datetime-local" id="filter-starts-at-from">
+                </div>
+                <div class="s2 middle-align center-align">
+                    <span>〜</span>
+                </div>
+                <div class="s5 field border small">
+                    <input type="datetime-local" id="filter-ends-at-to">
+                </div>
+            </div>
+            <div class="row">
+                <label class="checkbox">
+                    <input type="checkbox" id="filter-is-overdue">
+                    <span>終了日時が現在を超過しているもののみ表示</span>
+                </label>
+            </div>
+        </div>
+
+        <hr class="max">
+
+        <!-- Board Filter -->
+        <div class="s12 m12 l12 extra-line">
+            <span class="bold small-text">ボード</span>
+            <div class="row tiny-space no-margin">
+                <button class="chip fill" onclick="App.modals.filterTask.selectBoards()">
+                    <i>edit</i>
+                    <span>選択</span>
+                </button>
+                <div id="filter-boards" class="row wrap">
+                    <!-- Board chips will be rendered here -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <nav class="right-align small-padding">
+        <button class="border round text-primary" onclick="App.modals.filterTask.resetDefaults()">デフォルトに戻す</button>
+        <button class="primary round" onclick="App.modals.filterTask.apply()">適用</button>
+    </nav>
 </dialog>
 
 <script>
@@ -268,7 +244,7 @@
                 const allMembers = App.state.data.members || [];
 
                 if (memberIds.length === 0) {
-                    container.innerHTML = '<span class="small-text" style="opacity: 0.6;">未選択</span>';
+                    container.innerHTML = '<span class="small-text secondary-text"">未選択（全てのメンバー）</span>';
                     return;
                 }
 
@@ -276,9 +252,9 @@
                     const member = allMembers.find(m => m.id === id);
                     const name = member ? member.display_name : '不明';
                     return `
-                        <div class="chip small">
+                        <div class="chip small filter-chip-remove" onclick="App.modals.filterTask.removeMember('${role}', '${id}')">
                             <span>${escapeHtml(name)}</span>
-                            <i data-role="${role}" data-member-id="${id}" class="filter-chip-remove">close</i>
+                            <i>close</i>
                         </div>
                     `;
                 }).join('');

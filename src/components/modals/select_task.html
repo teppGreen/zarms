@@ -12,8 +12,8 @@
         <!-- 検索バー -->
         <div class="field round border prefix">
             <i>search</i>
-            <input type="text" id="task-search-input" placeholder="タスク名で検索..."
-                oninput="App.modals.selectTasks.filterResults()">
+            <input type="text" id="task-search-input" placeholder="タスク名で検索してEnterキーを押してください..."
+                onkeydown="if(event.key === 'Enter') { event.preventDefault(); App.modals.selectTasks.searchTasks(); }">
         </div>
     </header>
 
@@ -35,17 +35,18 @@
         App.modals.selectTasks = {
             callback: null,
             selectedIds: [],
-            allTasks: [],
+            searchResults: [],
             multiSelect: false,
+            isLoading: false,
 
             open: async function (options = {}) {
                 this.callback = options.callback || null;
                 this.multiSelect = options.multiSelect || false;
                 this.selectedIds = options.preSelected || [];
+                this.searchResults = [];
 
-                // App.state.data.tasks から直接ロード
-                this.allTasks = App.state.data.tasks || [];
-                this.render();
+                // 初期表示（検索前のメッセージ）
+                this.renderInitialState();
                 await ui('#modal-select-tasks');
 
                 // フォーカスを確実に行うための再試行ロジック
@@ -65,34 +66,77 @@
                 tryFocus();
             },
 
-            render: function () {
-                this.filterResults();
+            renderInitialState: function () {
+                const container = document.getElementById('task-results-container');
+                if (!container) return;
+                container.innerHTML = '<p class="padding">タスク名を入力してEnterキーを押してください</p>';
             },
 
-            filterResults: function () {
+            searchTasks: async function () {
                 const searchInput = document.getElementById('task-search-input');
-                const container = document.getElementById('task-results-container');
+                const searchTerm = searchInput ? searchInput.value.trim() : '';
 
+                if (!searchTerm) {
+                    this.renderInitialState();
+                    return;
+                }
+
+                // ローディング表示
+                this.isLoading = true;
+                this.renderLoading();
+
+                try {
+                    // データベース検索を実行
+                    const results = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
+                        where: {
+                            name: ["=", searchTerm]
+                        },
+                        orderBy: { 
+                            ['display_id']: 'desc' 
+                        }
+                    });
+
+                    this.searchResults = results || [];
+                    this.renderResults();
+                } catch (error) {
+                    console.error('タスク検索エラー:', error);
+                    this.renderError();
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            renderLoading: function () {
+                const container = document.getElementById('task-results-container');
                 if (!container) return;
 
-                const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+                container.innerHTML = `
+                    <div class="padding center-align">
+                        <progress class="circle"></progress>
+                        <p class="small-margin">検索中...</p>
+                    </div>
+                `;
+            },
 
-                // フィルタリング
-                let filtered = this.allTasks.filter(task => {
-                    const matchesSearch = !searchTerm ||
-                        (task.name && task.name.toLowerCase().includes(searchTerm)) ||
-                        (task.display_id && task.display_id.toString().toLowerCase().includes(searchTerm));
+            renderError: function () {
+                const container = document.getElementById('task-results-container');
+                if (!container) return;
 
-                    return matchesSearch;
-                });
+                container.innerHTML = '<p class="padding">検索中にエラーが発生しました</p>';
+            },
 
-                // 表示
-                if (filtered.length === 0) {
+            renderResults: function () {
+                const container = document.getElementById('task-results-container');
+                if (!container) return;
+
+                // 検索結果が0件の場合
+                if (this.searchResults.length === 0) {
                     container.innerHTML = '<p class="padding">該当するタスクが見つかりません</p>';
                     return;
                 }
 
-                container.innerHTML = filtered.map(task => {
+                // 検索結果を表示
+                container.innerHTML = this.searchResults.map(task => {
                     const isSelected = this.selectedIds.includes(task.id);
                     const displayName = task.name || '無題のタスク';
                     const displayId = task.display_id ? `#${task.display_id}` : '';
