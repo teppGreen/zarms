@@ -37,8 +37,8 @@
             <div class="row tiny-space no-margin">
                 <span class="small">作成者</span>
                 <button class="chip fill" onclick="App.modals.filterTask.selectMembers('created_by')">
-                    <i>person_edit</i>
-                    <span>選択</span>
+                    <i>person_add</i>
+                    <span>追加</span>
                 </button>
                 <div id="filter-members-created-by" class="row wrap top-align">
                     <!-- Chips will be rendered here -->
@@ -49,8 +49,8 @@
             <div class="row tiny-space no-margin">
                 <span class="small">進行者</span>
                 <button class="chip fill" onclick="App.modals.filterTask.selectMembers('processed_by')">
-                    <i>person_edit</i>
-                    <span>選択</span>
+                    <i>person_add</i>
+                    <span>追加</span>
                 </button>
                 <div id="filter-members-processed-by" class="row wrap top-align">
                     <!-- Chips will be rendered here -->
@@ -61,8 +61,8 @@
             <div class="row tiny-space no-margin">
                 <span class="small">確認者</span>
                 <button class="chip fill" onclick="App.modals.filterTask.selectMembers('reviewed_by')">
-                    <i>person_edit</i>
-                    <span>選択</span>
+                    <i>person_add</i>
+                    <span>追加</span>
                 </button>
                 <div id="filter-members-reviewed-by" class="row wrap top-align">
                     <!-- Chips will be rendered here -->
@@ -73,8 +73,8 @@
             <div class="row tiny-space no-margin">
                 <span class="small">受領者</span>
                 <button class="chip fill" onclick="App.modals.filterTask.selectMembers('received_by')">
-                    <i>person_edit</i>
-                    <span>選択</span>
+                    <i>person_add</i>
+                    <span>追加</span>
                 </button>
                 <div id="filter-members-received-by" class="row wrap top-align">
                     <!-- Chips will be rendered here -->
@@ -198,7 +198,7 @@
                     const board = allBoards.find(b => b.id === id);
                     const name = board ? board.name : '不明';
                     return `
-                        <div class="chip small">
+                        <div class="chip small" onclick="App.modals.filterTask.removeBoard('${id}')">
                             <span>${escapeHtml(name)}</span>
                             <i data-board-id="${id}" class="filter-board-chip-remove">close</i>
                         </div>
@@ -405,36 +405,36 @@
             /**
              * イベント委譲でチップ削除を処理（初期化時に1回だけ呼ぶ）
              */
-            setupChipEventDelegation: function () {
-                // メンバーチップの削除イベント
-                ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
-                    const container = document.getElementById(`filter-members-${role.replace('_', '-')}`);
-                    if (container) {
-                        container.parentNode.addEventListener('click', (e) => {
-                            if (e.target.classList.contains('filter-chip-remove')) {
-                                const role = e.target.dataset.role;
-                                const memberId = e.target.dataset.memberId;
+            // setupChipEventDelegation: function () {
+            //     // メンバーチップの削除イベント
+            //     ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
+            //         const container = document.getElementById(`filter-members-${role.replace('_', '-')}`);
+            //         if (container) {
+            //             container.parentNode.addEventListener('click', (e) => {
+            //                 if (e.target.classList.contains('filter-chip-remove')) {
+            //                     const role = e.target.dataset.role;
+            //                     const memberId = e.target.dataset.memberId;
 
-                                // フィルタデータから削除（再描画も行われる）
-                                this.removeMember(role, memberId);
-                            }
-                        });
-                    }
-                });
+            //                     // フィルタデータから削除（再描画も行われる）
+            //                     this.removeMember(role, memberId);
+            //                 }
+            //             });
+            //         }
+            //     });
 
-                // ボードチップの削除イベント
-                const boardContainer = document.getElementById('filter-boards');
-                if (boardContainer) {
-                    boardContainer.parentNode.addEventListener('click', (e) => {
-                        if (e.target.classList.contains('filter-board-chip-remove')) {
-                            const boardId = e.target.dataset.boardId;
+            //     // ボードチップの削除イベント
+            //     const boardContainer = document.getElementById('filter-boards');
+            //     if (boardContainer) {
+            //         boardContainer.parentNode.addEventListener('click', (e) => {
+            //             if (e.target.classList.contains('filter-board-chip-remove')) {
+            //                 const boardId = e.target.dataset.boardId;
 
-                            // フィルタデータから削除（再描画も行われる）
-                            this.removeBoard(boardId);
-                        }
-                    });
-                }
-            }
+            //                 // フィルタデータから削除（再描画も行われる）
+            //                 this.removeBoard(boardId);
+            //             }
+            //         });
+            //     }
+            // }
         };
 
         // モーダルが読み込まれたらイベント委譲を設定
