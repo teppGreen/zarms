@@ -15,6 +15,7 @@
       userId: null, // 現在のユーザーのID（uuid）
       userProperties: templateVariables.userProperties || {}, // ユーザープロパティ
       previousTab: null,
+      isDevelopment: templateVariables.isDevelopment,
 
       get: function (tableName) {
         return this.data[tableName];
@@ -86,6 +87,8 @@
 
     // 全データを読み込み
     await loadAllData();
+
+    App.utils.navigation.changeH1();
 
     // URLパラメータを取得
     const urlParams = templateVariables.urlParams || {};
@@ -347,7 +350,7 @@
     }
   }
 
-  // 自動データ更新（1分ごと）
+  // 自動データ更新
   let autoRefreshInterval = null;
   let refreshDataAbortController = null;
 

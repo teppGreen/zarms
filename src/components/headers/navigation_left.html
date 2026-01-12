@@ -343,10 +343,20 @@
                     if (i === 2 || i === 5) html += `<hr class="small-margin">`;
                 }
                 nav.innerHTML = html;
+            },
+
+            // 開発モードの時にh1を変更
+            changeH1: function () {
+                if (!App.state.isDevelopment) return;
+                
+                const h1 = document.querySelector('#left-nav header h1');
+                if (h1) {
+                    console.log('[changeH1] h1 found:', h1);
+                    h1.textContent = 'DEV-MODE';
+                    h1.classList.add('error');
+                }
             }
         };
-
-        // 初期表示時にプレースホルダーを描画
         App.utils.navigation.renderLoadingPlaceholders();
     })();
 </script>

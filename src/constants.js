@@ -4,13 +4,11 @@
 
 const scriptProperties = PropertiesService.getScriptProperties();
 const FAVICON_FILE_ID = scriptProperties.getProperty('FAVICON_FILE_ID');
-let SPREADSHEET_ID = scriptProperties.getProperty('SPREADSHEET_ID');
-if (!SPREADSHEET_ID) {
-  try {
-    SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
-  } catch (e) {
-    console.warn('Failed to get active spreadsheet ID. Please set SPREADSHEET_ID in Script Properties.', e);
-  }
+let SPREADSHEET_ID;
+if (isDevelopment()) {
+  SPREADSHEET_ID = scriptProperties.getProperty('DEV_SPREADSHEET_ID');
+} else {
+  SPREADSHEET_ID = scriptProperties.getProperty('SPREADSHEET_ID');
 }
 
 const TABLE_NAMES = {

@@ -16,6 +16,14 @@
         <i>share</i>
         <div class="tooltip bottom">共有</div>
       </button>
+      <button class="circle transparent" id="task-duplicate-btn">
+        <i>content_copy</i>
+        <div class="tooltip bottom">複製</div>
+      </button>
+      <button class="circle transparent" id="task-delete-btn" onclick="App.modals.taskDetail.deleteTask()">
+        <i>delete</i>
+        <div class="tooltip bottom">削除</div>
+      </button>
     </nav>
 
     <div class="grid small-padding tiny-space no-margin">
@@ -188,8 +196,8 @@
        * @param {string} taskId - タスクID
        * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
        */
-      create: async function () {
-        const promptValue = prompt('新しいタスクの名前', '');
+      create: async function (promptTempValue = '') {
+        const promptValue = prompt('新しいタスクの名前', promptTempValue);
 
         if (!promptValue) {
           return;
@@ -301,6 +309,11 @@
         const currentBoardId = App.pages.boards?.currentBoardId;
         const boardTasks = (currentBoardId && App.pages.boards?.cachedBoardTasks?.[currentBoardId]) || [];
         let task = boardTasks.find(t => t.id === taskId);
+
+        // キャッシュに見つからない場合、グローバルデータから検索（My Boardなどでキャッシュに含まれていない場合への対策）
+        if (!task && App.state.data.tasks) {
+          task = App.state.data.tasks.find(t => t.id === taskId);
+        }
 
         if (!task) {
           console.error('[TaskDetail] Task not found:', taskId);
@@ -472,6 +485,61 @@
 
           App.utils.url.updateParams(newParams, false);
         }
+      },
+
+      /**
+       * タスクを削除
+       */
+      deleteTask: function () {
+        if (!confirm('このタスクを削除しますか？')) {
+          return;
+        }
+
+        const id = this.currentId;
+        const currentItem = this.currentItem;
+
+        // 変更フラグをクリア
+        this.isDirty = false;
+
+        // モーダルを閉じる
+        this.close();
+
+        showSnackbar('タスクを削除しました', 'success');
+
+        // Optimistic UI Update: ローカルデータから削除
+        if (App.state.data.tasks) {
+          const index = App.state.data.tasks.findIndex(t => t.id === id);
+          if (index > -1) {
+            App.state.data.tasks.splice(index, 1);
+          }
+        }
+
+        // ボードキャッシュからも削除
+        if (currentItem && currentItem.board_id && App.pages.boards && App.pages.boards.cachedBoardTasks) {
+          const cache = App.pages.boards.cachedBoardTasks[currentItem.board_id];
+          if (cache) {
+            const cacheIndex = cache.findIndex(t => t.id === id);
+            if (cacheIndex > -1) {
+              cache.splice(cacheIndex, 1);
+            }
+            // カンバン再描画
+            if (App.pages.boards.renderKanban) {
+              App.pages.boards.renderKanban(currentItem.board_id);
+            }
+          }
+        }
+
+        // DB削除
+        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'remove', {
+          where: { id: ["=", id] }
+        })
+          .then(() => {
+            console.log('Task deleted from server');
+          })
+          .catch(err => {
+            console.error('Failed to delete task:', err);
+            showSnackbar('タスクの削除に失敗しました', 'error');
+          });
       },
 
       /**
@@ -744,6 +812,8 @@
 
         // Link Copy Button
         this.setupLinkCopyButton(task);
+        // Duplicate Button
+        this.setupDuplicateButton(task);
 
         // Name
         const nameInput = document.getElementById('task-name-input');
@@ -838,6 +908,92 @@
               showSnackbar('リンクのコピーに失敗しました', 'error');
             });
           });
+        });
+      },
+
+      /**
+       * 複製ボタンをセットアップ
+       * @param {Object} task - タスクオブジェクト
+       */
+      setupDuplicateButton: function (task) {
+        const btnDuplicate = document.getElementById('task-duplicate-btn');
+        if (!btnDuplicate) return;
+
+        // 既存のイベントリスナーを削除（重複防止）
+        const newBtn = btnDuplicate.cloneNode(true);
+        btnDuplicate.parentNode.replaceChild(newBtn, btnDuplicate);
+
+        newBtn.addEventListener('click', async () => {
+          const promptValue = prompt('新しいタスク名', task.name + ' のコピー');
+
+          // キャンセル(null)または空文字の場合は中断
+          if (promptValue === null) {
+            return;
+          } else if (promptValue === '') {
+            alert('タスク名を入力してください');
+            return;
+          }
+
+          // 現在のタスクデータをコピー
+          const newTask = { ...task };
+
+          // 新しい値を設定
+          newTask.name = promptValue;
+          newTask.id = crypto.randomUUID();
+          newTask.display_id = '#';
+          newTask.created_at = new Date().toISOString();
+          newTask.updated_at = new Date().toISOString();
+          newTask.updated_by = App.state.userId;
+          newTask.created_by = App.state.userId;
+          newTask.created_by_display_name = activeUser.display_name;
+          newTask.created_by_profile_photo_url = activeUser.profile_photo_url;
+
+          // ローカルデータに追加
+          if (!App.state.data.tasks) {
+            App.state.data.tasks = [];
+          }
+          App.state.data.tasks.push(newTask);
+
+          // ボードキャッシュにも追加 (表示中のボードと同じであれば、またはMy Board表示中であれば)
+          const currentBoardId = App.pages.boards && App.pages.boards.currentBoardId;
+          if (currentBoardId && (newTask.board_id === currentBoardId || currentBoardId === 'my-board')) {
+            const cache = App.pages.boards.cachedBoardTasks[currentBoardId];
+            if (Array.isArray(cache)) {
+              cache.push(newTask);
+              console.log('newTask is added to cachedBoardTasks', currentBoardId, newTask.id);
+            }
+          }
+
+          // モーダルを閉じる
+          this.close();
+
+          await new Promise(resolve => setTimeout(resolve, 300));
+          this.open(newTask.id, false, true);
+
+          // サーバーに保存
+          callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'insert', newTask)
+            .then(result => {
+              if (result && result.data && result.data.display_id) {
+                // サーバー生成のdisplay_idで更新
+                newTask.display_id = result.data.display_id;
+
+                // モーダルが開いていればUI更新
+                if (this.currentId === newTask.id) {
+                  const displayIdEl = document.getElementById('task-display-id');
+                  if (displayIdEl) displayIdEl.textContent = `#${newTask.display_id}`;
+
+                  this.setupLinkCopyButton(newTask);
+
+                  if (this.originalData) {
+                    this.originalData.display_id = result.data.display_id;
+                  }
+                }
+              }
+            })
+            .catch(err => {
+              console.error('Failed to duplicate task:', err);
+              showSnackbar('タスクの複製に失敗しました', 'error');
+            });
         });
       },
 
