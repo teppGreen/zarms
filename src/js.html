@@ -108,6 +108,7 @@
       }
     }
 
+    App.pages.home.loadData();
     await App.utils.navigation.switchTab(initialTab, true); // trueでURL更新をスキップ
 
     // モーダルパラメータがある場合は該当のモーダルを開く
@@ -445,7 +446,7 @@
   // グローバルショートカットキーの設定
   function setupGlobalShortcuts() {
     document.addEventListener('keydown', (e) => {
-      
+
       // 検索
       if (!e.isComposing && e.altKey && e.code === 'KeyF') {
         e.preventDefault();
@@ -906,5 +907,17 @@
 
   async function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function calculateDaysUntil(to) {
+    const eventDate = new Date(to);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    eventDate.setHours(0, 0, 0, 0);
+
+    const diffTime = eventDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    return diffDays;
   }
 </script>

@@ -329,6 +329,28 @@
                             ).join('');
                         } else {
                             const columnTasks = boardTasks.filter(column.filter);
+                            // starts_at、ends_atの順にソート
+                            columnTasks.sort((a, b) => {
+                                // starts_atで比較（nullは最後）
+                                if (!a.starts_at && !b.starts_at) {
+                                    // 両方nullの場合、ends_atで比較
+                                    if (!a.ends_at && !b.ends_at) return 0;
+                                    if (!a.ends_at) return 1;
+                                    if (!b.ends_at) return -1;
+                                    return new Date(a.ends_at) - new Date(b.ends_at);
+                                }
+                                if (!a.starts_at) return 1;
+                                if (!b.starts_at) return -1;
+
+                                const startsDiff = new Date(a.starts_at) - new Date(b.starts_at);
+                                if (startsDiff !== 0) return startsDiff;
+
+                                // starts_atが同じ場合、ends_atで比較（nullは最後）
+                                if (!a.ends_at && !b.ends_at) return 0;
+                                if (!a.ends_at) return 1;
+                                if (!b.ends_at) return -1;
+                                return new Date(a.ends_at) - new Date(b.ends_at);
+                            });
                             itemsHtml = columnTasks.map(task => this.createTaskCard(task)).join('');
                             countText = columnTasks.length;
                         }
@@ -503,7 +525,7 @@
 
                 if (!promptValue) {
                     return;
-                } else if(promptValue === '') {
+                } else if (promptValue === '') {
                     alert('ボード名を入力してください');
                     return;
                 }
@@ -830,9 +852,8 @@
                     // Overdue Filter
                     if (filters.isOverdue) {
                         if (t.task_status_key === 'DONE') return false;
-                        if (!t.ends_at && !t.starts_at) return false;
+                        if (!t.ends_at) return false;
                         if (new Date(t.ends_at) > new Date()) return false;
-                        if (new Date(t.starts_at) > new Date()) return false;
                     }
 
                     return true;

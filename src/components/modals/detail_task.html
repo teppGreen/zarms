@@ -14,7 +14,7 @@
       </div>
       <button class="circle transparent" id="task-copy-link-btn">
         <i>share</i>
-        <div class="tooltip">共有</div>
+        <div class="tooltip bottom">共有</div>
       </button>
     </nav>
 
@@ -55,7 +55,7 @@
                 </button>
               </div>
               <p class="no-line">
-                <span class="small-text" title="このタスクを作成した人&#13;&#10;ステータスを「未着手」に変更する人">作成者<br></span>
+                <span class="small-text" title="このタスクを作成した人&#13;&#10;ステータスを「未着手」に変更する人" style="cursor: help;">作成者<br></span>
                 <span class="middle-align">
                   <span id="label-created-by"></span>
                   <!-- <a onclick="App.modals.taskDetail.selectMember('created_by')"><i class="tiny">edit</i></a> -->
@@ -72,7 +72,7 @@
                 </button>
               </div>
               <p class="no-line">
-                <span class="small-text" title="このタスクを進行する人&#13;&#10;ステータスを「進行中」「確認中」に変更する人">進行者<br></span>
+                <span class="small-text" title="このタスクを進行する人&#13;&#10;ステータスを「進行中」「確認中」に変更する人" style="cursor: help;">進行者<br></span>
                 <span class="middle-align">
                   <span id="label-processed-by"></span>
                   <a onclick="App.modals.taskDetail.selectMember('processed_by')"><i class="tiny">edit</i></a>
@@ -89,7 +89,7 @@
                 </button>
               </div>
               <p class="no-line">
-                <span class="small-text" title="このタスクが要件通り完了されたかを確認する人&#13;&#10;ステータスを「完了」に変更する人">確認者<br></span>
+                <span class="small-text" title="このタスクが要件通り完了されたかを確認する人&#13;&#10;ステータスを「完了」に変更する人" style="cursor: help;">確認者<br></span>
                 <span class="middle-align">
                   <span id="label-reviewed-by"></span>
                   <a onclick="App.modals.taskDetail.selectMember('reviewed_by')"><i class="tiny">edit</i></a>
@@ -106,7 +106,7 @@
                 </button>
               </div>
               <p class="no-line">
-                <span class="small-text" title="このタスクに関連して成果物などが発生した際に、&#13;&#10;その成果物を受け取る人">受領者<br></span>
+                <span class="small-text" title="このタスクに関連して成果物などが発生した際に、&#13;&#10;その成果物を受け取る人" style="cursor: help;">受領者<br></span>
                 <span class="middle-align">
                   <span id="label-received-by"></span>
                   <a onclick="App.modals.taskDetail.selectMember('received_by')"><i class="tiny">edit</i></a>
@@ -150,15 +150,14 @@
       <!-- Right Column: Comments -->
       <div class="s12 m4 l4 surface-variant small-round padding">
         <div class="bottom-margin">
-          <button class="no-margin responsive primary round max"
+          <button disabled class="no-margin responsive primary round max"
             onclick="App.modals.taskDetail.openNewComment()">
             <i>add_comment</i>
             <span>新しいコメントを作成</span>
           </button>
         </div>
-        <div class="scroll medium-height" id="task-comments-list">
-          <!-- コメントが動的に生成される -->
-        </div>
+        <div class="scroll medium-height"><p>コメント機能は今後実装予定です</p></div>
+        <!-- <div class="scroll medium-height" id="task-comments-list"></div> -->
       </div>
     </div>
 
@@ -220,6 +219,8 @@
           task_status_key: 'TODO',
           priority_key: 'MEDIUM',
           board_id: boardId,
+          starts_at: formatDateTimeForInput(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 1, 10, 0)),
+          ends_at: formatDateTimeForInput(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 2, 18, 0)),
           created_by: activeUser.id,
           processed_by: activeUser.id, // 作成者がデフォルト
           reviewed_by: activeUser.id, // 作成者がデフォルト
