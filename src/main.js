@@ -26,7 +26,7 @@ function doGet(e) {
   };
 
   return template.evaluate()
-    .setTitle('ZEN Boards')
+    .setTitle('ZARMS')
     .setFaviconUrl('https://drive.google.com/uc?id=' + FAVICON_FILE_ID + '&.png')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);

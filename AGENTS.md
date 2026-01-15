@@ -1,10 +1,10 @@
-# **ZEN Boards \- AI Agent Instructions**
+# **ZARMS \- AI Agent Instructions**
 
-大学祭実行委員会のためのタスク管理ツール「ZEN Boards」の開発ガイドラインです。AIエージェントはこのファイルを読み込み、すべての指示を遵守してください。
+大学祭実行委員会のためのタスク管理ツール「ZARMS」の開発ガイドラインです。AIエージェントはこのファイルを読み込み、すべての指示を遵守してください。
 
 ## **1\. プロジェクト概要**
 
-* **名称**: ZEN Boards  
+* **名称**: ZARMS  
 * **用途**: 大学祭実行委員会内のタスク管理  
 * **プラットフォーム**: Google Apps Script (GAS) Web App
 
