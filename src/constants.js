@@ -16,6 +16,7 @@ const TABLE_NAMES = {
   BOARDS: 'boards',
   COMMENTS: 'comments',
   DIRECTORIES: 'directories',
+  APPS: 'apps',
   LINKS: 'links',
   MEMBERS: 'members',
   MEMBER_DIRECTORY_ASSIGNMENTS: 'member_directory_assignments',

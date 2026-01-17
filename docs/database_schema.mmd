@@ -54,10 +54,10 @@ erDiagram
         uuid updated_by "最終更新者"
         datetime updated_at "最終更新日時"
     }
-    links {
-        uuid id PK "リンクID"
-        varchar name "リンク名"
-        varchar url "リンクURL"
+    apps {
+        uuid id PK "アプリID"
+        varchar name "アプリ名"
+        varchar url "アプリURL"
         text remark "システム備考"
         uuid created_by "作成者"
         datetime created_at "作成日時"
@@ -93,6 +93,7 @@ erDiagram
     tasks {
         uuid id PK "タスクID"
         int display_id "タスクID(連番)"
+        uuid parent_task_id "親タスクID"
         uuid board_id "ボードID"
         varchar name "タスク名"
         text description "タスク説明"
@@ -110,6 +111,8 @@ erDiagram
         datetime updated_at "最終更新日時"
     }
     logs }|--|| members : "created_by"
+    apps }|--|| members : "created_by"
+    apps }|--|| members : "updated_by"
     boards }|--|| members : "created_by"
     boards }|--|| members : "updated_by"
     comments }|--|| boards : "mentioned_to"
@@ -125,6 +128,7 @@ erDiagram
     member_assignments }|--|| members : "member_id"
     member_assignments }|--|| members : "created_by"
     member_assignments }|--|| members : "updated_by"
+    tasks }|--|| tasks : "parent_task_id"
     tasks }|--|| members : "processed_by"
     tasks }|--|| members : "reviewed_by"
     tasks }|--|| members : "received_by"
