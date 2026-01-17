@@ -9,7 +9,7 @@
         directories: [],
         members: [],
         tasks: [],
-        links: []
+        apps: []
       },
 
       userId: null, // 現在のユーザーのID（uuid）
@@ -209,13 +209,13 @@
   // 初回ロード: 最小限のデータのみ取得
   async function loadAllData() {
     try {
-      // boards, links, members テーブルから並列でデータ取得
-      const [boardsResult, linksResult, membersResult, directoriesResult] = await Promise.all([
+      // boards, apps, members テーブルから並列でデータ取得
+      const [boardsResult, appsResult, membersResult, directoriesResult] = await Promise.all([
         callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {
           columns: ['id', 'display_id', 'name', 'description', 'is_active'],
           orderBy: { name: 'asc' }
         }),
-        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LINKS, 'select', {}),
+        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.APPS, 'select', {}),
         callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {
           // where: { is_active: ["=", true] } // 全部FALSEになっちゃう不具合　一旦コメントアウト
         }),
@@ -226,18 +226,18 @@
 
       // 結果からデータを取得（キャッシュ情報を含む可能性がある）
       let boards = boardsResult?.data || boardsResult || [];
-      let links = linksResult?.data || linksResult || [];
+      let apps = appsResult?.data || appsResult || [];
       let members = membersResult?.data || membersResult || [];
       let directories = directoriesResult?.data || directoriesResult || [];
 
       // App.stateに保存
       console.log('Boards fetched (minimal):', boards);
-      console.log('Links fetched:', links);
+      console.log('Apps fetched:', apps);
       console.log('Members fetched:', members);
       console.log('Directories fetched:', directories);
 
       App.state.data.boards = boards;
-      App.state.data.links = links;
+      App.state.data.apps = apps;
       App.state.data.members = members;
       App.state.data.directories = directories;
 
@@ -255,12 +255,12 @@
       App.pages.members.loadData(true);
 
       // アプリリンクを描画
-      App.utils.header.renderAppLinks();
+      App.utils.header.renderApps();
 
       hideLoading();
 
       // キャッシュからのデータだった場合、バックグラウンドで最新データを取得して再描画
-      if (boardsResult?.isCached === true || linksResult?.isCached === true || membersResult?.isCached === true || directoriesResult?.isCached === true) {
+      if (boardsResult?.isCached === true || appsResult?.isCached === true || membersResult?.isCached === true || directoriesResult?.isCached === true) {
         console.log('キャッシュデータを検出。バックグラウンドで最新データを取得中...');
         setTimeout(async () => {
           try {
@@ -277,12 +277,12 @@
               promises.push(Promise.resolve(boardsResult));
             }
 
-            if (linksResult?.isCached === true) {
+            if (appsResult?.isCached === true) {
               promises.push(
-                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LINKS, 'select', {}, null, true)
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.APPS, 'select', {}, null, true)
               );
             } else {
-              promises.push(Promise.resolve(linksResult));
+              promises.push(Promise.resolve(appsResult));
             }
 
             if (membersResult?.isCached === true) {
@@ -301,14 +301,14 @@
               promises.push(Promise.resolve(directoriesResult));
             }
 
-            const [freshBoardsResult, freshLinksResult, freshMembersResult, freshDirectoriesResult] = await Promise.all(promises);
+            const [freshBoardsResult, freshAppsResult, freshMembersResult, freshDirectoriesResult] = await Promise.all(promises);
             const freshBoards = freshBoardsResult?.data || freshBoardsResult || [];
-            const freshLinks = freshLinksResult?.data || freshLinksResult || [];
+            const freshApps = freshAppsResult?.data || freshAppsResult || [];
             const freshMembers = freshMembersResult?.data || freshMembersResult || [];
             const freshDirectories = freshDirectoriesResult?.data || freshDirectoriesResult || [];
 
             App.state.data.boards = freshBoards;
-            App.state.data.links = freshLinks;
+            App.state.data.apps = freshApps;
             App.state.data.members = freshMembers;
             App.state.data.directories = freshDirectories;
 
@@ -331,8 +331,8 @@
 
             App.pages.boards.initialize();
 
-            if (linksResult?.isCached === true) {
-              App.utils.header.renderAppLinks();
+            if (appsResult?.isCached === true) {
+              App.utils.header.renderApps();
             }
 
             console.log('バックグラウンド更新完了');

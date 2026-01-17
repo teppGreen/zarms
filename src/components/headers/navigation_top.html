@@ -65,7 +65,7 @@
                 <p>新しいコメントを作成します</p>
                 <span><i class="tiny no-padding no-margin">keyboard_option_key</i>C</span>
             </div>
-        </button> --> 
+        </button> -->
     </nav>
 
     <!-- 検索バー -->
@@ -108,38 +108,38 @@
     (function () {
         App.utils.header = {
             /**
-             * linksテーブルのデータからアプリリンクを動的に生成します
+             * appsテーブルのデータからアプリリンクを動的に生成します
              */
-            renderAppLinks: function () {
+            renderApps: function () {
                 const appsGrid = document.getElementById('apps-grid');
                 if (!appsGrid) {
                     console.warn('apps-grid element not found');
                     return;
                 }
 
-                // App.state.data.linksからデータを取得
-                const links = App.state.data.links || [];
+                // App.state.data.appsからデータを取得
+                const apps = App.state.data.apps || [];
 
-                if (links.length === 0) {
+                if (apps.length === 0) {
                     appsGrid.innerHTML = '<div class="s12 center-align"><p>リンクがありません</p></div>';
                     return;
                 }
 
                 // リンクボタンを生成
-                const linksHtml = links.map(link => {
+                const appsHtml = apps.map(app => {
 
                     return `
                         <div class="s4 center-align small-margin">
-                            <button class="transparent small-round vertical" onclick="window.open('${link.url}')">
-                                <img class="responsive" src="https:/\/t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${link.url}&size=128"
-                                    alt="${link.name}">
-                                <span>${link.name}</span>
+                            <button class="transparent small-round vertical" onclick="window.open('${app.url}')">
+                                <img class="responsive" src="https:/\/t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${app.url}&size=128"
+                                    alt="${app.name}">
+                                <span>${app.name}</span>
                             </button>
                         </div>
                     `;
                 }).join('');
 
-                appsGrid.innerHTML = linksHtml;
+                appsGrid.innerHTML = appsHtml;
             },
 
             /**
