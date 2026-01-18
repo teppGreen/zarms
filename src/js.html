@@ -529,7 +529,7 @@
           if (errorMsg.includes("Quota exceeded for quota metric 'Read requests'") &&
             errorMsg.includes("sheets.googleapis.com")) {
             console.warn(`[callGAS] Quota limit reached for ${functionName}. Retrying in 60 seconds...`);
-            showSnackbar(`アクセスが集中しているため、処理を完了できませんでした。\n自動的に再試行しますので、画面を閉じずにお待ちください。`, 'error', 'top', 60);
+            showSnackbar(`エラーが発生したため処理が完了しませんでした。\n再試行中のため、画面を閉じずにお待ちください。`, 'error', 'top', 0);
 
             // 60秒待機してから再試行
             setTimeout(() => {
@@ -537,6 +537,7 @@
               callGAS(functionName, ...args)
                 .then(resolve)
                 .catch(reject);
+              showSnackbar(`処理が完了しました。`, 'success', 'top', 5);
             }, 60000);
           } else {
             // その他のエラーは通常通りreject

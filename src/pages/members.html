@@ -52,9 +52,9 @@
 
                 // member_assignmentsデータを取得
                 try {
-                    const res = await callGAS('handleDatabaseProcess', App.state.userId, 'member_assignments', 'select', {
+                    const res = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBER_ASSIGNMENTS, 'select', {
                         where: {
-                            related_table: ["=", "directories"],
+                            related_table: ["=", TABLE_NAMES.DIRECTORIES],
                         }
                     },null,true);
                     this.memberAssignments = res.data || res || [];

@@ -1,38 +1,53 @@
 <!-- タスク詳細モーダル -->
 <dialog id="modal-detail-task" class="transparent bottom no-padding" style="position: absolute;">
-
-  <div class="bottom-margin" onclick="App.modals.taskDetail.close()" title="タスク詳細画面を閉じる">
+  <style>
+    .ql-tooltip {
+      z-index: 10005 !important;
+    }
+  </style>
+  <div class="bottom-margin" onclick="App.modals.taskDetail.close(false,false)" title="タスク詳細画面を閉じる">
     <i class="center extra center" title="タスク詳細画面を閉じる">keyboard_arrow_down</i>
   </div>
 
-  <div class="background padding">
+  <div class="surface-container padding">
     <!-- Header -->
-    <nav class="row align-center small-padding bottom-margin">
-      <h5 id="task-display-id" class="font-number bold no-margin"></h5>
-      <div class="field transparent max no-margin">
-        <input type="text" id="task-name-input" class="font-title bold" style="font-size: 1.5rem;" placeholder="タスク名">
+    <div class="grid small-padding bottom-margin">
+      <div class="s3">
+        <div class="field no-border max suffix no-wrap">
+          <select id="task-board-select">
+            <!-- 動的に生成 -->
+          </select>
+          <i>arrow_drop_down</i>
+        </div>
       </div>
-      <div class="medium"></div>
-      <button class="circle transparent" id="task-copy-link-btn">
-        <i>share</i>
-        <div class="tooltip bottom">共有</div>
-      </button>
-      <button class="circle transparent" id="task-duplicate-btn">
-        <i>content_copy</i>
-        <div class="tooltip bottom">複製</div>
-      </button>
-      <button class="circle transparent" id="task-delete-btn" onclick="App.modals.taskDetail.deleteTask()">
-        <i>delete</i>
-        <div class="tooltip bottom">削除</div>
-      </button>
-    </nav>
+      <div class="s6 field max no-wrap">
+        <input type="text" id="task-name-input" style="font-size: 1.25rem; font-weight: 500;" placeholder="タスク名">
+      </div>
+
+      <div class="s3">
+        <nav class="row right-align">
+          <button class="circle transparent" id="task-copy-link-btn">
+            <i>share</i>
+            <div class="tooltip bottom">共有</div>
+          </button>
+          <button class="circle transparent" id="task-duplicate-btn">
+            <i>content_copy</i>
+            <div class="tooltip bottom">複製</div>
+          </button>
+          <button class="circle transparent" id="task-delete-btn" onclick="App.modals.taskDetail.deleteTask()">
+            <i>delete</i>
+            <div class="tooltip bottom">削除</div>
+          </button>
+        </nav>
+      </div>
+    </div>
 
     <div class="grid small-padding tiny-space no-margin">
       <!-- Left Column: Status & Avatars -->
-      <div class="s12 m4 l4">
+      <div class="s12 m3">
         <!-- Status -->
         <div class="grid">
-          <div class="s12 padding-small">
+          <div class="s6">
             <div class="field label border small">
               <select id="task-status-select" class="transparent">
                 <option value="TODO">未着手</option>
@@ -43,7 +58,7 @@
               <label>ステータス</label>
             </div>
           </div>
-          <div class="s12 padding-small">
+          <div class="s6">
             <div class="field label border small">
               <select id="task-priority-select">
                 <option value="LOW">低</option>
@@ -53,117 +68,148 @@
               <label>優先度</label>
             </div>
           </div>
+          <div class="s12" title="ステータスを「進行中」に変更する期限">
+            <div class="field label border small">
+              <input type="datetime-local" id="task-starts-at-input" placeholder=" ">
+              <label>開始日時<i class="tiny">info</i></label>
+            </div>
+          </div>
+          <div class="s12" title="ステータスを「完了」に変更する期限">
+            <div class="field label border small">
+              <input type="datetime-local" id="task-ends-at-input" placeholder=" ">
+              <label>終了日時<i class="tiny">info</i></label>
+            </div>
+          </div>
 
           <!-- Avatars Flow -->
           <div class="s12">
-            <!-- Created By -->
-            <div class="row small-margin">
-              <div class="" onclick="App.modals.taskDetail.selectMember('created_by')">
-                <button id="avatar-created-by" class="no-margin circle transparent large">
-                  <!-- ボタンのクラスとコンテンツ（画像またはアイコン）はrenderMemberAvatarで設定される -->
-                </button>
+            <fieldset>
+              <legend class="small-text">担当者</legend>
+              <!-- Created By -->
+              <div class="row">
+                <div class="" onclick="App.modals.taskDetail.selectMember('created_by')">
+                  <button id="avatar-created-by" class="no-margin circle transparent">
+                    <!-- ボタンのクラスとコンテンツ（画像またはアイコン）はrenderMemberAvatarで設定される -->
+                  </button>
+                </div>
+                <p class="no-line">
+                  <span class="small-text" title="このタスクを作成した人&#13;&#10;ステータスを「未着手」に変更する人"
+                    style="cursor: help;">作成者<br></span>
+                  <span class="middle-align">
+                    <span id="label-created-by"></span>
+                    <!-- <a onclick="App.modals.taskDetail.selectMember('created_by')"><i class="tiny">edit</i></a> -->
+                  </span>
+                </p>
               </div>
-              <p class="no-line">
-                <span class="small-text" title="このタスクを作成した人&#13;&#10;ステータスを「未着手」に変更する人"
-                  style="cursor: help;">作成者<br></span>
-                <span class="middle-align">
-                  <span id="label-created-by"></span>
-                  <!-- <a onclick="App.modals.taskDetail.selectMember('created_by')"><i class="tiny">edit</i></a> -->
-                </span>
-              </p>
-            </div>
 
-            <i class="extra secondary-text left-margin right-margin">arrow_downward</i>
-
-            <!-- Processed By -->
-            <div class="row small-margin">
-              <div class="" onclick="App.modals.taskDetail.selectMember('processed_by')">
-                <button id="avatar-processed-by" class="no-margin circle transparent large">
-                </button>
+              <!-- Processed By -->
+              <div class="row">
+                <div class="" onclick="App.modals.taskDetail.selectMember('processed_by')">
+                  <button id="avatar-processed-by" class="no-margin circle transparent">
+                  </button>
+                </div>
+                <p class="no-line">
+                  <span class="small-text" title="このタスクを進行する人&#13;&#10;ステータスを「進行中」「確認中」に変更する人"
+                    style="cursor: help;">進行者<br></span>
+                  <span class="middle-align">
+                    <span id="label-processed-by"></span>
+                    <a onclick="App.modals.taskDetail.selectMember('processed_by')"><i class="tiny">edit</i></a>
+                  </span>
+                </p>
               </div>
-              <p class="no-line">
-                <span class="small-text" title="このタスクを進行する人&#13;&#10;ステータスを「進行中」「確認中」に変更する人"
-                  style="cursor: help;">進行者<br></span>
-                <span class="middle-align">
-                  <span id="label-processed-by"></span>
-                  <a onclick="App.modals.taskDetail.selectMember('processed_by')"><i class="tiny">edit</i></a>
-                </span>
-              </p>
-            </div>
 
-            <i class="extra secondary-text left-margin right-margin">arrow_downward</i>
-
-            <!-- Reviewed By -->
-            <div class="row small-margin">
-              <div class="" onclick="App.modals.taskDetail.selectMember('reviewed_by')">
-                <button id="avatar-reviewed-by" class="no-margin circle transparent large">
-                </button>
+              <!-- Reviewed By -->
+              <div class="row">
+                <div class="" onclick="App.modals.taskDetail.selectMember('reviewed_by')">
+                  <button id="avatar-reviewed-by" class="no-margin circle transparent">
+                  </button>
+                </div>
+                <p class="no-line">
+                  <span class="small-text" title="このタスクが要件通り完了されたかを確認する人&#13;&#10;ステータスを「完了」に変更する人"
+                    style="cursor: help;">確認者<br></span>
+                  <span class="middle-align">
+                    <span id="label-reviewed-by"></span>
+                    <a onclick="App.modals.taskDetail.selectMember('reviewed_by')"><i class="tiny">edit</i></a>
+                  </span>
+                </p>
               </div>
-              <p class="no-line">
-                <span class="small-text" title="このタスクが要件通り完了されたかを確認する人&#13;&#10;ステータスを「完了」に変更する人"
-                  style="cursor: help;">確認者<br></span>
-                <span class="middle-align">
-                  <span id="label-reviewed-by"></span>
-                  <a onclick="App.modals.taskDetail.selectMember('reviewed_by')"><i class="tiny">edit</i></a>
-                </span>
-              </p>
-            </div>
 
-            <i class="extra secondary-text left-margin right-margin">arrow_downward</i>
-
-            <!-- Received By -->
-            <div class="row small-margin">
-              <div class="" onclick="App.modals.taskDetail.selectMember('received_by')">
-                <button id="avatar-received-by" class="no-margin circle transparent large">
-                </button>
+              <!-- Received By -->
+              <div class="row">
+                <div class="" onclick="App.modals.taskDetail.selectMember('received_by')">
+                  <button id="avatar-received-by" class="no-margin circle transparent">
+                  </button>
+                </div>
+                <p class="no-line">
+                  <span class="small-text" title="このタスクに関連して成果物などが発生した際に、&#13;&#10;その成果物を受け取る人"
+                    style="cursor: help;">受領者<br></span>
+                  <span class="middle-align">
+                    <span id="label-received-by"></span>
+                    <a onclick="App.modals.taskDetail.selectMember('received_by')"><i class="tiny">edit</i></a>
+                  </span>
+                </p>
               </div>
-              <p class="no-line">
-                <span class="small-text" title="このタスクに関連して成果物などが発生した際に、&#13;&#10;その成果物を受け取る人"
-                  style="cursor: help;">受領者<br></span>
-                <span class="middle-align">
-                  <span id="label-received-by"></span>
-                  <a onclick="App.modals.taskDetail.selectMember('received_by')"><i class="tiny">edit</i></a>
-                </span>
-              </p>
+            </fieldset>
+          </div>
+
+          <div class="s12">
+            <div class="center-align row tiny-space secondary-text" title="最終更新">
+              <i>update</i>
+              <span class="font-number" id="task-last-updated-datetime"></span>
+              <!-- <span class="" id="task-last-updated-by"></span> -->
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Middle Column: Details -->
-      <div class="s12 m4 l4">
-        <div class="grid tiny-space">
-          <div class="s12 padding-small">
-            <div class="field label border small">
-              <input type="datetime-local" id="task-starts-at-input" placeholder=" ">
-              <label>開始日時：「進行中」に変更する期限</label>
+      <!-- Middle Column -->
+      <div class="s12 m6 small-round background padding">
+        <nav class="center-align max tiny-space  bottom-margin">
+          <nav class="tabbed small max" id="task-detail-tabs">
+            <a class="active" onclick="App.modals.taskDetail.switchTaskDetailTab(this,'description')">
+              <span>説明</span>
+            </a>
+            <a class onclick="App.modals.taskDetail.switchTaskDetailTab(this,'list')">
+              <span>リスト</span>
+              <div class="badge l secondary font-number none" id="task-list-badge">0</div>
+            </a>
+            <a class onclick="App.modals.taskDetail.switchTaskDetailTab(this,'related')">
+              <span>関連</span>
+              <div class="badge l secondary font-number none" id="task-related-badge">0</div>
+            </a>
+            <a class onclick="App.modals.taskDetail.switchTaskDetailTab(this,'links')">
+              <span>リンク</span>
+              <div class="badge l secondary font-number none" id="task-links-badge">0</div>
+            </a>
+          </nav>
+          <button disabled class="large circle primary" id="task-detail-add-button">
+            <i>add</i>
+            <div class="tooltip left round left-padding right-padding">
+                <p>新しいボードを作成します</p>
             </div>
+          </button>
+        </nav>
+        <div class="page medium-height active" id="task-detail-description">
+          <div class="border" id="task-description-editor"></div>
+          <!-- ここにQuillエディタが表示される -->
+        </div>
+        <div class="page medium-height scroll" id="task-detail-list">
+          <div id="task-list-items">
+            <!-- リスト項目がここに動的に生成されます -->
           </div>
-          <div class="s12 padding-small">
-            <div class="field label border small">
-              <input type="datetime-local" id="task-ends-at-input" placeholder=" ">
-              <label>終了日時：「完了」に変更する期限</label>
-            </div>
-          </div>
-          <div class="s12 padding-small">
-            <div class="field label border small no-wrap">
-              <select id="task-board-select">
-                <!-- 動的に生成 -->
-              </select>
-              <label>ボード</label>
-            </div>
-          </div>
-          <div class="s12 field label border">
-            <textarea id="task-description-input" rows="12" placeholder=" "></textarea>
-            <label>説明</label>
-          </div>
+        </div>
+        <div class="page medium-height scroll" id="task-detail-related">
+          <p>関連タスクがここに表示されます</p>
+        </div>
+        <div class="page medium-height scroll" id="task-detail-links">
+          <p>リンクがここに表示されます</p>
         </div>
       </div>
 
       <!-- Right Column: Comments -->
-      <div class="s12 m4 l4 surface-variant small-round padding">
+      <div class="s12 m3 background small-round padding">
         <div class="bottom-margin">
-          <button class="no-margin responsive primary round max" onclick="App.modals.taskDetail.openNewComment()">
+          <button class="no-margin responsive large fill round max" onclick="App.modals.taskDetail.openNewComment()">
             <i>add_comment</i>
             <span>新しいコメントを作成</span>
           </button>
@@ -173,9 +219,11 @@
     </div>
 
     <!-- Footer -->
-    <nav class="right-align small-padding no-margin">
-      <button class="border round large text-primary" onclick="App.modals.taskDetail.discard()">変更を破棄</button>
-      <button class="primary round large" onclick="App.modals.taskDetail.save()">変更を保存</button>
+    <nav class="small-padding no-margin">
+      <h5 id="task-display-id" class="font-number"></h5>
+      <div class="max"></div>
+      <button class="border large round error-text" onclick="App.modals.taskDetail.discard()">変更を破棄</button>
+      <button class="primary large round" onclick="App.modals.taskDetail.save()">変更を保存</button>
     </nav>
   </div>
 </dialog>
@@ -186,7 +234,12 @@
       currentId: null,
       currentItem: null,
       originalData: null, // 元のデータを保持（変更検知用）
-      isDirty: false, // 変更フラグ
+      isDirty: true, // 変更フラグ
+      quill: null, // Quillエディタインスタンス
+      currentLists: [], // 現在のタスクに紐づくリストデータ
+      originalLists: [], // リストの元のデータ（変更検知用）
+      listSortable: null, // SortableJSインスタンス
+      deletedListIds: [], // 削除されたリストIDの配列
 
       /**
        * タスク詳細モーダルを開く
@@ -327,10 +380,100 @@
         if (overlay) overlay.classList.add('active');
         if (modal) modal.classList.add('active');
 
-        this.render(task);
-        this.isDirty = defaultDirty;
-        this.bindChangeListeners();
+        // Quillの初期化（初回のみ）
+        if (!this.quill) {
+          this.quill = new Quill('#task-description-editor', {
+            theme: 'bubble',
+            placeholder: '進行者の人の目線に立って、タスクの説明を書きましょう。',
+            modules: {
+              toolbar: [
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                ['link', 'clean']
+              ]
+            }
+          });
 
+
+          // URL自動リンク化
+          this.quill.on('text-change', (delta, oldDelta, source) => {
+            if (source !== 'user') return;
+
+            // 変更された位置を取得
+            let changeIndex = 0;
+            let changeLength = 0;
+            delta.ops.forEach(op => {
+              if (op.retain) {
+                changeIndex += op.retain;
+              } else if (op.insert) {
+                changeLength = typeof op.insert === 'string' ? op.insert.length : 1;
+              }
+            });
+
+            // 変更位置のフォーマットを確認
+            const format = this.quill.getFormat(changeIndex, 1);
+
+            // リンク内で編集された場合、リンクを解除
+            if (format.link) {
+              // リンクの範囲を特定して解除
+              const text = this.quill.getText();
+              let linkStart = changeIndex;
+              let linkEnd = changeIndex;
+
+              // リンクの開始位置を探す
+              while (linkStart > 0 && this.quill.getFormat(linkStart - 1, 1).link === format.link) {
+                linkStart--;
+              }
+
+              // リンクの終了位置を探す
+              while (linkEnd < text.length && this.quill.getFormat(linkEnd, 1).link === format.link) {
+                linkEnd++;
+              }
+
+              // リンクを解除
+              this.quill.formatText(linkStart, linkEnd - linkStart, 'link', false, 'silent');
+            }
+
+            // スペースまたは改行が入力された場合のみリンク化を試みる
+            const insertedText = delta.ops.find(op => op.insert)?.insert;
+            if (insertedText !== ' ' && insertedText !== '\n') return;
+
+            // カーソル位置の直前のテキストを取得してURLパターンをチェック
+            const text = this.quill.getText();
+            const beforeCursor = text.substring(0, changeIndex);
+
+            // 最後の単語（スペース区切り）を取得
+            const words = beforeCursor.split(/[\s\n]/);
+            const lastWord = words[words.length - 1];
+
+            // URLパターンにマッチするかチェック
+            const urlRegex = /^https?:\/\/[^\s]+$/;
+            if (urlRegex.test(lastWord)) {
+              const urlStart = changeIndex - lastWord.length;
+              const urlEnd = changeIndex;
+
+              // 既にリンクになっていないことを確認
+              const existingFormat = this.quill.getFormat(urlStart, lastWord.length);
+              if (!existingFormat.link) {
+                // リンク形式を適用
+                this.quill.formatText(urlStart, lastWord.length, 'link', lastWord, 'silent');
+              }
+            }
+          });
+
+
+          // リンクをクリックした際に新しいタブで開く
+          this.quill.root.addEventListener('click', (e) => {
+            const link = e.target.closest('a');
+            if (link && link.href) {
+              e.preventDefault();
+              window.open(link.href, '_blank', 'noopener,noreferrer');
+            }
+          });
+        }
+
+        this.render(task);
+        this.bindChangeListeners();
 
         // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
         if (!skipUrlUpdate && App.utils.url && App.utils.url.updateParams) {
@@ -356,8 +499,9 @@
           App.utils.url.updateParams(newParams, false);
         }
 
-        // コメントを読み込み
         this.loadComments(taskId);
+        this.loadLists(taskId);
+        this.isDirty = defaultDirty;
       },
 
       /**
@@ -367,7 +511,7 @@
       loadComments: function (taskId, skipLoadingCache = false) {
         const commentsList = document.getElementById('task-comments-list');
         if (commentsList) {
-          commentsList.innerHTML = '<div class="padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
+          commentsList.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
         }
 
         // コメントを非同期で取得
@@ -412,7 +556,7 @@
       bindChangeListeners: function () {
         const fields = [
           'task-name-input',
-          'task-description-input',
+          // 'task-description-input', // Removed for Quill
           'task-status-select',
           'task-priority-select',
           'task-board-select',
@@ -439,9 +583,14 @@
        * モーダルを閉じる
        * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
        */
-      close: function (skipUrlUpdate = false) {
+      close: function (skipUrlUpdate = false, skipDirtyCheck = false) {
+        // Quillの変更をチェック
+        const currentDescription = this.quill ? this.quill.root.innerHTML : '';
+        const originalDescription = this.originalData?.description || '';
+        const descriptionChanged = currentDescription !== originalDescription;
+
         // 変更がある場合は確認
-        if (this.isDirty) {
+        if (!skipDirtyCheck && (this.isDirty || descriptionChanged)) {
           if (!confirm('変更が保存されていません。破棄してもよろしいですか？')) {
             return false;
           }
@@ -470,7 +619,12 @@
        * 変更を破棄してモーダルを閉じる
        */
       discard: function () {
-        if (this.isDirty) {
+        // Quillの変更をチェック
+        const currentDescription = this.quill ? this.quill.root.innerHTML : '';
+        const originalDescription = this.originalData?.description || '';
+        const descriptionChanged = currentDescription !== originalDescription;
+
+        if (this.isDirty || descriptionChanged) {
           if (!confirm('変更を破棄しますか？')) {
             return;
           }
@@ -502,14 +656,14 @@
           return;
         }
 
-        const id = this.currentId;
-        const currentItem = this.currentItem;
-
         // 変更フラグをクリア
         this.isDirty = false;
 
+        const id = this.currentId;
+        const currentItem = this.currentItem;
+
         // モーダルを閉じる
-        this.close();
+        this.close(false, true);
 
         showSnackbar('タスクを削除しました', 'success');
 
@@ -552,7 +706,7 @@
       /**
        * 変更を保存
        */
-      save: function () {
+      save: async function () {
         const id = this.currentId;
         if (!id) {
           console.error('[TaskDetail] Cannot save: No ID');
@@ -581,8 +735,14 @@
           hasChanges = true;
         }
 
-        if (descInput && descInput.value !== originalData.description) {
-          updates.description = descInput.value;
+        // const descInput = document.getElementById('task-description-input');
+        const description = this.quill ? this.quill.root.innerHTML : '';
+
+        if (this.quill && description !== originalData.description) {
+          // Quillが空の場合、<p><br></p>などが入ることがあるので、実質空なら空文字にする処理が必要かも知れないが
+          // 一旦そのまま保存する。必要であれば sanitize or check empty
+          // Quillの isTaskEmpty 判定などは別途
+          updates.description = description;
           hasChanges = true;
         }
 
@@ -629,8 +789,14 @@
           }
         });
 
-        if (!hasChanges) {
-          this.close();
+        // リストの変更をチェック
+        const listChanges = this.getListChanges();
+        const hasListChanges = listChanges.toInsert.length > 0 ||
+          listChanges.toUpdate.length > 0 ||
+          listChanges.toDelete.length > 0;
+
+        if (!hasChanges && !hasListChanges) {
+          this.close(false, true);
           return;
         }
 
@@ -640,79 +806,119 @@
 
         // 先にモーダルを閉じる
         this.isDirty = false;
-        this.close();
+        this.close(false, true);
         showSnackbar('変更を保存しています。画面を閉じないでください。', 'info', 'top', 0);
 
-        // DB更新
-        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
-          where: { id: ["=", id] },
-          set: updates
-        }, 'タスクを更新')
-          .then(result => {
+        try {
+          // タスクの更新
+          if (hasChanges) {
+            const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
+              where: { id: ["=", id] },
+              set: updates
+            }, 'タスクを更新');
+
             if (!result || (Array.isArray(result) && result.length === 0)) {
-              console.error('[TaskDetail] Update returned failure');
-              showSnackbar('更新に失敗しました', 'error');
-              // Rollback
-              Object.assign(currentItem, originalData);
-              rollbackLocalData(TABLE_NAMES.TASKS, id, originalData);
-
-              // カンバン再描画して元に戻す
-              if (originalData.board_id && App.pages.boards && App.pages.boards.renderKanban) {
-                App.pages.boards.renderKanban(originalData.board_id);
-              }
-              return;
+              throw new Error('Task update failed');
             }
+          }
 
-            console.log('[TaskDetail] Update successful');
-            showSnackbar('変更を保存しました。', 'success');
+          // リストの変更を保存
+          if (hasListChanges) {
+            await this.saveListChanges(listChanges);
+          }
 
-            // もしこのタスクのモーダルが再度開かれていたら、内部状態を更新
-            if (this.currentId === id) {
-              this.originalData = { ...currentItem };
-              this.isDirty = false;
-            }
+          console.log('[TaskDetail] Update successful');
+          showSnackbar('変更を保存しました。', 'success');
 
-            // メンバーフィールドが更新された場合はボードデータを再読み込み
-            const memberFieldsUpdated = ['processed_by', 'reviewed_by', 'received_by'].some(role => updates.hasOwnProperty(role));
-            const boardId = currentItem.board_id;
+          // もしこのタスクのモーダルが再度開かれていたら、内部状態を更新
+          if (this.currentId === id) {
+            this.originalData = { ...currentItem };
+            this.originalLists = JSON.parse(JSON.stringify(this.currentLists));
+            this.deletedListIds = [];
+            this.isDirty = false;
+          }
 
-            if (memberFieldsUpdated && boardId && App.pages.boards && App.pages.boards.loadData) {
-              // JOINデータを含むボードデータを再読み込み
-              App.pages.boards.loadData(boardId, true).then(() => {
-                // currentItemは参照なので、loadDataでリストが書き換わると参照が切れる可能性があるが、
-                // IDで最新のものを探し直すことができる
-                if (this.currentId === id) {
-                  const updatedTask = App.pages.boards.cachedBoardTasks[boardId]?.find(t => t.id === id);
-                  if (updatedTask) {
-                    this.currentItem = updatedTask;
-                    this.originalData = { ...updatedTask };
-                    // アバターを再描画
-                    const members = App.state.data.members || [];
-                    const getMember = (id) => members.find(m => m.id === id);
-                    ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
-                      const member = getMember(updatedTask[role]);
-                      this.renderMemberAvatar(role, member?.display_name, member?.profile_photo_url);
-                    });
-                  }
+          // メンバーフィールドが更新された場合はボードデータを再読み込み
+          const memberFieldsUpdated = ['processed_by', 'reviewed_by', 'received_by'].some(role => updates.hasOwnProperty(role));
+          const boardId = currentItem.board_id;
+
+          if (memberFieldsUpdated && boardId && App.pages.boards && App.pages.boards.loadData) {
+            // JOINデータを含むボードデータを再読み込み
+            App.pages.boards.loadData(boardId, true).then(() => {
+              // currentItemは参照なので、loadDataでリストが書き換わると参照が切れる可能性があるが、
+              // IDで最新のものを探し直すことができる
+              if (this.currentId === id) {
+                const updatedTask = App.pages.boards.cachedBoardTasks[boardId]?.find(t => t.id === id);
+                if (updatedTask) {
+                  this.currentItem = updatedTask;
+                  this.originalData = { ...updatedTask };
+                  // アバターを再描画
+                  const members = App.state.data.members || [];
+                  const getMember = (id) => members.find(m => m.id === id);
+                  ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
+                    const member = getMember(updatedTask[role]);
+                    this.renderMemberAvatar(role, member?.display_name, member?.profile_photo_url);
+                  });
                 }
-              });
-            } else if (boardId && App.pages.boards && App.pages.boards.renderKanban) {
-              // メンバーフィールド以外の更新の場合はカンバンのみ再描画（Optimistic UIの確認）
-              App.pages.boards.renderKanban(boardId);
-            }
-          })
-          .catch(error => {
-            console.error('[TaskDetail] Update exception:', error);
-            App.utils.error.handle(error);
-            // Rollback
-            Object.assign(currentItem, originalData);
-            rollbackLocalData(TABLE_NAMES.TASKS, id, originalData);
+              }
+            });
+          } else if (boardId && App.pages.boards && App.pages.boards.renderKanban) {
+            // メンバーフィールド以外の更新の場合はカンバンのみ再描画（Optimistic UIの確認）
+            App.pages.boards.renderKanban(boardId);
+          }
+        } catch (error) {
+          console.error('[TaskDetail] Update exception:', error);
+          showSnackbar('更新に失敗しました', 'error');
+          // Rollback
+          Object.assign(currentItem, originalData);
+          rollbackLocalData(TABLE_NAMES.TASKS, id, originalData);
 
-            // カンバン再描画して元に戻す
-            if (originalData.board_id && App.pages.boards && App.pages.boards.renderKanban) {
-              App.pages.boards.renderKanban(originalData.board_id);
+          // カンバン再描画して元に戻す
+          if (originalData.board_id && App.pages.boards && App.pages.boards.renderKanban) {
+            App.pages.boards.renderKanban(originalData.board_id);
+          }
+          return;
+        }
+
+        console.log('[TaskDetail] Update successful');
+        showSnackbar('変更を保存しました。', 'success');
+
+        // もしこのタスクのモーダルが再度開かれていたら、内部状態を更新
+        if (this.currentId === id) {
+          this.originalData = { ...currentItem };
+          this.originalLists = JSON.parse(JSON.stringify(this.currentLists));
+          this.deletedListIds = [];
+          this.isDirty = false;
+        }
+
+        // メンバーフィールドが更新された場合はボードデータを再読み込み
+        const memberFieldsUpdated = ['processed_by', 'reviewed_by', 'received_by'].some(role => updates.hasOwnProperty(role));
+        const boardId = currentItem.board_id;
+
+        if (memberFieldsUpdated && boardId && App.pages.boards && App.pages.boards.loadData) {
+          // JOINデータを含むボードデータを再読み込み
+          App.pages.boards.loadData(boardId, true).then(() => {
+            // currentItemは参照なので、loadDataでリストが書き換わると参照が切れる可能性があるが、
+            // IDで最新のものを探し直すことができる
+            if (this.currentId === id) {
+              const updatedTask = App.pages.boards.cachedBoardTasks[boardId]?.find(t => t.id === id);
+              if (updatedTask) {
+                this.currentItem = updatedTask;
+                this.originalData = { ...updatedTask };
+                // アバターを再描画
+                const members = App.state.data.members || [];
+                const getMember = (id) => members.find(m => m.id === id);
+                ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
+                  const member = getMember(updatedTask[role]);
+                  this.renderMemberAvatar(role, member?.display_name, member?.profile_photo_url);
+                });
+              }
             }
           });
+        } else if (boardId && App.pages.boards && App.pages.boards.renderKanban) {
+          // メンバーフィールド以外の更新の場合はカンバンのみ再描画（Optimistic UIの確認）
+          App.pages.boards.renderKanban(boardId);
+        }
       },
 
       /**
@@ -722,14 +928,16 @@
         this.currentId = null;
         this.currentItem = null;
         this.originalData = null;
-        this.isDirty = false;
+        this.currentLists = [];
+        this.originalLists = [];
+        this.deletedListIds = [];
 
         // 入力フィールドをクリア
         const fields = [
           'task-status-select',
           'task-priority-select',
           'task-name-input',
-          'task-description-input',
+          // 'task-description-input',
           'task-board-select',
           'task-starts-at-input',
           'task-ends-at-input'
@@ -739,15 +947,27 @@
           if (el) el.value = '';
         });
 
+        if (this.quill) {
+          this.quill.setText('');
+        }
+
         const displayId = document.getElementById('task-display-id');
         if (displayId) displayId.textContent = '';
 
         const modalTitle = document.getElementById('task-modal-title');
         if (modalTitle) modalTitle.textContent = '';
 
+        const listsContainer = document.getElementById('task-list-items');
+        if (listsContainer) listsContainer.innerHTML = '';
+
         // コメントリストをクリア
         const commentsList = document.getElementById('task-comments-list');
         if (commentsList) commentsList.innerHTML = '';
+
+        const taskDetailTabBadge = document.querySelectorAll(`#task-detail-tabs > a > div.badge`);
+        taskDetailTabBadge.forEach(badge => {
+          badge.textContent = '0';
+        });
       },
 
       /**
@@ -768,7 +988,7 @@
 
         const members = App.state.data.members || [];
 
-        html += comments.map(comment => {
+        html += comments.map((comment, index) => {
           const creator = members.find(m => m.id === comment.created_by);
           const creatorName = creator ? creator.display_name : (comment.creator_display_name || '不明'); // Fallback if still available somewhere
           const creatorPhoto = creator ? creator.profile_photo_url : comment.creator_profile_photo_url;
@@ -779,23 +999,25 @@
             : '<i class="tiny">account_circle</i>';
 
           const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
+          const hr = index > 0 ? '<hr class="max small-margin">' : '';
 
           return `
-            <article class="padding no-margin border small-round surface">
+            ${hr}
+            <div class="small-padding">
               <div class="row tiny-space">
                 <a href="${creatorSlackProfileUrl}" target="_blank">
                 ${creatorIcon}
                 </a>
                 <div class="max row tiny-space">
-                  <span class="bold small-text">${escapeHtml(creatorName)}</span>
+                  <span class="bold small-text">${creatorName}</span>
                   <span class="small-text secondary-text">${createdAt}</span>
                 </div>
               </div>
               <div class="tiny-space"></div>
               <div class="">
-                <p class="small-text no-margin tiny-line">${escapeHtml(comment.content || '')}</p>
+                <p class="small-text no-margin tiny-line">${comment.content}</p>
               </div>
-            </article>
+            </div>
           `;
         }).join('');
 
@@ -831,11 +1053,10 @@
         if (nameInput) nameInput.value = task.name || '';
 
         // Description
-        const descInput = document.getElementById('task-description-input');
-        if (descInput) {
-          descInput.value = task.description || '';
-          // BeerCSSのラベル位置を更新するためにchangeイベントを発火
-          descInput.dispatchEvent(new Event('change', { bubbles: true }));
+        // Quillへ値をセット
+        if (this.quill) {
+          // HTMLとしてセット
+          this.quill.root.innerHTML = task.description || '';
         }
 
         // Status
@@ -879,6 +1100,24 @@
           // BeerCSSのラベル位置を更新するためにchangeイベントを発火
           startsAtInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
+
+        this.renderLastUpdated();
+      },
+
+      renderLastUpdated: function () {
+        const task = this.currentItem;
+        const updatedAt = task.updated_at;
+        const updatedBy = task.updated_by;
+
+        const members = App.state.data.members || [];
+        const updatedByMember = members.find(m => m.id === updatedBy);
+        const updatedByMemberName = updatedByMember?.display_name;
+
+        const lastUpdatedAtEl = document.getElementById('task-last-updated-datetime');
+        lastUpdatedAtEl.textContent = formatDateTimeForDisplay(updatedAt);
+
+        // const lastUpdatedByEl = document.getElementById('task-last-updated-by');
+        // lastUpdatedByEl.textContent = updatedByMemberName;
       },
 
       /**
@@ -976,7 +1215,7 @@
           }
 
           // モーダルを閉じる
-          this.close();
+          this.close(false, false);
 
           await new Promise(resolve => setTimeout(resolve, 500));
           this.open(newTask.id, false, true);
@@ -1024,7 +1263,7 @@
 
         // クラスとコンテンツを設定
         // 画像がある場合は transparent、ない場合は tertiary クラスを使用
-        const baseClass = 'no-margin circle large';
+        const baseClass = 'circle no-margin';
         if (photoUrl) {
           avatarBtn.className = `${baseClass} transparent`;
           avatarBtn.innerHTML = `<img src="${photoUrl}" class="responsive" alt="${escapeHtml(displayName || '未設定')}">`;
@@ -1078,12 +1317,12 @@
           return;
         }
 
-        // ローカル状態を更新
-        this.currentItem[role] = memberId;
-
         // Dirty フラグを立てる
         this.isDirty = true;
         console.log('updatedMemberField: Dirty flag set to true');
+
+        // ローカル状態を更新
+        this.currentItem[role] = memberId;
 
         // メンバー情報を取得してアバターを更新
         const members = App.state.data.members || [];
@@ -1140,6 +1379,391 @@
         }
 
         App.modals.newComment.open(taskId, boardId);
+      },
+
+      /**
+       * リストデータを読み込み
+       * @param {string} taskId - タスクID
+       */
+      loadLists: function (taskId) {
+        const listContainer = document.getElementById('task-list-items');
+        listContainer.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
+
+        const query = {
+          where: {
+            task_id: ["=", taskId]
+          },
+          orderBy: {
+            index: "asc"
+          }
+        };
+
+        console.log('[TaskDetail] Loading lists for task:', taskId);
+        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LISTS, 'select', query)
+          .then(results => {
+            console.log('[TaskDetail] Lists query results:', results);
+            if (this.currentId !== taskId) return;
+
+            const lists = results?.data || results || [];
+            console.log('[TaskDetail] Lists loaded:', lists);
+            this.currentLists = lists;
+            // originalDataにもリストを保存（変更検知用）
+            this.originalLists = JSON.parse(JSON.stringify(lists));
+            this.renderLists(results?.isCached);
+            this.updateListBadge();
+
+            if (results?.isCached) {
+              console.log('[TaskDetail] Lists are cached, refetching...');
+              callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LISTS, 'select', query, null, true)
+                .then(results => {
+                  const refleshedLists = results?.data || results || [];
+                  console.log('[TaskDetail] Lists refetched:', refleshedLists);
+                  this.currentLists = refleshedLists;
+                  this.originalLists = JSON.parse(JSON.stringify(refleshedLists));
+                  this.renderLists();
+                  this.updateListBadge();
+                })
+            }
+          })
+          .catch(error => {
+            console.error('[TaskDetail] Error loading lists:', error);
+          });
+      },
+
+      /**
+       * リスト項目を描画
+       */
+      renderLists: function (disabled = false) {
+        const container = document.getElementById('task-list-items');
+        if (!container) return;
+
+        // SortableJSインスタンスを破棄
+        if (this.listSortable) {
+          this.listSortable.destroy();
+          this.listSortable = null;
+        }
+
+        if (!this.currentLists || this.currentLists.length === 0) {
+          container.innerHTML = '<p>リスト項目はありません</p>';
+          return;
+        }
+
+        const members = App.state.data.members || [];
+
+        const html = this.currentLists.map(list => {
+          const assignee = members.find(m => m.id === list.assign_to);
+          const avatarHtml = assignee?.profile_photo_url
+            ? `<img src="${assignee.profile_photo_url}" class="responsive" alt="${escapeHtml(assignee.display_name)}">`
+            : '<i>person</i>';
+
+          return `
+            <div class="list-item row no-margin middle-align small-space small-padding background" data-list-id="${list.id}">
+              <i class="drag-handle" style="cursor: move;">drag_indicator</i>
+              <label class="checkbox">
+                <input type="checkbox" 
+                  ${list.is_done ? 'checked' : ''} 
+                  onchange="App.modals.taskDetail.updateListField('${list.id}', 'is_done', this.checked)"
+                  ${disabled ? 'disabled' : ''}>
+                <span></span>
+              </label>
+              <div class="field small no-margin max">
+                <input type="text" 
+                  value="${escapeHtml(list.name || '')}" 
+                  placeholder="リスト項目名"
+                  onchange="App.modals.taskDetail.updateListField('${list.id}', 'name', this.value)"
+                  ${disabled ? 'disabled' : ''}>
+              </div>
+              <button class="circle small transparent chip" 
+                onclick="App.modals.taskDetail.selectListAssignee('${list.id}')"
+                ${disabled ? 'disabled' : ''}>
+                ${avatarHtml}
+                <div class="tooltip left">${assignee ? escapeHtml(assignee.display_name) : '未設定'}</div>
+              </button>
+              <button class="circle small transparent" 
+                onclick="App.modals.taskDetail.deleteListItem('${list.id}')"
+                ${disabled ? 'disabled' : ''}>
+                <i>delete</i>
+              </button>
+            </div>
+          `;
+        }).join('');
+
+        container.innerHTML = html;
+        this.setupListSortable();
+      },
+
+      /**
+       * SortableJSを初期化
+       */
+      setupListSortable: function () {
+        const container = document.getElementById('task-list-items');
+        if (!container) return;
+
+        this.listSortable = Sortable.create(container, {
+          animation: 150,
+          handle: '.drag-handle',
+          ghostClass: 'surface-container',
+          onEnd: (evt) => this.onListReorder(evt)
+        });
+      },
+
+      /**
+       * リストの並び替え処理
+       */
+      onListReorder: function (evt) {
+        // isDirtyフラグを立てる
+        this.isDirty = true;
+        console.log('[TaskDetail] isDirty set to true (onListReorder)');
+
+        const oldIndex = evt.oldIndex;
+        const newIndex = evt.newIndex;
+
+        if (oldIndex === newIndex) return;
+
+        // ローカルデータの並び替え
+        const [movedItem] = this.currentLists.splice(oldIndex, 1);
+        this.currentLists.splice(newIndex, 0, movedItem);
+
+        // 移動したアイテムのindexのみを更新（前後のアイテムの中間値を使用）
+        const prevItem = this.currentLists[newIndex - 1];
+        const nextItem = this.currentLists[newIndex + 1];
+
+        if (!prevItem && !nextItem) {
+          movedItem.index = 0;
+        } else if (!prevItem) {
+          movedItem.index = nextItem.index - 1;
+        } else if (!nextItem) {
+          movedItem.index = prevItem.index + 1;
+        } else {
+          movedItem.index = (prevItem.index + nextItem.index) / 2;
+        }
+
+        // データベースへの保存は「変更を保存」ボタンで実行される
+        console.log('[TaskDetail] List order updated (not saved yet)');
+      },
+
+      /**
+       * 新しいリスト項目を作成
+       */
+      createListItem: async function () {
+        if (!this.currentId) return;
+
+        // isDirtyフラグを立てる
+        this.isDirty = true;
+        console.log('[TaskDetail] isDirty set to true (createListItem)');
+
+        const newList = {
+          id: crypto.randomUUID(),
+          task_id: this.currentId,
+          index: (this.currentLists[this.currentLists.length - 1]?.index ?? -1) + 1,
+          is_done: false,
+          name: '',
+          assign_to: null,
+          _isNew: true // 新規作成フラグ
+        };
+
+        // ローカルデータに追加
+        this.currentLists.push(newList);
+        await this.renderLists();
+        await this.updateListBadge();
+
+        const container = document.getElementById('task-list-items');
+        container.scrollTo(0, container.scrollHeight);
+
+        const listItems = container.querySelectorAll('div.list-item');
+        const addedListItem = listItems[listItems.length - 1].querySelector('div.field > input');
+
+        addedListItem.focus();
+        addedListItem.select();
+
+        // データベースへの保存は「変更を保存」ボタンで実行される
+        console.log('[TaskDetail] List item created (not saved yet)');
+      },
+
+      /**
+       * リスト項目のフィールドを更新
+       * @param {string} listId - リストID
+       * @param {string} field - フィールド名
+       * @param {any} value - 新しい値
+       */
+      updateListField: function (listId, field, value) {
+        const list = this.currentLists.find(l => l.id === listId);
+        if (!list) return;
+
+        // isDirtyフラグを立てる
+        this.isDirty = true;
+        console.log(`[TaskDetail] isDirty set to true (updateListField: ${field})`);
+
+        list[field] = value;
+
+        if (field === 'is_done') {
+          this.updateListBadge();
+        }
+
+        // データベースへの保存は「変更を保存」ボタンで実行される
+        console.log(`[TaskDetail] List field ${field} updated (not saved yet)`);
+      },
+
+      /**
+       * リスト項目を削除
+       * @param {string} listId - リストID
+       */
+      deleteListItem: function (listId) {
+        const list = this.currentLists.find(l => l.id === listId);
+        if (!list) return;
+
+        // isDirtyフラグを立てる
+        this.isDirty = true;
+        console.log('[TaskDetail] isDirty set to true (deleteListItem)');
+
+        // ローカルデータから削除
+        this.currentLists = this.currentLists.filter(l => l.id !== listId);
+
+        // インデックスの振り直しは行わない
+
+        this.renderLists();
+        this.updateListBadge();
+
+        // 新規作成されたものでなければ削除リストに追加
+        if (!list._isNew) {
+          this.deletedListIds.push(listId);
+        }
+
+        // データベースへの削除は「変更を保存」ボタンで実行される
+        console.log('[TaskDetail] List item deleted (not saved yet)');
+      },
+
+      /**
+       * リスト項目の担当者を選択
+       * @param {string} listId - リストID
+       */
+      selectListAssignee: function (listId) {
+        if (!App.modals.selectMembers) {
+          console.error('[TaskDetail] selectMembers modal not available');
+          return;
+        }
+
+        const list = this.currentLists.find(l => l.id === listId);
+        if (!list) return;
+
+        App.modals.selectMembers.open({
+          multiSelect: false,
+          preSelected: list.assign_to ? [list.assign_to] : [],
+          callback: (selectedIds) => {
+            if (selectedIds && selectedIds.length > 0) {
+              this.updateListField(listId, 'assign_to', selectedIds[0]);
+              this.renderLists();
+            }
+          }
+        });
+      },
+
+      /**
+       * リストバッジを更新
+       */
+      updateListBadge: function () {
+        const badge = document.getElementById('task-list-badge');
+        if (!badge) return;
+
+        const lists = this.currentLists;
+        let count = 0;
+        for (const list of lists) {
+          if (!list.is_done) {
+            count++;
+          }
+        }
+        badge.textContent = count;
+        count > 0 ? badge.classList.remove('secondary') : badge.classList.add('secondary');
+      },
+
+      /**
+       * リストの変更を取得
+       * @returns {Object} 変更内容
+       */
+      getListChanges: function () {
+        const toInsert = [];
+        const toUpdate = [];
+        const toDelete = [...this.deletedListIds];
+
+        // 現在のリストと元のリストを比較
+        this.currentLists.forEach(currentList => {
+          if (currentList._isNew) {
+            // 新規作成
+            const { _isNew, ...listData } = currentList;
+            toInsert.push(listData);
+          } else {
+            // 既存のリストを探す
+            const originalList = this.originalLists.find(l => l.id === currentList.id);
+            if (originalList) {
+              // 変更があるかチェック
+              const hasChanges =
+                currentList.index !== originalList.index ||
+                currentList.is_done !== originalList.is_done ||
+                currentList.name !== originalList.name ||
+                currentList.assign_to !== originalList.assign_to;
+
+              if (hasChanges) {
+                toUpdate.push(currentList);
+              }
+            }
+          }
+        });
+
+        return { toInsert, toUpdate, toDelete };
+      },
+
+      /**
+       * リストの変更を保存
+       * @param {Object} listChanges - 変更内容
+       */
+      saveListChanges: async function (listChanges) {
+        const { toInsert, toUpdate, toDelete } = listChanges;
+
+        // 挿入
+        await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LISTS, 'bulkinsert', toInsert);
+
+        // 削除
+        for (const listId of toDelete) {
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LISTS, 'remove', {
+            where: { id: ["=", listId] }
+          });
+        }
+
+        // 更新
+        for (const list of toUpdate) {
+          const { id, task_id, ...updates } = list;
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LISTS, 'update', {
+            where: { id: ["=", list.id] },
+            set: updates
+          });
+        }
+
+        console.log('[TaskDetail] List changes saved');
+      },
+
+      switchTaskDetailTab: function (clickedNav, tabId) {
+        ui(`#task-detail-${tabId}`);
+        clickedNav.parentNode.querySelectorAll('a').forEach(a => {
+          a.classList.remove('active');
+        });
+        clickedNav.classList.add('active');
+
+        const addButton = document.getElementById(`task-detail-add-button`);
+
+        switch (tabId) {
+          case `list`:
+            addButton.disabled = false;
+            addButton.onclick = () => {
+              this.createListItem();
+            };
+            addButton.querySelector('div.tooltip').style.display = 'block';
+            addButton.querySelector('div.tooltip > p').innerText = '新しいリスト項目を作成します';
+            break;
+          default:
+            addButton.disabled = true;
+            addButton.querySelector('div.tooltip').style.display = 'none';
+            break;
+        }
       }
     };
   })();
