@@ -19,8 +19,9 @@ const TABLE_NAMES = {
   APPS: 'apps',
   LINKS: 'links',
   MEMBERS: 'members',
-  MEMBER_DIRECTORY_ASSIGNMENTS: 'member_directory_assignments',
+  MEMBER_ASSIGNMENTS: 'member_assignments',
   TASKS: 'tasks',
+  LISTS: 'lists',
 };
 
 const DIRECTORY_TYPES = {
