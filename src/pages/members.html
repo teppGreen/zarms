@@ -3,23 +3,20 @@
         <nav class="no-margin no-padding">
             <h3 class="bold small">メンバー</h3>
             <div class="max"></div>
-            <button class="small-round border" onclick="App.pages.members.copyMemberEmails()">
-                <i>stacked_email</i>
-                <span>全員のメールアドレスをコピー</span>
-            </button>
+            <a onclick="App.pages.members.clearDirectorySelection()">
+                <span>フィルタをリセット</span>
+            </a>
         </nav>
     </header>
     <div class="grid">
         <!-- 左側: Members (75%) -->
-        <div class="s12 m9 no-scroll no-round">
-            <div id="members-list" class="large-height grid scroll">
-                <!-- Memberカードが動的に生成される -->
-            </div>
+        <div class="s12 m9 no-scroll no-round large-height">
+            <div id="members-table"></div>
         </div>
 
         <!-- 右側: Directories (25%) -->
-        <div class="s12 m3 no-scroll no-round">
-            <div id="directories-tree" class="large-height scroll">
+        <div class="s12 m3 no-scroll no-round large-height">
+            <div id="directories-tree">
                 <!-- ツリー構造が動的に生成される -->
             </div>
         </div>
@@ -32,77 +29,212 @@
             memberAssignments: [],
             currentMembers: [],
             expandedNodes: {},
-            selectedDirectoryId: null,
+            selectedDirectoryIds: new Set(), // Changed to Set for multi-selection
             tree: [],
+            table: null,
 
             loadData: async function (firstLoad = false) {
-                if (!firstLoad) {
+                // membersデータを取得 (firstLoad時のみ、またはstateから)
+                let members = App.state.data.members || [];
+                let directories = App.state.data.directories || [];
+
+                if (firstLoad) {
+                    // member_assignmentsデータを取得
+                    try {
+                        const res = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBER_ASSIGNMENTS, 'select', {
+                            where: {
+                                related_table: ["=", TABLE_NAMES.DIRECTORIES],
+                            }
+                        }, null, true);
+                        this.memberAssignments = res.data || res || [];
+                        console.log('Member assignments loaded:', this.memberAssignments.length);
+                    } catch (e) {
+                        console.error('Error loading member_assignments:', e);
+                        this.memberAssignments = [];
+                    }
+                    console.log('Members data loaded:', members.length);
+                    console.log('Directories data loaded:', directories.length);
+                    hideLoading();
+                }
+
+                // ディレクトリは常に描画（DOM操作のみなので安全）
+                this.renderDirectories(directories);
+
+                // Tabulatorの初期化と描画
+                // タブが表示されている場合のみ初期化する（非表示状態で初期化するとエラーになるため）
+                const container = document.getElementById('tab-members');
+                const isVisible = container && container.style.display !== 'none';
+
+                if (isVisible && !this.table) {
+                    this.initTable();
+                }
+
+                if (this.table) {
+                    this.renderMembers(members);
+                }
+            },
+
+            initTable: function () {
+                const self = this;
+                const copyIconFormatter = function (cell) {
+                    return `<button class="circle transparent small"><i class="tiny">content_copy</i></button>`;
+                };
+
+                const cellClickHandler = function (e, cell) {
+                    const value = cell.getValue();
+                    if (value) {
+                        navigator.clipboard.writeText(value).then(() => {
+                            showSnackbar('コピーしました');
+                        }).catch(err => {
+                            console.error('Copy failed', err);
+                        });
+                    }
+                };
+
+                // Footer click handler helper
+                window.handleFooterClick = function (field) {
+                    self.copyColumnData(field);
+                };
+
+                const footerButtonFormatter = function (cell, formatterParams, onRendered) {
+                    // Using a button with onclick calling the global handler (or reachable method)
+                    // Since Tabulator formatters render HTML string, we stick to HTML string with onclick.
+                    const field = cell.getColumn().getField();
+                    return `<button class="circle transparent small" onclick="handleFooterClick('${field}')" title="表示中の値をすべてコピー">
+                        <i class="tiny">content_copy</i>
+                    </button>`;
+                };
+
+                // Using bottomCalc to show the footer row. 
+                // We return a dummy value so the row is rendered.
+                const footerCalc = function (values, data, calcParams) {
+                    return "Copy";
+                };
+
+                this.table = new Tabulator("#members-table", {
+                    height: "100%",
+                    layout: "fitColumns",
+                    columnDefaults: {
+                        headerSort: true,
+                        cellClick: cellClickHandler,
+                    },
+                    columns: [
+                        {
+                            title: "",
+                            field: "profile_photo_url",
+                            width: 60,
+                            hozAlign: "center",
+                            headerSort: false, // Sort disabled
+                            formatter: function (cell, formatterParams, onRendered) {
+                                const url = cell.getValue();
+                                const displayName = cell.getData().display_name || "";
+                                if (url) {
+                                    return `<img src="${escapeHtml(url)}" class="circle small" style="width: 32px; height: 32px;" alt="${escapeHtml(displayName)}">`;
+                                } else {
+                                    return '<i class="extra">account_circle</i>';
+                                }
+                            }
+                        },
+                        {
+                            title: "表示名",
+                            field: "display_name",
+                            bottomCalc: footerCalc,
+                            bottomCalcFormatter: footerButtonFormatter,
+                            formatter: function (cell, formatterParams, onRendered) {
+                                const displayName = cell.getValue() || "";
+                                const slackUrl = cell.getData().slack_profile_url;
+                                if (slackUrl) {
+                                    return `<a href="${slackUrl}" target="_blank">@${escapeHtml(displayName)}</a>`;
+                                }
+                                return `@${escapeHtml(displayName)}`;
+                            }
+                        },
+                        {
+                            title: "氏名",
+                            field: "name",
+                            bottomCalc: footerCalc,
+                            bottomCalcFormatter: footerButtonFormatter
+                        },
+                        {
+                            title: "メールアドレス",
+                            field: "email",
+                            bottomCalc: footerCalc,
+                            bottomCalcFormatter: footerButtonFormatter
+                        },
+                        { title: "備考", field: "remark" },
+                        { title: "有効", field: "is_active", formatter: "tickCross", hozAlign: "center" },
+                        { title: "ID", field: "id", visible: false }
+                    ],
+                });
+            },
+
+            copyColumnData: function (field) {
+                const data = this.table.getData("active"); // Get filtered data
+                if (!data || data.length === 0) {
+                    showSnackbar('コピーするデータがありません', 'warning');
                     return;
                 }
 
-                // membersデータを取得
-                let members = App.state.data.members || [];
-                members = members.filter(member => member.is_active === true);
+                let textContent = "";
+                let htmlContent = "";
 
-                // directoriesデータを取得
-                let directories = App.state.data.directories || [];
+                if (field === 'display_name') {
+                    // Plain text: @name1,@name2...
+                    // HTML: <span><a...>...
+                    const items = data.map(m => {
+                        const name = m.display_name || "";
+                        const url = m.slack_profile_url || "";
+                        // Extract ID from URL (e.g. .../team/U123456)
+                        const slackId = url.split('/').pop() || "";
 
-                this.renderMembers(members);
-                this.renderDirectories(directories);
+                        return { name, url, slackId };
+                    });
 
-                // member_assignmentsデータを取得
-                try {
-                    const res = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBER_ASSIGNMENTS, 'select', {
-                        where: {
-                            related_table: ["=", TABLE_NAMES.DIRECTORIES],
-                        }
-                    },null,true);
-                    this.memberAssignments = res.data || res || [];
-                    console.log('Member assignments loaded:', this.memberAssignments.length);
-                } catch (e) {
-                    console.error('Error loading member_assignments:', e);
-                    this.memberAssignments = [];
+                    textContent = items.map(i => `@${i.name}`).join(',');
+
+                    htmlContent = items.map(i => {
+                        return `<span><a target="_blank" data-member-id="${escapeHtml(i.slackId)}" data-member-label="@${escapeHtml(i.name)}" href="${escapeHtml(i.url)}" rel="noopener noreferrer">@${escapeHtml(i.name)}</a></span>`;
+                    }).join(','); // Separator not strictly defined for HTML, using comma for consistency or just concatenation? "All values comma separated" applies to "copy" action generally.
+                    // For mentioning in Slack etc, usually space separated or just list. But requirement said "comma separated" for "email, name, display_name".
+                    // I will use comma for HTML too to be safe, or maybe just space?
+                    // "table values... comma separated... copy".
+                    // I will assume the comma is part of the clipboard content.
+                } else if (field === 'email') {
+                    const emails = data.map(m => m.email).filter(e => e);
+                    textContent = emails.join(',');
+                    htmlContent = emails.map(e => `<a href="mailto:${escapeHtml(e)}">${escapeHtml(e)}</a>`).join(',');
+                } else if (field === 'name') {
+                    const names = data.map(m => m.name).filter(n => n);
+                    textContent = names.join(',');
+                    htmlContent = names.map(n => escapeHtml(n)).join(',');
+                } else {
+                    return;
                 }
 
-                console.log('Members data loaded:', members.length);
-                console.log('Directories data loaded:', directories.length);
+                const blobText = new Blob([textContent], { type: "text/plain" });
+                const blobHtml = new Blob([htmlContent], { type: "text/html" });
 
-                hideLoading();
+                const clipboardData = [new ClipboardItem({
+                    ["text/plain"]: blobText,
+                    ["text/html"]: blobHtml
+                })];
+
+                navigator.clipboard.write(clipboardData).then(() => {
+                    showSnackbar(`${field}をコピーしました`, 'success');
+                }).catch(err => {
+                    console.error('Clipboard write failed', err);
+                    // Fallback to text
+                    navigator.clipboard.writeText(textContent).then(() => {
+                        showSnackbar('テキスト形式でコピーしました', 'success');
+                    });
+                });
             },
 
             renderMembers: function (members = []) {
                 this.currentMembers = members;
-                const container = document.getElementById('members-list');
-
-                if (members.length === 0) {
-                    container.innerHTML = `<div class="s12 small-padding">
-                        <i>warning</i>
-                        <span>選択した組織のメンバーは登録されていません</span>
-                    </div>`;
-                    return;
+                if (this.table) {
+                    this.table.replaceData(members);
                 }
-
-                let html = '';
-                members.forEach(member => {
-                    //  Slack風のカード表示
-                    html += `
-            <article class="s12 m6 l4 padding border round">
-              <div class="row">
-                <a href="${member.slack_profile_url}" target="_blank">
-                    ${member.profile_photo_url
-                        ? `<img src="${escapeHtml(member.profile_photo_url)}" class="circle small" alt="${escapeHtml(member.display_name)}">`
-                        : '<i class="extra">account_circle</i>'}
-                </a>
-                <div class="max no-line">
-                  <span class="small">${member.display_name || ''}</span>
-                  <span class="small-text"><a href="mailto:${member.email}">${member.email || ''}</a></span>
-                </div>
-              </div>
-            </article>
-          `;
-                });
-
-                container.innerHTML = html;
             },
 
             renderDirectories: function (directories = []) {
@@ -168,7 +300,7 @@
                 nodes.forEach(node => {
                     const hasChildren = node.children && node.children.length > 0;
                     const isExpanded = this.expandedNodes[node.id];
-                    const isSelected = this.selectedDirectoryId === node.id;
+                    const isSelected = this.selectedDirectoryIds.has(node.id);
 
                     // トグルアイコン
                     let toggleIcon = 'remove';
@@ -176,17 +308,25 @@
                         toggleIcon = isExpanded ? 'expand_more' : 'chevron_right';
                     }
 
-                    const activeClass = isSelected ? 'surface-variant' : '';
+                    // Checkbox
+                    const checkbox = `
+                        <label class="checkbox">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                                   onclick="event.stopPropagation(); App.pages.members.toggleDirectorySelection('${node.id}')">
+                            <span></span>
+                        </label>
+                    `;
 
                     html += `
-            <li class="${activeClass}" style="list-style: none;">
-              <div class="row small-space small-padding align-center">
+            <li style="list-style: none;">
+              <div class="row tiny-space small-padding align-center">
                 <button class="circle transparent small" 
                         onclick="event.stopPropagation(); App.pages.members.toggleNode('${node.id}')"
                         ${hasChildren ? '' : 'disabled'}>
                     <i>${toggleIcon}</i>
                 </button>
-                <div class="max pointer" onclick="App.pages.members.selectDirectory('${node.id}')">
+                ${checkbox}
+                <div class="max pointer" onclick="App.pages.members.toggleDirectorySelection('${node.id}')">
                     <span class="small-text ${isSelected ? 'bold' : ''}">${escapeHtml(node.name || '')}</span>
                 </div>
               </div>
@@ -232,18 +372,40 @@
                 return ids;
             },
 
-            selectDirectory: function (directoryId) {
-                if (this.selectedDirectoryId === directoryId) {
-                    // 選択解除
-                    this.selectedDirectoryId = null;
+            toggleDirectorySelection: function (directoryId) {
+                if (this.selectedDirectoryIds.has(directoryId)) {
+                    this.selectedDirectoryIds.delete(directoryId);
+                } else {
+                    this.selectedDirectoryIds.add(directoryId);
+                }
+                this.applyFilter();
+            },
+
+            clearDirectorySelection: function () {
+                this.selectedDirectoryIds.clear();
+                this.renderMembers(App.state.data.members || []);
+                // ツリー再描画
+                const directories = App.state.data.directories || [];
+                this.renderDirectories(directories);
+            },
+
+            applyFilter: function () {
+                if (this.selectedDirectoryIds.size === 0) {
                     this.renderMembers(App.state.data.members || []);
                 } else {
-                    // 選択
-                    this.selectedDirectoryId = directoryId;
+                    let targetIds = [];
+                    // 選択された全てのディレクトリについて、その子孫も含めたIDを収集
+                    this.selectedDirectoryIds.forEach(id => {
+                        const targetNode = this.findNode(this.tree, id);
+                        if (targetNode) {
+                            targetIds = targetIds.concat(this.collectIds(targetNode));
+                        } else {
+                            targetIds.push(id);
+                        }
+                    });
 
-                    // ターゲットノードとその子孫のIDを取得
-                    const targetNode = this.findNode(this.tree, directoryId);
-                    const targetIds = targetNode ? this.collectIds(targetNode) : [directoryId];
+                    // 重複除去
+                    targetIds = [...new Set(targetIds)];
 
                     // フィルタリング
                     const assignments = this.memberAssignments.filter(a =>
