@@ -943,46 +943,4 @@
 
     return diffDays;
   }
-
-  // ============================================
-  // Google Picker Utilities
-  // ============================================
-
-  /**
-   * Google Pickerを開く共通関数
-   * @param {Function} callback - ファイル選択時のコールバック関数。選択されたファイル情報の配列を受け取る
-   * @param {Object} options - オプション設定
-   * @param {boolean} options.multiSelect - 複数選択を有効にするか（デフォルト: true）
-   * @param {Array} options.views - 表示するビュー（デフォルト: [google.picker.ViewId.DOCS]）
-   */
-  function openGoogleDrivePicker(callback, options = {}) {
-    // OAuthトークンを取得
-    callGAS('getOAuthToken')
-      .then(token => {
-        // Google Picker APIを読み込む
-        gapi.load('picker', {
-          callback: () => {
-            // Pickerを構築
-            const picker = new google.picker.PickerBuilder()
-              .setOAuthToken(token)
-              .addView(google.picker.ViewId.DOCS)
-              .setCallback(callback)
-              .setOrigin('https://script.google.com')
-              .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-              .build();
-
-            // Pickerを表示
-            picker.setVisible(true);
-          },
-          onerror: (error) => {
-            console.error('Picker APIの読み込みに失敗しました:', error);
-            alert('Google Picker APIの読み込みに失敗しました。');
-          }
-        });
-      })
-      .catch(error => {
-        console.error('OAuthトークンの取得に失敗しました:', error);
-        alert('OAuthトークンの取得に失敗しました: ' + error.message);
-      });
-  }
 </script>
