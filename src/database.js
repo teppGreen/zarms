@@ -841,3 +841,45 @@ function sanitizeForClient(data) {
     // それ以外（文字列、数値、ブール値）はそのまま返す
     return data;
 }
+
+// ============================================
+// Google Drive API Helper Functions
+// ============================================
+
+/**
+ * OAuthトークンを取得
+ * @returns {string} OAuthトークン
+ */
+function getOAuthToken() {
+    try {
+        const token = ScriptApp.getOAuthToken();
+        return sanitizeForClient(token);
+    } catch (e) {
+        Logger.log('OAuthトークン取得エラー: ' + e.message);
+        throw new Error('OAuthトークンの取得に失敗しました: ' + e.message);
+    }
+}
+
+/**
+ * Google DriveのファイルIDからファイル情報を取得
+ * @param {string} fileId - Google DriveのファイルID
+ * @returns {Object} ファイル情報 { file_id, file_name, file_type, file_url, modified_time }
+ */
+function getDriveFileInfo(fileId) {
+    try {
+        const file = DriveApp.getFileById(fileId);
+
+        const fileInfo = {
+            file_id: fileId,
+            file_name: file.getName(),
+            file_type: file.getMimeType(),
+            file_url: file.getUrl(),
+            modified_time: file.getLastUpdated().toISOString()
+        };
+
+        return sanitizeForClient(fileInfo);
+    } catch (e) {
+        Logger.log('ファイル情報取得エラー: ' + e.message);
+        throw new Error('ファイル情報の取得に失敗しました: ' + e.message);
+    }
+}

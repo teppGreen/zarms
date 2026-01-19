@@ -135,6 +135,18 @@ erDiagram
         uuid updated_by "最終更新者"
         datetime updated_at "最終更新日時"
     }
+    files {
+        uuid id PK "ファイルID"
+        int index "インデックス"
+        uuid task_id "タスクID"
+        varchar gfile_id "ファイルID"
+        varchar url "Google ドライブファイルURL"
+        text remark "システム備考"
+        uuid created_by "作成者"
+        datetime created_at "作成日時"
+        uuid updated_by "最終更新者"
+        datetime updated_at "最終更新日時"
+    }
     logs }|--|| members : "created_by"
     apps }|--|| members : "created_by"
     apps }|--|| members : "updated_by"
@@ -164,3 +176,6 @@ erDiagram
     lists }|--|| members : "assign_to"
     lists }|--|| members : "created_by"
     lists }|--|| members : "updated_by"
+    files }|--|| tasks : "task_id"
+    files }|--|| members : "created_by"
+    files }|--|| members : "updated_by"

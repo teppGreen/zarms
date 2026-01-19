@@ -22,6 +22,7 @@ const TABLE_NAMES = {
   MEMBER_ASSIGNMENTS: 'member_assignments',
   TASKS: 'tasks',
   LISTS: 'lists',
+  FILES: 'files'
 };
 
 const DIRECTORY_TYPES = {
