@@ -1,33 +1,32 @@
 <dialog id="modal-select-tasks" class="modal padding no-scroll">
-    <header class="fixed small-padding">
-        <div class="row no-space align-center">
-            <div class="max">
-                <h5 class="bold">タスクを選択</h5>
-            </div>
-            <button class="circle transparent" onclick="ui('#modal-select-tasks')">
-                <i>close</i>
-            </button>
+    <div class="row small-padding bottom-margin no-space align-center">
+        <div class="max">
+            <h5 class="bold">タスクを選択</h5>
         </div>
+        <button class="circle transparent" onclick="ui('#modal-select-tasks')">
+            <i>close</i>
+        </button>
+    </div>
 
-        <!-- 検索バー -->
-        <div class="field round border prefix">
-            <i>search</i>
-            <input type="text" id="task-search-input" placeholder="タスク名で検索してEnterキーを押してください..."
-                onkeydown="if(event.key === 'Enter') { event.preventDefault(); App.modals.selectTasks.searchTasks(); }">
-        </div>
-    </header>
+    <!-- 検索バー -->
+    <div class="field small-round border prefix bottom-margin top-margin">
+        <i class="front" onclick="App.modals.selectTasks.searchTasks()">search</i>
+        <input type="text" id="task-search-input" placeholder="タスク名を入力してください（部分一致）"
+            onkeydown="if(event.key === 'Enter' && !event.isComposing) { event.preventDefault(); App.modals.selectTasks.searchTasks(); }">
+    </div>
 
     <!-- 結果リスト -->
-    <article id="task-results-container" class="scroll medium small-padding no-round small-line background no-elevate">
+    <article id="task-results-container"
+        class="scroll large-width medium-height small-padding small-round small-line background no-elevate">
         <!-- 動的に生成 -->
     </article>
 
-    <footer class="fixed small-padding">
-        <nav class="right-align">
-            <button class="border" onclick="ui('#modal-select-tasks')">キャンセル</button>
-            <button onclick="App.modals.selectTasks.confirm()">選択</button>
-        </nav>
-    </footer>
+    <nav class="right-align small-padding">
+        <a onclick="App.modals.selectTasks.confirm(true)"><span>選択を解除</span></a>
+        <div class="max"></div>
+        <button class="border" onclick="ui('#modal-select-tasks')">キャンセル</button>
+        <button onclick="App.modals.selectTasks.confirm()">選択</button>
+    </nav>
 </dialog>
 
 <script>
@@ -42,44 +41,16 @@
             open: async function (options = {}) {
                 this.callback = options.callback || null;
                 this.multiSelect = options.multiSelect || false;
-                this.selectedIds = options.preSelected || [];
-                this.searchResults = [];
 
-                // 初期表示（検索前のメッセージ）
-                this.renderInitialState();
                 await ui('#modal-select-tasks');
-
-                // フォーカスを確実に行うための再試行ロジック
-                const tryFocus = (count = 0) => {
-                    const input = document.getElementById('task-search-input');
-                    // offsetParent !== null は要素が表示されているかどうかの簡易チェック
-                    if (input && input.offsetParent !== null) {
-                        input.focus();
-                        input.select(); // 全選択
-                    } else if (count < 10) {
-                        // まだ表示されていない場合は少し待って再試行
-                        setTimeout(() => tryFocus(count + 1), 50);
-                    }
-                };
-
-                // 初回実行
-                tryFocus();
-            },
-
-            renderInitialState: function () {
-                const container = document.getElementById('task-results-container');
-                if (!container) return;
-                container.innerHTML = '<p class="padding">タスク名を入力してEnterキーを押してください</p>';
+                const input = document.getElementById('task-search-input');
+                input.focus();
+                input.select();
             },
 
             searchTasks: async function () {
                 const searchInput = document.getElementById('task-search-input');
-                const searchTerm = searchInput ? searchInput.value.trim() : '';
-
-                if (!searchTerm) {
-                    this.renderInitialState();
-                    return;
-                }
+                const searchTerm = searchInput ? `%${searchInput.value.trim()}%` : '';
 
                 // ローディング表示
                 this.isLoading = true;
@@ -89,14 +60,14 @@
                     // データベース検索を実行
                     const results = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
                         where: {
-                            name: ["=", searchTerm]
+                            name: ["LIKE", searchTerm]
                         },
-                        orderBy: { 
-                            ['display_id']: 'desc' 
+                        orderBy: {
+                            ['display_id']: 'desc'
                         }
-                    });
+                    },null,true);
 
-                    this.searchResults = results || [];
+                    this.searchResults = results?.data || [];
                     this.renderResults();
                 } catch (error) {
                     console.error('タスク検索エラー:', error);
@@ -169,9 +140,21 @@
                 }
             },
 
-            confirm: function () {
-                if (this.callback) {
-                    this.callback(this.selectedIds);
+            confirm: function (reset = false) {
+                if (reset) {
+                    this.callback([]);
+                } else {
+                    // 選択されたタスクの詳細情報を取得
+                    const selectedTasks = this.searchResults.filter(task =>
+                        this.selectedIds.includes(task.id)
+                    ).map(task => ({
+                        id: task.id,
+                        name: task.name,
+                        display_id: task.display_id,
+                        task_status_key: task.task_status_key
+                    }));
+
+                    this.callback(selectedTasks);
                 }
                 ui('#modal-select-tasks');
             }

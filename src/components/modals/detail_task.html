@@ -177,15 +177,15 @@
               <span>関連</span>
               <div class="badge l secondary font-number none" id="task-related-badge">0</div>
             </a>
-            <a class onclick="App.modals.taskDetail.switchTaskDetailTab(this,'links')">
-              <span>リンク</span>
-              <div class="badge l secondary font-number none" id="task-links-badge">0</div>
+            <a class onclick="App.modals.taskDetail.switchTaskDetailTab(this,'files')">
+              <span>ファイル</span>
+              <div class="badge l secondary font-number none" id="task-files-badge">0</div>
             </a>
           </nav>
           <button disabled class="large circle primary" id="task-detail-add-button">
             <i>add</i>
-            <div class="tooltip left round left-padding right-padding">
-                <p>新しいボードを作成します</p>
+            <div class="tooltip left round left-padding right-padding" style="display: none;">
+              <p></p>
             </div>
           </button>
         </nav>
@@ -199,10 +199,24 @@
           </div>
         </div>
         <div class="page medium-height scroll" id="task-detail-related">
-          <p>関連タスクがここに表示されます</p>
+          <!-- 親タスク -->
+          <fieldset class="border bottom-margin">
+            <legend class="small-text">親タスク</legend>
+            <div id="parent-task-container">
+            </div>
+          </fieldset>
+
+          <!-- 子タスク -->
+          <fieldset class="border">
+            <legend class="small-text">子タスク</legend>
+            <div id="child-tasks-container">
+            </div>
+          </fieldset>
         </div>
-        <div class="page medium-height scroll" id="task-detail-links">
-          <p>リンクがここに表示されます</p>
+        <div class="page medium-height scroll" id="task-detail-files">
+          <div id="task-files-list">
+            <!-- ファイル一覧がここに動的に生成されます -->
+          </div>
         </div>
       </div>
 
@@ -240,6 +254,19 @@
       originalLists: [], // リストの元のデータ（変更検知用）
       listSortable: null, // SortableJSインスタンス
       deletedListIds: [], // 削除されたリストIDの配列
+
+      // 関連タスク管理
+      currentParentTask: null, // 親タスクデータ
+      currentChildTasks: [], // 子タスクの配列
+      originalParentTaskId: null, // 元の親タスクID（変更検知用）
+      originalChildTaskIds: [], // 元の子タスクIDの配列（変更検知用）
+      deletedChildTaskIds: [], // 削除された子タスクIDの配列
+
+      // ファイル管理
+      currentFiles: [], // 現在のファイルデータ
+      originalFiles: [], // 元のファイルデータ（変更検知用）
+      deletedFileIds: [], // 削除されたファイルIDの配列
+
 
       /**
        * タスク詳細モーダルを開く
@@ -501,6 +528,8 @@
 
         this.loadComments(taskId);
         this.loadLists(taskId);
+        this.loadRelatedTasks(taskId);
+        this.loadFiles(taskId);
         this.isDirty = defaultDirty;
       },
 
@@ -795,7 +824,25 @@
           listChanges.toUpdate.length > 0 ||
           listChanges.toDelete.length > 0;
 
-        if (!hasChanges && !hasListChanges) {
+        // 関連タスクの変更をチェック
+        const relatedChanges = this.getRelatedTaskChanges();
+        const hasRelatedChanges = relatedChanges.hasParentChange ||
+          relatedChanges.childTasksToAdd.length > 0 ||
+          relatedChanges.childTasksToRemove.length > 0;
+
+        // ファイルの変更をチェック
+        const fileChanges = this.getFileChanges();
+        const hasFileChanges = fileChanges.toInsert.length > 0 ||
+          fileChanges.toUpdate.length > 0 ||
+          fileChanges.toDelete.length > 0;
+
+        // 親タスクの変更をupdatesに含める
+        if (relatedChanges.hasParentChange) {
+          updates.parent_task_id = currentItem.parent_task_id || '';
+          hasChanges = true;
+        }
+
+        if (!hasChanges && !hasListChanges && !hasRelatedChanges && !hasFileChanges) {
           this.close(false, true);
           return;
         }
@@ -825,6 +872,16 @@
           // リストの変更を保存
           if (hasListChanges) {
             await this.saveListChanges(listChanges);
+          }
+
+          // 関連タスクの変更を保存
+          if (hasRelatedChanges) {
+            await this.saveRelatedTaskChanges(id, relatedChanges);
+          }
+
+          // ファイルの変更を保存
+          if (hasFileChanges) {
+            await this.saveFileChanges(fileChanges);
           }
 
           console.log('[TaskDetail] Update successful');
@@ -932,6 +989,19 @@
         this.originalLists = [];
         this.deletedListIds = [];
 
+        // 関連タスクのリセット
+        this.currentParentTask = null;
+        this.currentChildTasks = [];
+        this.originalParentTaskId = null;
+        this.originalChildTaskIds = [];
+        this.deletedChildTaskIds = [];
+
+        // ファイルのリセット
+        this.currentFiles = [];
+        this.originalFiles = [];
+        this.deletedFileIds = [];
+
+
         // 入力フィールドをクリア
         const fields = [
           'task-status-select',
@@ -968,6 +1038,10 @@
         taskDetailTabBadge.forEach(badge => {
           badge.textContent = '0';
         });
+
+        // ファイルリストをクリア
+        const filesList = document.getElementById('task-files-list');
+        if (filesList) filesList.innerHTML = '';
       },
 
       /**
@@ -1741,6 +1815,329 @@
         console.log('[TaskDetail] List changes saved');
       },
 
+      /**
+       * 関連タスクの変更を取得
+       */
+      getRelatedTaskChanges: function () {
+        const currentParentId = this.currentItem?.parent_task_id || null;
+        const originalParentId = this.originalParentTaskId || null;
+        const hasParentChange = currentParentId !== originalParentId;
+
+        // 新しく追加された子タスク
+        const currentChildIds = this.currentChildTasks.map(t => t.id);
+        const childTasksToAdd = currentChildIds.filter(id => !this.originalChildTaskIds.includes(id));
+
+        // 削除された子タスク
+        const childTasksToRemove = this.deletedChildTaskIds;
+
+        return {
+          hasParentChange,
+          childTasksToAdd,
+          childTasksToRemove
+        };
+      },
+
+      /**
+       * 関連タスクの変更を保存
+       */
+      saveRelatedTaskChanges: async function (currentTaskId, relatedChanges) {
+        const { childTasksToAdd, childTasksToRemove } = relatedChanges;
+        console.log(`[saveRelatedTaskChanges] ${JSON.stringify(relatedChanges)}`);
+
+        // すべての現在の子タスクのparent_task_idをcurrentIdに設定
+        for (const childTask of childTasksToAdd) {
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
+            where: { id: ["=", childTask] },
+            set: { parent_task_id: currentTaskId }
+          });
+        }
+
+        // 削除された子タスクのparent_task_idをnullに設定
+        for (const childTask of childTasksToRemove) {
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
+            where: { id: ["=", childTask] },
+            set: { parent_task_id: '' }
+          });
+        }
+
+        console.log('[TaskDetail] Related task changes saved');
+      },
+
+      /**
+       * 関連タスク（親タスク・子タスク）を読み込み
+       * @param {string} taskId - タスクID
+       */
+      loadRelatedTasks: async function (taskId) {
+        if (!taskId) return;
+
+        const parentTaskContainer = document.getElementById('parent-task-container');
+        parentTaskContainer.innerHTML = '<div class="center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
+
+        const childTasksContainer = document.getElementById('child-tasks-container');
+        childTasksContainer.innerHTML = '<div class="center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
+
+        const currentItem = this.currentItem;
+        const parentTaskId = currentItem?.parent_task_id;
+        const query_parent = {
+          where: {
+            id: ["=", parentTaskId]
+          }
+        };
+        const query_child = {
+          where: {
+            parent_task_id: ["=", taskId]
+          },
+          orderBy: {
+            display_id: 'asc'
+          }
+        };
+
+        let parentTask;
+        // 親タスクを取得
+        if (parentTaskId) {
+          parentTask = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_parent);
+          this.currentParentTask = parentTask ? parentTask.data[0] : null;
+        } else {
+          this.currentParentTask = null;
+        }
+
+        this.originalParentTaskId = parentTaskId || null;
+        this.renderParentTask();
+
+        // 子タスクを取得
+        const childTasks = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_child);
+
+        this.currentChildTasks = childTasks ? childTasks.data : [];
+        this.originalChildTaskIds = (childTasks ? childTasks.data : []).map(t => t.id);
+        this.deletedChildTaskIds = [];
+
+        this.renderChildTasks();
+        this.updateRelatedBadge();
+
+        if (parentTask?.isCached) {
+          callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_parent, null, true)
+            .then(results => {
+              this.currentParentTask = results ? results?.data[0] : null;
+              this.renderParentTask();
+            })
+        }
+
+        if (childTasks?.isCached) {
+          callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_child, null, true)
+            .then(results => {
+              this.currentChildTasks = results ? results?.data : [];
+              this.originalChildTaskIds = (results ? results?.data : []).map(t => t.id);
+              this.renderChildTasks();
+            })
+        }
+
+        this.updateRelatedBadge();
+      },
+
+      /**
+       * タスクステータスキーをテキストに変換
+       */
+      getStatusText: function (statusKey) {
+        const statusMap = {
+          'TODO': '未着手',
+          'IN_PROGRESS': '進行中',
+          'IN_REVIEW': '確認中',
+          'DONE': '完了'
+        };
+        return statusMap[statusKey] || statusKey;
+      },
+
+      /**
+       * 親タスクフィールドを描画
+       */
+      renderParentTask: function () {
+        const container = document.getElementById('parent-task-container');
+        if (!container) return;
+
+        if (this.currentParentTask) {
+          const displayId = this.currentParentTask.display_id ? `#${this.currentParentTask.display_id}` : '';
+          const taskName = escapeHtml(this.currentParentTask.name || '無題のタスク');
+          const statusText = this.getStatusText(this.currentParentTask.task_status_key);
+          const statusClass = this.currentParentTask.task_status_key === 'DONE' ? 'success' : 'secondary';
+          container.innerHTML = `
+            <div class="row middle-align small-space">
+              <div class="max" id="parent-task-display">
+                <p class="no-margin">
+                  <strong>${displayId}</strong> ${taskName}
+                  <span class="chip small ${statusClass}">${statusText}</span>
+                </p>
+              </div>
+              <button class="circle transparent small" onclick="App.modals.taskDetail.editParentTask()"
+                title="親タスクを編集">
+                <i>edit</i>
+              </button>
+            </div>`;
+        } else {
+          container.innerHTML = `
+            <div class="row middle-align small-space">
+              <div class="max" id="parent-task-display">
+                <p class="no-margin">
+                  親タスクはありません。
+                </p>
+              </div>
+              <button class="circle transparent small" onclick="App.modals.taskDetail.editParentTask()"
+                title="親タスクを追加">
+                <i>add</i>
+              </button>
+            </div>`;
+        }
+      },
+
+      /**
+       * 子タスクリストを描画
+       */
+      renderChildTasks: function () {
+        const container = document.getElementById('child-tasks-container');
+        if (!container) return;
+
+        if (this.currentChildTasks.length === 0) {
+          container.innerHTML = `
+          <div class="row middle-align small-space">
+                <div class="max">
+                  <p class="no-margin">
+                    子タスクはありません。
+                  </p>
+                </div>
+                <button class="circle transparent small" onclick="App.modals.taskDetail.addChildTask()" title="子タスクを追加">
+                  <i>add</i>
+                </button>
+              </div>`;
+        } else {
+          container.innerHTML = this.currentChildTasks.map(task => {
+            const displayId = task.display_id ? `#${task.display_id}` : '';
+            const taskName = escapeHtml(task.name || '無題のタスク');
+            const statusText = this.getStatusText(task.task_status_key);
+            const statusClass = task.task_status_key === 'DONE' ? 'success' : 'secondary';
+            return `
+              <div class="row middle-align small-space">
+                <div class="max">
+                  <p class="no-margin">
+                    <strong>${displayId}</strong> ${taskName}
+                    <span class="chip small ${statusClass}">${statusText}</span>
+                  </p>
+                </div>
+                <button class="circle transparent small" onclick="App.modals.taskDetail.removeChildTask('${task.id}')" title="子タスクを削除">
+                  <i>delete</i>
+                </button>
+              </div>
+            `;
+          }).join('');
+        }
+      },
+
+      /**
+       * 親タスクを編集
+       */
+      editParentTask: function () {
+        if (!App.modals.selectTasks) {
+          console.error('[TaskDetail] selectTasks modal not available');
+          return;
+        }
+
+        const currentParentId = this.currentParentTask?.id || null;
+
+        App.modals.selectTasks.open({
+          multiSelect: false,
+          preSelected: currentParentId ? [currentParentId] : [],
+          callback: (selectedTasks) => {
+            if (selectedTasks.length === 0) {
+              // 親タスクを削除
+              this.currentParentTask = null;
+              this.currentItem.parent_task_id = null;
+            } else {
+              // 親タスクを設定（callbackから受け取った情報を使用）
+              const selectedTask = selectedTasks[0];
+              this.currentParentTask = selectedTask;
+              this.currentItem.parent_task_id = selectedTask.id;
+            }
+            this.renderParentTask();
+            this.updateRelatedBadge();
+            this.isDirty = true;
+          }
+        });
+      },
+
+      /**
+       * 子タスクを追加
+       */
+      addChildTask: function () {
+        if (!App.modals.selectTasks) {
+          console.error('[TaskDetail] selectTasks modal not available');
+          return;
+        }
+
+        App.modals.selectTasks.open({
+          multiSelect: false,
+          preSelected: [],
+          callback: async (selectedTasks) => {
+            if (selectedTasks.length === 0) return;
+
+            const selectedTask = selectedTasks[0];
+
+            // App.state.data.tasksから最新の情報を取得して親タスク情報を確認
+            const currentParentTaskId = selectedTask.parent_task_id;
+
+            // 既に親タスクが設定されているかチェック
+            if (currentParentTaskId) {
+              const confirmOverwrite = confirm(
+                `#${selectedTask.display_id} ${selectedTask.name}には既に親タスクが設定されています。上書きしますか？`
+              );
+              if (!confirmOverwrite) return;
+            }
+
+            // 子タスクリストに追加（callbackから受け取った情報を使用）
+            if (!this.currentChildTasks.find(t => t.id === selectedTask.id)) {
+              this.currentChildTasks.push(selectedTask);
+              this.renderChildTasks();
+              this.updateRelatedBadge();
+              this.isDirty = true;
+            }
+          }
+        });
+      },
+
+      /**
+       * 子タスクを削除
+       * @param {string} taskId - タスクID
+       */
+      removeChildTask: function (taskId) {
+        // 削除リストに追加
+        if (!this.deletedChildTaskIds.includes(taskId)) {
+          this.deletedChildTaskIds.push(taskId);
+        }
+
+        // currentChildTasksから削除
+        this.currentChildTasks = this.currentChildTasks.filter(t => t.id !== taskId);
+
+        this.renderChildTasks();
+        this.updateRelatedBadge();
+        this.isDirty = true;
+      },
+
+      /**
+       * 関連タブのバッジを更新
+       */
+      updateRelatedBadge: function () {
+        const badge = document.getElementById('task-related-badge');
+        if (!badge) return;
+
+        const count = (this.currentParentTask ? 1 : 0) + this.currentChildTasks.length;
+        badge.textContent = count;
+
+        if (count > 0) {
+          badge.classList.remove('secondary');
+          badge.classList.add('primary');
+        } else {
+          badge.classList.remove('primary');
+          badge.classList.add('secondary');
+        }
+      },
+
       switchTaskDetailTab: function (clickedNav, tabId) {
         ui(`#task-detail-${tabId}`);
         clickedNav.parentNode.querySelectorAll('a').forEach(a => {
@@ -1759,11 +2156,345 @@
             addButton.querySelector('div.tooltip').style.display = 'block';
             addButton.querySelector('div.tooltip > p').innerText = '新しいリスト項目を作成します';
             break;
+          case `related`:
+            addButton.disabled = false;
+            addButton.onclick = () => {
+              this.addChildTask();
+            };
+            addButton.querySelector('div.tooltip').style.display = 'block';
+            addButton.querySelector('div.tooltip > p').innerText = '子タスクを追加します';
+            break;
+          case `files`:
+            addButton.disabled = false;
+            addButton.onclick = () => {
+              this.openFilePicker();
+            };
+            addButton.querySelector('div.tooltip').style.display = 'block';
+            addButton.querySelector('div.tooltip > p').innerText = 'Google Driveからファイルを追加します';
+            break;
           default:
             addButton.disabled = true;
             addButton.querySelector('div.tooltip').style.display = 'none';
             break;
         }
+      },
+
+      /**
+       * ファイルデータを読み込み
+       * @param {string} taskId - タスクID
+       */
+      loadFiles: function (taskId) {
+        const filesContainer = document.getElementById('task-files-list');
+        filesContainer.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
+
+        const query = {
+          where: {
+            task_id: ["=", taskId]
+          },
+          orderBy: {
+            index: "asc"
+          }
+        };
+
+        console.log('[TaskDetail] Loading files for task:', taskId);
+        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.FILES, 'select', query)
+          .then(results => {
+            console.log('[TaskDetail] Files query results:', results);
+            if (this.currentId !== taskId) return;
+
+            const files = results?.data || results || [];
+            console.log('[TaskDetail] Files loaded:', files);
+            this.currentFiles = files;
+            this.originalFiles = JSON.parse(JSON.stringify(files));
+            this.renderFiles(results?.isCached);
+            this.updateFilesBadge();
+
+            if (results?.isCached) {
+              console.log('[TaskDetail] Files are cached, refetching...');
+              callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.FILES, 'select', query, null, true)
+                .then(results => {
+                  const refreshedFiles = results?.data || results || [];
+                  console.log('[TaskDetail] Files refetched:', refreshedFiles);
+                  this.currentFiles = refreshedFiles;
+                  this.originalFiles = JSON.parse(JSON.stringify(refreshedFiles));
+                  this.renderFiles();
+                  this.updateFilesBadge();
+                })
+            }
+          })
+          .catch(error => {
+            console.error('[TaskDetail] Error loading files:', error);
+            if (this.currentId === taskId && filesContainer) {
+              filesContainer.innerHTML = '<p class="error-text padding">ファイルの読み込みに失敗しました</p>';
+            }
+          });
+      },
+
+      /**
+       * Google Pickerを開く
+       */
+      openFilePicker: function () {
+        callGAS('getOAuthToken')
+          .then(token => {
+            // Google Picker APIを読み込む
+            gapi.load('picker', {
+              callback: () => {
+                // Pickerを構築
+                const picker = new google.picker.PickerBuilder()
+                  .setOAuthToken(token)
+                  .addView(google.picker.ViewId.DOCS)
+                  .setCallback((data) => this.pickerCallback(data))
+                  .setOrigin('https://script.google.com')
+                  .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+                  .build();
+
+                // Pickerを表示
+                picker.setVisible(true);
+              },
+              onerror: (error) => {
+                console.error('Picker APIの読み込みに失敗しました:', error);
+                alert('Google Picker APIの読み込みに失敗しました。');
+              }
+            });
+          })
+          .catch(error => {
+            console.error('OAuthトークンの取得に失敗しました:', error);
+            alert('OAuthトークンの取得に失敗しました: ' + error.message);
+          });
+      },
+
+      /**
+       * Picker選択時のコールバック
+       * @param {Object} data - Pickerのレスポンスデータ
+       */
+      pickerCallback: function (data) {
+        if (data[google.picker.Response.ACTION] === google.picker.Action.PICKED) {
+          const docs = data[google.picker.Response.DOCUMENTS];
+
+          // isDirtyフラグを立てる
+          this.isDirty = true;
+          console.log('[TaskDetail] isDirty set to true (pickerCallback)');
+
+          // 選択されたファイルごとに処理
+          docs.forEach(doc => {
+            const fileId = doc[google.picker.Document.ID];
+
+            // ファイル情報を取得
+            callGAS('getDriveFileInfo', fileId)
+              .then(fileInfo => {
+                const newFile = {
+                  id: crypto.randomUUID(),
+                  task_id: this.currentId,
+                  index: (this.currentFiles[this.currentFiles.length - 1]?.index ?? -1) + 1,
+                  gfile_id: fileInfo.file_id,
+                  url: fileInfo.file_url,
+                  _isNew: true, // 新規作成フラグ
+                  _fileInfo: fileInfo // 表示用の情報を保持
+                };
+
+                // ローカルデータに追加
+                this.currentFiles.push(newFile);
+                this.renderFiles();
+                this.updateFilesBadge();
+
+                console.log('[TaskDetail] File added (not saved yet):', newFile);
+              })
+              .catch(error => {
+                console.error('ファイル情報の取得に失敗しました:', error);
+                showSnackbar('ファイルの取得に失敗しました: ' + error.message, 'error');
+              });
+          });
+        } else if (data[google.picker.Response.ACTION] === google.picker.Action.CANCEL) {
+          // ユーザーがキャンセルした場合、何もしない
+        }
+      },
+
+      /**
+       * ファイル一覧を描画
+       * @param {boolean} disabled - 無効化フラグ
+       */
+      renderFiles: function (disabled = false) {
+        const container = document.getElementById('task-files-list');
+        if (!container) return;
+
+        if (!this.currentFiles || this.currentFiles.length === 0) {
+          container.innerHTML = '<p>ファイルはありません</p>';
+          return;
+        }
+
+        const html = this.currentFiles.map(file => {
+          const fileInfo = file._fileInfo;
+          if (!fileInfo) {
+            // _fileInfoがない場合（DBから読み込んだ場合）はプレースホルダーを表示
+            return `
+              <div class="row middle-align small-space small-padding background" data-file-id="${file.id}">
+                <i>description</i>
+                <div class="max">
+                  <p class="no-margin"><strong>読み込み中...</strong></p>
+                  <p class="no-margin small-text secondary-text">ファイル情報を取得しています</p>
+                </div>
+                <button class="circle small transparent" 
+                  onclick="App.modals.taskDetail.deleteFile('${file.id}')"
+                  ${disabled ? 'disabled' : ''}>
+                  <i>delete</i>
+                </button>
+              </div>
+            `;
+          }
+
+          // MIMEタイプに基づいてアイコンを決定
+          let icon = 'description';
+          if (fileInfo.file_type.includes('folder')) {
+            icon = 'folder';
+          } else if (fileInfo.file_type.includes('spreadsheet')) {
+            icon = 'grid_on';
+          } else if (fileInfo.file_type.includes('document')) {
+            icon = 'article';
+          } else if (fileInfo.file_type.includes('presentation')) {
+            icon = 'slideshow';
+          } else if (fileInfo.file_type.includes('image')) {
+            icon = 'image';
+          } else if (fileInfo.file_type.includes('video')) {
+            icon = 'videocam';
+          } else if (fileInfo.file_type.includes('pdf')) {
+            icon = 'picture_as_pdf';
+          }
+
+          const updatedAt = formatDateTimeForDisplay(fileInfo.modified_time, 'MM/dd HH:mm');
+
+          return `
+            <div class="row middle-align small-space small-padding background" data-file-id="${file.id}">
+              <i>${icon}</i>
+              <div class="max">
+                <p class="no-margin"><a href="${escapeHtml(fileInfo.file_url)}" target="_blank"><strong>${escapeHtml(fileInfo.file_name)}</strong></a></p>
+                <p class="no-margin small-text secondary-text">最終更新: ${updatedAt}</p>
+              </div>
+              <button class="circle small transparent" 
+                onclick="App.modals.taskDetail.deleteFile('${file.id}')"
+                ${disabled ? 'disabled' : ''}>
+                <i>delete</i>
+              </button>
+            </div>
+          `;
+        }).join('');
+
+        container.innerHTML = html;
+
+        // _fileInfoがないファイルの情報を取得
+        this.currentFiles.forEach((file, index) => {
+          if (!file._fileInfo && file.gfile_id) {
+            callGAS('getDriveFileInfo', file.gfile_id)
+              .then(fileInfo => {
+                this.currentFiles[index]._fileInfo = fileInfo;
+                this.renderFiles(disabled);
+              })
+              .catch(error => {
+                console.error('ファイル情報の取得に失敗しました:', error);
+              });
+          }
+        });
+      },
+
+      /**
+       * ファイルを削除
+       * @param {string} fileId - ファイルID
+       */
+      deleteFile: function (fileId) {
+        const file = this.currentFiles.find(f => f.id === fileId);
+        if (!file) return;
+
+        // isDirtyフラグを立てる
+        this.isDirty = true;
+        console.log('[TaskDetail] isDirty set to true (deleteFile)');
+
+        // ローカルデータから削除
+        this.currentFiles = this.currentFiles.filter(f => f.id !== fileId);
+
+        this.renderFiles();
+        this.updateFilesBadge();
+
+        // 新規作成されたものでなければ削除リストに追加
+        if (!file._isNew) {
+          this.deletedFileIds.push(fileId);
+        }
+
+        console.log('[TaskDetail] File deleted (not saved yet)');
+      },
+
+      /**
+       * ファイルバッジを更新
+       */
+      updateFilesBadge: function () {
+        const badge = document.getElementById('task-files-badge');
+        if (!badge) return;
+
+        const count = this.currentFiles.length;
+        badge.textContent = count;
+        count > 0 ? badge.classList.remove('secondary') : badge.classList.add('secondary');
+      },
+
+      /**
+       * ファイルの変更を取得
+       * @returns {Object} 変更内容
+       */
+      getFileChanges: function () {
+        const toInsert = [];
+        const toUpdate = [];
+        const toDelete = [...this.deletedFileIds];
+
+        // 現在のファイルと元のファイルを比較
+        this.currentFiles.forEach(currentFile => {
+          if (currentFile._isNew) {
+            // 新規作成
+            const { _isNew, _fileInfo, ...fileData } = currentFile;
+            toInsert.push(fileData);
+          } else {
+            // 既存のファイルを探す
+            const originalFile = this.originalFiles.find(f => f.id === currentFile.id);
+            if (originalFile) {
+              // 変更があるかチェック（indexのみ変更可能性がある）
+              const hasChanges = currentFile.index !== originalFile.index;
+
+              if (hasChanges) {
+                const { _fileInfo, ...fileData } = currentFile;
+                toUpdate.push(fileData);
+              }
+            }
+          }
+        });
+
+        return { toInsert, toUpdate, toDelete };
+      },
+
+      /**
+       * ファイルの変更を保存
+       * @param {Object} fileChanges - 変更内容
+       */
+      saveFileChanges: async function (fileChanges) {
+        const { toInsert, toUpdate, toDelete } = fileChanges;
+
+        // 挿入
+        if (toInsert.length > 0) {
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.FILES, 'bulkinsert', toInsert);
+        }
+
+        // 削除
+        for (const fileId of toDelete) {
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.FILES, 'remove', {
+            where: { id: ["=", fileId] }
+          });
+        }
+
+        // 更新
+        for (const file of toUpdate) {
+          const { id, task_id, ...updates } = file;
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.FILES, 'update', {
+            where: { id: ["=", file.id] },
+            set: updates
+          });
+        }
+
+        console.log('[TaskDetail] File changes saved');
       }
     };
   })();
