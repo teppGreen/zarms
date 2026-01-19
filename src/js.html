@@ -372,6 +372,12 @@
     try {
       console.log('[refreshData] 自動更新開始 (コンテキスト対応)');
 
+      // タスク詳細が開いている場合は実行しない
+      if (document.getElementById('modal-detail-task')?.classList.contains('active')) {
+        console.log('[refreshData] タスク詳細が開いているため、自動更新をスキップします');
+        return;
+      }
+
       // 中止チェック
       if (currentController.aborted) {
         console.log('[refreshData] 処理が中止されました');
