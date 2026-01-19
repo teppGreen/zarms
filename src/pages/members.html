@@ -2,6 +2,9 @@
     <header class="small-margin no-padding">
         <nav class="no-margin no-padding">
             <h3 class="bold small">メンバー</h3>
+            <a href="https://docs.google.com/spreadsheets/d/1Jwq5klCWFMNqSURHk2JrbF43X4JTy5I7M5aBE3uDVNw/edit" target="_blank" title="委員名簿を開く">
+                <i class="large">open_in_new</i>
+            </a>
             <div class="max"></div>
             <a onclick="App.pages.members.clearDirectorySelection()">
                 <span>フィルタをリセット</span>
@@ -15,7 +18,7 @@
         </div>
 
         <!-- 右側: Directories (25%) -->
-        <div class="s12 m3 no-scroll no-round large-height">
+        <div class="s12 m3 scroll no-round large-height">
             <div id="directories-tree">
                 <!-- ツリー構造が動的に生成される -->
             </div>
@@ -32,6 +35,14 @@
             selectedDirectoryIds: new Set(), // Changed to Set for multi-selection
             tree: [],
             table: null,
+            columnTitles: {
+                profile_photo_url: 'プロフィール画像',
+                display_name: 'Slack 表示名',
+                name: '氏名',
+                email: 'メールアドレス',
+                remark: 'システム備考',
+                is_active: '有効'
+            },
 
             loadData: async function (firstLoad = false) {
                 // membersデータを取得 (firstLoad時のみ、またはstateから)
@@ -54,10 +65,9 @@
                     }
                     console.log('Members data loaded:', members.length);
                     console.log('Directories data loaded:', directories.length);
-                    hideLoading();
                 }
 
-                // ディレクトリは常に描画（DOM操作のみなので安全）
+                // ディレクトリは常に描画（DOM操作のみ）
                 this.renderDirectories(directories);
 
                 // Tabulatorの初期化と描画
@@ -72,23 +82,50 @@
                 if (this.table) {
                     this.renderMembers(members);
                 }
+                hideLoading();
             },
 
             initTable: function () {
                 const self = this;
-                const copyIconFormatter = function (cell) {
-                    return `<button class="circle transparent small"><i class="tiny">content_copy</i></button>`;
-                };
 
                 const cellClickHandler = function (e, cell) {
                     const value = cell.getValue();
-                    if (value) {
-                        navigator.clipboard.writeText(value).then(() => {
-                            showSnackbar('コピーしました');
-                        }).catch(err => {
-                            console.error('Copy failed', err);
-                        });
+                    const field = cell.getField();
+                    let textContent, htmlContent;
+
+                    // display_nameの場合は特別な処理
+                    if (field === 'display_name') {
+                        const rowData = cell.getData();
+                        const displayName = rowData.display_name || "";
+                        const slackUrl = rowData.slack_profile_url || "";
+                        const slackId = slackUrl.slice(-11); // 最後の11文字
+                        textContent = displayName;
+                        htmlContent = `<span><a target="_blank" data-member-id="${escapeHtml(slackId)}" href="${escapeHtml(slackUrl)}" rel="noopener noreferrer">@${escapeHtml(displayName)}</a></span> `;
+                    } else if (field === 'email') {
+                        textContent = value;
+                        htmlContent = `<a href="mailto:${escapeHtml(value)}">${escapeHtml(value)}</a>`;
+                    } else {
+                        textContent = value;
+                        htmlContent = escapeHtml(value);
                     }
+
+                    const blobText = new Blob([textContent], { type: "text/plain" });
+                    const blobHtml = new Blob([htmlContent], { type: "text/html" });
+
+                    const clipboardData = [new ClipboardItem({
+                        ["text/plain"]: blobText,
+                        ["text/html"]: blobHtml
+                    })];
+
+                    navigator.clipboard.write(clipboardData).then(() => {
+                        showSnackbar(`コピーしました`, 'success');
+                    }).catch(err => {
+                        console.error('Clipboard write failed', err);
+                        // Fallback to text
+                        navigator.clipboard.writeText(textContent).then(() => {
+                            showSnackbar(`コピーしました`, 'success');
+                        });
+                    });
                 };
 
                 // Footer click handler helper
@@ -100,9 +137,11 @@
                     // Using a button with onclick calling the global handler (or reachable method)
                     // Since Tabulator formatters render HTML string, we stick to HTML string with onclick.
                     const field = cell.getColumn().getField();
-                    return `<button class="circle transparent small" onclick="handleFooterClick('${field}')" title="表示中の値をすべてコピー">
-                        <i class="tiny">content_copy</i>
-                    </button>`;
+                    return `<div class="center-align middle-align" style="width: 100%; height: 100%;">
+                        <button class="circle transparent small" onclick="event.stopPropagation(); handleFooterClick('${field}')" title="この列の値をすべてコピー">
+                            <i class="tiny">content_copy</i>
+                        </button>
+                    </div>`;
                 };
 
                 // Using bottomCalc to show the footer row. 
@@ -113,56 +152,60 @@
 
                 this.table = new Tabulator("#members-table", {
                     height: "100%",
-                    layout: "fitColumns",
+                    layout: "fitDataFill",
                     columnDefaults: {
                         headerSort: true,
                         cellClick: cellClickHandler,
+                        hozAlign: "left",
+                        vertAlign: "middle",
                     },
                     columns: [
                         {
                             title: "",
                             field: "profile_photo_url",
-                            width: 60,
                             hozAlign: "center",
                             headerSort: false, // Sort disabled
                             formatter: function (cell, formatterParams, onRendered) {
-                                const url = cell.getValue();
-                                const displayName = cell.getData().display_name || "";
-                                if (url) {
-                                    return `<img src="${escapeHtml(url)}" class="circle small" style="width: 32px; height: 32px;" alt="${escapeHtml(displayName)}">`;
+                                const profilePhotoUrl = cell.getValue();
+                                const slackUrl = cell.getData().slack_profile_url;
+                                let icon;
+                                if (profilePhotoUrl) {
+                                    icon = `<i class="extra circle transparent"><img src="${escapeHtml(profilePhotoUrl)}" class="responsive"></i>`;
                                 } else {
-                                    return '<i class="extra">account_circle</i>';
+                                    icon = '<i class="extra circle">account_circle</i>';
                                 }
+                                return `<a href="${slackUrl}" target="_blank" rel="noopener noreferrer">${icon}</a>`;
                             }
                         },
                         {
-                            title: "表示名",
+                            title: this.columnTitles[`display_name`],
                             field: "display_name",
                             bottomCalc: footerCalc,
                             bottomCalcFormatter: footerButtonFormatter,
-                            formatter: function (cell, formatterParams, onRendered) {
-                                const displayName = cell.getValue() || "";
-                                const slackUrl = cell.getData().slack_profile_url;
-                                if (slackUrl) {
-                                    return `<a href="${slackUrl}" target="_blank">@${escapeHtml(displayName)}</a>`;
-                                }
-                                return `@${escapeHtml(displayName)}`;
+                            bottomCalcFormatterParams: {
+                                cellClick: function () { } // フッターセル自体のクリックを無効化
                             }
                         },
                         {
-                            title: "氏名",
+                            title: this.columnTitles[`name`],
                             field: "name",
                             bottomCalc: footerCalc,
-                            bottomCalcFormatter: footerButtonFormatter
+                            bottomCalcFormatter: footerButtonFormatter,
+                            bottomCalcFormatterParams: {
+                                cellClick: function () { } // フッターセル自体のクリックを無効化
+                            }
                         },
                         {
-                            title: "メールアドレス",
+                            title: this.columnTitles[`email`],
                             field: "email",
                             bottomCalc: footerCalc,
-                            bottomCalcFormatter: footerButtonFormatter
+                            bottomCalcFormatter: footerButtonFormatter,
+                            bottomCalcFormatterParams: {
+                                cellClick: function () { } // フッターセル自体のクリックを無効化
+                            }
                         },
-                        { title: "備考", field: "remark" },
-                        { title: "有効", field: "is_active", formatter: "tickCross", hozAlign: "center" },
+                        { title: this.columnTitles[`remark`], field: "remark" },
+                        { title: this.columnTitles[`is_active`], field: "is_active", formatter: "tickCross", hozAlign: "center" },
                         { title: "ID", field: "id", visible: false }
                     ],
                 });
@@ -175,30 +218,20 @@
                     return;
                 }
 
-                let textContent = "";
-                let htmlContent = "";
+                let textContent, htmlContent;
 
                 if (field === 'display_name') {
-                    // Plain text: @name1,@name2...
-                    // HTML: <span><a...>...
                     const items = data.map(m => {
                         const name = m.display_name || "";
                         const url = m.slack_profile_url || "";
-                        // Extract ID from URL (e.g. .../team/U123456)
-                        const slackId = url.split('/').pop() || "";
-
+                        const slackId = url.slice(-11);
                         return { name, url, slackId };
                     });
 
-                    textContent = items.map(i => `@${i.name}`).join(',');
-
+                    textContent = items.map(i => `${i.name}`).join(',');
                     htmlContent = items.map(i => {
-                        return `<span><a target="_blank" data-member-id="${escapeHtml(i.slackId)}" data-member-label="@${escapeHtml(i.name)}" href="${escapeHtml(i.url)}" rel="noopener noreferrer">@${escapeHtml(i.name)}</a></span>`;
-                    }).join(','); // Separator not strictly defined for HTML, using comma for consistency or just concatenation? "All values comma separated" applies to "copy" action generally.
-                    // For mentioning in Slack etc, usually space separated or just list. But requirement said "comma separated" for "email, name, display_name".
-                    // I will use comma for HTML too to be safe, or maybe just space?
-                    // "table values... comma separated... copy".
-                    // I will assume the comma is part of the clipboard content.
+                        return `<span><a target="_blank" data-member-id="${escapeHtml(i.slackId)}" data-member-label="@${escapeHtml(i.name)}" href="${escapeHtml(i.url)}" rel="noopener noreferrer">@${escapeHtml(i.name)}</a></span> `;
+                    }).join('');
                 } else if (field === 'email') {
                     const emails = data.map(m => m.email).filter(e => e);
                     textContent = emails.join(',');
@@ -220,12 +253,12 @@
                 })];
 
                 navigator.clipboard.write(clipboardData).then(() => {
-                    showSnackbar(`${field}をコピーしました`, 'success');
+                    showSnackbar(`${this.columnTitles[field]}をコピーしました`, 'success');
                 }).catch(err => {
                     console.error('Clipboard write failed', err);
                     // Fallback to text
                     navigator.clipboard.writeText(textContent).then(() => {
-                        showSnackbar('テキスト形式でコピーしました', 'success');
+                        showSnackbar(`${this.columnTitles[field]}をコピーしました`, 'success');
                     });
                 });
             },
@@ -241,7 +274,7 @@
                 const container = document.getElementById('directories-tree');
 
                 if (directories.length === 0) {
-                    container.innerHTML = '<p class="padding small">組織が登録されていません</p>';
+                    container.innerHTML = '<p class="padding">組織が登録されていません</p>';
                     return;
                 }
 
@@ -318,22 +351,22 @@
                     `;
 
                     html += `
-            <li style="list-style: none;">
-              <div class="row tiny-space small-padding align-center">
-                <button class="circle transparent small" 
-                        onclick="event.stopPropagation(); App.pages.members.toggleNode('${node.id}')"
-                        ${hasChildren ? '' : 'disabled'}>
-                    <i>${toggleIcon}</i>
-                </button>
-                ${checkbox}
-                <div class="max pointer" onclick="App.pages.members.toggleDirectorySelection('${node.id}')">
-                    <span class="small-text ${isSelected ? 'bold' : ''}">${escapeHtml(node.name || '')}</span>
-                </div>
-              </div>
-            `;
+                        <li style="list-style: none;">
+                        <div class="row tiny-space small-padding align-center">
+                            <button class="circle transparent small" 
+                                    onclick="event.stopPropagation(); App.pages.members.toggleNode('${node.id}')"
+                                    ${hasChildren ? '' : 'disabled'}>
+                                <i>${toggleIcon}</i>
+                            </button>
+                            ${checkbox}
+                            <div class="max pointer" onclick="App.pages.members.toggleDirectorySelection('${node.id}')">
+                                <span class="small-text ${isSelected ? 'bold' : ''}">${escapeHtml(node.name || '')}</span>
+                            </div>
+                        </div>
+                    `;
 
                     if (hasChildren && isExpanded) {
-                        html += `<div style="padding-left: 24px;">${this.renderTree(node.children)}</div>`;
+                        html += `<div style="padding-left: 1.2rem;">${this.renderTree(node.children)}</div>`;
                     }
 
                     html += '</li>';
@@ -423,30 +456,6 @@
                 // ツリー再描画（選択状態の更新のため）
                 const directories = App.state.data.directories || [];
                 this.renderDirectories(directories);
-            },
-
-            copyMemberEmails: function () {
-                if (!this.currentMembers || this.currentMembers.length === 0) {
-                    showSnackbar('コピーするメールアドレスがありません', 'error');
-                    return;
-                }
-                const emails = this.currentMembers
-                    .map(m => m.email)
-                    .filter(email => email) // Filter out empty emails
-                    .join(',');
-
-                if (!emails) {
-                    showSnackbar('メールアドレスが見つかりませんでした', 'error');
-                    return;
-                }
-
-                // Copy to clipboard
-                navigator.clipboard.writeText(emails).then(() => {
-                    showSnackbar('表示中のメンバーのメールアドレスをコピーしました');
-                }).catch(err => {
-                    console.error('Failed to copy: ', err);
-                    showSnackbar('クリップボードに値をコピーできませんでした', 'error');
-                });
             }
         };
     })();
