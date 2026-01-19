@@ -223,9 +223,20 @@
                     const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query, null, isRefresh);
                     let tasks = result?.data || result || [];
 
+                    // マイボードの場合、リストデータも取得
+                    let lists = [];
+                    if (boardId === 'my-board' && this.myBoardFilters?.includeListMembers) {
+                        try {
+                            const listsResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LISTS, 'select', {}, null, isRefresh);
+                            lists = listsResult?.data || listsResult || [];
+                        } catch (error) {
+                            console.error('Error loading lists:', error);
+                        }
+                    }
+
                     // マイボードの場合、フロントエンドでさらにフィルタリング
                     if (boardId === 'my-board') {
-                        tasks = this.filterMyBoardTasks(tasks);
+                        tasks = this.filterMyBoardTasks(tasks, lists);
                     }
 
                     // ボード固有のタスクキャッシュに保存
@@ -245,9 +256,20 @@
                                 const freshResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query, null, true); // forceRefresh = true
                                 let freshTasks = freshResult?.data || freshResult || [];
 
+                                // マイボードの場合、リストデータも再取得
+                                let freshLists = [];
+                                if (boardId === 'my-board' && this.myBoardFilters?.includeListMembers) {
+                                    try {
+                                        const freshListsResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LISTS, 'select', {}, null, true);
+                                        freshLists = freshListsResult?.data || freshListsResult || [];
+                                    } catch (error) {
+                                        console.error('Error loading fresh lists:', error);
+                                    }
+                                }
+
                                 // マイボードの場合のフィルタリング（再取得時）
                                 if (boardId === 'my-board') {
-                                    freshTasks = this.filterMyBoardTasks(freshTasks);
+                                    freshTasks = this.filterMyBoardTasks(freshTasks, freshLists);
                                 }
 
                                 this.cachedBoardTasks[boardId] = freshTasks;
@@ -779,7 +801,7 @@
             /**
              * マイボードのタスクをフィルタリング
              */
-            filterMyBoardTasks: function (tasks) {
+            filterMyBoardTasks: function (tasks, lists = []) {
                 const filters = this.myBoardFilters;
 
                 return tasks.filter(t => {
@@ -808,6 +830,20 @@
                         if (selectedMembers.length > 0 && selectedMembers.includes(t[role])) {
                             memberMatch = true;
                             break;
+                        }
+
+                        // processed_byの場合、includeListMembersがtrueならリストの担当者も確認
+                        if (role === 'processed_by' && filters.includeListMembers && selectedMembers.length > 0) {
+                            // このタスクに紐づくリストを検索
+                            const taskLists = lists.filter(list => list.task_id === t.id);
+                            // リストの担当者が選択されたメンバーに含まれているか確認
+                            for (const list of taskLists) {
+                                if (list.assign_to && selectedMembers.includes(list.assign_to)) {
+                                    memberMatch = true;
+                                    break;
+                                }
+                            }
+                            if (memberMatch) break;
                         }
                     }
 

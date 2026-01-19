@@ -8,7 +8,7 @@
         </button>
     </nav>
 
-    <div class="grid large-width medium-height scroll padding tiny-space no-margin small-round">
+    <div class="grid background large-width medium-height scroll padding tiny-space no-margin small-round">
         <!-- Title Filter -->
         <div class="s12 m12 l12 extra-line">
             <span class="bold small-text">タスク名</span>
@@ -28,7 +28,7 @@
             </div>
         </div>
 
-        <hr class="max">
+        <hr class="max s12">
 
         <!-- Member Filters -->
         <div class="s12 m12 l12 extra-line">
@@ -80,9 +80,16 @@
                     <!-- Chips will be rendered here -->
                 </div>
             </div>
+
+            <div class="row">
+                <label class="checkbox">
+                    <input type="checkbox" id="filter-processed-by-include-list-members">
+                    <span>進行者にリストの担当者を含める</span>
+                </label>
+            </div>
         </div>
 
-        <hr class="max">
+        <hr class="max s12">
 
         <!-- Date Filters -->
         <div class="s12 m12 l12 extra-line">
@@ -106,7 +113,7 @@
             </div>
         </div>
 
-        <hr class="max">
+        <hr class="max s12">
 
         <!-- Board Filter -->
         <div class="s12 m12 l12 extra-line">
@@ -286,6 +293,7 @@
                 const endsAtFrom = document.getElementById('filter-ends-at-from');
                 const endsAtTo = document.getElementById('filter-ends-at-to');
                 const overdue = document.getElementById('filter-is-overdue');
+                const includeListMembers = document.getElementById('filter-processed-by-include-list-members');
 
                 const filters = {
                     title: titleInput ? titleInput.value : '',
@@ -307,7 +315,8 @@
                         }
                     },
                     boards: App.pages.boards?.myBoardFilters?.boards || [],
-                    isOverdue: overdue ? overdue.checked : false
+                    isOverdue: overdue ? overdue.checked : false,
+                    includeListMembers: includeListMembers ? includeListMembers.checked : false
                 };
 
                 // ボードページにフィルタ設定を保存
@@ -332,6 +341,7 @@
                 const endsAtFrom = document.getElementById('filter-ends-at-from');
                 const endsAtTo = document.getElementById('filter-ends-at-to');
                 const overdue = document.getElementById('filter-is-overdue');
+                const includeListMembers = document.getElementById('filter-processed-by-include-list-members');
 
                 if (titleInput) titleInput.value = '';
                 if (titleMatchSelect) titleMatchSelect.value = 'contains';
@@ -340,6 +350,7 @@
                 if (endsAtFrom) endsAtFrom.value = '';
                 if (endsAtTo) endsAtTo.value = '';
                 if (overdue) overdue.checked = false;
+                if (includeListMembers) includeListMembers.checked = true;
 
                 // メンバーフィルタをデフォルトに戻す
                 if (App.pages.boards) {
@@ -374,6 +385,7 @@
                 const endsAtFrom = document.getElementById('filter-ends-at-from');
                 const endsAtTo = document.getElementById('filter-ends-at-to');
                 const overdue = document.getElementById('filter-is-overdue');
+                const includeListMembers = document.getElementById('filter-processed-by-include-list-members');
 
                 if (titleInput) titleInput.value = filters.title || '';
                 if (titleMatchSelect) titleMatchSelect.value = filters.titleMatchMode || 'contains';
@@ -392,6 +404,7 @@
                 }
 
                 if (overdue) overdue.checked = filters.isOverdue;
+                if (includeListMembers) includeListMembers.checked = filters.includeListMembers || false;
 
                 // メンバーチップを描画
                 ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
