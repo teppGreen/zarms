@@ -177,10 +177,10 @@
               <span>関連</span>
               <div class="badge l secondary font-number none" id="task-related-badge">0</div>
             </a>
-            <a disabled title="今後実装予定" onclick="App.modals.taskDetail.switchTaskDetailTab(this,'files')">
+            <!-- <a onclick="App.modals.taskDetail.switchTaskDetailTab(this,'files')">
               <span>ファイル</span>
               <div class="badge l secondary font-number none" id="task-files-badge">0</div>
-            </a>
+            </a> -->
           </nav>
           <button disabled class="large circle primary" id="task-detail-add-button">
             <i>add</i>
@@ -612,7 +612,7 @@
        * モーダルを閉じる
        * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
        */
-      close: function (skipUrlUpdate = false, skipDirtyCheck = false) {
+      close: function (skipUrlUpdate = false, skipDirtyCheck = false, skipClose = false) {
         // Quillの変更をチェック
         const currentDescription = this.quill ? this.quill.root.innerHTML : '';
         const originalDescription = this.originalData?.description || '';
@@ -620,9 +620,18 @@
 
         // 変更がある場合は確認
         if (!skipDirtyCheck && (this.isDirty || descriptionChanged)) {
-          if (!confirm('変更が保存されていません。破棄してもよろしいですか？')) {
+          const shouldSave = confirm('変更を保存しますか？');
+          if (shouldSave) {
+            // 保存を実行
+            this.save(skipClose);
+            return true;
+          } else {
             return false;
           }
+        }
+
+        if (skipClose) {
+          return true;
         }
 
         ui('#modal-detail-task');
@@ -642,6 +651,8 @@
 
           App.utils.url.updateParams(newParams, false);
         }
+
+        return true;
       },
 
       /**
@@ -735,7 +746,7 @@
       /**
        * 変更を保存
        */
-      save: async function () {
+      save: async function (skipClose = false) {
         const id = this.currentId;
         if (!id) {
           console.error('[TaskDetail] Cannot save: No ID');
@@ -843,7 +854,7 @@
         }
 
         if (!hasChanges && !hasListChanges && !hasRelatedChanges && !hasFileChanges) {
-          this.close(false, true);
+          this.close(false, true, skipClose);
           return;
         }
 
@@ -851,9 +862,22 @@
         Object.assign(currentItem, updates);
         updateLocalData(TABLE_NAMES.TASKS, id, updates);
 
-        // 先にモーダルを閉じる
+        // 変更フラグをクリアしてモーダルを閉じる
         this.isDirty = false;
-        this.close(false, true);
+        ui('#modal-detail-task');
+
+        // URLパラメータを更新
+        if (App.utils.url && App.utils.url.updateParams) {
+          const currentParams = App.utils.url.getParams();
+          const newParams = {
+            tab: currentParams.tab || 'home'
+          };
+          if (currentParams.board_id) {
+            newParams.board_id = currentParams.board_id;
+          }
+          App.utils.url.updateParams(newParams, false);
+        }
+
         showSnackbar('変更を保存しています。画面を閉じないでください。', 'info', 'top', 0);
 
         try {
@@ -1248,6 +1272,11 @@
         btnDuplicate.parentNode.replaceChild(newBtn, btnDuplicate);
 
         newBtn.addEventListener('click', async () => {
+          const result = await this.close(false, false, true);
+          if (!result) {
+            return;
+          }
+
           const promptValue = prompt('新しいタスク名', task.name + ' のコピー');
 
           // キャンセル(null)または空文字の場合は中断
@@ -1258,6 +1287,7 @@
             return;
           }
 
+          this.close(false, true);
           // 現在のタスクデータをコピー
           const newTask = { ...task };
 
@@ -1287,9 +1317,6 @@
               console.log('newTask is added to cachedBoardTasks', currentBoardId, newTask.id);
             }
           }
-
-          // モーダルを閉じる
-          this.close(false, false);
 
           await new Promise(resolve => setTimeout(resolve, 500));
           this.open(newTask.id, false, true);
@@ -1963,7 +1990,7 @@
             <div class="row middle-align small-space">
               <div class="max" id="parent-task-display">
                 <p class="no-margin">
-                  <strong>${displayId}</strong> ${taskName}
+                  <strong style="cursor: pointer; text-decoration: underline;" onclick="App.modals.taskDetail.openRelatedTask('${this.currentParentTask.id}', '${this.currentParentTask.board_id || ''}')">${displayId}</strong> ${taskName}
                   <span class="chip small ${statusClass}">${statusText}</span>
                 </p>
               </div>
@@ -2017,7 +2044,7 @@
               <div class="row middle-align small-space">
                 <div class="max">
                   <p class="no-margin">
-                    <strong>${displayId}</strong> ${taskName}
+                    <strong style="cursor: pointer; text-decoration: underline;" onclick="App.modals.taskDetail.openRelatedTask('${task.id}', '${task.board_id || ''}')">${displayId}</strong> ${taskName}
                     <span class="chip small ${statusClass}">${statusText}</span>
                   </p>
                 </div>
@@ -2118,6 +2145,45 @@
         this.updateRelatedBadge();
         this.isDirty = true;
       },
+
+      /**
+       * 関連タスクを開く（親タスクまたは子タスク）
+       * @param {string} taskId - 開くタスクのID
+       * @param {string} boardId - タスクが属するボードID
+       */
+      openRelatedTask: async function (taskId, boardId) {
+        if (!taskId) {
+          console.error('[TaskDetail] Invalid task ID');
+          return;
+        }
+
+        // close関数を実行（変更確認を含む）
+        const closeResult = this.close();
+
+        // closeがfalseを返した場合（ユーザーが保存をキャンセルした場合）は処理を中断
+        if (!closeResult) {
+          return;
+        }
+
+        // URLパラメータを更新してボードに移動
+        if (App.utils.url && App.utils.url.updateParams) {
+          const newParams = {
+            tab: 'board',
+            board_id: boardId || 'my-board' // ボードIDがない場合はMy Boardに移動
+          };
+
+          App.utils.url.updateParams(newParams, false);
+        }
+
+        // ボードタブに切り替え
+        if (App.utils.navigation && App.utils.navigation.switchTab) {
+          // ボードの読み込みを待つ
+          await App.utils.navigation.switchTab(`board-${boardId || 'my-board'}`);
+          // タスクを開く
+          this.open(taskId, false);
+        }
+      },
+
 
       /**
        * 関連タブのバッジを更新
