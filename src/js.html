@@ -955,41 +955,21 @@
    * @param {boolean} options.multiSelect - 複数選択を有効にするか（デフォルト: true）
    * @param {Array} options.views - 表示するビュー（デフォルト: [google.picker.ViewId.DOCS]）
    */
-  function openGooglePicker(callback, options = {}) {
-    const {
-      multiSelect = true,
-      views = [google.picker.ViewId.DOCS]
-    } = options;
-
+  function openGoogleDrivePicker(callback, options = {}) {
+    // OAuthトークンを取得
     callGAS('getOAuthToken')
       .then(token => {
         // Google Picker APIを読み込む
         gapi.load('picker', {
           callback: () => {
             // Pickerを構築
-            const builder = new google.picker.PickerBuilder()
+            const picker = new google.picker.PickerBuilder()
               .setOAuthToken(token)
-              .setCallback((data) => {
-                if (data[google.picker.Response.ACTION] === google.picker.Action.PICKED) {
-                  const docs = data[google.picker.Response.DOCUMENTS];
-                  callback(docs);
-                } else if (data[google.picker.Response.ACTION] === google.picker.Action.CANCEL) {
-                  // ユーザーがキャンセルした場合、何もしない
-                }
-              })
-              .setOrigin('https:\/\/script.google.com');
-
-            // ビューを追加
-            views.forEach(view => {
-              builder.addView(view);
-            });
-
-            // 複数選択を有効化
-            if (multiSelect) {
-              builder.enableFeature(google.picker.Feature.MULTISELECT_ENABLED);
-            }
-
-            const picker = builder.build();
+              .addView(google.picker.ViewId.DOCS)
+              .setCallback(callback)
+              .setOrigin('https://script.google.com')
+              .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+              .build();
 
             // Pickerを表示
             picker.setVisible(true);
