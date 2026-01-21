@@ -441,19 +441,21 @@
             },
 
             /**
-             * カードクリック時の処理
+             * カードクリック時の処理（イベント委譲版）
              */
             bindCardClick: function (container) {
                 if (!container) return;
 
-                const cards = container.querySelectorAll('.kanban-card');
-                cards.forEach(card => {
-                    card.addEventListener('click', () => {
+                // イベント委譲を使用して、親コンテナに1つのイベントリスナーを設定
+                container.addEventListener('click', (e) => {
+                    // カードまたはその子要素がクリックされたかチェック
+                    const card = e.target.closest('.kanban-card');
+                    if (card) {
                         const taskId = card.dataset.eid;
                         if (taskId && App.modals.taskDetail) {
                             App.modals.taskDetail.open(taskId);
                         }
-                    });
+                    }
                 });
             },
 
@@ -927,7 +929,13 @@
 
                     let iconSrc, buttonClass;
                     if (url) {
-                        iconSrc = `<img src="${url}" title="${escapeHtml(assigneeNames[index])}" class="responsive">`;
+                        // URLをサニタイズしてエスケープ
+                        const safeUrl = sanitizeUrl(url);
+                        if (safeUrl) {
+                            iconSrc = `<img src="${escapeHtmlAttribute(safeUrl)}" title="${escapeHtml(assigneeNames[index])}" class="responsive">`;
+                        } else {
+                            iconSrc = `<i title="${escapeHtml(assigneeNames[index])}">person</i>`;
+                        }
                         buttonClass = 'circle transparent small';
                     } else {
                         iconSrc = `<i title="${escapeHtml(assigneeNames[index])}">person</i>`;
@@ -955,7 +963,7 @@
 
 
                 return `
-                <article class="kanban-card small-margin padding" data-eid="${task.id}" role="button" style="cursor: move;">
+                <article class="kanban-card small-margin padding" data-eid="${escapeHtmlAttribute(task.id)}" role="button" style="cursor: move;">
                     <div>
                         <span>${displayId} <strong>${escapeHtml(task.name || '')}</strong></span>
                     </div>
