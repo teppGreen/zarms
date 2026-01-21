@@ -57,24 +57,37 @@ function loadMainApp(urlParams, activeUser) {
  * @returns {Object|null} ユーザー情報（id, email, display_nameなど）またはnull
  */
 function getMemberByEmail(email) {
-  // membersテーブルからemailが一致するレコードを検索
-  console.log('[getMemberByEmail]email', email);
-  let result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
-    where: { email: ["=", email] }
-  }, null, false);
-
-  let members = result?.data || result || [];
-
-  if (members.length === 0) {
-    result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
-      where: { email: ["=", email] }
-    }, null, true); //キャッシュなしで再試行
-    members = result?.data || result || [];
-    if (members.length === 0) {
-      throw new Error('User not found');
+  try {
+    console.log('[getMemberByEmail] email:', email);
+    
+    if (!email || typeof email !== 'string') {
+      throw new ValidationError('Invalid email address', 'email', email);
     }
+    
+    let result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
+      where: { email: ["=", email] }
+    }, null, false);
+
+    let members = result?.data || result || [];
+
+    if (members.length === 0) {
+      // キャッシュなしで再試行
+      result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
+        where: { email: ["=", email] }
+      }, null, true);
+      
+      members = result?.data || result || [];
+      
+      if (members.length === 0) {
+        throw new ValidationError('User not found', 'email', email);
+      }
+    }
+    
+    return members[0];
+  } catch (error) {
+    console.error('[getMemberByEmail] Error:', error);
+    throw error;
   }
-  return members[0];
 }
 
 /**
