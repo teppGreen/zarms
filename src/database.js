@@ -63,15 +63,15 @@ const BOOLEAN_COLUMNS = ['is_active', 'is_done'];
  * @returns {string} 列ID（例: 0→'A', 25→'Z', 26→'AA', 27→'AB'）
  */
 function columnIndexToId(index) {
-  let id = '';
-  let currentIndex = index;
-  
-  while (currentIndex >= 0) {
-    id = COLUMN_IDS[currentIndex % 26] + id;
-    currentIndex = Math.floor(currentIndex / 26) - 1;
-  }
-  
-  return id;
+    let id = '';
+    let currentIndex = index;
+
+    while (currentIndex >= 0) {
+        id = COLUMN_IDS[currentIndex % 26] + id;
+        currentIndex = Math.floor(currentIndex / 26) - 1;
+    }
+
+    return id;
 }
 
 /**
@@ -82,7 +82,7 @@ function columnIndexToId(index) {
  */
 function getHeadersMap(sheetName) {
     try {
-        const headers = getHeadersFromSheetsAPI(sheetName);
+        const headers = getTableHeaders(sheetName);
         const headersMap = {};
 
         headers.forEach((header, index) => {
@@ -106,17 +106,17 @@ function getHeadersMap(sheetName) {
  * @returns {boolean} boolean値
  */
 function toBooleanSafe(value) {
-  if (typeof value === 'boolean') {
-    return value;
-  }
-  if (typeof value === 'string') {
-    const normalized = value.toLowerCase().trim();
-    return normalized === 'true' || normalized === '1' || normalized === 'yes';
-  }
-  if (typeof value === 'number') {
-    return value !== 0;
-  }
-  return false;
+    if (typeof value === 'boolean') {
+        return value;
+    }
+    if (typeof value === 'string') {
+        const normalized = value.toLowerCase().trim();
+        return normalized === 'true' || normalized === '1' || normalized === 'yes';
+    }
+    if (typeof value === 'number') {
+        return value !== 0;
+    }
+    return false;
 }
 
 /**
@@ -249,7 +249,7 @@ function select(sheetName, query = {}) {
         }
 
         // ヘッダーの取得
-        const headers = getHeadersFromSheetsAPI(sheetName);
+        const headers = getTableHeaders(sheetName);
 
         // データの変換
         const results = gvizResponse.table.rows.map(row => {
@@ -398,18 +398,6 @@ function getTableHeaders(tableName) {
 }
 
 /**
- * Sheets APIからヘッダー情報を取得（レガシー互換用）
- * 新しいコードではgetTableHeaders()を使用することを推奨
- * @param {string} sheetName - シート名
- * @returns {Array} ヘッダー配列
- * @deprecated getTableHeaders()を使用してください
- */
-function getHeadersFromSheetsAPI(sheetName) {
-    // パフォーマンス向上のため、定数から取得
-    return getTableHeaders(sheetName);
-}
-
-/**
  * オブジェクトをSheets APIのフォーマットに変換
  * @param {Object} record - データオブジェクト
  * @param {Array} headers - ヘッダー配列
@@ -441,7 +429,7 @@ function insert(userId, sheetName, record) {
     lock.waitLock(60000);
 
     try {
-        const headers = getHeadersFromSheetsAPI(sheetName);
+        const headers = getTableHeaders(sheetName);
         const preparedData = prepareNewData(userId, sheetName, record);
         const rowData = convertRecordToArray(preparedData, headers);
 
@@ -474,7 +462,7 @@ function bulkInsert(userId, sheetName, records) {
     lock.waitLock(60000);
 
     try {
-        const headers = getHeadersFromSheetsAPI(sheetName);
+        const headers = getTableHeaders(sheetName);
         const preparedData = records.map(record => prepareNewData(userId, sheetName, record));
         const values = preparedData.map(record => convertRecordToArray(record, headers));
 
@@ -512,7 +500,7 @@ function update(userId, sheetName, query) {
 
     try {
         const headersMap = getHeadersMap(sheetName);
-        const headers = getHeadersFromSheetsAPI(sheetName);
+        const headers = getTableHeaders(sheetName);
 
         // 更新対象のレコードを検索
         const targetRecords = select(sheetName, { where: query.where });
@@ -589,7 +577,7 @@ function remove(sheetName, query) {
     lock.waitLock(60000);
 
     try {
-        const headers = getHeadersFromSheetsAPI(sheetName);
+        const headers = getTableHeaders(sheetName);
 
         // 削除対象のレコードを検索
         const targetRecords = select(sheetName, { where: query.where });
@@ -700,16 +688,16 @@ function getItems(userId, tableName, forceRefresh = false) {
  * @returns {*} ソートされたオブジェクト
  */
 function sortObjectKeys(obj) {
-  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
-    return obj;
-  }
-  
-  const sorted = {};
-  Object.keys(obj).sort().forEach(key => {
-    sorted[key] = sortObjectKeys(obj[key]);
-  });
-  
-  return sorted;
+    if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+        return obj;
+    }
+
+    const sorted = {};
+    Object.keys(obj).sort().forEach(key => {
+        sorted[key] = sortObjectKeys(obj[key]);
+    });
+
+    return sorted;
 }
 
 /**
@@ -718,13 +706,13 @@ function sortObjectKeys(obj) {
  * @returns {string} ハッシュ値（16進数文字列）
  */
 function hashString(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash |= 0; // 32bit整数に変換
-  }
-  return Math.abs(hash).toString(16);
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0; // 32bit整数に変換
+    }
+    return Math.abs(hash).toString(16);
 }
 
 /**
@@ -734,20 +722,20 @@ function hashString(str) {
  * @returns {string} キャッシュキー
  */
 function generateCacheKey(tableName, dataObject) {
-  const sortedData = sortObjectKeys(dataObject);
-  const dataStr = JSON.stringify(sortedData);
-  const hash = hashString(dataStr);
-  
-  // キーの長さを制限（Google Apps Scriptのキャッシュキーの上限を考慮）
-  const maxKeyLength = 250;
-  const baseKey = `db_${tableName}_${hash}`;
-  
-  if (baseKey.length > maxKeyLength) {
-    // 長すぎる場合はテーブル名とハッシュのみ
-    return `db_${tableName.substring(0, 50)}_${hash}`;
-  }
-  
-  return baseKey;
+    const sortedData = sortObjectKeys(dataObject);
+    const dataStr = JSON.stringify(sortedData);
+    const hash = hashString(dataStr);
+
+    // キーの長さを制限（Google Apps Scriptのキャッシュキーの上限を考慮）
+    const maxKeyLength = 250;
+    const baseKey = `db_${tableName}_${hash}`;
+
+    if (baseKey.length > maxKeyLength) {
+        // 長すぎる場合はテーブル名とハッシュのみ
+        return `db_${tableName.substring(0, 50)}_${hash}`;
+    }
+
+    return baseKey;
 }
 
 // ============================================
@@ -868,7 +856,7 @@ function getNextSerial(sheetName, columnName) {
 }
 
 function prepareNewData(userId, sheetName, dataObject) {
-    const headers = getHeadersFromSheetsAPI(sheetName);
+    const headers = getTableHeaders(sheetName);
     const newData = { ...dataObject };
 
     const now = new Date().toISOString();
@@ -884,7 +872,7 @@ function prepareNewData(userId, sheetName, dataObject) {
 }
 
 function prepareUpdateData(userId, sheetName, dataObject) {
-    const headers = getHeadersFromSheetsAPI(sheetName);
+    const headers = getTableHeaders(sheetName);
     const newData = { ...dataObject };
 
     const now = new Date().toISOString();

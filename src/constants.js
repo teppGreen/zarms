@@ -57,7 +57,7 @@ const TASK_STATUS = {
  * パフォーマンス向上のため、スプレッドシートへのAPIアクセスを削減
  */
 const TABLE_HEADERS = {
-  LOGS: ['log', 'operation_type_key', 'table_name', 'record_id', 'data', 'remark', 'created_by', 'created_at'],
+  LOGS: ['id', 'operation_type_key', 'table_name', 'record_id', 'data', 'remark', 'created_by', 'created_at'],
   BOARDS: ['id', 'display_id', 'email', 'name', 'description', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   COMMENTS: ['id', 'display_id', 'content', 'mentioned_to', 'related_table', 'related_id', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   DIRECTORIES: ['id', 'display_id', 'parent_directory_id', 'directory_type_key', 'name', 'slack_channel_url', 'gfolder_id', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
