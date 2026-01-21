@@ -11,6 +11,7 @@
             currentBoardId: null, // 現在表示中のボードID
             lastRenderTimes: {}, // ボードごとの最終レンダリング時刻
             cachedBoardTasks: {}, // ボードごとのタスクデータキャッシュ
+            clickHandlers: {}, // ボードごとのクリックハンドラーを保持
             // マイボードのフィルタ設定
             myBoardFilters: {},
 
@@ -446,8 +447,15 @@
             bindCardClick: function (container) {
                 if (!container) return;
 
-                // イベント委譲を使用して、親コンテナに1つのイベントリスナーを設定
-                container.addEventListener('click', (e) => {
+                const containerId = container.id;
+                
+                // 既存のハンドラーがあれば削除
+                if (this.clickHandlers[containerId]) {
+                    container.removeEventListener('click', this.clickHandlers[containerId]);
+                }
+
+                // 新しいハンドラーを作成
+                const handler = (e) => {
                     // カードまたはその子要素がクリックされたかチェック
                     const card = e.target.closest('.kanban-card');
                     if (card) {
@@ -456,7 +464,11 @@
                             App.modals.taskDetail.open(taskId);
                         }
                     }
-                });
+                };
+
+                // ハンドラーを保存して追加
+                this.clickHandlers[containerId] = handler;
+                container.addEventListener('click', handler);
             },
 
             /**
