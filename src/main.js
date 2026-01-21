@@ -2,21 +2,15 @@
 // code.gs - メインロジックとWebアプリのエントリーポイント
 // ============================================
 
-// Webアプリのエントリーポイント
+/**
+ * Webアプリのエントリーポイント
+ * ユーザーの認証状態を確認し、適切な画面を表示します
+ * @param {Object} e - イベントオブジェクト（URLパラメータなどを含む）
+ * @returns {HtmlOutput} HTMLテンプレート
+ */
 function doGet(e) {
   // 現在のユーザーを取得
   const activeUserEmail = Session.getActiveUser().getEmail();
-
-  // テスト用
-  // const activeUser = getMemberByEmail(activeUserEmail);
-  // const template = HtmlService.createTemplateFromFile('index');
-  // template.templateVariables = {
-  //   urlParams: e.parameter,
-  //   activeUser: activeUser,
-  //   TABLE_NAMES: TABLE_NAMES,
-  //   DIRECTORY_TYPES: DIRECTORY_TYPES,
-  //   TASK_STATUS: TASK_STATUS
-  // };
 
   const template = HtmlService.createTemplateFromFile('register');
   template.templateVariables = {
@@ -32,6 +26,13 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+/**
+ * メインアプリケーションをロードします
+ * 認証済みユーザーに対してアプリケーション画面を返します
+ * @param {Object} urlParams - URLパラメータ
+ * @param {Object} activeUser - 現在のアクティブユーザー情報
+ * @returns {string} HTMLコンテンツ
+ */
 function loadMainApp(urlParams, activeUser) {
   const template = HtmlService.createTemplateFromFile('index');
   template.templateVariables = {
@@ -53,8 +54,11 @@ function loadMainApp(urlParams, activeUser) {
 // ============================================
 
 /**
- * 現在ログイン中のユーザー情報を取得します
- * @returns {Object|null} ユーザー情報（id, email, display_nameなど）またはnull
+ * メールアドレスからメンバー情報を取得します
+ * キャッシュを利用し、見つからない場合は再試行します
+ * @param {string} email - メールアドレス
+ * @returns {Object} ユーザー情報（id, email, display_nameなど）
+ * @throws {ValidationError} ユーザーが見つからない場合
  */
 function getMemberByEmail(email) {
   try {
@@ -93,7 +97,7 @@ function getMemberByEmail(email) {
 /**
  * Slack URLからユーザーを検索します（ユーザー登録用）
  * @param {string} slackProfileUrl - SlackプロフィールURL
- * @returns {Object|null} ユーザー情報またはnull
+ * @returns {Object|null} ユーザー情報、見つからない場合はnull
  */
 function findUserBySlackUrl(slackProfileUrl) {
   try {
@@ -117,7 +121,7 @@ function findUserBySlackUrl(slackProfileUrl) {
 /**
  * ユーザーのemailを登録します（ユーザー登録用）
  * @param {string} userId - ユーザーのID（uuid）
- * @returns {boolean} 成功フラグ
+ * @returns {boolean} 成功した場合true、失敗した場合false
  */
 function registerUserEmail(userId) {
   try {
@@ -144,7 +148,6 @@ function registerUserEmail(userId) {
  * ユーザープロパティを保存します
  * @param {string} key - プロパティキー
  * @param {string} value - プロパティ値
- * @returns {boolean} 成功フラグ
  */
 function saveUserProperty(key, value) {
   try {
@@ -162,19 +165,27 @@ function saveUserProperty(key, value) {
 
 
 /**
- * 指定されたファイルをインクルードします
- * @param {string} filename - インクルードするファイルの拡張子を除いた名前
- * @returns {string} ファイルの内容
+ * HTMLファイルをインクルードします
+ * @param {string} filename - ファイル名（拡張子なし）
+ * @returns {string} HTMLコンテンツ
  */
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
+/**
+ * 現在のスクリプトのURLを取得します
+ * @returns {string} スクリプトのWebアプリURL
+ */
 function getScriptUrl() {
   const url = ScriptApp.getService().getUrl();
   return url;
 }
 
+/**
+ * 開発モードかどうかを判定します
+ * @returns {boolean} 開発モードの場合true
+ */
 function isDevelopment() {
   const REGEX = /^https:\/\/script\.google\.com\/a\/.*\/dev.*$/;
   const url = ScriptApp.getService().getUrl();
