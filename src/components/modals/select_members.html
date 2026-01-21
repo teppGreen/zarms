@@ -49,9 +49,9 @@
                     if (input && input.offsetParent !== null) {
                         input.focus();
                         input.select(); // 全選択
-                    } else if (count < 10) {
+                    } else if (count < UI_CONFIG.MODAL_FOCUS_MAX_RETRIES) {
                         // まだ表示されていない場合は少し待って再試行
-                        setTimeout(() => tryFocus(count + 1), 50);
+                        setTimeout(() => tryFocus(count + 1), UI_CONFIG.MODAL_FOCUS_DELAY);
                     }
                 };
 
