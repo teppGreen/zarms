@@ -278,7 +278,8 @@
 
             const now = new Date();
             const jstHours = (now.getUTCHours() + 9) % 24;
-            return jstHours >= 2 && jstHours < 5;
+            return jstHours >= EVENT_CONFIG.MAINTENANCE_HOURS.START && 
+                   jstHours < EVENT_CONFIG.MAINTENANCE_HOURS.END;
         }
 
         function showMaintenanceStep() {
@@ -329,11 +330,12 @@
         }
 
         function showAccessErrorStep() {
+            const allowedDomains = AUTH_CONFIG.ALLOWED_DOMAINS.join(' または ');
             document.getElementById('active-user-email').innerHTML = `
                 <span class="secondary-text small-text">
-                    サインイン中のアカウント: <a target="_blank" href="https://myaccount.google.com/?authuser=${activeUserEmail}">${activeUserEmail}</a><br>
-                    サインイン可能なドメイン: student.zen.ac.jp または zen.ac.jp
-                </span>`;
+                    サインイン中のアカウント: <a target="_blank" href="https:\\/\\/myaccount.google.com\\/?authuser=${activeUserEmail}">${activeUserEmail}<\/a><br>
+                    サインイン可能なドメイン: ${allowedDomains}
+                <\/span>`;
             showStep('step-access-error');
         }
 
