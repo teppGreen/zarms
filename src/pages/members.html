@@ -175,14 +175,14 @@
                                 
                                 let icon;
                                 if (safePhotoUrl) {
-                                    // URLをエスケープして安全に埋め込み
-                                    icon = `<i class="extra circle transparent"><img src="${escapeHtmlAttribute(safePhotoUrl)}" class="responsive"></i>`;
+                                    // URLはサニタイズ済みなので、そのまま使用（HTMLコンテキストの特殊文字のみエスケープ）
+                                    icon = `<i class="extra circle transparent"><img src="${escapeHtml(safePhotoUrl)}" class="responsive"></i>`;
                                 } else {
                                     icon = '<i class="extra circle">account_circle</i>';
                                 }
                                 
                                 if (safeSlackUrl) {
-                                    return `<a href="${escapeHtmlAttribute(safeSlackUrl)}" target="_blank" rel="noopener noreferrer">${icon}</a>`;
+                                    return `<a href="${escapeHtml(safeSlackUrl)}" target="_blank" rel="noopener noreferrer">${icon}</a>`;
                                 }
                                 
                                 return icon;

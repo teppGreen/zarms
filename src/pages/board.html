@@ -929,10 +929,11 @@
 
                     let iconSrc, buttonClass;
                     if (url) {
-                        // URLをサニタイズしてエスケープ
+                        // URLをサニタイズ
                         const safeUrl = sanitizeUrl(url);
                         if (safeUrl) {
-                            iconSrc = `<img src="${escapeHtmlAttribute(safeUrl)}" title="${escapeHtml(assigneeNames[index])}" class="responsive">`;
+                            // URLはサニタイズ済みなので、そのまま使用（HTMLコンテキストの特殊文字のみエスケープ）
+                            iconSrc = `<img src="${escapeHtml(safeUrl)}" title="${escapeHtml(assigneeNames[index])}" class="responsive">`;
                         } else {
                             iconSrc = `<i title="${escapeHtml(assigneeNames[index])}">person</i>`;
                         }
