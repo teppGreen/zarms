@@ -1343,4 +1343,81 @@
 
     return diffDays;
   }
+
+  // ============================================
+  // Testing Utilities (開発環境のみ)
+  // ============================================
+
+  if (App.state.isDevelopment) {
+    /**
+     * テスト用のヘルパー関数
+     */
+    App.test = {
+      /**
+       * モックデータを生成します
+       * @param {string} type - データタイプ（'member', 'task', 'board'など）
+       * @param {Object} overrides - 上書きするプロパティ
+       * @returns {Object} モックデータ
+       */
+      createMockData: function(type, overrides = {}) {
+        const defaults = {
+          member: {
+            id: generateUuid(),
+            email: 'test@student.zen.ac.jp',
+            display_name: 'テストユーザー',
+            name: 'テスト 太郎',
+            is_active: true,
+            created_at: new Date().toISOString()
+          },
+          task: {
+            id: generateUuid(),
+            display_id: 1,
+            name: 'テストタスク',
+            description: 'テスト用のタスクです',
+            task_status_key: 'TODO',
+            priority_key: 'MEDIUM',
+            is_active: true,
+            created_at: new Date().toISOString()
+          },
+          board: {
+            id: generateUuid(),
+            display_id: 1,
+            name: 'テストボード',
+            description: 'テスト用のボードです',
+            is_active: true,
+            created_at: new Date().toISOString()
+          }
+        };
+
+        return Object.assign({}, defaults[type] || {}, overrides);
+      },
+
+      /**
+       * App.stateをリセットします
+       */
+      resetState: function() {
+        App.state.data = {
+          boards: [],
+          directories: [],
+          members: [],
+          tasks: [],
+          apps: []
+        };
+        console.log('[App.test] State reset');
+      },
+
+      /**
+       * すべてのモーダルを閉じます
+       */
+      closeAllModals: async function() {
+        const modals = document.querySelectorAll('dialog[open]');
+        for (const modal of modals) {
+          await ui(`#${modal.id}`);
+        }
+        console.log('[App.test] All modals closed');
+      }
+    };
+
+    console.log('[App.test] Testing utilities loaded');
+  }
 </script>

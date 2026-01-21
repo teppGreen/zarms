@@ -973,12 +973,59 @@ function getSheet(ss, sheetName) {
     return sheet;
 }
 
+// ============================================
+// Dependency Injection for Testing
+// テスト時にモックを注入できるようにする
+// ============================================
+
+/**
+ * 依存関係の注入ポイント（テスト用）
+ */
+const DatabaseDependencies = {
+  spreadsheetService: {
+    openById: (id) => SpreadsheetApp.openById(id),
+    getActiveSpreadsheet: () => SpreadsheetApp.getActiveSpreadsheet()
+  },
+  cacheService: {
+    getScriptCache: () => CacheService.getScriptCache(),
+    getUserCache: () => CacheService.getUserCache()
+  },
+  utilitiesService: {
+    getUuid: () => Utilities.getUuid()
+  }
+};
+
+/**
+ * テスト用の依存関係を設定します
+ * @param {Object} mockDependencies - モック化された依存関係
+ */
+function setDatabaseDependencies(mockDependencies) {
+  Object.assign(DatabaseDependencies, mockDependencies);
+}
+
+/**
+ * 依存関係を元に戻します
+ */
+function resetDatabaseDependencies() {
+  DatabaseDependencies.spreadsheetService = {
+    openById: (id) => SpreadsheetApp.openById(id),
+    getActiveSpreadsheet: () => SpreadsheetApp.getActiveSpreadsheet()
+  };
+  DatabaseDependencies.cacheService = {
+    getScriptCache: () => CacheService.getScriptCache(),
+    getUserCache: () => CacheService.getUserCache()
+  };
+  DatabaseDependencies.utilitiesService = {
+    getUuid: () => Utilities.getUuid()
+  };
+}
+
 /**
  * UUIDを生成します
  * @returns {string} 生成されたUUID
  */
 function generateUuid() {
-    const uuid = Utilities.getUuid();
+    const uuid = DatabaseDependencies.utilitiesService.getUuid();
     console.log('Generated UUID: ' + uuid);
     return uuid;
 }
