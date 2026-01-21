@@ -169,20 +169,20 @@
                                 const profilePhotoUrl = cell.getValue();
                                 const slackUrl = cell.getData().slack_profile_url;
                                 
-                                // URLをサニタイズ
+                                // URLをサニタイズ（危険なプロトコルを除外）
                                 const safeSlackUrl = sanitizeUrl(slackUrl);
                                 const safePhotoUrl = sanitizeUrl(profilePhotoUrl);
                                 
                                 let icon;
                                 if (safePhotoUrl) {
-                                    // URLはサニタイズ済みなので、そのまま使用（HTMLコンテキストの特殊文字のみエスケープ）
-                                    icon = `<i class="extra circle transparent"><img src="${escapeHtml(safePhotoUrl)}" class="responsive"></i>`;
+                                    // URLはサニタイズ済みで安全なので、そのまま使用
+                                    icon = `<i class="extra circle transparent"><img src="${safePhotoUrl}" class="responsive"></i>`;
                                 } else {
                                     icon = '<i class="extra circle">account_circle</i>';
                                 }
                                 
                                 if (safeSlackUrl) {
-                                    return `<a href="${escapeHtml(safeSlackUrl)}" target="_blank" rel="noopener noreferrer">${icon}</a>`;
+                                    return `<a href="${safeSlackUrl}" target="_blank" rel="noopener noreferrer">${icon}</a>`;
                                 }
                                 
                                 return icon;

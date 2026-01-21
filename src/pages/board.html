@@ -929,11 +929,11 @@
 
                     let iconSrc, buttonClass;
                     if (url) {
-                        // URLをサニタイズ
+                        // URLをサニタイズ（危険なプロトコルを除外）
                         const safeUrl = sanitizeUrl(url);
                         if (safeUrl) {
-                            // URLはサニタイズ済みなので、そのまま使用（HTMLコンテキストの特殊文字のみエスケープ）
-                            iconSrc = `<img src="${escapeHtml(safeUrl)}" title="${escapeHtml(assigneeNames[index])}" class="responsive">`;
+                            // URLはサニタイズ済みで安全なので、そのまま使用
+                            iconSrc = `<img src="${safeUrl}" title="${escapeHtml(assigneeNames[index])}" class="responsive">`;
                         } else {
                             iconSrc = `<i title="${escapeHtml(assigneeNames[index])}">person</i>`;
                         }
@@ -964,7 +964,7 @@
 
 
                 return `
-                <article class="kanban-card small-margin padding" data-eid="${escapeHtmlAttribute(task.id)}" role="button" style="cursor: move;">
+                <article class="kanban-card small-margin padding" data-eid="${task.id}" role="button" style="cursor: move;">
                     <div>
                         <span>${displayId} <strong>${escapeHtml(task.name || '')}</strong></span>
                     </div>
