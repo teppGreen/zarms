@@ -827,18 +827,18 @@
     
     // 相対URLは許可
     if (urlTrimmed.startsWith('/') || urlTrimmed.startsWith('./') || urlTrimmed.startsWith('../')) {
-      return url;
+      return urlTrimmed;
     }
     
     // 安全なプロトコルのみ許可
     const safeProtocols = /^(https?|mailto):/i;
     if (safeProtocols.test(urlTrimmed)) {
-      return url;
+      return urlTrimmed;
     }
     
     // プロトコルなしの場合は許可（相対URL扱い）
     if (!urlTrimmed.includes(':')) {
-      return url;
+      return urlTrimmed;
     }
     
     // それ以外のプロトコル（javascript:, data:, vbscript:, file:, ftp:, blob: など）は拒否
@@ -873,7 +873,7 @@
 
     // パスを辿って関数を取得
     for (let i = 0; i < parts.length; i++) {
-      if (current && typeof current === 'object' && parts[i] in current) {
+      if (current && typeof current === 'object' && Object.prototype.hasOwnProperty.call(current, parts[i])) {
         current = current[parts[i]];
       } else {
         console.warn(`[resolveFunctionSafely] Cannot resolve path: ${functionPath} at ${parts[i]}`);
