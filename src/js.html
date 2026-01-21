@@ -75,7 +75,11 @@
 
   window.onload = initializeApp;
 
-  // 初期化
+  /**
+   * アプリケーションを初期化します
+   * ショートカット設定、履歴ハンドラー設定、データ読み込みを行います
+   * @returns {Promise<void>}
+   */
   async function initializeApp() {
     setupGlobalShortcuts();
     setupBrowserHistoryHandlers();
@@ -206,7 +210,11 @@
     }
   }
 
-  // 初回ロード: 最小限のデータのみ取得
+  /**
+   * 全データを読み込みます（初回ロード用）
+   * boards, apps, members, directoriesを並列で取得します
+   * @returns {Promise<void>}
+   */
   async function loadAllData() {
     try {
       // boards, apps, members テーブルから並列でデータ取得
@@ -580,22 +588,28 @@
 
   let loadingTimeout = null;
 
+  /**
+   * ローディング表示を表示します
+   */
   function showLoading() {
     if (loadingTimeout) clearTimeout(loadingTimeout);
     document.body.style.cursor = 'wait';
   }
 
+  /**
+   * ローディング表示を非表示にします
+   */
   function hideLoading() {
     document.body.style.cursor = '';
   }
 
   /**
-  * スナックバーを表示する
-  * @param {string} text - 表示するテキスト
-  * @param {string} [color=''] - 色 (例: 'error', 'primary')。デフォルトは空欄
-  * @param {string} [position='top'] - 位置 ('top', 'bottom')。デフォルトは 'top'
-  * @param {number} [seconds=5] - 表示時間(秒)。デフォルトは 5秒
-  */
+   * スナックバーを表示します
+   * @param {string} text - 表示メッセージ
+   * @param {string} [color=''] - メッセージタイプ（'error', 'primary'など）
+   * @param {string} [position='top'] - 表示位置（'top'または'bottom'）
+   * @param {number} [seconds=5] - 表示時間（秒、0の場合は自動で消えない）
+   */
   function showSnackbar(text, color = '', position = 'top', seconds = 5) {
     const snackbar = document.getElementById('global-snackbar');
     if (!snackbar) return;
@@ -635,6 +649,12 @@
   // ヘルパー関数
   // ============================================
 
+  /**
+   * 日時を指定形式でフォーマットします
+   * @param {string} dateString - フォーマットする日時
+   * @param {string} [format='yyyy/MM/dd(E) HH:mm'] - フォーマット形式
+   * @returns {string} フォーマットされた日時文字列
+   */
   function formatDateTimeForDisplay(dateString, format = 'yyyy/MM/dd(E) HH:mm') {
     if (!dateString) return '';
     try {
@@ -673,6 +693,11 @@
     }
   }
 
+  /**
+   * HTML文字列をエスケープします
+   * @param {string} text - エスケープする文字列
+   * @returns {string} エスケープされた文字列
+   */
   function escapeHtml(text) {
     if (text === null || typeof text === 'undefined') return '';
     return String(text).replace(/[&<>"']/g, match => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[match]);
@@ -962,6 +987,11 @@
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  /**
+   * 指定日までの残り日数を計算します
+   * @param {string} to - 目標日（YYYY-MM-DD形式）
+   * @returns {number} 残り日数
+   */
   function calculateDaysUntil(to) {
     const eventDate = new Date(to);
     const today = new Date();

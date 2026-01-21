@@ -60,9 +60,9 @@ const CacheManager = {
     get: function (key, cachePublicRange) {
         try {
             let cache;
-            if (cachePublicRange === `script`) {
+            if (cachePublicRange === CACHE_CONFIG.PUBLIC_RANGE.SCRIPT) {
                 cache = CacheService.getScriptCache();
-            } else if (cachePublicRange === `user`) {
+            } else if (cachePublicRange === CACHE_CONFIG.PUBLIC_RANGE.USER) {
                 cache = CacheService.getUserCache();
             } else {
                 throw new CacheError(`Invalid cachePublicRange: ${cachePublicRange}`, key);
@@ -84,12 +84,12 @@ const CacheManager = {
      * @param {number} ttl - 有効期限（秒）
      * @throws {CacheError} キャッシュ保存に失敗した場合
      */
-    put: function (key, value, cachePublicRange, ttl = 21600) {
+    put: function (key, value, cachePublicRange, ttl = CACHE_CONFIG.DEFAULT_TTL) {
         try {
             let cache;
-            if (cachePublicRange === `script`) {
+            if (cachePublicRange === CACHE_CONFIG.PUBLIC_RANGE.SCRIPT) {
                 cache = CacheService.getScriptCache();
-            } else if (cachePublicRange === `user`) {
+            } else if (cachePublicRange === CACHE_CONFIG.PUBLIC_RANGE.USER) {
                 cache = CacheService.getUserCache();
             } else {
                 throw new CacheError(`Invalid cachePublicRange: ${cachePublicRange}`, key);
@@ -110,9 +110,9 @@ const CacheManager = {
     invalidate: function (key, cachePublicRange) {
         try {
             let cache;
-            if (cachePublicRange === `script`) {
+            if (cachePublicRange === CACHE_CONFIG.PUBLIC_RANGE.SCRIPT) {
                 cache = CacheService.getScriptCache();
-            } else if (cachePublicRange === `user`) {
+            } else if (cachePublicRange === CACHE_CONFIG.PUBLIC_RANGE.USER) {
                 cache = CacheService.getUserCache();
             } else {
                 throw new CacheError(`Invalid cachePublicRange: ${cachePublicRange}`, key);
@@ -128,9 +128,6 @@ const CacheManager = {
 // ============================================
 // Constants
 // ============================================
-
-// 列IDの文字配列（A-Z）
-const COLUMN_IDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
 // boolean型のカラム名リスト
 const BOOLEAN_COLUMNS = ['is_active', 'is_done'];
@@ -247,10 +244,14 @@ function parseWhereClause(whereClause, headersMap) {
 // ============================================
 
 /**
- * Google Visualization APIを使用してデータを取得
+ * データを検索します（SELECT）
  * @param {string} sheetName - シート名
- * @param {Object} query - SSSQL形式のクエリオブジェクト
- * @returns {Array} 取得したデータ配列
+ * @param {Object} query - クエリオブジェクト
+ * @param {Object} [query.where] - WHERE条件 {column: [operator, value]}
+ * @param {Object} [query.orderBy] - ORDER BY条件 {column: 'asc'|'desc'}
+ * @param {number} [query.limit] - 取得件数制限
+ * @returns {Array<Object>} 検索結果の配列
+ * @throws {DatabaseError} 検索に失敗した場合
  */
 function select(sheetName, query = {}) {
     try {
@@ -500,11 +501,12 @@ function convertRecordToArray(record, headers) {
 // ============================================
 
 /**
- * 新しいレコードを挿入
+ * データを挿入します（INSERT）
  * @param {string} userId - ユーザーID
  * @param {string} sheetName - シート名
- * @param {Object} record - 挿入するレコード
- * @returns {Object} 挿入結果
+ * @param {Object} record - 挿入するデータ
+ * @returns {Object} 挿入されたレコード
+ * @throws {DatabaseError} 挿入に失敗した場合
  */
 function insert(userId, sheetName, record) {
     const lock = LockService.getScriptLock();
@@ -533,11 +535,12 @@ function insert(userId, sheetName, record) {
 }
 
 /**
- * 複数のレコードを一括挿入
+ * データを一括挿入します（BULK INSERT）
  * @param {string} userId - ユーザーID
  * @param {string} sheetName - シート名
- * @param {Array} records - 挿入するレコード配列
- * @returns {Object} 挿入結果
+ * @param {Array<Object>} records - 挿入するデータの配列
+ * @returns {Array<Object>} 挿入されたレコードの配列
+ * @throws {DatabaseError} 挿入に失敗した場合
  */
 function bulkInsert(userId, sheetName, records) {
     const lock = LockService.getScriptLock();
@@ -570,11 +573,12 @@ function bulkInsert(userId, sheetName, records) {
 // ============================================
 
 /**
- * レコードを更新
+ * データを更新します（UPDATE）
  * @param {string} userId - ユーザーID
  * @param {string} sheetName - シート名
- * @param {Object} query - 更新クエリ { set: {...}, where: {...} }
- * @returns {Object} 更新結果
+ * @param {Object} query - 更新データ {set: {...}, where: {...}}
+ * @returns {Array<Object>} 更新されたレコードの配列
+ * @throws {DatabaseError} 更新に失敗した場合
  */
 function update(userId, sheetName, query) {
     const lock = LockService.getScriptLock();
@@ -649,10 +653,11 @@ function update(userId, sheetName, query) {
 // ============================================
 
 /**
- * レコードを削除
+ * データを削除します（DELETE）
  * @param {string} sheetName - シート名
- * @param {Object} query - 削除クエリ { where: {...} }
- * @returns {Object} 削除結果
+ * @param {Object} query - 削除条件 {where: {...}}
+ * @returns {number} 削除された件数
+ * @throws {DatabaseError} 削除に失敗した場合
  */
 function remove(sheetName, query) {
     const lock = LockService.getScriptLock();
@@ -808,11 +813,9 @@ function generateCacheKey(tableName, dataObject) {
     const dataStr = JSON.stringify(sortedData);
     const hash = hashString(dataStr);
 
-    // キーの長さを制限（Google Apps Scriptのキャッシュキーの上限を考慮）
-    const maxKeyLength = 250;
     const baseKey = `db_${tableName}_${hash}`;
 
-    if (baseKey.length > maxKeyLength) {
+    if (baseKey.length > CACHE_CONFIG.MAX_KEY_LENGTH) {
         // 長すぎる場合はテーブル名とハッシュのみ
         return `db_${tableName.substring(0, 50)}_${hash}`;
     }
@@ -950,16 +953,30 @@ function handleDatabaseProcess(userId, tableName, operation, dataObject, remark,
 // Helper Functions
 // ============================================
 
+/**
+ * スプレッドシートオブジェクトを取得します（権限チェック用）
+ * @returns {Spreadsheet} スプレッドシートオブジェクト
+ */
 function getSpreadsheet() { //ページ読み込み時の権限チェックに使用中。データベース操作時には使っていない。
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     return ss;
 }
 
+/**
+ * シートオブジェクトを取得します
+ * @param {Spreadsheet} ss - スプレッドシートオブジェクト
+ * @param {string} sheetName - シート名
+ * @returns {Sheet} シートオブジェクト
+ */
 function getSheet(ss, sheetName) {
     const sheet = ss.getSheetByName(sheetName);
     return sheet;
 }
 
+/**
+ * UUIDを生成します
+ * @returns {string} 生成されたUUID
+ */
 function generateUuid() {
     const uuid = Utilities.getUuid();
     console.log('Generated UUID: ' + uuid);
@@ -967,7 +984,7 @@ function generateUuid() {
 }
 
 /**
- * 次のシリアル番号を取得（display_id用）
+ * 次のシリアル番号を取得します（display_id用）
  * @param {string} sheetName - シート名
  * @param {string} columnName - カラム名
  * @returns {number} 次のシリアル番号
@@ -1053,11 +1070,11 @@ function createLog(userId, tableName, dataObject, operation, remark) {
 }
 
 /**
- * 指定されたテーブルに関連するすべてのキャッシュを無効化
+ * テーブルキャッシュを無効化します
  * @param {string} tableName - テーブル名
  */
 function invalidateTableCache(tableName) {
-    const cachePublicRange = 'script';
+    const cachePublicRange = CACHE_CONFIG.PUBLIC_RANGE.SCRIPT;
     const generalCacheKey = `user_items_${tableName}`;
     CacheManager.invalidate(generalCacheKey, cachePublicRange);
 }

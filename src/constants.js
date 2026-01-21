@@ -69,3 +69,42 @@ const TABLE_HEADERS = {
   LINKS: ['id', 'index', 'task_id', 'label', 'url', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   FILES: ['id', 'index', 'task_id', 'gfile_id', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at']
 };
+
+// ============================================
+// キャッシュ、再試行、UI設定
+// ============================================
+
+/**
+ * キャッシュ設定
+ */
+const CACHE_CONFIG = {
+  DEFAULT_TTL: 21600, // 6時間（秒）
+  MAX_KEY_LENGTH: 250, // キャッシュキーの最大長
+  PUBLIC_RANGE: {
+    SCRIPT: 'script', // スクリプト全体で共有
+    USER: 'user'      // ユーザーごと
+  }
+};
+
+/**
+ * 再試行設定
+ */
+const RETRY_CONFIG = {
+  DELAY_MS: 10000,        // 再試行までの待機時間（ミリ秒）
+  PROGRESS_INTERVAL_MS: 100, // 進捗更新間隔（ミリ秒）
+  MAX_RETRIES: 3          // 最大再試行回数
+};
+
+/**
+ * UI設定
+ */
+const UI_CONFIG = {
+  SNACKBAR_DURATION: 3000,  // スナックバー表示時間（ミリ秒）
+  MODAL_FOCUS_DELAY: 50,     // モーダルフォーカスの再試行間隔（ミリ秒）
+  MODAL_FOCUS_MAX_RETRIES: 10 // モーダルフォーカスの最大再試行回数
+};
+
+/**
+ * 列ID定数（Excel形式）
+ */
+const COLUMN_IDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
