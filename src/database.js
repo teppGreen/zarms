@@ -48,29 +48,36 @@ const CacheManager = {
 // ============================================
 
 /**
+ * 列インデックス（0始まり）を列ID（A, B, ..., Z, AA, AB, ...）に変換
+ * @param {number} index - 列インデックス（0始まり）
+ * @returns {string} 列ID（例: 0→'A', 25→'Z', 26→'AA', 27→'AB'）
+ */
+function columnIndexToId(index) {
+  const columnIds = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+  let id = '';
+  let currentIndex = index;
+  
+  while (currentIndex >= 0) {
+    id = columnIds[currentIndex % 26] + id;
+    currentIndex = Math.floor(currentIndex / 26) - 1;
+  }
+  
+  return id;
+}
+
+/**
  * シート名からヘッダーマッピングを取得・キャッシュ
  * GViz APIでは列名ではなく列ID（A, B, C...）で指定する必要があるため
  * @param {string} sheetName - シート名
  * @returns {Object} { columnName: columnId, ... } のマッピングオブジェクト
  */
 function getHeadersMap(sheetName) {
-
     try {
         const headers = getHeadersFromSheetsAPI(sheetName);
-
-        // ヘッダー名を列IDにマッピング
         const headersMap = {};
-        const columnIds = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
         headers.forEach((header, index) => {
-            if (index < 26) {
-                headersMap[header] = columnIds[index];
-            } else {
-                // 26列目以降はAA, AB, AC...形式
-                const firstLetter = columnIds[Math.floor((index - 26) / 26)];
-                const secondLetter = columnIds[(index - 26) % 26];
-                headersMap[header] = firstLetter + secondLetter;
-            }
+            headersMap[header] = columnIndexToId(index);
         });
 
         return headersMap;
@@ -83,6 +90,25 @@ function getHeadersMap(sheetName) {
 // ============================================
 // Query Parsing for GViz API
 // ============================================
+
+/**
+ * 値を安全にboolean型に変換します
+ * @param {*} value - 変換する値
+ * @returns {boolean} boolean値
+ */
+function toBooleanSafe(value) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.toLowerCase().trim();
+    return normalized === 'true' || normalized === '1' || normalized === 'yes';
+  }
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+  return false;
+}
 
 /**
  * SSSQL形式のWHERE句をGViz Query Languageに変換
@@ -217,7 +243,7 @@ function select(sheetName, query = {}) {
         const headers = getHeadersFromSheetsAPI(sheetName);
 
         // データの変換
-        return gvizResponse.table.rows.map(row => {
+        const results = gvizResponse.table.rows.map(row => {
             const record = {};
             row.c.forEach((cell, index) => {
                 const header = headers[index];
@@ -238,6 +264,18 @@ function select(sheetName, query = {}) {
             });
             return record;
         });
+
+        // boolean型カラムの正規化
+        const booleanColumns = ['is_active', 'is_done']; // boolean型のカラム名リスト
+        results.forEach(row => {
+            booleanColumns.forEach(col => {
+                if (row.hasOwnProperty(col)) {
+                    row[col] = toBooleanSafe(row[col]);
+                }
+            });
+        });
+
+        return results;
 
     } catch (error) {
         console.error(`Error in select operation for ${sheetName}:`, error);
@@ -636,6 +674,66 @@ function getItems(userId, tableName, forceRefresh = false) {
 }
 
 // ============================================
+// Cache Key Generation Utilities
+// ============================================
+
+/**
+ * オブジェクトのキーを再帰的にソートします
+ * @param {*} obj - ソート対象のオブジェクト
+ * @returns {*} ソートされたオブジェクト
+ */
+function sortObjectKeys(obj) {
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+    return obj;
+  }
+  
+  const sorted = {};
+  Object.keys(obj).sort().forEach(key => {
+    sorted[key] = sortObjectKeys(obj[key]);
+  });
+  
+  return sorted;
+}
+
+/**
+ * 文字列から簡易ハッシュ値を生成します
+ * @param {string} str - ハッシュ化する文字列
+ * @returns {string} ハッシュ値（16進数文字列）
+ */
+function hashString(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // 32bit整数に変換
+  }
+  return Math.abs(hash).toString(16);
+}
+
+/**
+ * 安全なキャッシュキーを生成します
+ * @param {string} tableName - テーブル名
+ * @param {Object} dataObject - データオブジェクト
+ * @returns {string} キャッシュキー
+ */
+function generateCacheKey(tableName, dataObject) {
+  const sortedData = sortObjectKeys(dataObject);
+  const dataStr = JSON.stringify(sortedData);
+  const hash = hashString(dataStr);
+  
+  // キーの長さを制限（Google Apps Scriptのキャッシュキーの上限を考慮）
+  const maxKeyLength = 250;
+  const baseKey = `db_${tableName}_${hash}`;
+  
+  if (baseKey.length > maxKeyLength) {
+    // 長すぎる場合はテーブル名とハッシュのみ
+    return `db_${tableName.substring(0, 50)}_${hash}`;
+  }
+  
+  return baseKey;
+}
+
+// ============================================
 // Main Database Process Function
 // ============================================
 
@@ -650,8 +748,8 @@ function getItems(userId, tableName, forceRefresh = false) {
  * @returns {Object|Array} 操作結果
  */
 function handleDatabaseProcess(userId, tableName, operation, dataObject, remark, forceRefresh = false) {
-    // キャッシュキーの生成
-    const cacheKey = `db_${tableName}_${JSON.stringify(dataObject)}`;
+    // 修正: 安全なキャッシュキー生成
+    const cacheKey = generateCacheKey(tableName, dataObject);
     const cachePublicRange = 'script';
 
     // selectかつforceRefreshがfalseの場合、キャッシュを使用
