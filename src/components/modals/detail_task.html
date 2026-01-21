@@ -289,7 +289,7 @@
         const taskId = crypto.randomUUID();
 
         // 現在のボードIDを取得（あれば）
-        let boardId = '';
+        let boardId = 'my-board';
         // 現在表示中のタブを特定
         const currentTab = document.querySelector('main > div[style*="display: block"]');
         const tabId = currentTab.id; // 例: 'tab-home', 'tab-members', 'tab-board'
@@ -1454,11 +1454,11 @@
         const boardSelect = document.getElementById('task-board-select');
         if (!boardSelect) return;
 
-        boardSelect.innerHTML = `<option value="null">マイボード</option>`;
+        boardSelect.innerHTML = `<option value="my-board" ${(!selectedBoardId || selectedBoardId === 'my-board' || selectedBoardId === 'null') ? 'selected' : ''}>マイボード</option>`;
 
         const boards = App.state.data.boards || [];
         boardSelect.innerHTML += boards.map(board =>
-          `<option value="${escapeHtml(board.id)}" ${(board.id === selectedBoardId && selectedBoardId) ? 'selected' : ''}>${escapeHtml(board.name || '')}</option>`
+          `<option value="${escapeHtml(board.id)}" ${board.id === selectedBoardId ? 'selected' : ''}>${escapeHtml(board.name || '')}</option>`
         ).join('');
       },
 

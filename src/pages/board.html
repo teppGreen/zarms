@@ -205,19 +205,9 @@
                 }
 
                 try {
-                    let query;
-                    // マイボードの場合の特殊処理
-                    if (boardId === 'my-board') {
-                        // board_id が null のものを取得
-                        query = {
-                            // where: { board_id: ["is", null] }
-                        };
-                    } else {
-                        // 通常のボード
-                        query = {
-                            where: { board_id: ["=", boardId] }
-                        };
-                    }
+                    let query = {
+                        where: { board_id: ["=", boardId] }
+                    };
 
                     // JOINは使わず、単純なSELECTを実行
                     const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query, null, isRefresh);
