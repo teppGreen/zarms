@@ -2,7 +2,7 @@
     <header class="small-margin no-padding">
         <nav class="no-margin no-padding">
             <h3 class="bold small">メンバー</h3>
-            <a href="https://docs.google.com/spreadsheets/d/1Jwq5klCWFMNqSURHk2JrbF43X4JTy5I7M5aBE3uDVNw/edit" target="_blank" title="委員名簿を開く">
+            <a id="member-spreadsheet-link" target="_blank" title="委員名簿を開く">
                 <i class="large">open_in_new</i>
             </a>
             <div class="max"></div>
@@ -28,6 +28,14 @@
 
 <script>
     (function () {
+        // スプレッドシートURLを設定から取得
+        document.addEventListener('DOMContentLoaded', function() {
+            const link = document.getElementById('member-spreadsheet-link');
+            if (link) {
+                link.href = EXTERNAL_URLS.MEMBER_SPREADSHEET;
+            }
+        });
+
         App.pages.members = {
             memberAssignments: [],
             currentMembers: [],

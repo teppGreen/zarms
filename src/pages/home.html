@@ -15,7 +15,7 @@
                 【関連】親タスクと子タスクを設定できるようにしました<br>
                 </p>
                 <p>また、マイボードのフィルタで「進行者」に設定した人を、リストの担当者としても検索するか選択できるようにしました。
-                <p>今後もより使いやすくなるよう、アップデートしていきます。<a class="link" href="https://forms.gle/afXzsGKxvm9qVG4G9" target="_blank">お問い合わせフォーム</a>からフィードバックをお待ちしています。</p>
+                <p>今後もより使いやすくなるよう、アップデートしていきます。<a id="home-contact-form-link-1" class="link" target="_blank">お問い合わせフォーム</a>からフィードバックをお待ちしています。</p>
             </article>
         </div>
          <div class="s12 m6">
@@ -25,7 +25,7 @@
                     <h5 class="small">総務からのお知らせ</h5>
                 </div>
                 <p class="bold">1/20(火) - 総務の業務内容について</p>
-                <p>総務ユニットでは、組織全体の情報環境の整備・ITツールの利活用推進・活動データの分析・契約管理等を行っていきます。<a class="link" href="https://docs.google.com/document/d/1BXpWaVsyJChC-rSDgjEvH33s_5FvXiaimvHIYxBTxoY/preview?tab=t.ox00ab3wnxmq" target="_blank">総務の業務内容</a>に関連する内容で質問・提案・依頼・報告などがあれば、<a class="link" href="https://forms.gle/afXzsGKxvm9qVG4G9" target="_blank">お問い合わせフォーム</a>や総務ユニットリーダー(@TEPPei)にお気軽にお申し付けください。</p>
+                <p>総務ユニットでは、組織全体の情報環境の整備・ITツールの利活用推進・活動データの分析・契約管理等を行っていきます。<a id="home-soumu-document-link" class="link" target="_blank">総務の業務内容</a>に関連する内容で質問・提案・依頼・報告などがあれば、<a id="home-contact-form-link-2" class="link" target="_blank">お問い合わせフォーム</a>や総務ユニットリーダー(@TEPPei)にお気軽にお申し付けください。</p>
             </article>
         </div>
     </div>
@@ -33,6 +33,17 @@
 
 <script>
     (function () {
+        // URLを設定から取得
+        document.addEventListener('DOMContentLoaded', function() {
+            const contactFormLink1 = document.getElementById('home-contact-form-link-1');
+            const contactFormLink2 = document.getElementById('home-contact-form-link-2');
+            const soumuDocLink = document.getElementById('home-soumu-document-link');
+            
+            if (contactFormLink1) contactFormLink1.href = EXTERNAL_URLS.CONTACT_FORM;
+            if (contactFormLink2) contactFormLink2.href = EXTERNAL_URLS.CONTACT_FORM;
+            if (soumuDocLink) soumuDocLink.href = EXTERNAL_URLS.SOUMU_DOCUMENT;
+        });
+
         App.pages.home = {
             loadData: function () {
                 this.renderContent();
@@ -42,7 +53,7 @@
             renderContent: function () {
                 const greeting = this.getGreeting();
                 const formattedDate = formatDateTimeForDisplay(new Date(), 'yyyy年MM月dd日(E)');
-                const daysUntilEvent = calculateDaysUntil('2026-04-24');
+                const daysUntilEvent = calculateDaysUntil(EVENT_CONFIG.FESTIVAL_DATE);
 
                 const content = `
                     <div class="row">
