@@ -449,6 +449,12 @@
 
                 const containerId = container.id;
                 
+                // containerにIDがない場合は処理をスキップ
+                if (!containerId) {
+                    console.warn('[bindCardClick] Container has no ID, skipping event binding');
+                    return;
+                }
+                
                 // 既存のハンドラーがあれば削除
                 if (this.clickHandlers[containerId]) {
                     container.removeEventListener('click', this.clickHandlers[containerId]);
