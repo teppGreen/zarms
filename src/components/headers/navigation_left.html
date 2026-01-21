@@ -103,6 +103,14 @@
                                     console.log(`[switchTab] Throttling loadData for board ${boardId}. Last render was ${now - lastRender}ms ago.`);
                                     App.pages.boards.currentBoardId = boardId;
                                     isThrottled = true;
+                                    
+                                    // スロットル時でもイベントハンドラーとSortableを再設定
+                                    if (canvas && App.pages.boards.bindCardClick) {
+                                        App.pages.boards.bindCardClick(canvas);
+                                    }
+                                    if (App.pages.boards.setupSortable) {
+                                        App.pages.boards.setupSortable(boardId);
+                                    }
                                     return;
                                 }
 
