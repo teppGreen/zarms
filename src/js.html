@@ -598,8 +598,8 @@
    * @param {Function} callback - 成功時のコールバック
    */
   function callGASWithCallback(functionName, args, callback) {
-    // コールバックを記録
-    App.utils.gas.lastCallback = callback;
+    // コールバックを安全に登録
+    App.utils.gas.registerCallback(callback);
     
     return callGAS(functionName, ...args)
       .then(result => {
@@ -612,11 +612,11 @@
 
   // JavaScript関数呼び出しを記録するヘルパー関数（下位互換性のため残す）
   function recordJSInvocation(functionName, ...args) {
-    App.utils.gas.lastCallback = function() {
+    App.utils.gas.registerCallback(function() {
       if (typeof window[functionName] === 'function') {
         window[functionName](...args);
       }
-    };
+    });
   }
 
   /**
