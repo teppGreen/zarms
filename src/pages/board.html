@@ -205,9 +205,12 @@
                 }
 
                 try {
-                    let query = {
-                        where: { board_id: ["=", boardId] }
-                    };
+                    let query = {};
+                    if (boardId !== 'my-board') {
+                        query = {
+                            where: { board_id: ["=", boardId] }
+                        };
+                    }
 
                     // JOINは使わず、単純なSELECTを実行
                     const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query, null, isRefresh);
