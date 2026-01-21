@@ -16,7 +16,10 @@ function doGet(e) {
   template.templateVariables = {
     scriptUrl: getScriptUrl(),
     urlParams: e.parameter,
-    activeUserEmail: activeUserEmail
+    activeUserEmail: activeUserEmail,
+    EVENT_CONFIG: EVENT_CONFIG,
+    AUTH_CONFIG: AUTH_CONFIG,
+    EXTERNAL_URLS: EXTERNAL_URLS
   };
 
   return template.evaluate()
@@ -42,6 +45,10 @@ function loadMainApp(urlParams, activeUser) {
     TABLE_NAMES: TABLE_NAMES,
     DIRECTORY_TYPES: DIRECTORY_TYPES,
     TASK_STATUS: TASK_STATUS,
+    EXTERNAL_URLS: EXTERNAL_URLS,
+    EVENT_CONFIG: EVENT_CONFIG,
+    AUTH_CONFIG: AUTH_CONFIG,
+    UI_TEXT: UI_TEXT,
     userProperties: PropertiesService.getUserProperties().getProperties()
   };
 
