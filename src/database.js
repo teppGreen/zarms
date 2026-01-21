@@ -3,43 +3,125 @@
 // ============================================
 
 // ============================================
+// Custom Error Classes
+// ============================================
+
+/**
+ * データベース操作のエラー
+ */
+class DatabaseError extends Error {
+  constructor(message, operation, tableName, details = null) {
+    super(message);
+    this.name = 'DatabaseError';
+    this.operation = operation;
+    this.tableName = tableName;
+    this.details = details;
+    this.timestamp = new Date().toISOString();
+  }
+}
+
+/**
+ * バリデーションエラー
+ */
+class ValidationError extends Error {
+  constructor(message, field = null, value = null) {
+    super(message);
+    this.name = 'ValidationError';
+    this.field = field;
+    this.value = value;
+    this.timestamp = new Date().toISOString();
+  }
+}
+
+/**
+ * キャッシュ操作のエラー
+ */
+class CacheError extends Error {
+  constructor(message, key = null) {
+    super(message);
+    this.name = 'CacheError';
+    this.key = key;
+    this.timestamp = new Date().toISOString();
+  }
+}
+
+// ============================================
 // Caching Utility
+// 責任: キャッシュの取得・保存・無効化
 // ============================================
 const CacheManager = {
+    /**
+     * キャッシュから値を取得します
+     * @param {string} key - キャッシュキー
+     * @param {('script'|'user')} cachePublicRange - キャッシュの範囲
+     * @returns {*|null} キャッシュされた値、存在しない場合はnull
+     * @throws {CacheError} キャッシュ取得に失敗した場合
+     */
     get: function (key, cachePublicRange) {
-        let cache;
-        if (cachePublicRange === `script`) {
-            cache = CacheService.getScriptCache();
-        } else if (cachePublicRange === `user`) {
-            cache = CacheService.getUserCache();
-        } else {
-            throw new Error(`Invalid cachePublicRange: ${cachePublicRange}`);
+        try {
+            let cache;
+            if (cachePublicRange === `script`) {
+                cache = CacheService.getScriptCache();
+            } else if (cachePublicRange === `user`) {
+                cache = CacheService.getUserCache();
+            } else {
+                throw new CacheError(`Invalid cachePublicRange: ${cachePublicRange}`, key);
+            }
+            const cached = cache.get(key);
+            if (!cached) return null;
+            return JSON.parse(cached);
+        } catch (error) {
+            if (error instanceof CacheError) throw error;
+            throw new CacheError(`Failed to get cache: ${error.message}`, key);
         }
-        const cached = cache.get(key);
-        if (!cached) return null;
-        return JSON.parse(cached);
     },
+    
+    /**
+     * キャッシュに値を保存します
+     * @param {string} key - キャッシュキー
+     * @param {*} value - 保存する値
+     * @param {('script'|'user')} cachePublicRange - キャッシュの範囲
+     * @param {number} ttl - 有効期限（秒）
+     * @throws {CacheError} キャッシュ保存に失敗した場合
+     */
     put: function (key, value, cachePublicRange, ttl = 21600) {
-        let cache;
-        if (cachePublicRange === `script`) {
-            cache = CacheService.getScriptCache();
-        } else if (cachePublicRange === `user`) {
-            cache = CacheService.getUserCache();
-        } else {
-            throw new Error(`Invalid cachePublicRange: ${cachePublicRange}`);
+        try {
+            let cache;
+            if (cachePublicRange === `script`) {
+                cache = CacheService.getScriptCache();
+            } else if (cachePublicRange === `user`) {
+                cache = CacheService.getUserCache();
+            } else {
+                throw new CacheError(`Invalid cachePublicRange: ${cachePublicRange}`, key);
+            }
+            cache.put(key, JSON.stringify(value), ttl);
+        } catch (error) {
+            if (error instanceof CacheError) throw error;
+            throw new CacheError(`Failed to put cache: ${error.message}`, key);
         }
-        cache.put(key, JSON.stringify(value), ttl);
     },
+    
+    /**
+     * キャッシュを無効化します
+     * @param {string} key - キャッシュキー
+     * @param {('script'|'user')} cachePublicRange - キャッシュの範囲
+     * @throws {CacheError} キャッシュ無効化に失敗した場合
+     */
     invalidate: function (key, cachePublicRange) {
-        let cache;
-        if (cachePublicRange === `script`) {
-            cache = CacheService.getScriptCache();
-        } else if (cachePublicRange === `user`) {
-            cache = CacheService.getUserCache();
-        } else {
-            throw new Error(`Invalid cachePublicRange: ${cachePublicRange}`);
+        try {
+            let cache;
+            if (cachePublicRange === `script`) {
+                cache = CacheService.getScriptCache();
+            } else if (cachePublicRange === `user`) {
+                cache = CacheService.getUserCache();
+            } else {
+                throw new CacheError(`Invalid cachePublicRange: ${cachePublicRange}`, key);
+            }
+            cache.remove(key);
+        } catch (error) {
+            if (error instanceof CacheError) throw error;
+            throw new CacheError(`Failed to invalidate cache: ${error.message}`, key);
         }
-        cache.remove(key);
     }
 };
 
@@ -752,60 +834,114 @@ function generateCacheKey(tableName, dataObject) {
  * @param {boolean} forceRefresh - キャッシュを無視して強制的に再取得するか（selectのみ）
  * @returns {Object|Array} 操作結果
  */
+// ============================================
+// Database Operations Handler
+// 責任: データベース操作の統括、キャッシュ戦略の決定
+// ============================================
+
+/**
+ * データベース操作を処理します
+ * このメイン関数は以下を統括します:
+ * - キャッシュ戦略の決定
+ * - 適切な操作関数へのディスパッチ
+ * - エラーハンドリング
+ * - ログ記録とキャッシュ無効化のトリガー
+ * 
+ * @param {string|null} userId - ユーザーID
+ * @param {string} tableName - テーブル名
+ * @param {('select'|'insert'|'update'|'remove'|'bulkinsert')} operation - 操作タイプ
+ * @param {Object} dataObject - データオブジェクト
+ * @param {string|null} remark - 備考
+ * @param {boolean} forceRefresh - キャッシュを無視するか
+ * @returns {Object|Array} 操作結果
+ * @throws {DatabaseError} データベース操作に失敗した場合
+ * @throws {ValidationError} 入力値が不正な場合
+ */
 function handleDatabaseProcess(userId, tableName, operation, dataObject, remark, forceRefresh = false) {
-    // 修正: 安全なキャッシュキー生成
-    const cacheKey = generateCacheKey(tableName, dataObject);
-    const cachePublicRange = 'script';
-
-    // selectかつforceRefreshがfalseの場合、キャッシュを使用
-    if (operation === 'select' && !forceRefresh) {
-        const cached = CacheManager.get(cacheKey, cachePublicRange);
-        if (cached) {
-            return { data: cached, isCached: true };
-        }
-    }
-
-    let result;
-
     try {
-        switch (operation) {
-            case 'select':
-                result = select(tableName, dataObject);
-                // selectの場合は常にキャッシュを作成
-                CacheManager.put(cacheKey, result, cachePublicRange);
-                return { data: result, isCached: false };
-            case 'insert':
-                result = insert(userId, tableName, dataObject);
-                createLog(userId, tableName, dataObject, operation, remark);
-                // insert時は関連するselectキャッシュを無効化
-                invalidateTableCache(tableName);
-                break;
-            case 'bulkinsert':
-                result = bulkInsert(userId, tableName, dataObject);
-                createLog(userId, tableName, dataObject, operation, remark);
-                // bulkinsert時は関連するselectキャッシュを無効化
-                invalidateTableCache(tableName);
-                break;
-            case 'update':
-                result = update(userId, tableName, dataObject);
-                createLog(userId, tableName, dataObject, operation, remark);
-                // update時は関連するselectキャッシュを無効化
-                invalidateTableCache(tableName);
-                break;
-            case 'remove':
-                result = remove(tableName, dataObject);
-                createLog(userId, tableName, dataObject, operation, remark);
-                // remove時は関連するselectキャッシュを無効化
-                invalidateTableCache(tableName);
-                break;
-            default:
-                throw new Error(`Unsupported operation: ${operation}`);
+        // キャッシュキーの生成
+        const cacheKey = generateCacheKey(tableName, dataObject);
+        const cachePublicRange = 'script';
+
+        // selectかつforceRefreshがfalseの場合、キャッシュを使用
+        if (operation === 'select' && !forceRefresh) {
+            try {
+                const cached = CacheManager.get(cacheKey, cachePublicRange);
+                if (cached) {
+                    return { data: cached, isCached: true };
+                }
+            } catch (cacheError) {
+                // キャッシュ取得失敗はログのみ、処理は継続
+                console.warn('[handleDatabaseProcess] Cache retrieval failed:', cacheError);
+            }
         }
 
-        console.log(`[handleDatabaseProcess] result: ${JSON.stringify(result)}`);
-        return result;
+        let result;
+
+        try {
+            switch (operation) {
+                case 'select':
+                    result = select(tableName, dataObject);
+                    // selectの場合は常にキャッシュを作成
+                    try {
+                        CacheManager.put(cacheKey, result, cachePublicRange);
+                    } catch (cacheError) {
+                        console.warn('[handleDatabaseProcess] Cache storage failed:', cacheError);
+                    }
+                    return { data: result, isCached: false };
+                    
+                case 'insert':
+                    result = insert(userId, tableName, dataObject);
+                    createLog(userId, tableName, dataObject, operation, remark);
+                    invalidateTableCache(tableName);
+                    break;
+                    
+                case 'bulkinsert':
+                    result = bulkInsert(userId, tableName, dataObject);
+                    createLog(userId, tableName, dataObject, operation, remark);
+                    invalidateTableCache(tableName);
+                    break;
+                    
+                case 'update':
+                    result = update(userId, tableName, dataObject);
+                    createLog(userId, tableName, dataObject, operation, remark);
+                    invalidateTableCache(tableName);
+                    break;
+                    
+                case 'remove':
+                    result = remove(tableName, dataObject);
+                    createLog(userId, tableName, dataObject, operation, remark);
+                    invalidateTableCache(tableName);
+                    break;
+                    
+                default:
+                    throw new ValidationError(`Unsupported operation: ${operation}`, 'operation', operation);
+            }
+
+            console.log(`[handleDatabaseProcess] ${operation} on ${tableName} completed successfully`);
+            return result;
+            
+        } catch (error) {
+            // データベース操作のエラーをラップ
+            throw new DatabaseError(
+                `Database operation failed: ${error.message}`,
+                operation,
+                tableName,
+                error
+            );
+        }
     } catch (error) {
-        console.error(`Database operation error (${operation} on ${tableName}):`, error);
+        // エラーログを詳細に記録
+        console.error(`[handleDatabaseProcess] Error:`, {
+            name: error.name,
+            message: error.message,
+            operation: error.operation || operation,
+            tableName: error.tableName || tableName,
+            timestamp: error.timestamp || new Date().toISOString(),
+            stack: error.stack
+        });
+        
+        // エラーを再スロー
         throw error;
     }
 }
@@ -882,23 +1018,37 @@ function prepareUpdateData(userId, sheetName, dataObject) {
     return newData;
 }
 
-function createLog(userId, tableName, dataObject, operation, remark) {
-    const logData = {
-        id: generateUuid(),
-        operation_type_key: operation.toUpperCase(),
-        table_name: tableName,
-        record_id: dataObject.id || ``,
-        data: JSON.stringify(dataObject),
-        remark: remark || ``,
-        created_by: userId,
-        created_at: new Date().toISOString()
-    };
+// ============================================
+// Log Operations
+// 責任: 操作ログの記録
+// ============================================
 
+/**
+ * 操作ログを作成します
+ * @param {string} userId - ユーザーID
+ * @param {string} tableName - テーブル名
+ * @param {Object} dataObject - データオブジェクト
+ * @param {string} operation - 操作タイプ
+ * @param {string|null} remark - 備考
+ * @throws {DatabaseError} ログ記録に失敗した場合
+ */
+function createLog(userId, tableName, dataObject, operation, remark) {
     try {
+        const logData = {
+            id: generateUuid(),
+            operation_type_key: operation.toUpperCase(),
+            table_name: tableName,
+            record_id: dataObject.id || ``,
+            data: JSON.stringify(dataObject),
+            remark: remark || ``,
+            created_by: userId,
+            created_at: new Date().toISOString()
+        };
+
         insert(userId, TABLE_NAMES.LOGS, logData);
     } catch (error) {
-        console.error('Error creating log:', error);
-        // ログ作成の失敗はメイン処理をブロックしない
+        console.error('[createLog] Failed to create log:', error);
+        // ログ記録の失敗は主処理には影響させない
     }
 }
 
