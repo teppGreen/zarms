@@ -813,11 +813,9 @@ function generateCacheKey(tableName, dataObject) {
     const dataStr = JSON.stringify(sortedData);
     const hash = hashString(dataStr);
 
-    // キーの長さを制限（Google Apps Scriptのキャッシュキーの上限を考慮）
-    const maxKeyLength = 250;
     const baseKey = `db_${tableName}_${hash}`;
 
-    if (baseKey.length > maxKeyLength) {
+    if (baseKey.length > CACHE_CONFIG.MAX_KEY_LENGTH) {
         // 長すぎる場合はテーブル名とハッシュのみ
         return `db_${tableName.substring(0, 50)}_${hash}`;
     }
