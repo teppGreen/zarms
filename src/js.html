@@ -521,10 +521,43 @@
   
   App.utils.gas = {
     lastInvocation: null,
-    lastCallback: null,
+    lastCallback: null,  // 関数参照を直接保存（文字列ではなく）
     retryState: {
       isRetrying: false,
       progressInterval: null
+    },
+
+    /**
+     * コールバック関数を登録します
+     * @param {Function|string} callback - コールバック関数または関数パス
+     */
+    registerCallback: function(callback) {
+      if (typeof callback === 'function') {
+        this.lastCallback = callback;
+      } else if (typeof callback === 'string') {
+        // 文字列の場合は安全に解決
+        this.lastCallback = resolveFunctionSafely(callback);
+      } else {
+        this.lastCallback = null;
+      }
+    },
+
+    /**
+     * 登録されたコールバックを実行します
+     * @param {...any} args - コールバックの引数
+     * @returns {boolean} 実行成功した場合true
+     */
+    executeCallback: function(...args) {
+      if (this.lastCallback && typeof this.lastCallback === 'function') {
+        try {
+          this.lastCallback(...args);
+          return true;
+        } catch (e) {
+          console.error('[executeCallback] Failed to execute callback:', e);
+          return false;
+        }
+      }
+      return false;
     }
   };
 
@@ -584,6 +617,39 @@
         window[functionName](...args);
       }
     };
+  }
+
+  /**
+   * 複数のテーブルからデータを並列で取得します（バッチ処理）
+   * @param {Array<Object>} queries - クエリ配列 [{tableName, operation, dataObject}, ...]
+   * @returns {Promise<Array>} 結果の配列
+   */
+  async function batchDatabaseOperations(queries) {
+    if (!queries || queries.length === 0) {
+      return [];
+    }
+
+    // 並列実行
+    const promises = queries.map(query => {
+      return callGAS(
+        'handleDatabaseProcess',
+        App.state.userId,
+        query.tableName,
+        query.operation || 'select',
+        query.dataObject || {},
+        query.remark || null,
+        query.forceRefresh || false
+      );
+    });
+
+    try {
+      const results = await Promise.all(promises);
+      console.log('[batchDatabaseOperations] Completed', results.length, 'operations');
+      return results;
+    } catch (error) {
+      console.error('[batchDatabaseOperations] Error:', error);
+      throw error;
+    }
   }
 
   let loadingTimeout = null;
@@ -694,13 +760,65 @@
   }
 
   /**
-   * HTML文字列をエスケープします
+   * HTML文字列をエスケープします（XSS対策）
    * @param {string} text - エスケープする文字列
    * @returns {string} エスケープされた文字列
    */
   function escapeHtml(text) {
-    if (text === null || typeof text === 'undefined') return '';
-    return String(text).replace(/[&<>"']/g, match => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[match]);
+    if (text === null || text === undefined) {
+      return '';
+    }
+    
+    const str = String(text);
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#x27;',
+      '/': '&#x2F;'
+    };
+    
+    return str.replace(/[&<>"'/]/g, function(char) {
+      return map[char];
+    });
+  }
+
+  /**
+   * HTML属性値をエスケープします
+   * @param {string} text - エスケープする文字列
+   * @returns {string} エスケープされた文字列
+   */
+  function escapeHtmlAttribute(text) {
+    if (text === null || text === undefined) {
+      return '';
+    }
+    
+    const str = String(text);
+    // 属性値では特に " と ' をエスケープ
+    return str.replace(/["']/g, function(char) {
+      return char === '"' ? '&quot;' : '&#x27;';
+    });
+  }
+
+  /**
+   * URLをサニタイズします
+   * @param {string} url - サニタイズするURL
+   * @returns {string} サニタイズされたURL
+   */
+  function sanitizeUrl(url) {
+    if (!url || typeof url !== 'string') {
+      return '';
+    }
+    
+    // javascript:, data:, vbscript: などの危険なスキームを除外
+    const dangerousProtocols = /^(javascript|data|vbscript):/i;
+    if (dangerousProtocols.test(url.trim())) {
+      console.warn('[sanitizeUrl] Dangerous protocol detected:', url);
+      return '';
+    }
+    
+    return url;
   }
 
   /**
@@ -711,6 +829,40 @@
   function escapeDoubleSlashes(url) {
     if (!url) return '';
     return String(url).replace(/\//g, '\\/');
+  }
+
+  /**
+   * 関数名から関数オブジェクトを安全に取得します
+   * evalを使用せず、予め定義されたパスから関数を探索します
+   * @param {string} functionPath - 関数のパス（例: 'App.pages.boards.loadData'）
+   * @returns {Function|null} 関数オブジェクト、見つからない場合はnull
+   */
+  function resolveFunctionSafely(functionPath) {
+    if (!functionPath || typeof functionPath !== 'string') {
+      return null;
+    }
+
+    // ドット区切りのパスを配列に分割
+    const parts = functionPath.split('.');
+    let current = window;
+
+    // パスを辿って関数を取得
+    for (let i = 0; i < parts.length; i++) {
+      if (current && typeof current === 'object' && parts[i] in current) {
+        current = current[parts[i]];
+      } else {
+        console.warn(`[resolveFunctionSafely] Cannot resolve path: ${functionPath} at ${parts[i]}`);
+        return null;
+      }
+    }
+
+    // 最終的に関数であることを確認
+    if (typeof current === 'function') {
+      return current;
+    }
+
+    console.warn(`[resolveFunctionSafely] Path does not resolve to a function: ${functionPath}`);
+    return null;
   }
 
   // ============================================

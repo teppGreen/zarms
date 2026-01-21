@@ -96,14 +96,8 @@
                             showSnackbar('操作が完了しました', 'success');
                             this.hideRetryPopup();
                             
-                            // JavaScript側のコールバックがあれば実行
-                            if (App.utils.gas.lastCallback && typeof App.utils.gas.lastCallback === 'function') {
-                                try {
-                                    App.utils.gas.lastCallback();
-                                } catch (e) {
-                                    console.error('[retryLastOperation] Callback execution failed:', e);
-                                }
-                            }
+                            // コールバックがあれば実行（evalを使用しない安全な方法）
+                            App.utils.gas.executeCallback();
                         })
                         .catch(error => {
                             this.hideRetryPopup();
