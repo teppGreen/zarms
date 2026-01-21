@@ -506,52 +506,76 @@
     });
   }
 
-  // 直前のcallGAS呼び出しを記録（HTTP 429エラー時の再試行用）
-  let lastCallGASInvocation = null;
-  // 直前のJavaScript関数呼び出しを記録（HTTP 429エラー時の再試行用）
-  let lastJSInvocation = null;
+  // ============================================
+  // GAS Call Management
+  // App.utilsにGAS呼び出し管理を追加
+  // ============================================
+  
+  App.utils.gas = {
+    lastInvocation: null,
+    lastCallback: null,
+    retryState: {
+      isRetrying: false,
+      progressInterval: null
+    }
+  };
 
-  // JavaScript関数呼び出しを記録するヘルパー関数
-  function recordJSInvocation(functionName, ...args) {
-    lastJSInvocation = {
-      functionName: functionName,
-      args: args
-    };
+  /**
+   * Google Apps Script関数を呼び出します
+   * @param {string} functionName - 呼び出す関数名
+   * @param {...any} args - 関数の引数
+   * @returns {Promise} 実行結果のPromise
+   */
+  function callGAS(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      // 最後の呼び出しを記録
+      App.utils.gas.lastInvocation = {
+        functionName: functionName,
+        args: args,
+        timestamp: new Date().toISOString()
+      };
+
+      showLoading();
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          hideLoading();
+          resolve(result);
+        })
+        .withFailureHandler(function (error) {
+          hideLoading();
+          reject(error);
+        })
+        [functionName](...args);
+    });
   }
 
-  function callGAS(functionName, ...args) {
-    // 呼び出し履歴を記録
-    lastCallGASInvocation = {
-      functionName: functionName,
-      args: args
+  /**
+   * コールバック付きでGAS関数を呼び出します
+   * @param {string} functionName - 呼び出す関数名
+   * @param {Array} args - 関数の引数配列
+   * @param {Function} callback - 成功時のコールバック
+   */
+  function callGASWithCallback(functionName, args, callback) {
+    // コールバックを記録
+    App.utils.gas.lastCallback = callback;
+    
+    return callGAS(functionName, ...args)
+      .then(result => {
+        if (callback && typeof callback === 'function') {
+          callback(result);
+        }
+        return result;
+      });
+  }
+
+  // JavaScript関数呼び出しを記録するヘルパー関数（下位互換性のため残す）
+  function recordJSInvocation(functionName, ...args) {
+    App.utils.gas.lastCallback = function() {
+      if (typeof window[functionName] === 'function') {
+        window[functionName](...args);
+      }
     };
-
-    return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler((error) => {
-          const errorMsg = String(error);
-          // Google Sheets APIのQuota exceededエラーを判定
-          if (errorMsg.includes("Quota exceeded for quota metric 'Read requests'") &&
-            errorMsg.includes("sheets.googleapis.com")) {
-            console.warn(`[callGAS] Quota limit reached for ${functionName}. Retrying in 60 seconds...`);
-            showSnackbar(`エラーが発生したため処理が完了しませんでした。\n再試行中のため、画面を閉じずにお待ちください。`, 'error', 'top', 0);
-
-            // 60秒待機してから再試行
-            setTimeout(() => {
-              console.log(`[callGAS] Retrying ${functionName}...`);
-              callGAS(functionName, ...args)
-                .then(resolve)
-                .catch(reject);
-              showSnackbar(`処理が完了しました。`, 'success', 'top', 5);
-            }, 60000);
-          } else {
-            // その他のエラーは通常通りreject
-            reject(error);
-          }
-        })
-      [functionName](...args);
-    });
   }
 
   let loadingTimeout = null;
