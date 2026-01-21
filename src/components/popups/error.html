@@ -2,31 +2,64 @@
     (function () {
         App.utils.error = {
             /**
-            * GASエラーを処理します
-            * @param {Object} error - エラーオブジェクト
-            */
-            handle: function (error) {
+             * GASエラーを処理します
+             * @param {Error} error - エラーオブジェクト
+             * @param {Object} context - エラーコンテキスト（オプション）
+             */
+            handle: function (error, context = {}) {
                 hideLoading();
-                console.error('GAS Error:', error);
+                
+                console.error('Error occurred:', {
+                    error: error,
+                    context: context,
+                    timestamp: new Date().toISOString()
+                });
 
-                // HTTP 429エラーを検出（エラーメッセージに"429"が含まれているか、エラーコードが429か）
-                const is429Error = error.toString().includes('HTTP 429');
+                // HTTP 429エラーを検出
+                const is429Error = error.toString().includes('HTTP 429') || 
+                                   error.toString().includes('quota') ||
+                                   error.toString().includes('rate limit');
 
-                if (is429Error && typeof lastCallGASInvocation !== 'undefined' && lastCallGASInvocation) {
-                    // HTTP 429エラーの場合、アラートを表示せずに再試行
+                if (is429Error && App.utils.gas && App.utils.gas.lastInvocation) {
+                    // HTTP 429エラーの場合、再試行処理を実行
                     this.retryLastOperation();
                     return;
                 }
 
-                // その他のエラーは通常通りアラートを表示
-                alert('エラーが発生しました: ' + (error.message || error.toString()));
+                // エラータイプに応じたメッセージを生成
+                let userMessage = 'エラーが発生しました';
+                
+                if (error.name === 'ValidationError') {
+                    userMessage = `入力エラー: ${error.message}`;
+                    if (error.field) {
+                        userMessage += `\n対象フィールド: ${error.field}`;
+                    }
+                } else if (error.name === 'DatabaseError') {
+                    userMessage = `データベースエラー: ${error.message}`;
+                    if (error.tableName) {
+                        userMessage += `\nテーブル: ${error.tableName}`;
+                    }
+                } else {
+                    userMessage += ': ' + (error.message || error.toString());
+                }
+
+                // 開発環境の場合は詳細を表示
+                if (App.state.isDevelopment) {
+                    userMessage += '\n\n[開発モード] 詳細: ' + JSON.stringify({
+                        name: error.name,
+                        stack: error.stack ? error.stack.substring(0, 200) : 'N/A'
+                    }, null, 2);
+                }
+
+                alert(userMessage);
             },
 
             /**
-            * HTTP 429エラー時の再試行処理
-            */
+             * HTTP 429エラー時の再試行処理
+             */
             retryLastOperation: function () {
-                if (typeof lastCallGASInvocation === 'undefined' || !lastCallGASInvocation) {
+                if (!App.utils.gas || !App.utils.gas.lastInvocation) {
+                    console.warn('[retryLastOperation] No last invocation found');
                     return;
                 }
 
@@ -34,104 +67,64 @@
                 this.showRetryPopup();
 
                 // 10秒待機してから再試行
+                const retryDelay = 10000;
                 let progress = 0;
-                const duration = 10000; // 10秒
-                const interval = 100; // 100msごとに更新
-                const increment = (interval / duration) * 100;
+                const interval = 100;
+                const increment = (interval / retryDelay) * 100;
 
-                retryProgressInterval = setInterval(() => {
+                App.utils.gas.retryState.progressInterval = setInterval(() => {
                     progress += increment;
                     if (progress >= 100) {
                         progress = 100;
-                        clearInterval(retryProgressInterval);
-                        retryProgressInterval = null;
+                        clearInterval(App.utils.gas.retryState.progressInterval);
+                        App.utils.gas.retryState.progressInterval = null;
                     }
                     this.updateRetryProgress(progress);
                 }, interval);
 
                 // 10秒後に再試行
                 setTimeout(() => {
-                    if (retryProgressInterval) {
-                        clearInterval(retryProgressInterval);
-                        retryProgressInterval = null;
+                    if (App.utils.gas.retryState.progressInterval) {
+                        clearInterval(App.utils.gas.retryState.progressInterval);
+                        App.utils.gas.retryState.progressInterval = null;
                     }
 
-                    console.log('lastCallGASInvocation:', lastCallGASInvocation);
-                    if (typeof lastJSInvocation !== 'undefined') {
-                        console.log('lastJSInvocation:', lastJSInvocation);
-                    }
-
-                    // 直前のGAS操作を再試行
-                    const { functionName, args } = lastCallGASInvocation;
+                    const { functionName, args } = App.utils.gas.lastInvocation;
+                    console.log('[retryLastOperation] Retrying:', functionName);
+                    
                     callGAS(functionName, ...args)
                         .then(() => {
-                            // GASの再試行が成功したら、記録されたJavaScript関数も実行
-                            if (typeof lastJSInvocation !== 'undefined' && lastJSInvocation && lastJSInvocation.functionName &&
-                                lastJSInvocation.args) {
-                                const jsFunctionName = lastJSInvocation.functionName;
-                                const jsArgs = lastJSInvocation.args;
-
-                                // 関数を取得して実行
-                                let jsFunction = null;
-                                if (typeof window[jsFunctionName] === 'function') {
-                                    jsFunction = window[jsFunctionName];
-                                } else {
-                                    // 関数名から直接関数を取得を試みる
-                                    try {
-                                        jsFunction = eval(jsFunctionName);
-                                        if (typeof jsFunction !== 'function') {
-                                            jsFunction = null;
-                                        }
-                                    } catch (e) {
-                                        console.warn(`Failed to get function ${jsFunctionName}:`, e);
-                                    }
-                                }
-
-                                if (jsFunction && typeof jsFunction === 'function') {
-                                    try {
-                                        jsFunction(...jsArgs);
-                                    } catch (e) {
-                                        console.error(`Failed to execute ${jsFunctionName}:`, e);
-                                    }
-                                } else {
-                                    console.warn(`Function ${jsFunctionName} not found`);
-                                }
-                            }
-
-                            // 成功時はポップアップを閉じる
-                            if (typeof lastCallGASInvocation !== 'undefined') lastCallGASInvocation = null;
-                            if (typeof lastJSInvocation !== 'undefined') lastJSInvocation = null;
+                            showSnackbar('操作が完了しました', 'success');
                             this.hideRetryPopup();
-                        })
-                        .catch((error) => {
-                            // 再試行時もHTTP 429エラーの場合は再度再試行
-                            const is429Error = error.toString().includes('429');
-
-                            if (is429Error) {
-                                // 再度再試行
-                                this.retryLastOperation();
-                            } else {
-                                // その他のエラーはポップアップを閉じて通常のエラー処理
-                                if (typeof lastCallGASInvocation !== 'undefined') lastCallGASInvocation = null;
-                                if (typeof lastJSInvocation !== 'undefined') lastJSInvocation = null;
-                                this.hideRetryPopup();
-                                this.handle(error);
+                            
+                            // JavaScript側のコールバックがあれば実行
+                            if (App.utils.gas.lastCallback && typeof App.utils.gas.lastCallback === 'function') {
+                                try {
+                                    App.utils.gas.lastCallback();
+                                } catch (e) {
+                                    console.error('[retryLastOperation] Callback execution failed:', e);
+                                }
                             }
+                        })
+                        .catch(error => {
+                            this.hideRetryPopup();
+                            this.handle(error, { isRetry: true });
                         });
-                }, duration);
+                }, retryDelay);
             },
 
             /**
-            * 再試行ポップアップを表示
-            */
+             * 再試行ポップアップを表示
+             */
             showRetryPopup: function () {
                 // 既存のポップアップがあれば削除
-                if (retryPopup) {
-                    retryPopup.remove();
+                let existingPopup = document.getElementById('retry-popup');
+                if (existingPopup) {
+                    existingPopup.remove();
                 }
 
                 // ポップアップ要素を作成
-                retryPopup = document.createElement('div');
+                const retryPopup = document.createElement('div');
                 retryPopup.id = 'retry-popup';
                 retryPopup.className = 'retry-popup';
                 retryPopup.innerHTML = `
@@ -149,9 +142,10 @@
             },
 
             /**
-            * 再試行プログレスを更新
-            */
+             * 再試行プログレスを更新
+             */
             updateRetryProgress: function (progress) {
+                const retryPopup = document.getElementById('retry-popup');
                 if (retryPopup) {
                     const progressFill = retryPopup.querySelector('.retry-progress-fill');
                     if (progressFill) {
@@ -161,16 +155,16 @@
             },
 
             /**
-            * 再試行ポップアップを非表示
-            */
+             * 再試行ポップアップを非表示
+             */
             hideRetryPopup: function () {
+                const retryPopup = document.getElementById('retry-popup');
                 if (retryPopup) {
                     retryPopup.remove();
-                    retryPopup = null;
                 }
-                if (retryProgressInterval) {
-                    clearInterval(retryProgressInterval);
-                    retryProgressInterval = null;
+                if (App.utils.gas.retryState.progressInterval) {
+                    clearInterval(App.utils.gas.retryState.progressInterval);
+                    App.utils.gas.retryState.progressInterval = null;
                 }
             }
         };
