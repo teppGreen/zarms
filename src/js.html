@@ -795,9 +795,20 @@
     }
     
     const str = String(text);
-    // 属性値では特に " と ' をエスケープ
-    return str.replace(/["']/g, function(char) {
-      return char === '"' ? '&quot;' : '&#x27;';
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#x27;',
+      '/': '&#x2F;',
+      '\n': '&#10;',
+      '\r': '&#13;',
+      '\t': '&#9;'
+    };
+    
+    return str.replace(/[&<>"'/\n\r\t]/g, function(char) {
+      return map[char];
     });
   }
 
@@ -811,14 +822,28 @@
       return '';
     }
     
-    // javascript:, data:, vbscript: などの危険なスキームを除外
-    const dangerousProtocols = /^(javascript|data|vbscript):/i;
-    if (dangerousProtocols.test(url.trim())) {
-      console.warn('[sanitizeUrl] Dangerous protocol detected:', url);
-      return '';
+    // 危険なプロトコルを除外（ホワイトリスト方式に変更）
+    const urlTrimmed = url.trim();
+    
+    // 相対URLは許可
+    if (urlTrimmed.startsWith('/') || urlTrimmed.startsWith('./') || urlTrimmed.startsWith('../')) {
+      return url;
     }
     
-    return url;
+    // 安全なプロトコルのみ許可
+    const safeProtocols = /^(https?|mailto):/i;
+    if (safeProtocols.test(urlTrimmed)) {
+      return url;
+    }
+    
+    // プロトコルなしの場合は許可（相対URL扱い）
+    if (!urlTrimmed.includes(':')) {
+      return url;
+    }
+    
+    // それ以外のプロトコル（javascript:, data:, vbscript:, file:, ftp:, blob: など）は拒否
+    console.warn('[sanitizeUrl] Unsafe protocol detected:', url);
+    return '';
   }
 
   /**
