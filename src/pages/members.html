@@ -168,13 +168,24 @@
                             formatter: function (cell, formatterParams, onRendered) {
                                 const profilePhotoUrl = cell.getValue();
                                 const slackUrl = cell.getData().slack_profile_url;
+                                
+                                // URLをサニタイズ
+                                const safeSlackUrl = sanitizeUrl(slackUrl);
+                                const safePhotoUrl = sanitizeUrl(profilePhotoUrl);
+                                
                                 let icon;
-                                if (profilePhotoUrl) {
-                                    icon = `<i class="extra circle transparent"><img src="${escapeHtml(profilePhotoUrl)}" class="responsive"></i>`;
+                                if (safePhotoUrl) {
+                                    // URLをエスケープして安全に埋め込み
+                                    icon = `<i class="extra circle transparent"><img src="${escapeHtmlAttribute(safePhotoUrl)}" class="responsive"></i>`;
                                 } else {
                                     icon = '<i class="extra circle">account_circle</i>';
                                 }
-                                return `<a href="${slackUrl}" target="_blank" rel="noopener noreferrer">${icon}</a>`;
+                                
+                                if (safeSlackUrl) {
+                                    return `<a href="${escapeHtmlAttribute(safeSlackUrl)}" target="_blank" rel="noopener noreferrer">${icon}</a>`;
+                                }
+                                
+                                return icon;
                             }
                         },
                         {
