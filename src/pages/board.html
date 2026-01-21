@@ -11,6 +11,7 @@
             currentBoardId: null, // 現在表示中のボードID
             lastRenderTimes: {}, // ボードごとの最終レンダリング時刻
             cachedBoardTasks: {}, // ボードごとのタスクデータキャッシュ
+            clickHandlers: {}, // ボードごとのクリックハンドラーを保持
             // マイボードのフィルタ設定
             myBoardFilters: {},
 
@@ -441,20 +442,39 @@
             },
 
             /**
-             * カードクリック時の処理
+             * カードクリック時の処理（イベント委譲版）
              */
             bindCardClick: function (container) {
                 if (!container) return;
 
-                const cards = container.querySelectorAll('.kanban-card');
-                cards.forEach(card => {
-                    card.addEventListener('click', () => {
+                const containerId = container.id;
+                
+                // containerにIDがない場合は処理をスキップ
+                if (!containerId) {
+                    console.warn('[bindCardClick] Container has no ID, skipping event binding');
+                    return;
+                }
+                
+                // 既存のハンドラーがあれば削除
+                if (this.clickHandlers[containerId]) {
+                    container.removeEventListener('click', this.clickHandlers[containerId]);
+                }
+
+                // 新しいハンドラーを作成
+                const handler = (e) => {
+                    // カードまたはその子要素がクリックされたかチェック
+                    const card = e.target.closest('.kanban-card');
+                    if (card) {
                         const taskId = card.dataset.eid;
                         if (taskId && App.modals.taskDetail) {
                             App.modals.taskDetail.open(taskId);
                         }
-                    });
-                });
+                    }
+                };
+
+                // ハンドラーを保存して追加
+                this.clickHandlers[containerId] = handler;
+                container.addEventListener('click', handler);
             },
 
             /**
@@ -927,7 +947,14 @@
 
                     let iconSrc, buttonClass;
                     if (url) {
-                        iconSrc = `<img src="${url}" title="${escapeHtml(assigneeNames[index])}" class="responsive">`;
+                        // URLをサニタイズ（危険なプロトコルを除外）
+                        const safeUrl = sanitizeUrl(url);
+                        if (safeUrl) {
+                            // URLはサニタイズ済みで安全なので、そのまま使用
+                            iconSrc = `<img src="${safeUrl}" title="${escapeHtml(assigneeNames[index])}" class="responsive">`;
+                        } else {
+                            iconSrc = `<i title="${escapeHtml(assigneeNames[index])}">person</i>`;
+                        }
                         buttonClass = 'circle transparent small';
                     } else {
                         iconSrc = `<i title="${escapeHtml(assigneeNames[index])}">person</i>`;

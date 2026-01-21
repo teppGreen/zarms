@@ -96,15 +96,18 @@
 
                 container.innerHTML = filtered.map(board => {
                     const isSelected = this.selectedIds.includes(board.id);
+                    const safeBoardName = escapeHtml(board.name);
+                    const safeBoardId = escapeHtmlAttribute(board.id);
+                    
                     return `
                         <div><label class="${this.multiSelect ? 'checkbox' : 'radio'} row middle-align small-space">
                             <input type="${this.multiSelect ? 'checkbox' : 'radio'}" 
                                 name="board-select" 
-                                value="${board.id}" 
+                                value="${safeBoardId}" 
                                 ${isSelected ? 'checked' : ''}
-                                onchange="App.modals.selectBoards.toggleSelection('${board.id}', this.checked)">
+                                onchange="App.modals.selectBoards.toggleSelection('${safeBoardId}', this.checked)">
                             <span class="small-margin">
-                                <strong>${escapeHtml(board.name)}</strong>
+                                <strong>${safeBoardName}</strong>
                             </span>
                         </label></div>
                     `;
