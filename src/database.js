@@ -277,7 +277,7 @@ function select(sheetName, query = {}) {
         // boolean型カラムの正規化
         results.forEach(row => {
             BOOLEAN_COLUMNS.forEach(col => {
-                if (row.hasOwnProperty(col)) {
+                if (Object.prototype.hasOwnProperty.call(row, col)) {
                     row[col] = toBooleanSafe(row[col]);
                 }
             });
@@ -384,20 +384,29 @@ function selectWithJoin(sheetName, query = {}, joins = []) {
 // ============================================
 
 /**
- * Sheets APIからヘッダー情報を取得
- * @param {string} sheetName - シート名
+ * テーブル名からヘッダー配列を取得
+ * パフォーマンス向上のため、定数から取得（スプレッドシートAPIへのアクセスを削減）
+ * @param {string} tableName - テーブル名
  * @returns {Array} ヘッダー配列
  */
-function getHeadersFromSheetsAPI(sheetName) {
-    try {
-        const response = Sheets.Spreadsheets.Values.get(SPREADSHEET_ID, `${sheetName}!1:1`);
-        const headers = response.values ? response.values[0] : [];
-
-        return headers;
-    } catch (error) {
-        console.error(`Error getting headers for ${sheetName}:`, error);
-        throw error;
+function getTableHeaders(tableName) {
+    const tableKey = tableName.toUpperCase();
+    if (!TABLE_HEADERS[tableKey]) {
+        throw new Error(`Unknown table: ${tableName}`);
     }
+    return TABLE_HEADERS[tableKey];
+}
+
+/**
+ * Sheets APIからヘッダー情報を取得（レガシー互換用）
+ * 新しいコードではgetTableHeaders()を使用することを推奨
+ * @param {string} sheetName - シート名
+ * @returns {Array} ヘッダー配列
+ * @deprecated getTableHeaders()を使用してください
+ */
+function getHeadersFromSheetsAPI(sheetName) {
+    // パフォーマンス向上のため、定数から取得
+    return getTableHeaders(sheetName);
 }
 
 /**
