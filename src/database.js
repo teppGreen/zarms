@@ -44,6 +44,16 @@ const CacheManager = {
 };
 
 // ============================================
+// Constants
+// ============================================
+
+// 列IDの文字配列（A-Z）
+const COLUMN_IDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+
+// boolean型のカラム名リスト
+const BOOLEAN_COLUMNS = ['is_active', 'is_done'];
+
+// ============================================
 // Header Mapping Utility for GViz & Sheets API
 // ============================================
 
@@ -53,12 +63,11 @@ const CacheManager = {
  * @returns {string} 列ID（例: 0→'A', 25→'Z', 26→'AA', 27→'AB'）
  */
 function columnIndexToId(index) {
-  const columnIds = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
   let id = '';
   let currentIndex = index;
   
   while (currentIndex >= 0) {
-    id = columnIds[currentIndex % 26] + id;
+    id = COLUMN_IDS[currentIndex % 26] + id;
     currentIndex = Math.floor(currentIndex / 26) - 1;
   }
   
@@ -266,9 +275,8 @@ function select(sheetName, query = {}) {
         });
 
         // boolean型カラムの正規化
-        const booleanColumns = ['is_active', 'is_done']; // boolean型のカラム名リスト
         results.forEach(row => {
-            booleanColumns.forEach(col => {
+            BOOLEAN_COLUMNS.forEach(col => {
                 if (row.hasOwnProperty(col)) {
                     row[col] = toBooleanSafe(row[col]);
                 }
@@ -705,7 +713,7 @@ function hashString(str) {
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // 32bit整数に変換
+    hash |= 0; // 32bit整数に変換
   }
   return Math.abs(hash).toString(16);
 }
