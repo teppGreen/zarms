@@ -1098,6 +1098,169 @@
   };
 
   // ============================================
+  // Modal Utilities
+  // 責任: モーダルの共通処理（フォーカス、フィルタリング、選択管理）
+  // ============================================
+
+  /**
+   * モーダル関連のユーティリティ関数
+   */
+  App.utils.modal = {
+    /**
+     * 入力フィールドにフォーカスを設定します（リトライ機能付き）
+     * @param {string} selector - 入力フィールドのセレクタ
+     * @param {number} maxRetries - 最大リトライ回数
+     * @param {number} delay - リトライ間隔（ミリ秒）
+     */
+    focusInput: function(selector, maxRetries = UI_CONFIG.MODAL_FOCUS_MAX_RETRIES, delay = UI_CONFIG.MODAL_FOCUS_DELAY) {
+      const tryFocus = (count = 0) => {
+        const input = document.querySelector(selector);
+        if (input && input.offsetParent !== null) {
+          input.focus();
+          input.select();
+          return true;
+        } else if (count < maxRetries) {
+          setTimeout(() => tryFocus(count + 1), delay);
+          return false;
+        }
+        console.warn(`[focusInput] Failed to focus element: ${selector}`);
+        return false;
+      };
+      
+      tryFocus();
+    },
+
+    /**
+     * データをフィルタリングします（検索語による絞り込み）
+     * @param {Array<Object>} data - データ配列
+     * @param {string} searchTerm - 検索語
+     * @param {Array<string>} searchFields - 検索対象フィールド名の配列
+     * @param {boolean} activeOnly - is_activeがtrueのみ対象とするか
+     * @returns {Array<Object>} フィルタリングされたデータ
+     */
+    filterData: function(data, searchTerm, searchFields, activeOnly = true) {
+      if (!data || !Array.isArray(data)) {
+        return [];
+      }
+
+      const term = searchTerm ? searchTerm.toLowerCase().trim() : '';
+
+      return data.filter(item => {
+        // アクティブフィルタ
+        if (activeOnly && item.is_active !== true) {
+          return false;
+        }
+
+        // 検索語が空の場合はアクティブフィルタのみ適用
+        if (!term) {
+          return true;
+        }
+
+        // 指定されたフィールドのいずれかに検索語が含まれているか
+        return searchFields.some(field => {
+          const value = item[field];
+          return value && String(value).toLowerCase().includes(term);
+        });
+      });
+    },
+
+    /**
+     * 選択状態を切り替えます
+     * @param {Array<string>} selectedIds - 選択中のID配列
+     * @param {string} id - 切り替えるID
+     * @param {boolean} multiSelect - 複数選択可能か
+     * @returns {Array<string>} 更新後の選択ID配列
+     */
+    toggleSelection: function(selectedIds, id, multiSelect) {
+      const newSelection = [...selectedIds];
+      const index = newSelection.indexOf(id);
+
+      if (multiSelect) {
+        // 複数選択: トグル動作
+        if (index > -1) {
+          newSelection.splice(index, 1);
+        } else {
+          newSelection.push(id);
+        }
+      } else {
+        // 単一選択: 置き換え
+        return [id];
+      }
+
+      return newSelection;
+    },
+
+    /**
+     * チェックボックス\/ラジオボタンの選択状態を取得します
+     * @param {string} containerSelector - コンテナのセレクタ
+     * @param {string} inputName - input要素のname属性
+     * @param {boolean} multiSelect - 複数選択か
+     * @returns {Array<string>} 選択されたIDの配列
+     */
+    getSelectedIds: function(containerSelector, inputName, multiSelect) {
+      const container = document.querySelector(containerSelector);
+      if (!container) return [];
+
+      const inputs = container.querySelectorAll(`input[name="${inputName}"]:checked`);
+      return Array.from(inputs).map(input => input.value);
+    },
+
+    /**
+     * モーダルの検索入力欄をリセットします
+     * @param {string} selector - 検索入力欄のセレクタ
+     */
+    resetSearchInput: function(selector) {
+      const input = document.querySelector(selector);
+      if (input) {
+        input.value = '';
+      }
+    },
+
+    /**
+     * 選択結果をチップとして表示します
+     * @param {string} containerSelector - コンテナのセレクタ
+     * @param {Array<Object>} items - 選択されたアイテムの配列
+     * @param {Function} onRemove - チップ削除時のコールバック(itemId)
+     * @param {Function} labelFormatter - ラベル表示用のフォーマッタ(item) => string
+     */
+    renderSelectedChips: function(containerSelector, items, onRemove, labelFormatter) {
+      const container = document.querySelector(containerSelector);
+      if (!container) return;
+
+      if (!items || items.length === 0) {
+        container.innerHTML = '<span class="small-text secondary-text">なし<\/span>';
+        return;
+      }
+
+      let html = '';
+      items.forEach(item => {
+        const label = labelFormatter ? labelFormatter(item) : (item.name || item.display_name || item.id);
+        const safeLabel = escapeHtml(label);
+        const safeId = escapeHtmlAttribute(item.id);
+
+        html += `
+          <button class="chip" data-item-id="${safeId}">
+            <span>${safeLabel}<\/span>
+            <i>close<\/i>
+          <\/button>
+        `;
+      });
+
+      container.innerHTML = html;
+
+      // チップの削除イベントを設定
+      if (onRemove) {
+        container.querySelectorAll('.chip').forEach(chip => {
+          chip.addEventListener('click', () => {
+            const itemId = chip.dataset.itemId;
+            onRemove(itemId);
+          });
+        });
+      }
+    }
+  };
+
+  // ============================================
   // Optimistic UI: データ同期ロジック
   // ============================================
 
