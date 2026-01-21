@@ -109,18 +109,19 @@
                 // 検索結果を表示
                 container.innerHTML = this.searchResults.map(task => {
                     const isSelected = this.selectedIds.includes(task.id);
-                    const displayName = task.name || '無題のタスク';
+                    const displayName = escapeHtml(task.name || '無題のタスク');
                     const displayId = task.display_id ? `#${task.display_id}` : '';
+                    const safeId = escapeHtmlAttribute(task.id);
 
                     return `
                         <div><label class="${this.multiSelect ? 'checkbox' : 'radio'} row middle-align small-space">
                             <input type="${this.multiSelect ? 'checkbox' : 'radio'}" 
                                 name="task-select" 
-                                value="${task.id}" 
+                                value="${safeId}" 
                                 ${isSelected ? 'checked' : ''}
-                                onchange="App.modals.selectTasks.toggleSelection('${task.id}', this.checked)">
+                                onchange="App.modals.selectTasks.toggleSelection('${safeId}', this.checked)">
                             <span class="small-margin">
-                                <strong>${escapeHtml(displayName)}</strong>
+                                <strong>${displayName}</strong>
                                 ${displayId ? `<span class="small-text" style="opacity: 0.7;"> ${displayId}</span>` : ''}
                             </span>
                         </label></div>
