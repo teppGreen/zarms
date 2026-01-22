@@ -41,6 +41,7 @@
   <div>
     <?!= include('components/headers/navigation_top'); ?>
     <?!= include('components/headers/navigation_left'); ?>
+    <?!= include('components/headers/navigation_bottom'); ?>
 
     <main class="surface-container round padding right-margin bottom-margin">
       <?!= include('pages/home'); ?>
@@ -62,57 +63,6 @@
     </main>
   </div>
   <div id="global-snackbar" class="snackbar top"></div>
-
-  <!-- スマホ判定用の隠し要素 -->
-  <div id="mobile-detector" class="s" style="display: none;"></div>
-
-  <!-- ボトムナビゲーション（スマホ専用） -->
-  <nav id="bottom-nav" class="s bottom" style="display: none;">
-    <button class="circle transparent" onclick="App.modals.taskDetail.create()">
-      <i>add</i>
-      <div class="tooltip top">新規タスク</div>
-    </button>
-    <button class="circle transparent" onclick="ui('#modal-filter-task')">
-      <i>filter_list</i>
-      <div class="tooltip top">フィルター</div>
-    </button>
-    <button class="circle transparent" id="mobile-search-toggle">
-      <i>search</i>
-      <div class="tooltip top">検索</div>
-    </button>
-    <button class="circle transparent" onclick="window.open('https:\/\/docs.google.com\/forms\/d\/e\/1FAIpQLSes-123hjo8rrvF-suBIjNdUoEBHeHmJKj-u0MESHUQEa7IHg\/viewform', '_blank')">
-      <i>help</i>
-      <div class="tooltip top">お問い合わせ</div>
-    </button>
-    <button class="circle transparent" id="mobile-apps-toggle">
-      <i>apps</i>
-      <div class="tooltip top">アプリ</div>
-    </button>
-  </nav>
-
-  <!-- モバイル検索バー（スマホ専用・ボトムナビと切り替え） -->
-  <nav id="mobile-search-bar" class="s bottom" style="display: none;">
-    <button class="circle transparent" id="mobile-search-close">
-      <i>close</i>
-    </button>
-    <div class="field round prefix border max">
-      <i class="front">search</i>
-      <input placeholder="検索" id="mobile-search-input">
-    </div>
-  </nav>
-
-  <!-- モバイルアプリメニュー（スマホ専用） -->
-  <dialog id="mobile-apps-menu" class="s bottom no-padding">
-    <div class="small-margin" onclick="ui('#mobile-apps-menu')">
-      <i class="center extra">keyboard_arrow_down</i>
-    </div>
-    <div class="surface-container padding">
-      <h6 class="small-margin">アプリ</h6>
-      <div id="mobile-apps-grid" class="grid small-space">
-        <!-- アプリリンクを動的生成 -->
-      </div>
-    </div>
-  </dialog>
 
   <script>
     const templateVariables = <?!= JSON.stringify(templateVariables) ?>;

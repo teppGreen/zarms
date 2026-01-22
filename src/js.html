@@ -85,9 +85,7 @@
      * @returns {boolean} スマホの場合true
      */
     window.isMobile = function() {
-      const detector = document.getElementById('mobile-detector');
-      if (!detector) return window.innerWidth < MOBILE_BREAKPOINT; // フォールバック
-      return window.getComputedStyle(detector).display !== 'none';
+      return window.innerWidth < MOBILE_BREAKPOINT;
     };
 
     /**
@@ -96,19 +94,14 @@
     window.initializeMobileUI = function() {
       if (!isMobile()) return;
 
-      // ボトムナビゲーションを表示
-      const bottomNav = document.getElementById('bottom-nav');
-      if (bottomNav) {
-        bottomNav.style.display = 'flex';
-      }
-
       // 検索トグル
+      const bottomNav = document.getElementById('bottom-nav');
       const searchToggle = document.getElementById('mobile-search-toggle');
       const searchBar = document.getElementById('mobile-search-bar');
       const searchClose = document.getElementById('mobile-search-close');
       const searchInput = document.getElementById('mobile-search-input');
 
-      if (searchToggle && searchBar && searchClose) {
+      if (searchToggle && searchBar && searchClose && bottomNav) {
         searchToggle.addEventListener('click', function() {
           bottomNav.style.display = 'none';
           searchBar.style.display = 'flex';
