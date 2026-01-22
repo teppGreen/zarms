@@ -42,21 +42,8 @@
                 this.render();
                 await ui('#modal-select-members');
 
-                // フォーカスを確実に行うための再試行ロジック
-                const tryFocus = (count = 0) => {
-                    const input = document.getElementById('member-search-input');
-                    // offsetParent !== null は要素が表示されているかどうかの簡易チェック
-                    if (input && input.offsetParent !== null) {
-                        input.focus();
-                        input.select(); // 全選択
-                    } else if (count < UI_CONFIG.MODAL_FOCUS_MAX_RETRIES) {
-                        // まだ表示されていない場合は少し待って再試行
-                        setTimeout(() => tryFocus(count + 1), UI_CONFIG.MODAL_FOCUS_DELAY);
-                    }
-                };
-
-                // 初回実行
-                tryFocus();
+                // 共通処理を使用
+                App.utils.modal.focusInput('#member-search-input');
             },
 
             render: function () {
@@ -69,19 +56,15 @@
 
                 if (!container) return;
 
-                const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
-                const activeOnly = true;
+                const searchTerm = searchInput ? searchInput.value : '';
 
-                // フィルタリング
-                let filtered = this.allMembers.filter(member => {
-                    const matchesSearch = !searchTerm ||
-                        (member.display_name && member.display_name.toLowerCase().includes(searchTerm)) ||
-                        (member.email && member.email.toLowerCase().includes(searchTerm));
-
-                    const matchesActive = !activeOnly || member.is_active === true;
-
-                    return matchesSearch && matchesActive;
-                });
+                // 共通フィルタリング処理を使用
+                const filtered = App.utils.modal.filterData(
+                    this.allMembers,
+                    searchTerm,
+                    ['display_name', 'email'], // 検索対象フィールド
+                    true // activeOnly
+                );
 
                 // 表示
                 if (filtered.length === 0) {
@@ -122,9 +105,17 @@
             },
 
             confirm: function () {
-                if (this.callback) {
+                // 共通処理を使用
+                this.selectedIds = App.utils.modal.getSelectedIds(
+                    '#member-results-container',
+                    'member-select',
+                    this.multiSelect
+                );
+
+                if (this.callback && typeof this.callback === 'function') {
                     this.callback(this.selectedIds);
                 }
+
                 ui('#modal-select-members');
             }
         };

@@ -108,3 +108,51 @@ const UI_CONFIG = {
  * 列ID定数（Excel形式）
  */
 const COLUMN_IDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+
+// ============================================
+// 外部URL設定とイベント設定
+// ============================================
+
+/**
+ * 外部URL設定
+ */
+const EXTERNAL_URLS = {
+  CALENDAR: 'https://calendar.google.com/calendar/embed?height=600&wkst=1&ctz=Asia%2FTokyo&showPrint=0&showTitle=0&mode=MONTH&hl=ja&src=Y182ODEyOWNkMjU3YWE4MDU4YTE3NjAwZjVlYmFlNTg1OWZlOGE3NzEwNGFlZDkxOWQyMWU1OGZjZDQ1NmQ4MTEzQGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20&color=%23f09300',
+  CONTACT_FORM: 'https://forms.gle/afXzsGKxvm9qVG4G9',
+  MEMBER_SPREADSHEET: 'https://docs.google.com/spreadsheets/d/1Jwq5klCWFMNqSURHk2JrbF43X4JTy5I7M5aBE3uDVNw/edit',
+  SOUMU_DOCUMENT: 'https://docs.google.com/document/d/1BXpWaVsyJChC-rSDgjEvH33s_5FvXiaimvHIYxBTxoY/preview?tab=t.ox00ab3wnxmq',
+  LOGO_IMAGE: 'https://lh3.googleusercontent.com/d/1G9u8KOX93-PWEdKUwVWvB7WWGIOuQ2wh',
+  ZARMS_IMAGE: 'https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8'
+};
+
+/**
+ * イベント設定
+ */
+const EVENT_CONFIG = {
+  FESTIVAL_DATE: '2026-04-24', // リアル会場0日目（準備日）
+  MAINTENANCE_HOURS: {
+    START: 2,  // JST 2:00
+    END: 5     // JST 5:00
+  }
+};
+
+/**
+ * 認証設定
+ */
+const AUTH_CONFIG = {
+  ALLOWED_DOMAINS: ['student.zen.ac.jp', 'zen.ac.jp']
+};
+
+/**
+ * UI表示テキスト
+ */
+const UI_TEXT = {
+  APP_TITLE: 'ZARMS',
+  APP_DESCRIPTION: '大学祭実行委員会の業務システム「ZARMS」へようこそ！',
+  LOADING_MESSAGE: 'お待ちください',
+  ERROR_USER_NOT_FOUND: 'ユーザーが見つかりませんでした',
+  ERROR_ACCESS_DENIED: 'アクセス権限がありません',
+  SUCCESS_SAVED: '保存しました',
+  SUCCESS_DELETED: '削除しました',
+  SUCCESS_CREATED: '作成しました'
+};

@@ -189,30 +189,29 @@
              * ボードチップを描画
              */
             renderBoardChips: function () {
-                const container = document.getElementById('filter-boards');
+                const filters = App.pages.boards?.myBoardFilters;
+                if (!filters) return;
+
+                const boardIds = filters.boards || [];
+                const allBoards = App.state.data.boards || [];
+                const selectedBoards = allBoards.filter(b => boardIds.includes(b.id));
+
+                // 共通処理を使用
+                const containerSelector = '#filter-boards';
+                const container = document.querySelector(containerSelector);
                 if (!container) return;
 
-                const filters = App.pages.boards?.myBoardFilters;
-                const boardIds = filters?.boards || [];
-                const allBoards = App.state.data.boards || [];
-
-                if (boardIds.length === 0) {
-                    container.innerHTML = '<span class="small-text" style="opacity: 0.6;">未選択（全てのボード）</span>';
+                if (selectedBoards.length === 0) {
+                    container.innerHTML = '<span class="small-text" style="opacity: 0.6;">未選択（全てのボード）<\/span>';
                     return;
                 }
 
-                const html = boardIds.map(id => {
-                    const board = allBoards.find(b => b.id === id);
-                    const name = board ? board.name : '不明';
-                    return `
-                        <div class="chip small" onclick="App.modals.filterTask.removeBoard('${id}')">
-                            <span>${escapeHtml(name)}</span>
-                            <i data-board-id="${id}" class="filter-board-chip-remove">close</i>
-                        </div>
-                    `;
-                }).join('');
-
-                container.innerHTML = html;
+                App.utils.modal.renderSelectedChips(
+                    containerSelector,
+                    selectedBoards,
+                    (boardId) => this.removeBoard(boardId),
+                    (board) => board.name || 'Unknown'
+                );
             },
 
             /**
@@ -240,37 +239,32 @@
             },
 
             /**
-             * メンバーチップを描画
+             * メンバーチップを再描画します
+             * @param {string} role - ロール（'created_by', 'processed_by'など）
              */
-            renderMemberChips: function (role) {
-                const container = document.getElementById(`filter-members-${role.replace('_', '-')}`);
-                if (!container) return;
-
+            renderMemberChips: function(role) {
                 const filters = App.pages.boards?.myBoardFilters;
-                const memberIds = filters?.members?.[role] || [];
-                const allMembers = App.state.data.members || [];
-
-                if (memberIds.length === 0) {
-                    container.innerHTML = '<span class="small-text secondary-text"">未選択（全てのメンバー）</span>';
+                if (!filters || !filters.members || !filters.members[role]) {
                     return;
                 }
 
-                const html = memberIds.map(id => {
-                    const member = allMembers.find(m => m.id === id);
-                    const name = member ? member.display_name : '不明';
-                    return `
-                        <div class="chip small filter-chip-remove" onclick="App.modals.filterTask.removeMember('${role}', '${id}')">
-                            <span>${escapeHtml(name)}</span>
-                            <i>close</i>
-                        </div>
-                    `;
-                }).join('');
+                const memberIds = filters.members[role];
+                const allMembers = App.state.data.members || [];
+                const selectedMembers = allMembers.filter(m => memberIds.includes(m.id));
 
-                container.innerHTML = html;
+                // 共通処理を使用
+                App.utils.modal.renderSelectedChips(
+                    `#filter-members-${role.replace(/_/g, '-')}`,
+                    selectedMembers,
+                    (memberId) => this.removeMember(role, memberId),
+                    (member) => member.display_name || member.email || 'Unknown'
+                );
             },
 
             /**
-             * メンバーを削除
+             * メンバーを削除します
+             * @param {string} role - ロール
+             * @param {string} memberId - メンバーID
              */
             removeMember: function (role, memberId) {
                 if (!App.pages.boards?.myBoardFilters) return;
