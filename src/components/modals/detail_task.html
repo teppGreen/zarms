@@ -950,7 +950,8 @@
         }
 
         // モバイル時：モバイルフィールドをデスクトップフィールドに同期
-        if (window.isMobile && window.isMobile()) {
+        const isMobileDevice = window.isMobile && window.isMobile();
+        if (isMobileDevice) {
           this.syncMobileToDesktop();
         }
 
@@ -2359,7 +2360,8 @@
         }
 
         // スマホ時：外部ボードへのリンクは無反応
-        if (window.isMobile && window.isMobile()) {
+        const isMobileDevice = window.isMobile && window.isMobile();
+        if (isMobileDevice) {
           const currentBoardId = App.pages.boards?.currentBoardId;
           if (boardId && boardId !== 'my-board' && boardId !== currentBoardId) {
             console.log('[TaskDetail] Mobile: External board link blocked');
@@ -2689,8 +2691,10 @@
        * モバイル用スワイプ機能をセットアップ
        */
       setupMobileSwipe: function() {
-        if (!window.isMobile || !window.isMobile()) return;
+        const isMobileDevice = window.isMobile && window.isMobile();
+        if (!isMobileDevice) return;
 
+        const SWIPE_THRESHOLD = 50; // スワイプ判定の閾値（px）
         const container = document.getElementById('task-detail-swipe-container');
         if (!container) return;
 
@@ -2735,10 +2739,9 @@
         });
 
         const handleSwipe = () => {
-          const swipeThreshold = 50;
           const diff = touchStartX - touchEndX;
 
-          if (Math.abs(diff) < swipeThreshold) return;
+          if (Math.abs(diff) < SWIPE_THRESHOLD) return;
 
           if (diff > 0) {
             // 左スワイプ：次のパネルへ
@@ -2764,7 +2767,8 @@
        * モバイルとデスクトップの要素を同期
        */
       syncMobileDesktopElements: function() {
-        if (!window.isMobile || !window.isMobile()) return;
+        const isMobileDevice = window.isMobile && window.isMobile();
+        if (!isMobileDevice) return;
 
         // セレクトボックスの同期
         const boardSelect = document.getElementById('task-board-select');

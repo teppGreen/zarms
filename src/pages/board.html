@@ -399,8 +399,10 @@
              * モバイル用スワイプ機能をセットアップ
              */
             setupMobileSwipe: function(boardId) {
-                if (!window.isMobile || !window.isMobile()) return;
+                const isMobileDevice = window.isMobile && window.isMobile();
+                if (!isMobileDevice) return;
 
+                const SWIPE_THRESHOLD = 50; // スワイプ判定の閾値（px）
                 const container = document.getElementById(`kanban-canvas-${boardId}`);
                 if (!container) return;
 
@@ -431,10 +433,9 @@
                 });
 
                 const handleSwipe = () => {
-                    const swipeThreshold = 50;
                     const diff = touchStartX - touchEndX;
 
-                    if (Math.abs(diff) < swipeThreshold) return;
+                    if (Math.abs(diff) < SWIPE_THRESHOLD) return;
 
                     if (diff > 0) {
                         // 左スワイプ：次の列へ
@@ -462,7 +463,8 @@
              */
             setupSortable: function (boardId) {
                 // スマホの場合はSortableを無効化
-                if (window.isMobile && window.isMobile()) return;
+                const isMobileDevice = window.isMobile && window.isMobile();
+                if (isMobileDevice) return;
 
                 const container = document.getElementById(`kanban-canvas-${boardId}`);
                 if (!container) return;

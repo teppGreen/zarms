@@ -77,13 +77,16 @@
 
   // モバイル判定とモバイルUI初期化
   (function () {
+    // 定数定義
+    const MOBILE_BREAKPOINT = 600; // スマホ判定のブレークポイント（px）
+
     /**
      * スマホ判定関数
      * @returns {boolean} スマホの場合true
      */
     window.isMobile = function() {
       const detector = document.getElementById('mobile-detector');
-      if (!detector) return window.innerWidth < 600; // フォールバック
+      if (!detector) return window.innerWidth < MOBILE_BREAKPOINT; // フォールバック
       return window.getComputedStyle(detector).display !== 'none';
     };
 
