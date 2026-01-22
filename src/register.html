@@ -247,7 +247,7 @@
     </dialog>
 
     <script>
-        const { activeUserEmail, urlParams, scriptUrl } = <?!= JSON.stringify(templateVariables) ?>;
+        const { activeUserEmail, urlParams, scriptUrl, EVENT_CONFIG, AUTH_CONFIG, EXTERNAL_URLS } = <?!= JSON.stringify(templateVariables) ?>;
 
         const SLACK_PROFILE_URL_REGEX = /^https:\/\/zen-student\.slack\.com\/team\/U0[A-Z0-9]{9}$/;
         const DEFAULT_HELPER_TEXT = 'パソコンで<a href="https://zen-student.slack.com/account/profile" tabindex="-1" target="_blank" class="link">Slack プロフィール</a>を開き、︙メニューからコピーしてください。';
@@ -278,7 +278,8 @@
 
             const now = new Date();
             const jstHours = (now.getUTCHours() + 9) % 24;
-            return jstHours >= 2 && jstHours < 5;
+            return jstHours >= EVENT_CONFIG.MAINTENANCE_HOURS.START && 
+                   jstHours < EVENT_CONFIG.MAINTENANCE_HOURS.END;
         }
 
         function showMaintenanceStep() {
@@ -308,7 +309,7 @@
                                 .withFailureHandler(function (error) {
                                     console.error("loadMainApp failed:", error);
                                 })
-                                .loadMainApp(urlParams, activeUser);
+                                .loadMainApp(activeUser);
                         })
                         .withFailureHandler(function (error) {
                             showInputStep();
@@ -329,11 +330,12 @@
         }
 
         function showAccessErrorStep() {
+            const allowedDomains = AUTH_CONFIG.ALLOWED_DOMAINS.join(' または ');
             document.getElementById('active-user-email').innerHTML = `
                 <span class="secondary-text small-text">
-                    サインイン中のアカウント: <a target="_blank" href="https://myaccount.google.com/?authuser=${activeUserEmail}">${activeUserEmail}</a><br>
-                    サインイン可能なドメイン: student.zen.ac.jp または zen.ac.jp
-                </span>`;
+                    サインイン中のアカウント: <a target="_blank" href="https:\\/\\/myaccount.google.com\\/?authuser=${activeUserEmail}">${activeUserEmail}<\/a><br>
+                    サインイン可能なドメイン: ${allowedDomains}
+                <\/span>`;
             showStep('step-access-error');
         }
 
