@@ -44,6 +44,17 @@
 
     <!-- モバイル用スワイプコンテナ -->
     <div id="task-detail-swipe-container" class="s swipe-container">
+      <!-- スワイプインジケーター -->
+      <div class="s center-align small-margin">
+        <nav class="row center">
+          <i class="small" id="swipe-dot-0">circle</i>
+          <i class="small secondary-text" id="swipe-dot-1">circle</i>
+          <i class="small secondary-text" id="swipe-dot-2">circle</i>
+          <i class="small secondary-text" id="swipe-dot-3">circle</i>
+          <i class="small secondary-text" id="swipe-dot-4">circle</i>
+        </nav>
+      </div>
+
       <!-- カラム1: 基本情報 -->
       <div class="swipe-panel" data-panel-index="0">
         <div class="grid small-padding tiny-space no-margin">
@@ -759,7 +770,18 @@
           'task-ends-at-input'
         ];
 
-        fields.forEach(id => {
+        // モバイルフィールドも追加
+        const mobileFields = [
+          'task-board-select-mobile',
+          'task-status-select-mobile',
+          'task-priority-select-mobile',
+          'task-starts-at-input-mobile',
+          'task-ends-at-input-mobile'
+        ];
+
+        const allFields = fields.concat(mobileFields);
+
+        allFields.forEach(id => {
           const el = document.getElementById(id);
           if (el) {
             el.addEventListener('input', () => {
@@ -772,6 +794,14 @@
             });
           }
         });
+
+        // モバイルQuillエディタの変更を監視
+        if (this.quillMobile) {
+          this.quillMobile.on('text-change', () => {
+            this.isDirty = true;
+            console.log('Dirty flag set to true (mobile)');
+          });
+        }
       },
 
       /**
@@ -917,6 +947,11 @@
         if (!id) {
           console.error('[TaskDetail] Cannot save: No ID');
           return;
+        }
+
+        // モバイル時：モバイルフィールドをデスクトップフィールドに同期
+        if (window.isMobile && window.isMobile()) {
+          this.syncMobileToDesktop();
         }
 
         // 参照を保持（モーダルを閉じた後も使用するため）
@@ -2666,6 +2701,20 @@
         let touchStartX = 0;
         let touchEndX = 0;
 
+        // インジケーターを更新する関数
+        const updateIndicators = () => {
+          for (let i = 0; i < 5; i++) {
+            const dot = document.getElementById(`swipe-dot-${i}`);
+            if (dot) {
+              if (i === currentPanelIndex) {
+                dot.classList.remove('secondary-text');
+              } else {
+                dot.classList.add('secondary-text');
+              }
+            }
+          }
+        };
+
         // 最初のパネルのみ表示
         panels.forEach((panel, index) => {
           if (index === 0) {
@@ -2697,6 +2746,7 @@
               panels[currentPanelIndex].style.display = 'none';
               currentPanelIndex++;
               panels[currentPanelIndex].style.display = 'block';
+              updateIndicators();
             }
           } else {
             // 右スワイプ：前のパネルへ
@@ -2704,6 +2754,7 @@
               panels[currentPanelIndex].style.display = 'none';
               currentPanelIndex--;
               panels[currentPanelIndex].style.display = 'block';
+              updateIndicators();
             }
           }
         };
@@ -2817,6 +2868,50 @@
 
         if (this.quill && this.quillMobile) {
           this.quillMobile.setContents(this.quill.getContents());
+        }
+      },
+
+      /**
+       * モバイルからデスクトップへデータを同期（保存前）
+       */
+      syncMobileToDesktop: function() {
+        // セレクトボックスの同期
+        const boardSelect = document.getElementById('task-board-select');
+        const boardSelectMobile = document.getElementById('task-board-select-mobile');
+        if (boardSelect && boardSelectMobile) {
+          boardSelect.value = boardSelectMobile.value;
+        }
+
+        // ステータスの同期
+        const statusSelect = document.getElementById('task-status-select');
+        const statusSelectMobile = document.getElementById('task-status-select-mobile');
+        if (statusSelect && statusSelectMobile) {
+          statusSelect.value = statusSelectMobile.value;
+        }
+
+        // 優先度の同期
+        const prioritySelect = document.getElementById('task-priority-select');
+        const prioritySelectMobile = document.getElementById('task-priority-select-mobile');
+        if (prioritySelect && prioritySelectMobile) {
+          prioritySelect.value = prioritySelectMobile.value;
+        }
+
+        // 日時の同期
+        const startsAtInput = document.getElementById('task-starts-at-input');
+        const startsAtInputMobile = document.getElementById('task-starts-at-input-mobile');
+        if (startsAtInput && startsAtInputMobile) {
+          startsAtInput.value = startsAtInputMobile.value;
+        }
+
+        const endsAtInput = document.getElementById('task-ends-at-input');
+        const endsAtInputMobile = document.getElementById('task-ends-at-input-mobile');
+        if (endsAtInput && endsAtInputMobile) {
+          endsAtInput.value = endsAtInputMobile.value;
+        }
+
+        // Quillエディタの同期
+        if (this.quill && this.quillMobile) {
+          this.quill.setContents(this.quillMobile.getContents());
         }
       }
     };
