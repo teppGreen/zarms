@@ -1,5 +1,7 @@
 <script>
-  const { TABLE_NAMES, DIRECTORY_TYPES, TASK_STATUS, EXTERNAL_URLS, EVENT_CONFIG, AUTH_CONFIG, UI_TEXT, activeUser } = templateVariables;
+  // グローバル変数
+  // urlParams, EVENT_CONFIG, AUTH_CONFIG, EXTERNAL_URLS は既にregister.htmlで定義済みなので、再定義不要
+  const { TABLE_NAMES, DIRECTORY_TYPES, TASK_STATUS, UI_TEXT, activeUser } = templateVariables;
 
   // App.state の初期化とデータ管理用関数の定義
   (function () {
@@ -91,15 +93,11 @@
 
     // 全データを読み込み
     await loadAllData();
-
     App.utils.navigation.changeH1();
-
-    // URLパラメータを取得
-    const urlParams = templateVariables.urlParams || {};
-    console.log('[initializeApp] URL params:', urlParams);
 
     // データ読み込み前にホームページを表示（ユーザーがタブを切り替えられるようにする）
     // URLパラメータがある場合はそれを使用、ない場合はhomeを表示
+    console.log('[initializeApp] URL params:', urlParams);
     let initialTab = 'home';
     let hasUrlParams = false;
 
@@ -844,16 +842,6 @@
     // それ以外のプロトコル（javascript:, data:, vbscript:, file:, ftp:, blob: など）は拒否
     console.warn('[sanitizeUrl] Unsafe protocol detected:', url);
     return '';
-  }
-
-  /**
-   * URLのダブルスラッシュをエスケープします
-   * @param {string} url - エスケープするURL
-   * @returns {string} エスケープされたURL
-   */
-  function escapeDoubleSlashes(url) {
-    if (!url) return '';
-    return String(url).replace(/\//g, '\\/');
   }
 
   /**

@@ -36,18 +36,14 @@ function doGet(e) {
  * @param {Object} activeUser - 現在のアクティブユーザー情報
  * @returns {string} HTMLコンテンツ
  */
-function loadMainApp(urlParams, activeUser) {
+function loadMainApp(activeUser) {
   const template = HtmlService.createTemplateFromFile('index');
   template.templateVariables = {
-    urlParams: urlParams,
     activeUser: activeUser,
     isDevelopment: isDevelopment(),
     TABLE_NAMES: TABLE_NAMES,
     DIRECTORY_TYPES: DIRECTORY_TYPES,
     TASK_STATUS: TASK_STATUS,
-    EXTERNAL_URLS: EXTERNAL_URLS,
-    EVENT_CONFIG: EVENT_CONFIG,
-    AUTH_CONFIG: AUTH_CONFIG,
     UI_TEXT: UI_TEXT,
     userProperties: PropertiesService.getUserProperties().getProperties()
   };
