@@ -42,7 +42,169 @@
       </div>
     </div>
 
-    <div class="grid small-padding tiny-space no-margin">
+    <!-- モバイル用スワイプコンテナ -->
+    <div id="task-detail-swipe-container" class="s swipe-container">
+      <!-- カラム1: 基本情報 -->
+      <div class="swipe-panel" data-panel-index="0">
+        <div class="grid small-padding tiny-space no-margin">
+          <div class="s12">
+            <!-- ボード選択（モバイル用に再表示） -->
+            <div class="field label border small">
+              <select id="task-board-select-mobile">
+                <!-- 動的に生成 -->
+              </select>
+              <label>ボード</label>
+            </div>
+          </div>
+          <!-- Status -->
+          <div class="s6">
+            <div class="field label border small">
+              <select id="task-status-select-mobile" class="transparent">
+                <option value="TODO">未着手</option>
+                <option value="IN_PROGRESS">進行中</option>
+                <option value="IN_REVIEW">確認中</option>
+                <option value="DONE">完了</option>
+              </select>
+              <label>ステータス</label>
+            </div>
+          </div>
+          <div class="s6">
+            <div class="field label border small">
+              <select id="task-priority-select-mobile">
+                <option value="LOW">低</option>
+                <option value="MEDIUM">中</option>
+                <option value="HIGH">高</option>
+              </select>
+              <label>優先度</label>
+            </div>
+          </div>
+          <div class="s12">
+            <div class="field label border small">
+              <input type="datetime-local" id="task-starts-at-input-mobile" placeholder=" ">
+              <label>開始日時</label>
+            </div>
+          </div>
+          <div class="s12">
+            <div class="field label border small">
+              <input type="datetime-local" id="task-ends-at-input-mobile" placeholder=" ">
+              <label>終了日時</label>
+            </div>
+          </div>
+          <!-- Avatars Flow -->
+          <div class="s12">
+            <fieldset>
+              <legend class="small-text">担当者</legend>
+              <div class="row">
+                <div class="" onclick="App.modals.taskDetail.selectMember('created_by')">
+                  <button id="avatar-created-by-mobile" class="no-margin circle transparent"></button>
+                </div>
+                <p class="no-line">
+                  <span class="small-text">作成者<br></span>
+                  <span class="middle-align">
+                    <span id="label-created-by-mobile"></span>
+                  </span>
+                </p>
+              </div>
+              <div class="row">
+                <div class="" onclick="App.modals.taskDetail.selectMember('processed_by')">
+                  <button id="avatar-processed-by-mobile" class="no-margin circle transparent"></button>
+                </div>
+                <p class="no-line">
+                  <span class="small-text">進行者<br></span>
+                  <span class="middle-align">
+                    <span id="label-processed-by-mobile"></span>
+                    <a onclick="App.modals.taskDetail.selectMember('processed_by')"><i class="tiny">edit</i></a>
+                  </span>
+                </p>
+              </div>
+              <div class="row">
+                <div class="" onclick="App.modals.taskDetail.selectMember('reviewed_by')">
+                  <button id="avatar-reviewed-by-mobile" class="no-margin circle transparent"></button>
+                </div>
+                <p class="no-line">
+                  <span class="small-text">確認者<br></span>
+                  <span class="middle-align">
+                    <span id="label-reviewed-by-mobile"></span>
+                    <a onclick="App.modals.taskDetail.selectMember('reviewed_by')"><i class="tiny">edit</i></a>
+                  </span>
+                </p>
+              </div>
+              <div class="row">
+                <div class="" onclick="App.modals.taskDetail.selectMember('received_by')">
+                  <button id="avatar-received-by-mobile" class="no-margin circle transparent"></button>
+                </div>
+                <p class="no-line">
+                  <span class="small-text">受領者<br></span>
+                  <span class="middle-align">
+                    <span id="label-received-by-mobile"></span>
+                    <a onclick="App.modals.taskDetail.selectMember('received_by')"><i class="tiny">edit</i></a>
+                  </span>
+                </p>
+              </div>
+            </fieldset>
+          </div>
+          <div class="s12">
+            <div class="center-align row tiny-space secondary-text">
+              <i>update</i>
+              <span class="font-number" id="task-last-updated-datetime-mobile"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- カラム2: 説明 -->
+      <div class="swipe-panel" data-panel-index="1">
+        <div class="padding">
+          <h6 class="small-margin">説明</h6>
+          <div class="border scroll large-height" id="task-description-editor-mobile"></div>
+        </div>
+      </div>
+
+      <!-- カラム3: リスト -->
+      <div class="swipe-panel" data-panel-index="2">
+        <div class="padding">
+          <nav class="row small-margin">
+            <h6 class="small-margin">リスト</h6>
+            <div class="max"></div>
+            <button class="circle small primary" id="task-detail-add-button-mobile">
+              <i>add</i>
+            </button>
+          </nav>
+          <div class="scroll large-height" id="task-list-items-mobile"></div>
+        </div>
+      </div>
+
+      <!-- カラム4: 関連タスク -->
+      <div class="swipe-panel" data-panel-index="3">
+        <div class="padding">
+          <h6 class="small-margin">関連タスク</h6>
+          <fieldset class="border bottom-margin">
+            <legend class="small-text">親タスク</legend>
+            <div id="parent-task-container-mobile"></div>
+          </fieldset>
+          <fieldset class="border">
+            <legend class="small-text">子タスク</legend>
+            <div id="child-tasks-container-mobile"></div>
+          </fieldset>
+        </div>
+      </div>
+
+      <!-- カラム5: コメント -->
+      <div class="swipe-panel" data-panel-index="4">
+        <div class="padding">
+          <div class="bottom-margin">
+            <button class="no-margin responsive large fill round max" onclick="App.modals.taskDetail.openNewComment()">
+              <i>add_comment</i>
+              <span>新しいコメント</span>
+            </button>
+          </div>
+          <div class="scroll large-height" id="task-comments-list-mobile"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デスクトップ用レイアウト（既存） -->
+    <div class="m l grid small-padding tiny-space no-margin">
       <!-- Left Column: Status & Avatars -->
       <div class="s12 m3">
         <!-- Status -->
@@ -531,6 +693,10 @@
         this.loadRelatedTasks(taskId);
         this.loadFiles(taskId);
         this.isDirty = defaultDirty;
+
+        // モバイルUI初期化
+        this.setupMobileSwipe();
+        this.syncMobileDesktopElements();
       },
 
       /**
@@ -2157,6 +2323,15 @@
           return;
         }
 
+        // スマホ時：外部ボードへのリンクは無反応
+        if (window.isMobile && window.isMobile()) {
+          const currentBoardId = App.pages.boards?.currentBoardId;
+          if (boardId && boardId !== 'my-board' && boardId !== currentBoardId) {
+            console.log('[TaskDetail] Mobile: External board link blocked');
+            return;
+          }
+        }
+
         // close関数を実行（変更確認を含む）
         const closeResult = this.close();
 
@@ -2473,6 +2648,176 @@
         }
 
         console.log('[TaskDetail] File changes saved');
+      },
+
+      /**
+       * モバイル用スワイプ機能をセットアップ
+       */
+      setupMobileSwipe: function() {
+        if (!window.isMobile || !window.isMobile()) return;
+
+        const container = document.getElementById('task-detail-swipe-container');
+        if (!container) return;
+
+        const panels = container.querySelectorAll('.swipe-panel');
+        if (panels.length === 0) return;
+
+        let currentPanelIndex = 0;
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        // 最初のパネルのみ表示
+        panels.forEach((panel, index) => {
+          if (index === 0) {
+            panel.style.display = 'block';
+          } else {
+            panel.style.display = 'none';
+          }
+        });
+
+        // タッチイベントを設定
+        container.addEventListener('touchstart', (e) => {
+          touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        container.addEventListener('touchend', (e) => {
+          touchEndX = e.changedTouches[0].screenX;
+          handleSwipe();
+        });
+
+        const handleSwipe = () => {
+          const swipeThreshold = 50;
+          const diff = touchStartX - touchEndX;
+
+          if (Math.abs(diff) < swipeThreshold) return;
+
+          if (diff > 0) {
+            // 左スワイプ：次のパネルへ
+            if (currentPanelIndex < panels.length - 1) {
+              panels[currentPanelIndex].style.display = 'none';
+              currentPanelIndex++;
+              panels[currentPanelIndex].style.display = 'block';
+            }
+          } else {
+            // 右スワイプ：前のパネルへ
+            if (currentPanelIndex > 0) {
+              panels[currentPanelIndex].style.display = 'none';
+              currentPanelIndex--;
+              panels[currentPanelIndex].style.display = 'block';
+            }
+          }
+        };
+      },
+
+      /**
+       * モバイルとデスクトップの要素を同期
+       */
+      syncMobileDesktopElements: function() {
+        if (!window.isMobile || !window.isMobile()) return;
+
+        // セレクトボックスの同期
+        const boardSelect = document.getElementById('task-board-select');
+        const boardSelectMobile = document.getElementById('task-board-select-mobile');
+        if (boardSelect && boardSelectMobile) {
+          boardSelectMobile.innerHTML = boardSelect.innerHTML;
+          boardSelectMobile.value = boardSelect.value;
+        }
+
+        // ステータスの同期
+        const statusSelect = document.getElementById('task-status-select');
+        const statusSelectMobile = document.getElementById('task-status-select-mobile');
+        if (statusSelect && statusSelectMobile) {
+          statusSelectMobile.value = statusSelect.value;
+        }
+
+        // 優先度の同期
+        const prioritySelect = document.getElementById('task-priority-select');
+        const prioritySelectMobile = document.getElementById('task-priority-select-mobile');
+        if (prioritySelect && prioritySelectMobile) {
+          prioritySelectMobile.value = prioritySelect.value;
+        }
+
+        // 日時の同期
+        const startsAtInput = document.getElementById('task-starts-at-input');
+        const startsAtInputMobile = document.getElementById('task-starts-at-input-mobile');
+        if (startsAtInput && startsAtInputMobile) {
+          startsAtInputMobile.value = startsAtInput.value;
+        }
+
+        const endsAtInput = document.getElementById('task-ends-at-input');
+        const endsAtInputMobile = document.getElementById('task-ends-at-input-mobile');
+        if (endsAtInput && endsAtInputMobile) {
+          endsAtInputMobile.value = endsAtInput.value;
+        }
+
+        // 担当者の同期
+        ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
+          const avatar = document.getElementById(`avatar-${role}`);
+          const avatarMobile = document.getElementById(`avatar-${role}-mobile`);
+          if (avatar && avatarMobile) {
+            avatarMobile.innerHTML = avatar.innerHTML;
+            avatarMobile.className = avatar.className;
+          }
+
+          const label = document.getElementById(`label-${role}`);
+          const labelMobile = document.getElementById(`label-${role}-mobile`);
+          if (label && labelMobile) {
+            labelMobile.innerHTML = label.innerHTML;
+          }
+        });
+
+        // 最終更新日時の同期
+        const lastUpdated = document.getElementById('task-last-updated-datetime');
+        const lastUpdatedMobile = document.getElementById('task-last-updated-datetime-mobile');
+        if (lastUpdated && lastUpdatedMobile) {
+          lastUpdatedMobile.innerHTML = lastUpdated.innerHTML;
+        }
+
+        // リストの同期
+        const listItems = document.getElementById('task-list-items');
+        const listItemsMobile = document.getElementById('task-list-items-mobile');
+        if (listItems && listItemsMobile) {
+          listItemsMobile.innerHTML = listItems.innerHTML;
+        }
+
+        // 関連タスクの同期
+        const parentTaskContainer = document.getElementById('parent-task-container');
+        const parentTaskContainerMobile = document.getElementById('parent-task-container-mobile');
+        if (parentTaskContainer && parentTaskContainerMobile) {
+          parentTaskContainerMobile.innerHTML = parentTaskContainer.innerHTML;
+        }
+
+        const childTasksContainer = document.getElementById('child-tasks-container');
+        const childTasksContainerMobile = document.getElementById('child-tasks-container-mobile');
+        if (childTasksContainer && childTasksContainerMobile) {
+          childTasksContainerMobile.innerHTML = childTasksContainer.innerHTML;
+        }
+
+        // コメントの同期
+        const commentsList = document.getElementById('task-comments-list');
+        const commentsListMobile = document.getElementById('task-comments-list-mobile');
+        if (commentsList && commentsListMobile) {
+          commentsListMobile.innerHTML = commentsList.innerHTML;
+        }
+
+        // Quillエディタの同期（モバイル用に新しいインスタンスを作成）
+        if (!this.quillMobile) {
+          this.quillMobile = new Quill('#task-description-editor-mobile', {
+            theme: 'bubble',
+            placeholder: '進行者の人の目線に立って、タスクの説明を書きましょう。',
+            modules: {
+              toolbar: [
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                ['link', 'clean']
+              ]
+            }
+          });
+        }
+
+        if (this.quill && this.quillMobile) {
+          this.quillMobile.setContents(this.quill.getContents());
+        }
       }
     };
   })();

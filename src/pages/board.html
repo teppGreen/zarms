@@ -370,7 +370,7 @@
                         }
 
                         return `
-                            <div class="s12 m3 l3">
+                            <div class="s12 m3 l3 kanban-column" data-column-id="${column.id}">
                                 <div class="grid no-space">
                                     <div class="row s12 no-round left-margin right-margin">
                                         <span class="bold">${column.title}</span>
@@ -391,12 +391,79 @@
                 if (!isLoading) {
                     this.bindCardClick(container);
                     this.setupSortable(boardId);
+                    this.setupMobileSwipe(boardId);
                 }
+            },
+
+            /**
+             * モバイル用スワイプ機能をセットアップ
+             */
+            setupMobileSwipe: function(boardId) {
+                if (!window.isMobile || !window.isMobile()) return;
+
+                const container = document.getElementById(`kanban-canvas-${boardId}`);
+                if (!container) return;
+
+                const columns = container.querySelectorAll('.kanban-column');
+                if (columns.length === 0) return;
+
+                let currentColumnIndex = 0;
+                let touchStartX = 0;
+                let touchEndX = 0;
+
+                // 最初の列のみ表示
+                columns.forEach((col, index) => {
+                    if (index === 0) {
+                        col.classList.add('active');
+                    } else {
+                        col.style.display = 'none';
+                    }
+                });
+
+                // タッチイベントを設定
+                container.addEventListener('touchstart', (e) => {
+                    touchStartX = e.changedTouches[0].screenX;
+                }, { passive: true });
+
+                container.addEventListener('touchend', (e) => {
+                    touchEndX = e.changedTouches[0].screenX;
+                    handleSwipe();
+                });
+
+                const handleSwipe = () => {
+                    const swipeThreshold = 50;
+                    const diff = touchStartX - touchEndX;
+
+                    if (Math.abs(diff) < swipeThreshold) return;
+
+                    if (diff > 0) {
+                        // 左スワイプ：次の列へ
+                        if (currentColumnIndex < columns.length - 1) {
+                            columns[currentColumnIndex].style.display = 'none';
+                            columns[currentColumnIndex].classList.remove('active');
+                            currentColumnIndex++;
+                            columns[currentColumnIndex].style.display = 'block';
+                            columns[currentColumnIndex].classList.add('active');
+                        }
+                    } else {
+                        // 右スワイプ：前の列へ
+                        if (currentColumnIndex > 0) {
+                            columns[currentColumnIndex].style.display = 'none';
+                            columns[currentColumnIndex].classList.remove('active');
+                            currentColumnIndex--;
+                            columns[currentColumnIndex].style.display = 'block';
+                            columns[currentColumnIndex].classList.add('active');
+                        }
+                    }
+                };
             },
             /**
              * SortableJSを初期化
              */
             setupSortable: function (boardId) {
+                // スマホの場合はSortableを無効化
+                if (window.isMobile && window.isMobile()) return;
+
                 const container = document.getElementById(`kanban-canvas-${boardId}`);
                 if (!container) return;
 

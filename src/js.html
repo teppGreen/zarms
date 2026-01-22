@@ -75,6 +75,133 @@
   })();
 
 
+  // モバイル判定とモバイルUI初期化
+  (function () {
+    /**
+     * スマホ判定関数
+     * @returns {boolean} スマホの場合true
+     */
+    window.isMobile = function() {
+      const detector = document.getElementById('mobile-detector');
+      if (!detector) return window.innerWidth < 600; // フォールバック
+      return window.getComputedStyle(detector).display !== 'none';
+    };
+
+    /**
+     * モバイルUI初期化
+     */
+    window.initializeMobileUI = function() {
+      if (!isMobile()) return;
+
+      // ボトムナビゲーションを表示
+      const bottomNav = document.getElementById('bottom-nav');
+      if (bottomNav) {
+        bottomNav.style.display = 'flex';
+      }
+
+      // 検索トグル
+      const searchToggle = document.getElementById('mobile-search-toggle');
+      const searchBar = document.getElementById('mobile-search-bar');
+      const searchClose = document.getElementById('mobile-search-close');
+      const searchInput = document.getElementById('mobile-search-input');
+
+      if (searchToggle && searchBar && searchClose) {
+        searchToggle.addEventListener('click', function() {
+          bottomNav.style.display = 'none';
+          searchBar.style.display = 'flex';
+          searchInput.focus();
+        });
+
+        searchClose.addEventListener('click', function() {
+          searchBar.style.display = 'none';
+          bottomNav.style.display = 'flex';
+          searchInput.value = '';
+        });
+
+        // 検索実行（Enterキー）
+        searchInput.addEventListener('keydown', function(event) {
+          if (event.key === 'Enter' && !event.isComposing) {
+            event.preventDefault();
+            const searchValue = searchInput.value.trim();
+            if (searchValue && App.utils.search) {
+              // 検索バーを閉じる
+              searchBar.style.display = 'none';
+              bottomNav.style.display = 'flex';
+              // マイボードに移動して検索実行
+              App.utils.navigation.switchTab('board-my-board').then(() => {
+                if (App.pages.boards) {
+                  App.pages.boards.initializeMyBoardFilters(false);
+                  App.pages.boards.myBoardFilters.title = searchValue;
+                  App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
+                  App.pages.boards.loadData('my-board', false);
+                }
+              });
+              searchInput.value = '';
+            }
+          }
+        });
+      }
+
+      // アプリメニュートグル
+      const appsToggle = document.getElementById('mobile-apps-toggle');
+      const appsMenu = document.getElementById('mobile-apps-menu');
+
+      if (appsToggle && appsMenu) {
+        appsToggle.addEventListener('click', function() {
+          ui('#mobile-apps-menu');
+          renderMobileApps();
+        });
+      }
+    };
+
+    /**
+     * モバイルアプリメニューを描画
+     */
+    window.renderMobileApps = function() {
+      const appsGrid = document.getElementById('mobile-apps-grid');
+      if (!appsGrid) return;
+
+      const apps = App.state.data.apps || [];
+      if (apps.length === 0) {
+        appsGrid.innerHTML = '<div class="s12 center-align"><p>リンクがありません</p></div>';
+        return;
+      }
+
+      const appsHtml = apps.map(app => `
+        <div class="s12">
+          <a href="${app.url}" target="_blank" rel="noopener noreferrer" class="row">
+            <img class="small responsive round" src="https:\\/\\/t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${app.url}&size=128" alt="${app.name}">
+            <span>${app.name}</span>
+          </a>
+        </div>
+      `).join('');
+
+      appsGrid.innerHTML = appsHtml;
+    };
+
+    /**
+     * スマホ時のURLパラメータ強制リダイレクト
+     */
+    window.checkMobileRedirect = function() {
+      if (!isMobile()) return false;
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const tab = urlParams.get('tab');
+      const boardId = urlParams.get('board_id');
+
+      // マイボード以外の場合はリダイレクト
+      if (tab !== 'board' || boardId !== 'my-board') {
+        console.log('[Mobile] Redirecting to my-board');
+        const newUrl = window.location.pathname + '?tab=board&board_id=my-board';
+        window.history.replaceState({}, '', newUrl);
+        return true;
+      }
+
+      return false;
+    };
+  })();
+
+
   window.onload = initializeApp;
 
   /**
@@ -91,9 +218,15 @@
       App.state.userId = activeUser.id;
     }
 
+    // スマホ時のURLリダイレクトチェック
+    const didRedirect = checkMobileRedirect();
+
     // 全データを読み込み
     await loadAllData();
     App.utils.navigation.changeH1();
+
+    // モバイルUI初期化
+    initializeMobileUI();
 
     // データ読み込み前にホームページを表示（ユーザーがタブを切り替えられるようにする）
     // URLパラメータがある場合はそれを使用、ない場合はhomeを表示
@@ -111,6 +244,11 @@
         hasUrlParams = true;
         initialTab = urlParams.tab;
       }
+    }
+
+    // スマホの場合は強制的にマイボードに
+    if (isMobile() && (didRedirect || !hasUrlParams)) {
+      initialTab = 'board-my-board';
     }
 
     App.pages.home.loadData();
