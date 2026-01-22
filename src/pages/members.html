@@ -84,11 +84,12 @@
                 const isVisible = container && container.style.display !== 'none';
 
                 if (isVisible && !this.table) {
-                    this.initTable();
+                    await this.initTable();
+                    return this.loadData(false); //このままreturnせずに続行するとエラーが出てしまうのでなくなく
                 }
 
                 if (this.table) {
-                    this.renderMembers(members);
+                    await this.renderMembers(members);
                 }
                 hideLoading();
             },
