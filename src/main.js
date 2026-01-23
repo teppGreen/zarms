@@ -73,21 +73,12 @@ function getMemberByEmail(email) {
     
     let result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
       where: { email: ["=", email] }
-    }, null, false);
+    }, null, true);
 
     let members = result?.data || result || [];
 
     if (members.length === 0) {
-      // キャッシュなしで再試行
-      result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
-        where: { email: ["=", email] }
-      }, null, true);
-      
-      members = result?.data || result || [];
-      
-      if (members.length === 0) {
-        throw new ValidationError('User not found', 'email', email);
-      }
+      throw new ValidationError('User not found', 'email', email);
     }
     
     return members[0];
