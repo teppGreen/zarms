@@ -17,6 +17,41 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wdth,wght,GRAD,ROND@6..144,-10..0,25..151,1..1000,0..100,0..100&family=Noto+Sans+JP:wght@100..900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap"
         rel="stylesheet">
+    
+    <!-- Google Analytics 4 -->
+    <script>
+        (function() {
+            const analyticsConfig = <?!= JSON.stringify(templateVariables.ANALYTICS_CONFIG) ?>;
+            if (analyticsConfig && analyticsConfig.GA4_MEASUREMENT_ID) {
+                // GA4スクリプトを動的に追加
+                var gaScript = document.createElement('script');
+                gaScript.async = true;
+                gaScript.src = 'https:\/\/www.googletagmanager.com\/gtag\/js?id=' + analyticsConfig.GA4_MEASUREMENT_ID;
+                document.head.appendChild(gaScript);
+                
+                // GA4初期化
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', analyticsConfig.GA4_MEASUREMENT_ID);
+            }
+        })();
+    </script>
+    
+    <!-- Microsoft Clarity -->
+    <script type="text\/javascript">
+        (function() {
+            const analyticsConfig = <?!= JSON.stringify(templateVariables.ANALYTICS_CONFIG) ?>;
+            if (analyticsConfig && analyticsConfig.CLARITY_PROJECT_ID) {
+                (function(c,l,a,r,i,t,y){
+                    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                    t=l.createElement(r);t.async=1;t.src="https:\/\/www.clarity.ms\/tag\/"+i;
+                    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+                })(window,document,"clarity","script",analyticsConfig.CLARITY_PROJECT_ID);
+            }
+        })();
+    </script>
+    
     <?!= include('css'); ?>
 </head>
 

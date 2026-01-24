@@ -19,7 +19,8 @@ function doGet(e) {
     activeUserEmail: activeUserEmail,
     EVENT_CONFIG: EVENT_CONFIG,
     AUTH_CONFIG: AUTH_CONFIG,
-    EXTERNAL_URLS: EXTERNAL_URLS
+    EXTERNAL_URLS: EXTERNAL_URLS,
+    ANALYTICS_CONFIG: ANALYTICS_CONFIG
   };
 
   return template.evaluate()
@@ -45,7 +46,8 @@ function loadMainApp(activeUser) {
     DIRECTORY_TYPES: DIRECTORY_TYPES,
     TASK_STATUS: TASK_STATUS,
     UI_TEXT: UI_TEXT,
-    userProperties: PropertiesService.getUserProperties().getProperties()
+    userProperties: PropertiesService.getUserProperties().getProperties(),
+    ANALYTICS_CONFIG: ANALYTICS_CONFIG
   };
 
   return template.evaluate().getContent();

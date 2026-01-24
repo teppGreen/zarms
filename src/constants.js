@@ -11,6 +11,12 @@ if (isDevelopment()) {
   SPREADSHEET_ID = scriptProperties.getProperty('SPREADSHEET_ID');
 }
 
+// アナリティクス設定
+const ANALYTICS_CONFIG = {
+  GA4_MEASUREMENT_ID: scriptProperties.getProperty('GA4_MEASUREMENT_ID') || '',
+  CLARITY_PROJECT_ID: scriptProperties.getProperty('CLARITY_PROJECT_ID') || ''
+};
+
 const TABLE_NAMES = {
   LOGS: 'logs',
   BOARDS: 'boards',
