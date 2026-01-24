@@ -31,9 +31,15 @@
                 
                 // GA4初期化
                 window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', analyticsConfig.GA4_MEASUREMENT_ID);
+                window.gtag = function(){dataLayer.push(arguments);};
+                window.gtag('js', new Date());
+                window.gtag('config', analyticsConfig.GA4_MEASUREMENT_ID);
+                
+                // 初回ページビュー送信（register画面）
+                window.gtag('event', 'page_view', {
+                    page_path: '/register',
+                    page_title: 'サインイン・サインアップ'
+                });
             }
         })();
     </script>

@@ -3,6 +3,37 @@
   // urlParams, EVENT_CONFIG, AUTH_CONFIG, EXTERNAL_URLS は既にregister.htmlで定義済みなので、再定義不要
   const { TABLE_NAMES, DIRECTORY_TYPES, TASK_STATUS, UI_TEXT, activeUser } = templateVariables;
 
+  // ============================================
+  // Analytics Utilities
+  // ============================================
+  
+  /**
+   * Google Analytics 4にページビューを送信します（SPA用）
+   * @param {string} pagePath - ページパス（例: '/home', '/board/uuid'）
+   * @param {string} pageTitle - ページタイトル（例: 'ホーム', 'マイボード'）
+   */
+  function sendGA4PageView(pagePath, pageTitle) {
+    if (typeof window.gtag === 'function' && window.GA4_MEASUREMENT_ID) {
+      window.gtag('event', 'page_view', {
+        page_path: pagePath,
+        page_title: pageTitle
+      });
+      console.log('[Analytics] GA4 page_view sent:', pagePath, pageTitle);
+    }
+  }
+
+  /**
+   * Microsoft Clarityにカスタムタグを設定します
+   * @param {string} key - タグのキー
+   * @param {string} value - タグの値
+   */
+  function setClarityTag(key, value) {
+    if (typeof window.clarity === 'function') {
+      window.clarity('set', key, value);
+      console.log('[Analytics] Clarity tag set:', key, value);
+    }
+  }
+
   // App.state の初期化とデータ管理用関数の定義
   (function () {
     App.state = {

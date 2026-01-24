@@ -73,6 +73,10 @@
                 // ページ表示切り替え
                 document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
 
+                // アナリティクス用のページタイトルを取得
+                let pageTitle = tabName;
+                let pagePath = '/' + tabName;
+                
                 if (isBoardTab) {
                     // ボードタブの場合、ボードコンテナを表示し、その中の特定ボードを表示する
                     const boardId = tabName.replace('board-', '');
@@ -135,6 +139,39 @@
                             await this.switchTab('home');
                         }
                     }
+                }
+                
+                // アナリティクスにページビューを送信（タブ名からページタイトルを生成）
+                if (isBoardTab) {
+                    const boardId = tabName.replace('board-', '');
+                    if (boardId === 'my-board') {
+                        pageTitle = 'マイボード';
+                        pagePath = '/board/my-board';
+                    } else {
+                        // ボード名を取得
+                        const board = App.state.get('boards')?.find(b => b.id === boardId);
+                        pageTitle = board ? `ボード: ${board.name}` : `ボード: ${boardId}`;
+                        pagePath = '/board/' + boardId;
+                    }
+                } else {
+                    // タブ名から日本語タイトルを生成
+                    const titleMap = {
+                        'home': 'ホーム',
+                        'members': 'メンバー',
+                        'calendar': 'カレンダー'
+                    };
+                    pageTitle = titleMap[tabName] || tabName;
+                    pagePath = '/' + tabName;
+                }
+                
+                // Google Analytics 4にページビューを送信
+                if (typeof sendGA4PageView === 'function') {
+                    sendGA4PageView(pagePath, pageTitle);
+                }
+                
+                // Microsoft Clarityにタブ情報を送信
+                if (typeof setClarityTag === 'function') {
+                    setClarityTag('current_tab', tabName);
                 }
             },
 

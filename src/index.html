@@ -44,11 +44,16 @@
         gaScript.src = 'https:\/\/www.googletagmanager.com\/gtag\/js?id=' + analyticsConfig.GA4_MEASUREMENT_ID;
         document.head.appendChild(gaScript);
         
-        // GA4初期化
+        // GA4初期化（グローバルスコープで利用可能にする）
         window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', analyticsConfig.GA4_MEASUREMENT_ID);
+        window.gtag = function(){dataLayer.push(arguments);};
+        window.gtag('js', new Date());
+        window.gtag('config', analyticsConfig.GA4_MEASUREMENT_ID, {
+          send_page_view: false // 初期ページビューは手動で送信
+        });
+        
+        // 測定IDをグローバルに保存（SPA用）
+        window.GA4_MEASUREMENT_ID = analyticsConfig.GA4_MEASUREMENT_ID;
       }
     })();
   </script>
