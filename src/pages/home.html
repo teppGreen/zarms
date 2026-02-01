@@ -1,5 +1,5 @@
 <div id="tab-home" style="display: none;">
-    <div id="home-content" class="large-margin large-padding">
+    <div id="home-content" class="large-margin">
         <!-- コンテンツは loadData で動的に生成されます -->
     </div>
     <div class="grid no-space">
@@ -9,13 +9,16 @@
                     <i class="extra">info</i>
                     <h5 class="small">アップデート情報</h5>
                 </div>
-                <p class="bold">1/20(火) - タスク詳細画面を新しくしました</p>
-                <p>【説明】タスクの説明欄に太字・取り消し線・アンカーリンクなどを入力できるようにしました<br>
-                【リスト】タスクの中に簡易的なチェックリスト（項目名・担当者・完了有無）を作成できるようにしました<br>
-                【関連】親タスクと子タスクを設定できるようにしました<br>
-                </p>
-                <p>また、マイボードのフィルタで「進行者」に設定した人を、リストの担当者としても検索するか選択できるようにしました。
-                <p>今後もより使いやすくなるよう、アップデートしていきます。<a id="home-contact-form-link-1" class="link" target="_blank">お問い合わせフォーム</a>からフィードバックをお待ちしています。</p>
+                <p class="bold">2/2(月) - タスク作成アシスタント機能を追加しました</p>
+                <p>「タスクを整理する余裕がなく、ZARMSをあまり使えていない」というお声を聞きました。そこで、<strong>今後発生するタスクを適当に投げると、複数のタスクを一気に作成してくれる機能を追加しました。</strong><br>
+                    <span class="secondary-text small-text">※大学のGoogle Workspace上のGeminiで、カスタムGemsを利用する機能です。入力した内容がAIの学習に使われることはありません。</span></p>
+                <p>例えば↓のようなプロンプトを送ると、綺麗にタスクを整理してくれます。</p>
+                <p class="small-text no-line background small-padding small-round">えっと、来週の水曜日までに特番のスライドを職員に確認取る。あと、金曜までにオープニング動画の絵コンテを作りたい。あー、えっと、特番のスライドの修正が詰まってるからそっち優先したいかも。あ、あと、今週水曜までに台本の確認を先に職員に確認しときたい。えっと、あと何かあったっけ、できたら今月末までにテロップのデザインデータも完成させたいな、できたらでいいから。こんな感じ？</p>
+                <p>ぜひ使ってみてください！そして、皆さんのユニット内へのZARMSの布教もよろしくお願いします！<p>
+                <button class="primary responsive" onclick="App.modals.newTask.open()">
+                    <i>auto_awesome</i>
+                    <span>早速使ってみる</span>
+                </button>
             </article>
         </div>
          <div class="s12 m6">
@@ -24,8 +27,8 @@
                     <i class="extra">info</i>
                     <h5 class="small">総務からのお知らせ</h5>
                 </div>
-                <p class="bold">1/20(火) - 総務の業務内容について</p>
-                <p>総務ユニットでは、組織全体の情報環境の整備・ITツールの利活用推進・活動データの分析・契約管理等を行っていきます。<a id="home-soumu-document-link" class="link" target="_blank">総務の業務内容</a>に関連する内容で質問・提案・依頼・報告などがあれば、<a id="home-contact-form-link-2" class="link" target="_blank">お問い合わせフォーム</a>や総務ユニットリーダー(@TEPPei)にお気軽にお申し付けください。</p>
+                <p class="bold">2/2(月) - 総務の業務はぜひ総務を頼ってください！</p>
+                <p>総務ユニットでは、組織全体の情報環境の整備・ITツールの利活用推進・活動データの分析・契約管理等を進める役割を担っています。<a id="home-soumu-document-link" class="link" target="_blank">総務の業務内容</a>に関連する内容で質問・提案・依頼・報告・相談などがあれば、Slackで総務ユニット所属委員（各担当者、またはユニットリーダー(@TEPPei)）にお気軽にお申し付けください。</p>
             </article>
         </div>
     </div>
@@ -36,7 +39,6 @@
         // URLを設定から取得
         document.addEventListener('DOMContentLoaded', function() {
             const contactFormLink1 = document.getElementById('home-contact-form-link-1');
-            const contactFormLink2 = document.getElementById('home-contact-form-link-2');
             const soumuDocLink = document.getElementById('home-soumu-document-link');
             
             if (contactFormLink1) contactFormLink1.href = EXTERNAL_URLS.CONTACT_FORM;
