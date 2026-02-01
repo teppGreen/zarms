@@ -1,0 +1,432 @@
+<dialog id="modal-new-task" class="modal large padding">
+    <header class="fixed">
+        <nav class="small-padding top-margin">
+            <i class="large">auto_awesome</i>
+            <h5 class="bold">タスク作成アシスタント</h5>
+            <div class="max"></div>
+            <button class="circle transparent" onclick="ui('#modal-new-task')">
+                <i>close</i>
+            </button>
+        </nav>
+    </header>
+
+    <!-- 機能説明 -->
+    <div class="small-padding">
+        <p>複数のタスクをまとめて作成しましょう！AIがお手伝いします。</p>
+    </div>
+
+    <!-- ボード選択 -->
+    <div class="small-padding top-margin">
+        <h6 class="bold">1. ボードを選択する</h6>
+        <p>タスクを作成するボードを選択してください。</p>
+        <div class="field border">
+            <select id="new-task-board-select" required></select>
+        </div>
+    </div>
+
+    <!-- Gemini Custom Gemsへのリンク -->
+    <div class="small-padding top-margin">
+        <h6 class="bold">2. タスクを下書きする</h6>
+        <p>
+            <a id="gemini-gems-task-add-link" href="" target="_blank" rel="noopener noreferrer" class="link">
+                ZARMS AI (Gemini Gem)<i class="tiny">open_in_new</i>
+            </a>
+            を開いて、タスク名・タスク説明・開始日時・終了日時・優先度を決めてください。<br>
+            タスク表が完成したら、Canvasの内容をコピーしてください。<br>
+            <span class="secondary-text">※現時点では、各タスクの担当者は一律あなたに設定されます。必要であれば、作成後に変更してください。</span>
+        </p>
+    </div>
+
+    <!-- プレビューテーブル表示エリア -->
+    <div id="new-task-preview-container" class="small-padding top-margin">
+        <nav class="no-padding no-margin">
+            <h6 class="bold">3. 内容を確認する</h6>
+            <button class="primary small" onclick="App.modals.newTask.readFromClipboard()">
+                <i>content_paste</i>
+                <span>ペースト</span>
+            </button>
+            <button class="border small" onclick="App.modals.newTask.clearData()">
+                <i>clear</i>
+                <span>クリア</span>
+            </button>
+        </nav>
+        <p>
+            コピーしたCanvasの内容を
+            <a class="link" onclick="App.modals.newTask.readFromClipboard()">ペースト</a>
+            してください。
+        </p>
+        <div class="scroll top-margin background small-round small-padding">
+            <table id="new-task-preview-table" class="border">
+                <thead>
+                    <tr>
+                        <th>タスク名</th>
+                        <th>タスク説明</th>
+                        <th>開始日時</th>
+                        <th>終了日時</th>
+                        <th>優先度</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ボタン -->
+    <footer>
+        <nav class="small-padding">
+            <button id="new-task-create-btn" class="responsive primary slow-ripple"
+                onclick="App.modals.newTask.createTasks()" disabled>
+                <i>task</i>
+                <span>この内容でタスクを作成する</span>
+            </button>
+        </nav>
+    </footer>
+</dialog>
+
+<script>
+    // App.modals.newTask の定義
+    (function () {
+        document.addEventListener('DOMContentLoaded', function () {
+            const geminiGemsTaskAddLink = document.getElementById('gemini-gems-task-add-link');
+            if (geminiGemsTaskAddLink) {
+                geminiGemsTaskAddLink.href = EXTERNAL_URLS.GEMINI_GEMS_TASK_ADD;
+            }
+        });
+
+        App.modals.newTask = {
+            parsedTasks: [], // パースされたタスクデータを保持
+
+            /**
+             * モーダルを開く
+             */
+            open: async function () {
+                const modal = document.getElementById('modal-new-task');
+                if (!modal) {
+                    console.error('Modal modal-new-task not found');
+                    return;
+                }
+
+                // ボード選択肢を更新
+                this.updateBoardOptions();
+
+                // プレビューをクリア
+                this.clearPreview();
+
+                // データをクリア
+                this.clearData();
+
+                // モーダルを表示
+                await ui('#modal-new-task');
+            },
+
+            /**
+             * ボード選択肢を更新
+             */
+            updateBoardOptions: function () {
+                const select = document.getElementById('new-task-board-select');
+                if (!select) return;
+
+                // 既存のオプションをクリア
+                select.innerHTML = '<option value="my-board" selected>マイボード</option>';
+
+                // ボード一覧を取得
+                const boards = App.state.get('boards') || [];
+
+                // アクティブなボードのみをフィルタリングして追加
+                boards
+                    .filter(board => board.is_active)
+                    .forEach(board => {
+                        const option = document.createElement('option');
+                        option.value = board.id;
+                        option.textContent = board.name;
+                        select.appendChild(option);
+                    });
+            },
+
+            /**
+             * プレビューをクリア
+             */
+            clearPreview: function () {
+                this.parsedTasks = [];
+                const previewContainer = document.getElementById('new-task-preview-container');
+                const previewTableBody = document.querySelector('#new-task-preview-table tbody');
+                const createBtn = document.getElementById('new-task-create-btn');
+
+                if (previewTableBody) previewTableBody.innerHTML = '';
+                if (createBtn) createBtn.disabled = true;
+                if (createBtn) createBtn.innerHTML = '<i>task</i><span>この内容でタスクを作成する</span>';
+            },
+
+            /**
+             * クリップボードからデータを読み取る
+             */
+            readFromClipboard: async function () {
+                try {
+                    // クリップボードの読み取り権限をリクエスト
+                    const clipboardItems = await navigator.clipboard.read();
+
+                    let htmlContent = null;
+
+                    for (const clipboardItem of clipboardItems) {
+                        // HTML形式のデータを探す
+                        if (clipboardItem.types.includes('text/html')) {
+                            const blob = await clipboardItem.getType('text/html');
+                            htmlContent = await blob.text();
+                            break;
+                        }
+                    }
+
+                    // HTML形式が見つからない場合はプレーンテキストを試す
+                    if (!htmlContent) {
+                        htmlContent = await navigator.clipboard.readText();
+                    }
+
+                    if (htmlContent) {
+                        // パースとプレビュー表示
+                        this.parseAndPreview(htmlContent);
+                    } else {
+                        showSnackbar('クリップボードにデータが見つかりません', 'error');
+                    }
+                } catch (error) {
+                    console.error('クリップボード読み取りエラー:', error);
+                    showSnackbar('クリップボードの読み取りに失敗しました。ブラウザの権限を確認してください。', 'error');
+                }
+            },
+
+            /**
+             * データをクリア
+             */
+            clearData: function () {
+                this.clearPreview();
+            },
+
+            /**
+             * データをパースしてプレビュー表示
+             * @param {string} htmlContent - パースするHTML文字列
+             */
+            parseAndPreview: function (htmlContent) {
+                if (!htmlContent || !htmlContent.trim()) {
+                    this.clearPreview();
+                    return;
+                }
+
+                try {
+                    // HTMLをパースしてテーブルを取得
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(htmlContent, 'text/html');
+                    const table = doc.querySelector('table');
+
+                    if (!table) {
+                        throw new Error('テーブルが見つかりません');
+                    }
+
+                    // ヘッダー行を取得（最初の行をヘッダーとして扱う）
+                    const allRows = Array.from(table.querySelectorAll('tr'));
+
+                    if (allRows.length < 2) {
+                        throw new Error('データ行が見つかりません（ヘッダー行のみ）');
+                    }
+
+                    // 最初の行をヘッダーとして取得
+                    const headerRow = allRows[0];
+                    const headers = Array.from(headerRow.querySelectorAll('th, td')).map(cell => {
+                        return cell.textContent.trim();
+                    });
+
+                    // 2行目以降をデータ行として取得（最初の行は常にスキップ）
+                    const dataRows = allRows.slice(1);
+
+                    if (dataRows.length === 0) {
+                        throw new Error('データ行が見つかりません');
+                    }
+
+                    // タスクデータを抽出
+                    this.parsedTasks = dataRows.map(row => {
+                        const cells = Array.from(row.querySelectorAll('td, th'));
+                        const taskData = {};
+
+                        cells.forEach((cell, index) => {
+                            const header = headers[index];
+                            const content = cell.textContent.trim();
+
+                            if (header === 'タスク名') {
+                                // 改行を除去
+                                taskData.name = content.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                            } else if (header === 'タスク説明') {
+                                taskData.description = content;
+                            } else if (header === '開始日時') {
+                                taskData.starts_at = this.parseDateTime(content);
+                            } else if (header === '終了日時') {
+                                taskData.ends_at = this.parseDateTime(content);
+                            } else if (header === '優先度') {
+                                taskData.priority_key = this.parsePriority(content);
+                            }
+                        });
+
+                        return taskData;
+                    });
+
+                    // プレビューを表示
+                    this.renderPreview();
+
+                } catch (error) {
+                    console.error('データのパースエラー:', error);
+                    showSnackbar('データの形式が正しくありません。もう一度コピーし、再度ペーストしてください。');
+                    this.clearPreview();
+                }
+            },
+
+            /**
+             * 日時文字列をパース
+             * @param {string} dateStr - 日時文字列（例: "2026/02/02(月) 10:00"）
+             * @returns {string|null} ISO 8601形式の日時文字列
+             */
+            parseDateTime: function (dateStr) {
+                if (!dateStr) return null;
+
+                try {
+                    // "2026/02/02(月) 10:00" のような形式をパース
+                    const match = dateStr.match(/(\d{4})\/(\d{1,2})\/(\d{1,2}).*?(\d{1,2}):(\d{1,2})/);
+                    if (match) {
+                        const [, year, month, day, hour, minute] = match;
+                        const date = new Date(
+                            parseInt(year),
+                            parseInt(month) - 1,
+                            parseInt(day),
+                            parseInt(hour),
+                            parseInt(minute)
+                        );
+                        return formatDateTimeForInput(date.toISOString());
+                    }
+                    return null;
+                } catch (error) {
+                    console.error('日時のパースエラー:', error);
+                    return null;
+                }
+            },
+
+            /**
+             * 優先度文字列を変換
+             * @param {string} priorityStr - 優先度文字列（低/中/高）
+             * @returns {string} 優先度キー（LOW/MEDIUM/HIGH）
+             */
+            parsePriority: function (priorityStr) {
+                const priorityMap = {
+                    '低': 'LOW',
+                    '中': 'MEDIUM',
+                    '高': 'HIGH'
+                };
+                return priorityMap[priorityStr] || 'MEDIUM';
+            },
+
+            /**
+             * プレビューテーブルを描画
+             */
+            renderPreview: function () {
+                const previewContainer = document.getElementById('new-task-preview-container');
+                const previewTableBody = document.querySelector('#new-task-preview-table tbody');
+                const createBtn = document.getElementById('new-task-create-btn');
+
+                if (!previewTableBody) return;
+
+                // テーブルをクリア
+                previewTableBody.innerHTML = '';
+
+                // データ行を追加
+                this.parsedTasks.forEach(task => {
+                    const row = document.createElement('tr');
+
+                    // タスク名
+                    const nameCell = document.createElement('td');
+                    nameCell.textContent = task.name || '';
+                    row.appendChild(nameCell);
+
+                    // タスク説明
+                    const descCell = document.createElement('td');
+                    descCell.textContent = task.description || '';
+                    row.appendChild(descCell);
+
+                    // 開始日時
+                    const startsCell = document.createElement('td');
+                    startsCell.textContent = task.starts_at ? formatDateTimeForDisplay(task.starts_at) : '';
+                    row.appendChild(startsCell);
+
+                    // 終了日時
+                    const endsCell = document.createElement('td');
+                    endsCell.textContent = task.ends_at ? formatDateTimeForDisplay(task.ends_at) : '';
+                    row.appendChild(endsCell);
+
+                    // 優先度
+                    const priorityCell = document.createElement('td');
+                    const priorityDisplay = {
+                        'LOW': '低',
+                        'MEDIUM': '中',
+                        'HIGH': '高'
+                    };
+                    priorityCell.textContent = priorityDisplay[task.priority_key] || '';
+                    row.appendChild(priorityCell);
+
+                    previewTableBody.appendChild(row);
+                });
+
+                // 一括作成ボタンを有効化
+                if (createBtn) {
+                    createBtn.disabled = this.parsedTasks.length === 0;
+                }
+            },
+
+            /**
+             * タスクを一括作成
+             */
+            createTasks: async function () {
+                const boardSelect = document.getElementById('new-task-board-select');
+                const boardId = boardSelect.value;
+
+                if (!boardId) {
+                    showSnackbar('ボードを選択してください', 'error');
+                    return;
+                }
+
+                if (this.parsedTasks.length === 0) {
+                    showSnackbar('作成するタスクがありません', 'error');
+                    return;
+                }
+
+                try {
+                    showLoading();
+                    showSnackbar('タスクを作成中です。画面を開いたままお待ちください。', 'primary', 'top', 0);
+                    const btn = document.getElementById('new-task-create-btn');
+                    if (btn) {
+                        const icon = btn.querySelector('i');
+                        if (icon) {
+                            icon.outerHTML = '<progress class="circle indeterminate small"></progress>';
+                        }
+                        btn.disabled = true;
+                    }
+
+                    // タスクデータを準備（board_idを追加）
+                    const tasksToCreate = this.parsedTasks.map(task => ({
+                        ...task,
+                        board_id: boardId,
+                        task_status_key: 'TODO', // デフォルトステータス
+                        processed_by: App.state.userId,
+                        reviewed_by: App.state.userId,
+                        received_by: App.state.userId
+                    }));
+                    
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'bulkinsert', tasksToCreate);
+                    
+                    hideLoading();
+                    ui('#modal-new-task');
+                    showSnackbar(`${tasksToCreate.length}件のタスクを作成しました`, 'success');
+                    await App.utils.navigation.switchTab('board-' + boardId, false, true);
+                } catch (error) {
+                    hideLoading();
+                    console.error('タスク一括作成エラー:', error);
+                    showSnackbar('タスクの作成に失敗しました: ' + error.message, 'error');
+                }
+            }
+        };
+    })();
+</script>

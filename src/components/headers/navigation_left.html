@@ -37,7 +37,7 @@
              * @param {string} tabName - タブID（例: 'home', 'members', 'board-UUID'）
              * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
              */
-            switchTab: async function (tabName, skipUrlUpdate = false) {
+            switchTab: async function (tabName, skipUrlUpdate = false, forceLoadData = false) {
                 console.log(`switchTab called with: ${tabName}, skipUrlUpdate: ${skipUrlUpdate}`);
 
                 // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
@@ -93,13 +93,18 @@
                             if (App.pages.boards && App.pages.boards.loadData) {
                                 // 既に描画済み（キャンバスにコンテンツがある）場合はtrueを渡してローディング表示をスキップ
                                 const canvas = document.getElementById('kanban-canvas-' + boardId);
-                                const isRendered = canvas && canvas.children.length > 0;
+                                let isRendered;
+                                if (forceLoadData) {
+                                    isRendered = false;
+                                } else {
+                                    isRendered = canvas && canvas.children.length > 0;
+                                }
 
                                 // 前回レンダリングから60秒未満の場合は再ロードをスキップ
                                 const lastRender = App.pages.boards.lastRenderTimes?.[boardId] || 0;
                                 const now = Date.now();
                                 let isThrottled = false;
-                                if (now - lastRender < 60000) {
+                                if (now - lastRender < 60000 && !forceLoadData) {
                                     console.log(`[switchTab] Throttling loadData for board ${boardId}. Last render was ${now - lastRender}ms ago.`);
                                     App.pages.boards.currentBoardId = boardId;
                                     isThrottled = true;
