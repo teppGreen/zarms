@@ -41,14 +41,34 @@
         </menu>
 
         <!-- デスクトップ用 -->
-        <button class="l large round primary" onclick="App.modals.taskDetail.create()">
-            <i>add_task</i>
-            <span>タスク</span>
-            <div class="tooltip right round left-padding right-padding">
-                <p>新しいタスクを作成します</p>
-                <span><i class="tiny no-padding no-margin">keyboard_option_key</i>T</span>
-            </div>
-        </button>
+        <nav class="l primary group split">
+            <button class="left-round large" onclick="App.modals.taskDetail.create()">
+                <i>add_task</i>
+                <span>タスク</span>
+                <div class="tooltip right round left-padding right-padding">
+                    <p>新しいタスクを作成します</p>
+                    <span><i class="tiny no-padding no-margin">keyboard_option_key</i>T</span>
+                </div>
+            </button>
+            <button class="right-round square large">
+                <i>keyboard_arrow_down</i>
+                <menu class="right no-wrap">
+                    <li>
+                        <a onclick="App.modals.taskDetail.create()">
+                            <i>add</i>
+                            <span>タスクを作成する</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a onclick="App.modals.newTask.open()">
+                            <i>auto_awesome</i>
+                            <span>タスク作成アシスタント</span>
+                        </a>
+                    </li>
+                </menu>
+            </button>
+        </nav>
+
         <button class="l large round border" onclick="App.pages.boards.createBoard()">
             <i>create_new_folder</i>
             <span>ボード</span>
@@ -66,20 +86,18 @@
             oninput="App.utils.search.handleSearchInput(event)" onfocus="App.utils.search.handleSearchFocus(event)"
             onblur="App.utils.search.handleSearchBlur(event)">
         <div class="l tooltip right round left-padding right-padding">
-            <p>入力された文字が名前に含まれるタスクを検索します</p>
+            <p>タスク名を検索します</p>
             <span><i class="tiny no-padding no-margin">keyboard_option_key</i>F</span>
         </div>
     </div>
 
-    <div class="max"></div>
+    <div class="max l"></div>
 
     <button class="circle large transparent">
         <i>help</i>
         <menu id="help-menu" class="left no-wrap">
-            <li><a href="https://sites.google.com/student.zen.ac.jp/zarms/help" rel="noopener noreferrer" target="_blank">ヘルプ</a></li>
-            <li><a href="https://docs.google.com/forms/d/e/1FAIpQLSes-123hjo8rrvF-suBIjNdUoEBHeHmJKj-u0MESHUQEa7IHg/viewform"
-                    rel="noopener noreferrer" target="_blank">お問い合わせ</a></li>
-
+            <li><a id="help-link" href="" rel="noopener noreferrer" target="_blank">ヘルプ</a></li>
+            <li><a id="terms-link" href="" rel="noopener noreferrer" target="_blank">利用規約</a></li>
         </menu>
     </button>
 
@@ -97,6 +115,17 @@
 
 <script>
     (function () {
+        document.addEventListener('DOMContentLoaded', function () {
+            const helpLink = document.getElementById('help-link');
+            if (helpLink) {
+                helpLink.href = EXTERNAL_URLS.HELP_SITE;
+            }
+            const termsLink = document.getElementById('terms-link');
+            if (termsLink) {
+                termsLink.href = EXTERNAL_URLS.TERMS_SITE;
+            }
+        });
+
         App.utils.header = {
             /**
              * appsテーブルのデータからアプリリンクを動的に生成します
@@ -332,7 +361,7 @@
 
                 // 1. マイボードタブに移動（既に移動している場合は無視）
                 if (App.utils.navigation && App.utils.navigation.switchTab) {
-                    await App.utils.navigation.switchTab('board-my-board');
+                    await App.utils.navigation.switchTab('board-my-board', false, false, true);
                 }
 
                 // 2. 検索バーに入力されたタイトルを「含む」タスクとしてフィルタ

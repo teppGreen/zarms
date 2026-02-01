@@ -122,7 +122,10 @@ const EXTERNAL_URLS = {
   MEMBER_SPREADSHEET: 'https://docs.google.com/spreadsheets/d/1Jwq5klCWFMNqSURHk2JrbF43X4JTy5I7M5aBE3uDVNw/edit',
   SOUMU_DOCUMENT: 'https://docs.google.com/document/d/1BXpWaVsyJChC-rSDgjEvH33s_5FvXiaimvHIYxBTxoY/preview?tab=t.ox00ab3wnxmq',
   LOGO_IMAGE: 'https://lh3.googleusercontent.com/d/1G9u8KOX93-PWEdKUwVWvB7WWGIOuQ2wh',
-  ZARMS_IMAGE: 'https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8'
+  ZARMS_IMAGE: 'https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8',
+  HELP_SITE: 'https://sites.google.com/student.zen.ac.jp/zarms/help',
+  TERMS_SITE: 'https://sites.google.com/student.zen.ac.jp/zarms/terms',
+  GEMINI_GEMS_TASK_ADD: 'https://gemini.google.com/gem/1_GKJoSvkttvu4Nr1GnmX44OqKOZuWkwR'
 };
 
 /**
