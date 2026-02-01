@@ -679,6 +679,7 @@
     if (!snackbar) return;
     // クラスをリセット (snackbarクラスは必須、activeは後で追加)
     // 色と位置のクラスを追加
+    if (color === 'success') color = 'green';
     snackbar.className = `snackbar ${position} ${color}`;
     // テキストを設定
     snackbar.textContent = text;
@@ -1045,7 +1046,8 @@
       // 優先順位でソート
       openModals.sort((a, b) => {
         const getPriority = (id) => {
-          if (id.startsWith('modal-select-')) return 2;
+          if (id.startsWith('modal-select-')) return 3;
+          if (id.startsWith('modal-new-')) return 2;
           if (id.startsWith('modal-detail-')) return 1;
           return 0;
         };
@@ -1067,7 +1069,7 @@
           // 汎用的な閉じる処理
           if (typeof ui === 'function') {
             // Beer CSS
-            ui(`#${modalId}`, { skipUrlUpdate });
+            ui(`#${modalId}`);
           } else if (typeof targetModal.close === 'function') {
             try {
               targetModal.close();
