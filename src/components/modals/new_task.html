@@ -4,7 +4,7 @@
             <i class="large">auto_awesome</i>
             <h5 class="bold">タスク作成アシスタント</h5>
             <div class="max"></div>
-            <button class="circle transparent" onclick="ui('#modal-new-task')">
+            <button class="circle transparent" onclick="App.modals.newTask.close()">
                 <i>close</i>
             </button>
         </nav>
@@ -19,8 +19,9 @@
     <div class="small-padding top-margin">
         <h6 class="bold">1. ボードを選択する</h6>
         <p>タスクを作成するボードを選択してください。</p>
-        <div class="field border">
+        <div class="field border medium-width suffix no-wrap">
             <select id="new-task-board-select" required></select>
+            <i>arrow_drop_down</i>
         </div>
     </div>
 
@@ -101,12 +102,6 @@
              * モーダルを開く
              */
             open: async function () {
-                const modal = document.getElementById('modal-new-task');
-                if (!modal) {
-                    console.error('Modal modal-new-task not found');
-                    return;
-                }
-
                 // ボード選択肢を更新
                 this.updateBoardOptions();
 
@@ -117,7 +112,16 @@
                 this.clearData();
 
                 // モーダルを表示
-                await ui('#modal-new-task');
+                document.getElementById('all-overlay').classList.add('active');
+                document.getElementById('modal-new-task').classList.add('active');
+            },
+
+            /**
+             * モーダルを閉じる
+             */
+            close: function () {
+                document.getElementById('all-overlay').classList.remove('active');
+                document.getElementById('modal-new-task').classList.remove('active');
             },
 
             /**
@@ -272,7 +276,7 @@
 
                 } catch (error) {
                     console.error('データのパースエラー:', error);
-                    showSnackbar('データの形式が正しくありません。もう一度コピーし、再度ペーストしてください。');
+                    showSnackbar('データの形式が正しくありません。もう一度コピーし、再度ペーストしてください。', 'error');
                     this.clearPreview();
                 }
             },
@@ -418,7 +422,7 @@
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'bulkinsert', tasksToCreate);
                     
                     hideLoading();
-                    ui('#modal-new-task');
+                    App.modals.newTask.close();
                     showSnackbar(`${tasksToCreate.length}件のタスクを作成しました`, 'success');
                     await App.utils.navigation.switchTab('board-' + boardId, false, true);
                 } catch (error) {
