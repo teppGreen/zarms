@@ -1,5 +1,14 @@
 <div id="tab-members" style="display: none;">
     <header class="small-margin no-padding">
+        <nav class="no-margin no-padding space">
+            <h3 class="bold small">メンバー</h3>
+            <a id="open-member-spreadsheet" class="small-text secondary-text">新しいタブで開く<i class="tiny">open_in_new</i></a>
+        </nav>
+    </header>
+    <div class="small-margin large-height round border">
+        <iframe id="member-spreadsheet-link" src="" style="width: 100%; height: 100%; border: 0;"></iframe>
+    </div>
+    <!-- <header class="small-margin no-padding">
         <nav class="no-margin no-padding">
             <h3 class="bold small">メンバー</h3>
             <a id="member-spreadsheet-link" target="_blank" title="委員名簿を開く">
@@ -12,27 +21,28 @@
         </nav>
     </header>
     <div class="grid">
-        <!-- 左側: Members (75%) -->
         <div class="s12 m9 background no-scroll no-round large-height">
             <div id="members-table"></div>
         </div>
-
-        <!-- 右側: Directories (25%) -->
         <div class="s12 m3 background scroll no-round large-height">
             <div id="directories-tree">
-                <!-- ツリー構造が動的に生成される -->
             </div>
         </div>
-    </div>
+    </div> -->
 </div>
 
 <script>
     (function () {
         // スプレッドシートURLを設定から取得
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const link = document.getElementById('member-spreadsheet-link');
             if (link) {
-                link.href = EXTERNAL_URLS.MEMBER_SPREADSHEET;
+                link.src = EXTERNAL_URLS.MEMBER_SPREADSHEET + '&rm=minimal';
+            }
+
+            const link2 = document.getElementById('open-member-spreadsheet');
+            if (link2) {
+                link2.href = EXTERNAL_URLS.MEMBER_SPREADSHEET;
             }
         });
 
@@ -177,11 +187,11 @@
                             formatter: function (cell, formatterParams, onRendered) {
                                 const profilePhotoUrl = cell.getValue();
                                 const slackUrl = cell.getData().slack_profile_url;
-                                
+
                                 // URLをサニタイズ（危険なプロトコルを除外）
                                 const safeSlackUrl = sanitizeUrl(slackUrl);
                                 const safePhotoUrl = sanitizeUrl(profilePhotoUrl);
-                                
+
                                 let icon;
                                 if (safePhotoUrl) {
                                     // URLはサニタイズ済みで安全なので、そのまま使用
@@ -189,11 +199,11 @@
                                 } else {
                                     icon = '<i class="extra circle">account_circle</i>';
                                 }
-                                
+
                                 if (safeSlackUrl) {
                                     return `<a href="${safeSlackUrl}" target="_blank" rel="noopener noreferrer">${icon}</a>`;
                                 }
-                                
+
                                 return icon;
                             }
                         },
