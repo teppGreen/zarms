@@ -52,7 +52,12 @@
                 const currentTab = Array.from(document.querySelectorAll('main > div')).find(el => el.style.display !== 'none');
                 console.log(`Current tab:`, currentTab);
 
-                await App.utils.ui.closeTopModal();
+                const modalClosed = await App.utils.ui.closeTopModal();
+                // モーダルが閉じられなかった場合（キャンセルされた場合）、タブ切り替えを中止
+                if (modalClosed === false) {
+                    console.log(`[switchTab] Modal close was cancelled, aborting tab switch`);
+                    return;
+                }
 
                 // 左navのアクティブ状態管理
                 const sidebarLinks = document.querySelectorAll('nav.left a');
