@@ -4,6 +4,16 @@
     .ql-tooltip {
       z-index: 10005 !important;
     }
+    
+    /* リッチテキストエディタの横幅制御 */
+    #task-description-editor {
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    
+    #task-description-editor a {
+      word-break: break-all;
+    }
   </style>
   <div class="bottom-margin" onclick="App.modals.taskDetail.close(false,false)" title="タスク詳細画面を閉じる">
     <i class="center extra center" title="タスク詳細画面を閉じる">keyboard_arrow_down</i>
@@ -417,7 +427,21 @@
                 ['bold', 'italic', 'underline', 'strike'],
                 [{ 'list': 'ordered' }, { 'list': 'bullet' }],
                 ['link', 'clean']
-              ]
+              ],
+              keyboard: {
+                bindings: {
+                  // Shift+Enterでbrタグを挿入
+                  linebreak: {
+                    key: 'Enter',
+                    shiftKey: true,
+                    handler: function(range) {
+                      this.quill.insertText(range.index, '\n', 'user');
+                      this.quill.setSelection(range.index + 1, 'silent');
+                      return false;
+                    }
+                  }
+                }
+              }
             }
           });
 
@@ -436,30 +460,6 @@
                 changeLength = typeof op.insert === 'string' ? op.insert.length : 1;
               }
             });
-
-            // 変更位置のフォーマットを確認
-            const format = this.quill.getFormat(changeIndex, 1);
-
-            // リンク内で編集された場合、リンクを解除
-            if (format.link) {
-              // リンクの範囲を特定して解除
-              const text = this.quill.getText();
-              let linkStart = changeIndex;
-              let linkEnd = changeIndex;
-
-              // リンクの開始位置を探す
-              while (linkStart > 0 && this.quill.getFormat(linkStart - 1, 1).link === format.link) {
-                linkStart--;
-              }
-
-              // リンクの終了位置を探す
-              while (linkEnd < text.length && this.quill.getFormat(linkEnd, 1).link === format.link) {
-                linkEnd++;
-              }
-
-              // リンクを解除
-              this.quill.formatText(linkStart, linkEnd - linkStart, 'link', false, 'silent');
-            }
 
             // スペースまたは改行が入力された場合のみリンク化を試みる
             const insertedText = delta.ops.find(op => op.insert)?.insert;
