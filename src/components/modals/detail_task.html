@@ -4,15 +4,11 @@
     .ql-tooltip {
       z-index: 10005 !important;
     }
-    
-    /* リッチテキストエディタの横幅制御 */
-    #task-description-editor {
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-    }
-    
-    #task-description-editor a {
-      word-break: break-all;
+
+    #task-description-editor .ql-editor a {
+      word-break: break-all !important;
+      overflow-wrap: anywhere !important;
+      white-space: pre-wrap !important;
     }
   </style>
   <div class="bottom-margin" onclick="App.modals.taskDetail.close(false,false)" title="タスク詳細画面を閉じる">
@@ -419,9 +415,17 @@
 
         // Quillの初期化（初回のみ）
         if (!this.quill) {
+          // カスタムブロットの登録（Shift+Enter用）
+          const Embed = Quill.import('blots/embed');
+          class SoftBreakBlot extends Embed {
+            static blotName = 'softbreak';
+            static tagName = 'BR';
+          }
+          Quill.register(SoftBreakBlot);
+
           this.quill = new Quill('#task-description-editor', {
             theme: 'bubble',
-            placeholder: '進行者の人の目線に立って、タスクの説明を書きましょう。',
+            placeholder: '進行者の人の目線に立って、タスクの説明を書きましょう。\nShift+Enterで改行、Enterで段落区切り',
             modules: {
               toolbar: [
                 ['bold', 'italic', 'underline', 'strike'],
@@ -434,8 +438,8 @@
                   linebreak: {
                     key: 'Enter',
                     shiftKey: true,
-                    handler: function(range) {
-                      this.quill.insertText(range.index, '\n', 'user');
+                    handler: function (range) {
+                      this.quill.insertEmbed(range.index, 'softbreak', true, 'user');
                       this.quill.setSelection(range.index + 1, 'user');
                       return false;
                     }
@@ -445,49 +449,96 @@
             }
           });
 
-
-          // URL自動リンク化
+          // リンクの永続性と自動リンク化の処理
           this.quill.on('text-change', (delta, oldDelta, source) => {
             if (source !== 'user') return;
 
-            // 変更された位置を取得
-            let changeIndex = 0;
-            let changeLength = 0;
+            // 1. リンクの永続性（リンク内での編集時にリンクを維持）
+            // ただし、スペース、改行、softbreak（brタグ）の挿入時はリンクを継承しない
+            let index = 0;
             delta.ops.forEach(op => {
               if (op.retain) {
-                changeIndex += op.retain;
+                index += op.retain;
               } else if (op.insert) {
-                changeLength = typeof op.insert === 'string' ? op.insert.length : 1;
+                // 文字列の挿入の場合
+                if (typeof op.insert === 'string') {
+                  const len = op.insert.length;
+                  // スペース、改行の場合はリンクを継承しない
+                  if (op.insert !== ' ' && op.insert !== '\n') {
+                    const formatBefore = index > 0 ? this.quill.getFormat(index - 1, 1) : {};
+                    const formatAfter = this.quill.getFormat(index, 1);
+                    const linkUrl = formatBefore.link || formatAfter.link;
+                    if (linkUrl) {
+                      this.quill.formatText(index, len, 'link', linkUrl, 'silent');
+                    }
+                  }
+                  index += len;
+                } else if (typeof op.insert === 'object') {
+                  // softbreak等のEmbed要素の場合はリンクを継承しない
+                  index += 1;
+                }
               }
             });
 
-            // スペースまたは改行が入力された場合のみリンク化を試みる
-            const insertedText = delta.ops.find(op => op.insert)?.insert;
-            if (insertedText !== ' ' && insertedText !== '\n') return;
+            // 2. 自動リンク化（URL入力時に自動でリンクにする）
+            // スペースまたは改行が入力された場合に、その直前の単語をチェック
+            const hasSpaceOrNewline = delta.ops.some(op =>
+              op.insert && typeof op.insert === 'string' && (op.insert.includes(' ') || op.insert.includes('\n'))
+            );
 
-            // カーソル位置の直前のテキストを取得してURLパターンをチェック
-            const text = this.quill.getText();
-            const beforeCursor = text.substring(0, changeIndex);
+            if (hasSpaceOrNewline) {
+              // oldDeltaからテキストを取得（変更前の状態）
+              let oldText = '';
+              oldDelta.ops.forEach(op => {
+                if (typeof op.insert === 'string') {
+                  oldText += op.insert;
+                } else if (typeof op.insert === 'object') {
+                  // Embed（softbreak等）はスペースとして扱う
+                  oldText += ' ';
+                }
+              });
 
-            // 最後の単語（スペース区切り）を取得
-            const words = beforeCursor.split(/[\s\n]/);
-            const lastWord = words[words.length - 1];
+              // delta操作から挿入位置を特定
+              let insertPos = 0;
+              for (const op of delta.ops) {
+                if (op.retain) {
+                  insertPos += op.retain;
+                } else if (op.insert) {
+                  break;
+                }
+              }
 
-            // URLパターンにマッチするかチェック
-            const urlRegex = /^https?:\/\/[^\s]+$/;
-            if (urlRegex.test(lastWord)) {
-              const urlStart = changeIndex - lastWord.length;
-              const urlEnd = changeIndex;
+              // 挿入位置の直前のテキストを取得
+              const beforeInsert = oldText.substring(0, insertPos);
 
-              // 既にリンクになっていないことを確認
-              const existingFormat = this.quill.getFormat(urlStart, lastWord.length);
-              if (!existingFormat.link) {
-                // リンク形式を適用
-                this.quill.formatText(urlStart, lastWord.length, 'link', lastWord, 'silent');
+              // 最後の単語を抽出（スペース、改行、nbsp で分割）
+              const words = beforeInsert.split(/[\s\n\u00a0]+/);
+              const lastWord = words[words.length - 1];
+
+              // URLパターンにマッチするかチェック
+              const urlRegex = /^https?:\/\/[^\s\n\u00a0]+$/;
+              if (urlRegex.test(lastWord)) {
+                // 挿入位置からlastWordの長さを引いた位置がURL開始位置
+                const urlStart = insertPos - lastWord.length;
+
+                // 既にリンクになっていないことを確認
+                const existingFormat = this.quill.getFormat(urlStart, lastWord.length);
+                if (!existingFormat.link) {
+                  // リンク形式を適用
+                  this.quill.formatText(urlStart, lastWord.length, 'link', lastWord, 'silent');
+                }
+              }
+            }
+
+            // 3. 実質的に空の場合、エディタ自体のタグを消去（タグのみ残る現象の防止）
+            const textContent = this.quill.getText().trim();
+            const hasEmbeds = this.quill.root.querySelector('img, iframe, video');
+            if (textContent === '' && !hasEmbeds) {
+              if (this.quill.root.innerHTML !== '') {
+                this.quill.root.innerHTML = '';
               }
             }
           });
-
 
           // リンクをクリックした際に新しいタブで開く
           this.quill.root.addEventListener('click', (e) => {
@@ -609,12 +660,27 @@
       },
 
       /**
+       * Quillエディタの内容を取得（空の場合は空文字を返す）
+       * @returns {string}
+       */
+      getDescription: function () {
+        if (!this.quill) return '';
+        const text = this.quill.getText().trim();
+        const html = this.quill.root.innerHTML;
+        // 実質的なテキストがなく、かつ画像等の埋め込み要素もない場合は空文字を返す
+        if (text === '' && !this.quill.root.querySelector('img, iframe, video')) {
+          return '';
+        }
+        return html;
+      },
+
+      /**
        * モーダルを閉じる
        * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
        */
       close: function (skipUrlUpdate = false, skipDirtyCheck = false, skipClose = false) {
         // Quillの変更をチェック
-        const currentDescription = this.quill ? this.quill.root.innerHTML : '';
+        const currentDescription = this.getDescription();
         const originalDescription = this.originalData?.description || '';
         const descriptionChanged = currentDescription !== originalDescription;
 
@@ -660,7 +726,7 @@
        */
       discard: function () {
         // Quillの変更をチェック
-        const currentDescription = this.quill ? this.quill.root.innerHTML : '';
+        const currentDescription = this.getDescription();
         const originalDescription = this.originalData?.description || '';
         const descriptionChanged = currentDescription !== originalDescription;
 
@@ -776,12 +842,9 @@
         }
 
         // const descInput = document.getElementById('task-description-input');
-        const description = this.quill ? this.quill.root.innerHTML : '';
+        const description = this.getDescription();
 
-        if (this.quill && description !== originalData.description) {
-          // Quillが空の場合、<p><br></p>などが入ることがあるので、実質空なら空文字にする処理が必要かも知れないが
-          // 一旦そのまま保存する。必要であれば sanitize or check empty
-          // Quillの isTaskEmpty 判定などは別途
+        if (description !== (originalData.description || '')) {
           updates.description = description;
           hasChanges = true;
         }
