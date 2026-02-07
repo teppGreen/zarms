@@ -1,10 +1,5 @@
 <!-- タスク詳細モーダル -->
 <dialog id="modal-detail-task" class="transparent bottom no-padding" style="position: absolute;">
-  <style>
-    .ql-tooltip {
-      z-index: 10005 !important;
-    }
-  </style>
   <div class="bottom-margin" onclick="App.modals.taskDetail.close(false,false)" title="タスク詳細画面を閉じる">
     <i class="center extra center" title="タスク詳細画面を閉じる">keyboard_arrow_down</i>
   </div>
@@ -190,7 +185,7 @@
           </button>
         </nav>
         <div class="page medium-height active" id="task-detail-description">
-          <div class="border" id="task-description-editor"></div>
+          <div class="border quill-editor" id="task-description-editor"></div>
           <!-- ここにQuillエディタが表示される -->
         </div>
         <div class="page medium-height scroll" id="task-detail-list">
@@ -409,93 +404,8 @@
 
         // Quillの初期化（初回のみ）
         if (!this.quill) {
-          this.quill = new Quill('#task-description-editor', {
-            theme: 'bubble',
-            placeholder: '進行者の人の目線に立って、タスクの説明を書きましょう。',
-            modules: {
-              toolbar: [
-                ['bold', 'italic', 'underline', 'strike'],
-                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                ['link', 'clean']
-              ]
-            }
-          });
-
-
-          // URL自動リンク化
-          this.quill.on('text-change', (delta, oldDelta, source) => {
-            if (source !== 'user') return;
-
-            // 変更された位置を取得
-            let changeIndex = 0;
-            let changeLength = 0;
-            delta.ops.forEach(op => {
-              if (op.retain) {
-                changeIndex += op.retain;
-              } else if (op.insert) {
-                changeLength = typeof op.insert === 'string' ? op.insert.length : 1;
-              }
-            });
-
-            // 変更位置のフォーマットを確認
-            const format = this.quill.getFormat(changeIndex, 1);
-
-            // リンク内で編集された場合、リンクを解除
-            if (format.link) {
-              // リンクの範囲を特定して解除
-              const text = this.quill.getText();
-              let linkStart = changeIndex;
-              let linkEnd = changeIndex;
-
-              // リンクの開始位置を探す
-              while (linkStart > 0 && this.quill.getFormat(linkStart - 1, 1).link === format.link) {
-                linkStart--;
-              }
-
-              // リンクの終了位置を探す
-              while (linkEnd < text.length && this.quill.getFormat(linkEnd, 1).link === format.link) {
-                linkEnd++;
-              }
-
-              // リンクを解除
-              this.quill.formatText(linkStart, linkEnd - linkStart, 'link', false, 'silent');
-            }
-
-            // スペースまたは改行が入力された場合のみリンク化を試みる
-            const insertedText = delta.ops.find(op => op.insert)?.insert;
-            if (insertedText !== ' ' && insertedText !== '\n') return;
-
-            // カーソル位置の直前のテキストを取得してURLパターンをチェック
-            const text = this.quill.getText();
-            const beforeCursor = text.substring(0, changeIndex);
-
-            // 最後の単語（スペース区切り）を取得
-            const words = beforeCursor.split(/[\s\n]/);
-            const lastWord = words[words.length - 1];
-
-            // URLパターンにマッチするかチェック
-            const urlRegex = /^https?:\/\/[^\s]+$/;
-            if (urlRegex.test(lastWord)) {
-              const urlStart = changeIndex - lastWord.length;
-              const urlEnd = changeIndex;
-
-              // 既にリンクになっていないことを確認
-              const existingFormat = this.quill.getFormat(urlStart, lastWord.length);
-              if (!existingFormat.link) {
-                // リンク形式を適用
-                this.quill.formatText(urlStart, lastWord.length, 'link', lastWord, 'silent');
-              }
-            }
-          });
-
-
-          // リンクをクリックした際に新しいタブで開く
-          this.quill.root.addEventListener('click', (e) => {
-            const link = e.target.closest('a');
-            if (link && link.href) {
-              e.preventDefault();
-              window.open(link.href, '_blank', 'noopener,noreferrer');
-            }
+          this.quill = App.utils.quill.init('#task-description-editor', {
+            placeholder: '進行者の人の目線に立って、タスクの説明を書きましょう。\nShift+Enterで改行、Enterで段落区切り'
           });
         }
 
@@ -609,12 +519,20 @@
       },
 
       /**
+       * Quillエディタの内容を取得（空の場合は空文字を返す）
+       * @returns {string}
+       */
+      getDescription: function () {
+        return App.utils.quill.getContent(this.quill);
+      },
+
+      /**
        * モーダルを閉じる
        * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
        */
       close: function (skipUrlUpdate = false, skipDirtyCheck = false, skipClose = false) {
         // Quillの変更をチェック
-        const currentDescription = this.quill ? this.quill.root.innerHTML : '';
+        const currentDescription = this.getDescription();
         const originalDescription = this.originalData?.description || '';
         const descriptionChanged = currentDescription !== originalDescription;
 
@@ -660,7 +578,7 @@
        */
       discard: function () {
         // Quillの変更をチェック
-        const currentDescription = this.quill ? this.quill.root.innerHTML : '';
+        const currentDescription = this.getDescription();
         const originalDescription = this.originalData?.description || '';
         const descriptionChanged = currentDescription !== originalDescription;
 
@@ -776,12 +694,9 @@
         }
 
         // const descInput = document.getElementById('task-description-input');
-        const description = this.quill ? this.quill.root.innerHTML : '';
+        const description = this.getDescription();
 
-        if (this.quill && description !== originalData.description) {
-          // Quillが空の場合、<p><br></p>などが入ることがあるので、実質空なら空文字にする処理が必要かも知れないが
-          // 一旦そのまま保存する。必要であれば sanitize or check empty
-          // Quillの isTaskEmpty 判定などは別途
+        if (description !== (originalData.description || '')) {
           updates.description = description;
           hasChanges = true;
         }
@@ -1042,7 +957,7 @@
         });
 
         if (this.quill) {
-          this.quill.setText('');
+          App.utils.quill.clear(this.quill);
         }
 
         const displayId = document.getElementById('task-display-id');
@@ -1153,8 +1068,7 @@
         // Description
         // Quillへ値をセット
         if (this.quill) {
-          // HTMLとしてセット
-          this.quill.root.innerHTML = task.description || '';
+          App.utils.quill.setContent(this.quill, task.description);
         }
 
         // Status
