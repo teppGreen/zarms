@@ -448,13 +448,13 @@
                 if (!container) return;
 
                 const containerId = container.id;
-                
+
                 // containerにIDがない場合は処理をスキップ
                 if (!containerId) {
                     console.warn('[bindCardClick] Container has no ID, skipping event binding');
                     return;
                 }
-                
+
                 // 既存のハンドラーがあれば削除
                 if (this.clickHandlers[containerId]) {
                     container.removeEventListener('click', this.clickHandlers[containerId]);
@@ -909,6 +909,7 @@
 
             createTaskCard: function (task) {
                 const displayId = task.display_id ? `#${task.display_id}` : '';
+                const now = new Date();
 
                 // App.state.data.members からメンバー情報を取得
                 const allMembers = App.state.data.members || [];
@@ -916,6 +917,38 @@
                 const processedBy = allMembers.find(m => m.id === task.processed_by);
                 const reviewedBy = allMembers.find(m => m.id === task.reviewed_by);
                 const receivedBy = allMembers.find(m => m.id === task.received_by);
+
+                // 1. 現在のステータスに対応する担当者がユーザーと同じ場合、ボーダーを追加
+                let isCurrentUserAssignee = false;
+                const currentUserId = App.state.userId;
+                if (task.task_status_key === 'TODO' || task.task_status_key === 'IN_PROGRESS') {
+                    isCurrentUserAssignee = task.processed_by === currentUserId;
+                } else if (task.task_status_key === 'IN_REVIEW') {
+                    isCurrentUserAssignee = task.reviewed_by === currentUserId;
+                } else if (task.task_status_key === 'DONE') {
+                    isCurrentUserAssignee = task.received_by === currentUserId;
+                }
+                let articleClasses = isCurrentUserAssignee ? ' border primary-border' : '';
+
+                // 2. starts_at または ends_at が超過しているかチェック
+                const isStartsAtOverdue = task.starts_at && new Date(task.starts_at) < now && task.task_status_key === 'TODO';
+                const isEndsAtOverdue = task.ends_at && new Date(task.ends_at) < now && task.task_status_key !== 'DONE';
+                const isOverdue = isStartsAtOverdue || isEndsAtOverdue;
+
+                // ends_atの超過時はarticleにerror-containerクラスを追加
+                if (isEndsAtOverdue) {
+                    articleClasses += ' error-container';
+                }
+
+                // 3. 優先度アイコンの設定
+                let priorityIcon = '';
+                if (task.priority_key === 'HIGH') {
+                    priorityIcon = `<i class="circle extra transparent red-text" title="優先度: 高">sprint</i>`;
+                } else if (task.priority_key === 'MEDIUM') {
+                    priorityIcon = `<i class="circle extra transparent" title="優先度: 中">directions_run</i>`;
+                } else if (task.priority_key === 'LOW') {
+                    priorityIcon = `<i class="circle extra transparent" title="優先度: 低">directions_walk</i>`;
+                }
 
                 const assigneeNames = [
                     createdBy ? createdBy.display_name : '',
@@ -975,14 +1008,15 @@
                         <span class="error-text">終了日時を設定してください</span>
                     `;
                 } else {
+                    const overdueClass = isOverdue ? ' error-text' : '';
                     datetimeSpan = `
-                        <span>${formatDateTimeForDisplay(task.starts_at, 'MM/dd(E)') || ''} - ${formatDateTimeForDisplay(task.ends_at, 'MM/dd(E) HH:mm') || ''}</span>
+                        <span class="${overdueClass}">${formatDateTimeForDisplay(task.starts_at, 'MM/dd(E)') || ''} - ${formatDateTimeForDisplay(task.ends_at, 'MM/dd(E) HH:mm') || ''}</span>
                     `;
                 }
 
 
                 return `
-                <article class="kanban-card small-margin padding" data-eid="${task.id}" role="button" style="cursor: move;">
+                <article class="kanban-card elevate small-margin padding${articleClasses}" data-eid="${task.id}" role="button" style="cursor: move;">
                     <div>
                         <span>${displayId} <strong>${escapeHtml(task.name || '')}</strong></span>
                     </div>
@@ -990,7 +1024,7 @@
                         ${datetimeSpan}
                     </div>
                     <div class="tiny-space row">
-                        ${assigneeIcons.join('')}
+                        ${priorityIcon}${assigneeIcons.join('')}
                     </div>
                 </article>
                 `;
