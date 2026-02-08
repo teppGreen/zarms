@@ -944,17 +944,11 @@
                 } else if (task.task_status_key === 'DONE') {
                     isCurrentUserAssignee = task.received_by === currentUserId;
                 }
-                let articleClasses = isCurrentUserAssignee ? ' border primary-border' : '';
 
                 // 2. starts_at または ends_at が超過しているかチェック
                 const isStartsAtOverdue = task.starts_at && new Date(task.starts_at) < now && task.task_status_key === 'TODO';
                 const isEndsAtOverdue = task.ends_at && new Date(task.ends_at) < now && task.task_status_key !== 'DONE';
                 const isOverdue = isStartsAtOverdue || isEndsAtOverdue;
-
-                // ends_atの超過時はarticleにerror-containerクラスを追加
-                if (isEndsAtOverdue) {
-                    articleClasses += ' error-container';
-                }
 
                 // 3. 優先度アイコンの設定
                 let priorityIcon = '';
@@ -1030,6 +1024,19 @@
                     `;
                 }
 
+                let articleClasses = '';
+                if (isEndsAtOverdue) {
+                    articleClasses += ' error-container';
+                }
+
+                if (isCurrentUserAssignee) {
+                    articleClasses += ' border';
+                    if (isEndsAtOverdue) {
+                        articleClasses += ' error-border';
+                    } else {
+                        articleClasses += ' primary-border';
+                    }
+                }
 
                 return `
                 <article class="kanban-card elevate small-margin padding${articleClasses}" data-eid="${task.id}" role="button" style="cursor: move;">
