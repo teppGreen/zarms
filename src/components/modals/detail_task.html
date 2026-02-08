@@ -166,11 +166,11 @@
             </a>
             <a class onclick="App.modals.taskDetail.switchTaskDetailTab(this,'list')">
               <span>リスト</span>
-              <div class="badge l secondary font-number none" id="task-list-badge">0</div>
+              <div class="badge l secondary font-number none primary" id="task-list-badge" style="display: none;">0</div>
             </a>
             <a class onclick="App.modals.taskDetail.switchTaskDetailTab(this,'related')">
               <span>関連</span>
-              <div class="badge l secondary font-number none" id="task-related-badge">0</div>
+              <div class="badge l secondary font-number none primary" id="task-related-badge" style="display: none;">0</div>
             </a>
             <!-- <a onclick="App.modals.taskDetail.switchTaskDetailTab(this,'files')">
               <span>ファイル</span>
@@ -1688,7 +1688,7 @@
           }
         }
         badge.textContent = count;
-        count > 0 ? badge.classList.remove('secondary') : badge.classList.add('secondary');
+        count > 0 ? badge.style.display = '' : badge.style.display = 'none';
       },
 
       /**
@@ -2108,6 +2108,8 @@
 
         const count = (this.currentParentTask ? 1 : 0) + this.currentChildTasks.length;
         badge.textContent = count;
+
+        count > 0 ? badge.style.display = '' : badge.style.display = 'none';
       },
 
       switchTaskDetailTab: function (clickedNav, tabId) {
