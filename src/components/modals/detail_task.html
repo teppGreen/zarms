@@ -1856,7 +1856,7 @@
         this.updateRelatedBadge();
 
         if (parentTask?.isCached) {
-          callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_parent, null, true)
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_parent, null, true)
             .then(results => {
               this.currentParentTask = results ? results?.data[0] : null;
               this.renderParentTask();
@@ -1864,7 +1864,7 @@
         }
 
         if (childTasks?.isCached) {
-          callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_child, null, true)
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_child, null, true)
             .then(results => {
               this.currentChildTasks = results ? results?.data : [];
               this.originalChildTaskIds = (results ? results?.data : []).map(t => t.id);
