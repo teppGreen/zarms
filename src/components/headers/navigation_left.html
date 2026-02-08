@@ -1,6 +1,7 @@
 <nav id="left-nav" class="m l left no-wrap small-padding max no-scroll">
     <header class="no-padding no-margin">
-        <img src="https://lh3.googleusercontent.com/d/1G9u8KOX93-PWEdKUwVWvB7WWGIOuQ2wh" alt="ZARMS" class="small-width" onclick="App.utils.navigation.switchTab('home')">
+        <img src="https://lh3.googleusercontent.com/d/1G9u8KOX93-PWEdKUwVWvB7WWGIOuQ2wh" alt="ZARMS" class="small-width"
+            onclick="App.utils.navigation.switchTab('home')">
     </header>
 
     <a id="home-nav" onclick="App.utils.navigation.switchTab('home')">
@@ -106,7 +107,7 @@
                                     console.log(`[switchTab] Throttling loadData for board ${boardId}. forceLoadData: ${forceLoadData}, skipLoadData: ${skipLoadData}. Last render was ${now - lastRender}ms ago.`);
                                     App.pages.boards.currentBoardId = boardId;
                                     isThrottled = true;
-                                    
+
                                     // スロットル時でもイベントハンドラーとSortableを再設定
                                     if (canvas && App.pages.boards.bindCardClick) {
                                         App.pages.boards.bindCardClick(canvas);
@@ -337,8 +338,11 @@
                 // text class: Inactiveなら薄くするなどのスタイルがあれば適用(ここではopacity-textを使用してみる)
                 const textClass = !board.is_active ? 'secondary-text' : 'left-align';
 
+                // descriptionをtitle属性用に変換（改行を&#13;&#10;に変換）
+                const titleAttr = board.description ? ` title="${escapeHtml(board.description).replace(/\n/g, '&#13;&#10;')}"` : '';
+
                 return `
-                        <a onclick="App.utils.navigation.switchTab('${boardTabName}')" data-board-id="${board.id}">
+                        <a onclick="App.utils.navigation.switchTab('${boardTabName}')" data-board-id="${board.id}"${titleAttr}>
                             <i class="${textClass}">${icon}</i>
                             <span class="${textClass}">${this.formatBoardName(board.name || '')}</span>
                         </a>
