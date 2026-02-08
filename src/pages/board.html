@@ -107,6 +107,10 @@
                                     onblur="App.pages.boards.updateBoardName('${board.id}', this.value, this)">
                                 </div>
                                 <div class="medium"></div>
+                                <button class="circle transparent" id="btn-info-${board.id}">
+                                    <i>info</i>
+                                    <div class="tooltip bottom max"><p id="tooltip-description-${board.id}"></p></div>
+                                </button>
                                 <button class="circle transparent" id="btn-share-${board.id}">
                                     <i>share</i>
                                     <div class="tooltip bottom">共有</div>
@@ -648,6 +652,18 @@
             },
 
             setupHeaderEvents: function (board) {
+                // Info Button
+                const btnInfo = document.getElementById(`btn-info-${board.id}`);
+                const tooltipDescription = document.getElementById(`tooltip-description-${board.id}`);
+                if (btnInfo && tooltipDescription) {
+                    // tooltipにdescriptionを表示
+                    tooltipDescription.textContent = board.description || 'ボードの説明を追加';
+
+                    btnInfo.addEventListener('click', () => {
+                        this.openDescriptionModal(board.id);
+                    });
+                }
+
                 // Share Button
                 const btnShare = document.getElementById(`btn-share-${board.id}`);
                 if (btnShare) {
@@ -1028,6 +1044,100 @@
                     </div>
                 </article>
                 `;
+            },
+
+            /**
+             * ボード説明モーダルを開く
+             */
+            openDescriptionModal: function (boardId) {
+                const board = App.state.data.boards.find(b => b.id === boardId);
+                if (!board) return;
+
+                // モーダルが既に存在する場合は削除
+                const existingModal = document.getElementById(`modal-board-description-${boardId}`);
+                if (existingModal) {
+                    existingModal.remove();
+                }
+
+                // モーダルHTMLを生成
+                const modalHtml = `
+                    <dialog id="modal-board-description-${boardId}" class="modal padding no-scroll">
+                        <nav class="small-padding bottom-margin">
+                            <h5 class="max bold">ボードの説明</h5>
+                            <button class="circle transparent" onclick="ui('#modal-board-description-${boardId}')">
+                                <i>close</i>
+                            </button>
+                        </nav>
+                        <div class="field border background scroll large-width small-padding small-round">
+                            <textarea id="textarea-board-description-${boardId}" rows="10" placeholder="ここにボードの説明を入力してください。入力した内容は全員が閲覧できます。">${escapeHtml(board.description || '')}</textarea>
+                        </div>
+                        <nav class="right-align small-padding">
+                            <button class="border" onclick="ui('#modal-board-description-${boardId}')">
+                                <span>キャンセル</span>
+                            </button>
+                            <button onclick="App.pages.boards.saveBoardDescription('${boardId}')">
+                                <span>保存</span>
+                            </button>
+                        </nav>
+                    </dialog>
+                `;
+
+                // モーダルをDOMに追加
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+                // モーダルを開く
+                ui(`#modal-board-description-${boardId}`);
+            },
+
+            /**
+             * ボード説明を保存
+             */
+            saveBoardDescription: async function (boardId) {
+                const textarea = document.getElementById(`textarea-board-description-${boardId}`);
+                if (!textarea) return;
+
+                const newDescription = textarea.value;
+                const board = App.state.data.boards.find(b => b.id === boardId);
+                if (!board) return;
+
+                const oldDescription = board.description;
+
+                // Optimistic UI update
+                board.description = newDescription;
+
+                // tooltipを更新
+                const tooltipDescription = document.getElementById(`tooltip-description-${boardId}`);
+                if (tooltipDescription) {
+                    tooltipDescription.textContent = newDescription || 'ボードの説明を追加';
+                }
+
+                // 左ナビゲーションを再描画
+                if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+                    App.utils.navigation.renderBoardsNavigation();
+                }
+
+                // モーダルを閉じる
+                ui(`#modal-board-description-${boardId}`);
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'update', {
+                        where: { id: ["=", boardId] },
+                        set: { description: newDescription }
+                    }, 'ボードの説明を更新');
+
+                    showSnackbar('ボードの説明を更新しました。', 'success');
+                } catch (error) {
+                    console.error('Failed to update board description:', error);
+                    // ロールバック
+                    board.description = oldDescription;
+                    if (tooltipDescription) {
+                        tooltipDescription.textContent = oldDescription || 'ボードの説明を追加';
+                    }
+                    if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+                        App.utils.navigation.renderBoardsNavigation();
+                    }
+                    alert('ボードの説明の更新に失敗しました');
+                }
             }
         };
     })();
