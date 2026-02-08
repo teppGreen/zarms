@@ -1482,8 +1482,12 @@
                 key: 'Enter',
                 shiftKey: true,
                 handler: function (range) {
+                  // BRタグを挿入
                   this.quill.insertEmbed(range.index, 'softbreak', true, 'user');
-                  this.quill.setSelection(range.index + 1, 'user');
+                  // BRの直後にゼロ幅スペースを挿入してカーソル位置を確保
+                  this.quill.insertText(range.index + 1, '\u200B', 'user');
+                  // カーソルをゼロ幅スペースの後に移動
+                  this.quill.setSelection(range.index + 2, 'user');
                   return false;
                 }
               }
