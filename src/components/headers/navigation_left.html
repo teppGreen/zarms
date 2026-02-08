@@ -39,20 +39,18 @@
              */
             switchTab: async function (tabName, skipUrlUpdate = false, forceLoadData = false, skipLoadData = false) {
                 console.log(`switchTab called with: ${tabName}, skipUrlUpdate: ${skipUrlUpdate}`);
-
-                // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
-                if (!skipUrlUpdate) {
-                    const params = App.utils.url.getParamsFromTabId(tabName);
-                    App.utils.url.updateParams(params, false);
-                }
-
                 let isBoardTab = tabName.startsWith('board-');
 
                 // 現在のタブを取得して処理（必要なら）
                 const currentTab = Array.from(document.querySelectorAll('main > div')).find(el => el.style.display !== 'none');
                 console.log(`Current tab:`, currentTab);
 
-                await App.utils.ui.closeTopModal();
+                const modalClosed = await App.utils.ui.closeTopModal();
+                // モーダルが閉じられなかった場合（キャンセルされた場合）、タブ切り替えを中止
+                if (modalClosed === false) {
+                    console.log(`[switchTab] Modal close was cancelled, aborting tab switch`);
+                    return;
+                }
 
                 // 左navのアクティブ状態管理
                 const sidebarLinks = document.querySelectorAll('nav.left a');
@@ -140,6 +138,12 @@
                             await this.switchTab('home');
                         }
                     }
+                }
+
+                // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
+                if (!skipUrlUpdate) {
+                    const params = App.utils.url.getParamsFromTabId(tabName);
+                    App.utils.url.updateParams(params, false);
                 }
             },
 
