@@ -812,37 +812,43 @@
   }
 
   /**
-   * URLをサニタイズします
+   * URLをサニタイズします。安全なスキーム（http, https, mailto, tel）と相対URLのみを許可します。
    * @param {string} url - サニタイズするURL
-   * @returns {string} サニタイズされたURL
+   * @returns {string} サニタイズされたURL。安全でない場合は空文字を返します。
    */
   function sanitizeUrl(url) {
-    if (!url || typeof url !== 'string') {
-      return '';
+    if (!url || typeof url !== "string") {
+      return "";
     }
 
-    // 危険なプロトコルを除外（ホワイトリスト方式に変更）
     const urlTrimmed = url.trim();
 
-    // 相対URLは許可
-    if (urlTrimmed.startsWith('/') || urlTrimmed.startsWith('./') || urlTrimmed.startsWith('../')) {
+    // 相対URL（/で始まる、またはプロトコルを含まない）は許可
+    if (
+      urlTrimmed.startsWith("/") ||
+      urlTrimmed.startsWith("./") ||
+      urlTrimmed.startsWith("../") ||
+      !urlTrimmed.includes(":")
+    ) {
       return urlTrimmed;
     }
 
-    // 安全なプロトコルのみ許可
-    const safeProtocols = /^(https?|mailto):/i;
-    if (safeProtocols.test(urlTrimmed)) {
-      return urlTrimmed;
-    }
+    try {
+      // 安全なスキームのみ許可する（new URLで確実にプロトコルを検証）
+      const parsed = new URL(urlTrimmed, window.location.origin);
+      const allowedProtocols = ["http:", "https:", "mailto:", "tel:"];
 
-    // プロトコルなしの場合は許可（相対URL扱い）
-    if (!urlTrimmed.includes(':')) {
-      return urlTrimmed;
-    }
+      if (allowedProtocols.includes(parsed.protocol)) {
+        return parsed.href;
+      }
 
-    // それ以外のプロトコル（javascript:, data:, vbscript:, file:, ftp:, blob: など）は拒否
-    console.warn('[sanitizeUrl] Unsafe protocol detected:', url);
-    return '';
+      console.warn("[sanitizeUrl] Unsafe protocol detected:", urlTrimmed);
+      return "";
+    } catch (e) {
+      // 不正なURL形式の場合は許可しない
+      console.warn("[sanitizeUrl] Invalid URL format:", urlTrimmed);
+      return "";
+    }
   }
 
   /**
@@ -1506,16 +1512,22 @@
         this._handleEmptyCleanup(quill);
       });
 
-      // リンククリック時に新しいタブで開く
+      // リンククリック時に新しいタブで開く（安全なスキームのみ許可）
       quill.root.addEventListener('click', (e) => {
         const link = e.target.closest('a');
-        if (link && link.href) {
-          e.preventDefault();
-          window.open(link.href, '_blank', 'noopener,noreferrer');
+        if (!link || !link.href) {
+          return;
         }
+        const safeUrl = sanitizeUrl(link.href);
+        if (!safeUrl) {
+          // 不正なスキームのURLは開かない
+          e.preventDefault();
+          return;
+        }
+        e.preventDefault();
+        window.open(safeUrl, '_blank', 'noopener,noreferrer');
       });
     },
-
     /**
      * リンクの永続性を処理
      * @param {Quill} quill - Quillインスタンス
@@ -1531,9 +1543,11 @@
             const len = op.insert.length;
             // スペース、改行の場合はリンクを継承しない
             if (op.insert !== ' ' && op.insert !== '\n') {
+              // 挿入箇所の前後両方のリンクを確認（index は現在の挿入位置、index + len は挿入された文字列の直後の位置）
               const formatBefore = index > 0 ? quill.getFormat(index - 1, 1) : {};
-              const formatAfter = quill.getFormat(index, 1);
-              const linkUrl = formatBefore.link || formatAfter.link;
+              const formatAfter = quill.getFormat(index + len, 1);
+              // 両端が同じリンクである（＝リンクの途中に挿入された）場合のみリンクを継承し、境界では付与しない
+              const linkUrl = (formatBefore.link && formatBefore.link === formatAfter.link) ? formatBefore.link : null;
               if (linkUrl) {
                 quill.formatText(index, len, 'link', linkUrl, 'silent');
               }
