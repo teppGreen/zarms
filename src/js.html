@@ -1047,7 +1047,7 @@
      */
     closeTopModal: function (skipUrlUpdate = false) {
       const openModals = Array.from(document.querySelectorAll('dialog[open], dialog.active'));
-      if (openModals.length === 0) return false;
+      if (openModals.length === 0) return true;
 
       // 優先順位でソート
       openModals.sort((a, b) => {
@@ -1067,10 +1067,12 @@
 
       // 各種具体的なモーダル閉じる処理
       if (modalId.startsWith('modal-detail-task') && App.modals.taskDetail && App.modals.taskDetail.close) {
-        App.modals.taskDetail.close(skipUrlUpdate);
+        const closed = App.modals.taskDetail.close(skipUrlUpdate);
+        return closed;
       } else if (modalId === 'modal-detail-member') {
         if (App.modals.memberDetail && App.modals.memberDetail.close) {
-          App.modals.memberDetail.close(skipUrlUpdate);
+          const closed = App.modals.memberDetail.close(skipUrlUpdate);
+          return closed;
         } else {
           // 汎用的な閉じる処理
           if (typeof ui === 'function') {
@@ -1090,6 +1092,9 @@
         }
         return true;
       }
+
+      // その他のモーダルの場合もデフォルトで閉じる
+      return true;
     }
   };
 
