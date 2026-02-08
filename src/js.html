@@ -1543,9 +1543,11 @@
             const len = op.insert.length;
             // スペース、改行の場合はリンクを継承しない
             if (op.insert !== ' ' && op.insert !== '\n') {
+              // 挿入箇所の前後両方のリンクを確認（index は現在の挿入位置、index + len は挿入された文字列の直後の位置）
               const formatBefore = index > 0 ? quill.getFormat(index - 1, 1) : {};
-              const formatAfter = quill.getFormat(index, 1);
-              const linkUrl = formatBefore.link || formatAfter.link;
+              const formatAfter = quill.getFormat(index + len, 1);
+              // 両端が同じリンクである（＝リンクの途中に挿入された）場合のみリンクを継承し、境界では付与しない
+              const linkUrl = (formatBefore.link && formatBefore.link === formatAfter.link) ? formatBefore.link : null;
               if (linkUrl) {
                 quill.formatText(index, len, 'link', linkUrl, 'silent');
               }
