@@ -39,13 +39,6 @@
              */
             switchTab: async function (tabName, skipUrlUpdate = false, forceLoadData = false, skipLoadData = false) {
                 console.log(`switchTab called with: ${tabName}, skipUrlUpdate: ${skipUrlUpdate}`);
-
-                // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
-                if (!skipUrlUpdate) {
-                    const params = App.utils.url.getParamsFromTabId(tabName);
-                    App.utils.url.updateParams(params, false);
-                }
-
                 let isBoardTab = tabName.startsWith('board-');
 
                 // 現在のタブを取得して処理（必要なら）
@@ -145,6 +138,12 @@
                             await this.switchTab('home');
                         }
                     }
+                }
+
+                // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
+                if (!skipUrlUpdate) {
+                    const params = App.utils.url.getParamsFromTabId(tabName);
+                    App.utils.url.updateParams(params, false);
                 }
             },
 
