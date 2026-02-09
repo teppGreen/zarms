@@ -131,7 +131,17 @@
 
                     if (targetPage) {
                         targetPage.style.display = 'block';
-                        await this.loadTabData(tabName);
+
+                        let isBackground = false;
+                        if (tabName === 'home') {
+                            const homeContent = document.getElementById('home-content');
+                            // コンテンツが既に描画されているかチェック
+                            if (homeContent && homeContent.children.length > 0) {
+                                isBackground = true;
+                            }
+                        }
+
+                        await this.loadTabData(tabName, isBackground);
                     } else {
                         alert(`開こうとしたページが見つかりません。削除された可能性があります。\nページID: ${targetPageId}`);
                         // フォールバック: Homeへ
@@ -164,14 +174,19 @@
             /**
              * 通常タブデータを読み込む
              */
-            loadTabData: async function (tabName) {
-                console.log(`loadTabData called for: ${tabName}`);
-                showLoading();
+            loadTabData: async function (tabName, isBackground = false) {
+                console.log(`loadTabData called for: ${tabName}, isBackground: ${isBackground}`);
+
+                if (!isBackground) {
+                    showLoading();
+                }
 
                 if (App.pages[tabName] && App.pages[tabName].loadData) {
-                    await App.pages[tabName].loadData();
+                    await App.pages[tabName].loadData(isBackground);
                 } else {
-                    hideLoading();
+                    if (!isBackground) {
+                        hideLoading();
+                    }
                 }
             },
 
