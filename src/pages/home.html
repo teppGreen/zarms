@@ -1,76 +1,166 @@
 <div id="tab-home" style="display: none;">
-    <div id="home-content" class="large-margin">
+    <div id="home-content">
         <!-- コンテンツは loadData で動的に生成されます -->
-    </div>
-    <div class="grid no-space">
-        <div class="s12 m6">
-            <article class="large-margin large-padding">
-                <div class="hedaer row tiny-space">
-                    <i class="extra">info</i>
-                    <h5 class="small">アップデート情報</h5>
-                </div>
-                <p class="bold">2/2(月) - タスク作成アシスタント機能を追加しました</p>
-                <p>「タスクを整理する余裕がなく、ZARMSをあまり使えていない」というお声を聞きました。そこで、<strong>今後発生するタスクを適当に投げると、複数のタスクを一気に作成してくれる機能を追加しました。</strong><br>
-                    <span class="secondary-text small-text">※大学のGoogle Workspace上のGeminiで、カスタムGemsを利用する機能です。入力した内容がAIの学習に使われることはありません。</span></p>
-                <p>例えば↓のようなプロンプトを送ると、綺麗にタスクを整理してくれます。</p>
-                <p class="small-text no-line background small-padding small-round">えっと、来週の水曜日までに特番のスライドを職員に確認取る。あと、金曜までにオープニング動画の絵コンテを作りたい。あー、えっと、特番のスライドの修正が詰まってるからそっち優先したいかも。あ、あと、今週水曜までに台本の確認を先に職員に確認しときたい。えっと、あと何かあったっけ、できたら今月末までにテロップのデザインデータも完成させたいな、できたらでいいから。こんな感じ？</p>
-                <p>ぜひ使ってみてください！そして、皆さんのユニット内へのZARMSの布教もよろしくお願いします！<p>
-                <button class="primary responsive" onclick="App.modals.newTask.open()">
-                    <i>auto_awesome</i>
-                    <span>早速使ってみる</span>
-                </button>
-            </article>
-        </div>
-         <div class="s12 m6">
-            <article class="large-margin large-padding">
-                <div class="hedaer row tiny-space">
-                    <i class="extra">info</i>
-                    <h5 class="small">総務からのお知らせ</h5>
-                </div>
-                <p class="bold">2/2(月) - 総務の業務はぜひ総務を頼ってください！</p>
-                <p>総務ユニットでは、組織全体の情報環境の整備・ITツールの利活用推進・活動データの分析・契約管理等を進める役割を担っています。<a id="home-soumu-document-link" class="link" target="_blank">総務の業務内容</a>に関連する内容で質問・提案・依頼・報告・相談などがあれば、Slackで総務ユニット所属委員（各担当者、またはユニットリーダー(@TEPPei)）にお気軽にお申し付けください。</p>
-            </article>
-        </div>
     </div>
 </div>
 
 <script>
     (function () {
         // URLを設定から取得
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const contactFormLink1 = document.getElementById('home-contact-form-link-1');
             const soumuDocLink = document.getElementById('home-soumu-document-link');
-            
+
             if (contactFormLink1) contactFormLink1.href = EXTERNAL_URLS.CONTACT_FORM;
             if (contactFormLink2) contactFormLink2.href = EXTERNAL_URLS.CONTACT_FORM;
             if (soumuDocLink) soumuDocLink.href = EXTERNAL_URLS.SOUMU_DOCUMENT;
         });
 
         App.pages.home = {
-            loadData: function () {
-                this.renderContent();
-                hideLoading();
+            // データのキャッシュ
+            cachedTasks: [],
+            cachedLogs: [],
+            cachedBoardTasks: [],
+
+            loadData: async function (isRefresh = false) {
+                console.log('[Home] Loading data... isRefresh:', isRefresh);
+
+                if (!isRefresh) {
+                    this.renderContent();
+                    hideLoading();
+                }
+
+                try {
+                    const sevenDaysAgo = new Date();
+                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                    const isoDate = sevenDaysAgo.toISOString();
+
+                    // クエリの準備
+                    const tasksQuery = {
+                        where: { task_status_key: ['!=', 'DONE'] }
+                    };
+                    const logsQuery = {
+                        where: {
+                            table_name: ['=', 'tasks'],
+                            created_at: ['>', isoDate]
+                        }
+                    };
+                    const boardTasksQuery = {
+                        where: { updated_at: ['>', isoDate] },
+                        columns: ['board_id', 'updated_at']
+                    };
+
+                    // 一括取得
+                    const [tasksRes, logsRes, boardTasksRes] = await Promise.all([
+                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', tasksQuery, null, isRefresh),
+                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LOGS, 'select', logsQuery, null, isRefresh),
+                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', boardTasksQuery, null, isRefresh)
+                    ]);
+
+                    // データ展開
+                    const tasks = tasksRes?.data || tasksRes || [];
+                    const logs = logsRes?.data || logsRes || [];
+                    const boardTasks = boardTasksRes?.data || boardTasksRes || [];
+
+                    // キャッシュ更新
+                    this.cachedTasks = tasks;
+                    this.cachedLogs = logs;
+                    this.cachedBoardTasks = boardTasks;
+
+                    // 描画
+                    this.renderNextTasks(tasks);
+                    this.renderMemberRanking(logs);
+                    this.renderBoardRanking(boardTasks);
+
+                    // キャッシュヒット時の再取得（バックグラウンド）
+                    if (!isRefresh && (tasksRes?.isCached || logsRes?.isCached || boardTasksRes?.isCached)) {
+                        console.log('[Home] Cached data detected. Refreshing in background...');
+                        setTimeout(() => {
+                            this.loadData(true);
+                        }, 100);
+                    }
+
+                } catch (error) {
+                    console.error('[Home] Error loading data:', error);
+                    // エラー表示
+                    this.showError('home-next-tasks', 'データの読み込みに失敗しました');
+                    this.showError('home-member-ranking', 'データの読み込みに失敗しました');
+                    this.showError('home-board-ranking', 'データの読み込みに失敗しました');
+                }
             },
 
             renderContent: function () {
                 const greeting = this.getGreeting();
-                const formattedDate = formatDateTimeForDisplay(new Date(), 'yyyy年MM月dd日(E)');
+                const formattedDate = formatDateTimeForDisplay(new Date(), 'yyyy年MM月dd日(E) HH:mm');
                 const daysUntilEvent = calculateDaysUntil(EVENT_CONFIG.FESTIVAL_DATE);
 
-                const content = `
-                    <div class="row">
-                        <h1 class="small bold">${greeting}、${activeUser.display_name}さん｡</h1>
-                        <div class="max"></div>
-                        <p class="large-text">${formattedDate}</p>
+                const container = document.getElementById('home-content');
+                if (!container) return;
+
+                // タイトルとカウントダウン部分は共通
+                // 残りは4カラムグリッドで描画
+                container.innerHTML = `
+                    <header class="small-margin no-padding">
+                        <div class="row no-margin no-padding">
+                            <h2 class="small bold">${greeting}、${activeUser.display_name}さん｡</h2>
+                            <div class="max"></div>
+                            <div class="row no-margin no-padding tiny-space secondary-text" title="このページの最終更新">
+                                <i>update</i>
+                                <span class="font-number">${formattedDate}</span>
+                            </div>
+                        </div>
+                        <div class="large-text">
+                            <p>リアル会場0日目(準備日)まで、残り${daysUntilEvent}日です。</p>
+                        </div>
+                    </header>
+
+                    <div class="grid no-space">
+                        <!-- 2. 次のタスク (Next Tasks) -->
+                        <div class="s12 m6 l6 small-margin">
+                            <article class="padding large-height">
+                                <nav class="">
+                                    <h6 class="small bold">マイタスク</h6>
+                                    <div class="max"></div>
+                                    <button class="chip" onclick="App.pages.home.openMyBoardDefault()">
+                                        <i>assignment</i>
+                                        <span>マイボード</span>
+                                    </button>
+                                </nav>
+                                <span class="small-text secondary-text">あなたが次に取りかかるべきタスク</span>
+                                <div id="home-next-tasks" class="shimmer-loading scroll top-margin medium-height">
+                                </div>
+                            </article>
+                        </div>
+
+                        <!-- 3. メンバーランキング (Member Ranking) -->
+                        <div class="s12 m3 l3 small-margin">
+                           <article class="padding large-height">
+                                <nav class="">
+                                    <h6 class="small bold">メンバーランキング</h6>
+                                    <div class="max"></div>
+                                    <button class="chip" disabled>直近7日間</button>
+                                </nav>
+                                <span class="small-text secondary-text">期間内のタスクの作成・更新件数</span>
+                                <div id="home-member-ranking" class="shimmer-loading scroll top-margin medium-height">
+                                </div>
+                            </article>
+                        </div>
+
+                        <!-- 4. ボードランキング (Board Ranking) -->
+                        <div class="s12 m3 l3 small-margin">
+                           <article class="padding large-height">
+                                <nav class="">
+                                    <h6 class="small bold">ボードランキング</h6>
+                                    <div class="max"></div>
+                                    <button class="chip" disabled>直近7日間</button>
+                                </nav>
+                                <span class="small-text secondary-text">期間内のタスクの作成・更新件数</span>
+                                <div id="home-board-ranking" class="shimmer-loading scroll top-margin medium-height">
+                                </div>
+                            </article>
+                        </div>
                     </div>
-                
-                    <div class="large-text top-margin">
-                        リアル会場0日目(準備日)まで、残り${daysUntilEvent}日です。<br>
-                        サイドバーからボードを開いて、業務を始めましょう。
-                    </div>`;
-
-
-                document.getElementById('home-content').innerHTML = content;
+                `;
             },
 
             getGreeting: function () {
@@ -84,7 +174,339 @@
                 }
             },
 
+            // ---------------------------------------------------------
+            // 2. 次のタスク (Next Tasks)
+            // ---------------------------------------------------------
 
+
+            renderNextTasks: function (tasks) {
+                const container = document.getElementById('home-next-tasks');
+                if (!container) return;
+                container.classList.remove('shimmer-loading');
+
+                const userId = App.state.userId;
+                const now = new Date();
+
+                let myTasks = tasks.filter(t => {
+                    const status = t.task_status_key;
+                    if (status === 'TODO' || status === 'IN_PROGRESS') {
+                        return t.processed_by === userId;
+                    } else if (status === 'IN_REVIEW') {
+                        return t.reviewed_by === userId;
+                    }
+                    return false;
+                });
+
+                // 日付計算用（時間を切り捨てて日付のみにする）
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+                // ソートロジック
+                myTasks.sort((a, b) => {
+                    const getKeys = (t) => {
+                        const isTodo = t.task_status_key === 'TODO';
+                        if (isTodo) {
+                            return {
+                                primary: t.starts_at || '9999-12-31T23:59:59',
+                                secondary: t.ends_at || '9999-12-31T23:59:59'
+                            };
+                        } else {
+                            return {
+                                primary: t.ends_at || '9999-12-31T23:59:59',
+                                secondary: t.starts_at || '9999-12-31T23:59:59'
+                            };
+                        }
+                    };
+
+                    const kA = getKeys(a);
+                    const kB = getKeys(b);
+
+                    if (kA.primary !== kB.primary) return kA.primary.localeCompare(kB.primary);
+                    return kA.secondary.localeCompare(kB.secondary);
+                });
+
+                let listHtml = `
+                    <table class="border small-text">
+                      <thead class="fixed surface-container-low">
+                        <tr>
+                          <th class="left-align">タスク名</th>
+                          <th class="right-align">期限</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                `;
+
+                if (myTasks.length === 0) {
+                    listHtml += `<tr><td colspan="2" class="center-align secondary-text">担当中のタスクはありません</td></tr>`;
+                } else {
+                    const displayTasks = myTasks; // 上限なし
+
+                    displayTasks.forEach(t => {
+                        const isTodo = t.task_status_key === 'TODO';
+                        // 基準日時の決定
+                        const targetDateStr = isTodo ? t.starts_at : t.ends_at;
+
+                        let deadlineText = '-';
+                        let dateClass = '';
+
+                        if (targetDateStr) {
+                            const targetDate = new Date(targetDateStr);
+                            const targetDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+
+                            // 差分日数 (target - today)
+                            const diffTime = targetDay - today;
+                            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+                            const suffix = isTodo ? '開始' : '終了';
+
+                            if (diffDays === 0) {
+                                deadlineText = `本日${suffix}`;
+                            } else if (diffDays > 0) {
+                                deadlineText = `${diffDays}日後${suffix}`;
+                            } else {
+                                // 過去日
+                                deadlineText = `${Math.abs(diffDays)}日前${suffix}`;
+                                // 期限切れ（過去）の場合のみ赤字
+                                dateClass = 'error-text bold';
+                            }
+                        }
+
+                        // ホームからタスクを開く: ボードをロードしてから開く
+                        listHtml += `
+                            <tr style="cursor: pointer;" onclick="App.pages.home.openTaskFromHome('${t.id}', '${t.board_id}')">
+                                <td>
+                                    <div class="column">
+                                        <span>${escapeHtml(t.name)}</span>
+                                        <span class="secondary-text">#${t.display_id}</span>
+                                    </div>
+                                </td>
+                                <td class="${dateClass} right-align" style="width: 0; white-space: nowrap;">
+                                    ${deadlineText}
+                                </td>
+                            </tr>
+                        `;
+                    });
+                }
+
+                listHtml += `
+                      </tbody>
+                    </table>
+                `;
+                container.innerHTML = listHtml;
+            },
+
+            /**
+             * ホームページからタスクを開く
+             * openRelatedTaskと異なり、モーダルが開いていない前提なのでclose()をスキップ
+             */
+            openTaskFromHome: async function (taskId, boardId) {
+                if (!taskId) {
+                    console.error('[Home] Invalid task ID');
+                    return;
+                }
+
+                const targetBoardId = boardId || 'my-board';
+
+                // URLパラメータを更新してボードに移動
+                if (App.utils.url && App.utils.url.updateParams) {
+                    const newParams = {
+                        tab: 'board',
+                        board_id: targetBoardId
+                    };
+                    App.utils.url.updateParams(newParams, false);
+                }
+
+                // ボードタブに切り替え
+                if (App.utils.navigation && App.utils.navigation.switchTab) {
+                    await App.utils.navigation.switchTab(`board-${targetBoardId}`);
+
+                    // ボードのロード完了を待機
+                    if (App.pages.boards && App.pages.boards.waitForBoardLoad) {
+                        await App.pages.boards.waitForBoardLoad(targetBoardId);
+                    }
+
+                    // ボードのロード完了後にタスクを開く
+                    App.modals.taskDetail.open(taskId, false);
+                }
+            },
+
+            /**
+             * マイボードをデフォルト設定（自分）で開く
+             */
+            openMyBoardDefault: function () {
+                if (App.pages.boards) {
+                    // タブ切り替え（ロードはスキップ）
+                    App.utils.navigation.switchTab('board-my-board', false, false, true);
+
+                    // フィルタを自分のみ（デフォルト）にリセット
+                    App.pages.boards.initializeMyBoardFilters(true);
+
+                    // 明示的にデータをロード
+                    App.pages.boards.loadData('my-board', false);
+                }
+            },
+
+            /**
+             * 指定したメンバーでマイボードをフィルタして開く
+             */
+            openMyBoardForMember: function (userId) {
+                if (App.pages.boards) {
+                    // タブ切り替え（ロードはスキップ）
+                    App.utils.navigation.switchTab('board-my-board', false, false, true);
+
+                    // フィルタ設定を構成
+                    const filters = {
+                        members: {
+                            created_by: [userId],
+                            processed_by: [userId],
+                            reviewed_by: [userId],
+                            received_by: [userId]
+                        }
+                    };
+
+                    // 最初にフィルタをリセットしてからカスタム設定を適用
+                    App.pages.boards.initializeMyBoardFilters(false); // 空で初期化
+                    App.pages.boards.setMyBoardFilters(filters);
+
+                    // 明示的にデータをロード
+                    App.pages.boards.loadData('my-board', false);
+                }
+            },
+
+            // ---------------------------------------------------------
+            // 3. メンバーランキング (Member Ranking)
+            // ---------------------------------------------------------
+
+
+            renderMemberRanking: function (logs) {
+                const container = document.getElementById('home-member-ranking');
+                if (!container) return;
+                container.classList.remove('shimmer-loading');
+
+                // tasklogsからcreated_byを集計（簡易的）
+                const counts = {};
+                logs.forEach(log => {
+                    const userId = log.created_by;
+                    if (userId) {
+                        counts[userId] = (counts[userId] || 0) + 1;
+                    }
+                });
+
+                const ranking = Object.keys(counts).map(userId => {
+                    return { userId: userId, count: counts[userId] };
+                }).sort((a, b) => b.count - a.count);
+
+                let html = `
+                    <table class="border small-text">
+                      <thead class="fixed surface-container-low">
+                        <tr>
+                           <th class="center-align" style="width: 0; white-space: nowrap;">順位</th>
+                           <th class="left-align">表示名</th>
+                           <th class="right-align" style="width: 0; white-space: nowrap;">件数</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                `;
+
+                if (ranking.length === 0) {
+                    html += `<tr><td colspan="3" class="center-align secondary-text">データがありません</td></tr>`;
+                } else {
+                    const members = App.state.data.members || [];
+                    const getMember = (id) => members.find(m => m.id === id);
+
+                    ranking.forEach((item, index) => {
+                        const member = getMember(item.userId);
+                        const name = member ? member.display_name : '不明';
+                        const photo = member ? member.profile_photo_url : null;
+                        const rank = index + 1;
+
+                        let rankBadge = `<span>${rank}</span>`;
+
+                        const avatarHtml = photo
+                            ? `<i class="small circle"><img src="${photo}" class="responsive"></i>`
+                            : `<i class="small">account_circle</i>`;
+
+                        html += `
+                            <tr style="cursor: pointer;" onclick="App.pages.home.openMyBoardForMember('${item.userId}')">
+                                <td class="center-align font-number">${rankBadge}</td>
+                                <td>
+                                    <div class="row left-align tiny-space">
+                                        ${avatarHtml}${escapeHtml(name)}
+                                    </div>
+                                </td>
+                                <td class="right-align font-number">${item.count}</td>
+                            </tr>
+                        `;
+                    });
+                }
+                html += `</tbody></table>`;
+                container.innerHTML = html;
+            },
+
+            // ---------------------------------------------------------
+            // 4. ボードランキング (Board Ranking)
+            // ---------------------------------------------------------
+
+
+            renderBoardRanking: function (tasks) {
+                const container = document.getElementById('home-board-ranking');
+                if (!container) return;
+                container.classList.remove('shimmer-loading');
+
+                const counts = {};
+                tasks.forEach(t => {
+                    // my-board と空欄を除外
+                    if (t.board_id && t.board_id !== 'null' && t.board_id !== 'my-board' && t.board_id !== '') {
+                        counts[t.board_id] = (counts[t.board_id] || 0) + 1;
+                    }
+                });
+
+                const ranking = Object.keys(counts).map(boardId => {
+                    return { boardId: boardId, count: counts[boardId] };
+                }).sort((a, b) => b.count - a.count);
+
+                let html = `
+                    <table class="border small-text">
+                      <thead class="fixed surface-container-low">
+                        <tr>
+                           <th class="center-align" style="width: 0; white-space: nowrap;">順位</th>
+                           <th class="left-align">ボード名</th>
+                           <th class="right-align" style="width: 0; white-space: nowrap;">件数</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                `;
+
+                if (ranking.length === 0) {
+                    html += `<tr><td colspan="3" class="center-align secondary-text">データがありません</td></tr>`;
+                } else {
+                    const boards = App.state.data.boards || [];
+                    const getBoard = (id) => boards.find(b => b.id === id);
+
+                    ranking.forEach((item, index) => {
+                        const board = getBoard(item.boardId);
+                        const name = board ? board.name : '不明';
+                        const rank = index + 1;
+
+                        html += `
+                            <tr style="cursor: pointer;" onclick="App.utils.navigation.switchTab('board-${item.boardId}')">
+                                <td class="center-align font-number">${rank}</td>
+                                <td class="left-align">${escapeHtml(name)}</td>
+                                <td class="right-align font-number">${item.count}</td>
+                            </tr>
+                        `;
+                    });
+                }
+                html += `</tbody></table>`;
+                container.innerHTML = html;
+            },
+
+            showError: function (elementId, message) {
+                const container = document.getElementById(elementId);
+                if (container) {
+                    container.classList.remove('shimmer-loading');
+                    container.innerHTML = `<div class="padding error-text center-align"><i class="large">error_outline</i><p>${message}</p></div>`;
+                }
+            }
         };
     })();
 </script>
