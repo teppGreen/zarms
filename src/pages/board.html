@@ -12,6 +12,7 @@
             lastRenderTimes: {}, // ボードごとの最終レンダリング時刻
             cachedBoardTasks: {}, // ボードごとのタスクデータキャッシュ
             clickHandlers: {}, // ボードごとのクリックハンドラーを保持
+            loadingPromises: {}, // ボードごとの読み込みPromiseを保持
             // マイボードのフィルタ設定
             myBoardFilters: {},
 
@@ -62,6 +63,29 @@
             resetMyBoardFilters: function () {
                 this.initializeMyBoardFilters();
                 this.loadData('my-board', false);
+            },
+
+            /**
+             * マイボードフィルタを設定（ロードは行わない）
+             */
+            setMyBoardFilters: function (filters) {
+                // 既存のフィルタとマージ、または上書き
+                // filters構造: { members: { ... }, ... }
+                // ここでは部分的な更新を想定してマージする
+                if (filters.members) {
+                    this.myBoardFilters.members = { ...this.myBoardFilters.members, ...filters.members };
+                }
+                // 必要に応じて他のフィールドもマージ処理を追加
+            },
+
+            /**
+             * 指定したボードの読み込み完了を待機
+             */
+            waitForBoardLoad: function (boardId) {
+                if (this.loadingPromises[boardId]) {
+                    return this.loadingPromises[boardId];
+                }
+                return Promise.resolve();
             },
 
             /**
@@ -204,6 +228,11 @@
 
                 this.currentBoardId = boardId;
 
+                // 読み込みPromiseを作成
+                let resolveLoad;
+                const loadPromise = new Promise(resolve => resolveLoad = resolve);
+                this.loadingPromises[boardId] = loadPromise;
+
                 // 読み込み中アニメーションを表示
                 if (!isRefresh) {
                     this.renderKanban(boardId, true);
@@ -246,6 +275,12 @@
                     this.renderKanban(boardId, false);
                     hideLoading();
 
+                    // 読み込み完了としてマーク
+                    if (this.loadingPromises[boardId]) {
+                        resolveLoad();
+                        delete this.loadingPromises[boardId];
+                    }
+
                     // isCachedチェック: キャッシュデータの場合はバックグラウンドで最新データを取得
                     if (result?.isCached === true) {
                         console.log(`Board ${boardId}: キャッシュデータ検出。バックグラウンドで最新データを取得中...`);
@@ -283,6 +318,13 @@
                 } catch (error) {
                     console.error('Error loading board tasks:', error);
                     hideLoading();
+
+                    // エラー時もPromiseを解決（待機側が進めるように）
+                    if (this.loadingPromises[boardId]) {
+                        resolveLoad();
+                        delete this.loadingPromises[boardId];
+                    }
+
                     App.utils.error.handle(error);
                 }
             },
