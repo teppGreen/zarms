@@ -9,6 +9,15 @@
  * @returns {HtmlOutput} HTMLテンプレート
  */
 function doGet(e) {
+  // force_prod_db パラメータがある場合は UserProperties に保存（google.script.run での判定用）
+  const userProperties = PropertiesService.getUserProperties();
+  if (e.parameter.use_prod_db === 'true') {
+    userProperties.setProperty('USE_PROD_DB', 'true');
+  } else {
+    // パラメータがない場合は、以前の設定が残らないように削除
+    userProperties.deleteProperty('USE_PROD_DB');
+  }
+
   // 現在のユーザーを取得
   const activeUserEmail = Session.getActiveUser().getEmail();
 
@@ -191,15 +200,25 @@ function getScriptUrl() {
  * @returns {boolean} 開発モードの場合true
  */
 function isDevelopment(urlParams) {
-  // URLパラメータに use_prod_db=true が含まれている場合は強制的に false を返す
+  // 1. 引数の urlParams に use_prod_db=true が含まれている場合は強制的に false を返す
   if (urlParams && urlParams.use_prod_db === 'true') {
     return false;
+  }
+
+  // 2. UserProperties (doGetで保存したもの) をチェック
+  try {
+    const useProdDb = PropertiesService.getUserProperties().getProperty('USE_PROD_DB');
+    if (useProdDb === 'true') {
+      return false;
+    }
+  } catch (e) {
+    console.warn('[isDevelopment] Failed to access UserProperties', e);
   }
 
   const REGEX = /^https:\/\/script\.google\.com\/a\/.*\/dev.*$/;
   const url = ScriptApp.getService().getUrl();
 
-  // URLに直接含まれている可能性も考慮（環境によってはこちらが必要な場合があるため）
+  // 3. URL自体に直接含まれている可能性も考慮
   if (url.indexOf('use_prod_db=true') !== -1) {
     return false;
   }
