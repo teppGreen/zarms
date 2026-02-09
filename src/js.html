@@ -85,6 +85,7 @@
   async function initializeApp() {
     setupGlobalShortcuts();
     setupBrowserHistoryHandlers();
+    setupModalCloseWarning();
 
     // ユーザーIDを設定（templateVariablesから取得）
     if (activeUser && activeUser.id) {
@@ -207,6 +208,74 @@
       google.script.history.setChangeHandler(handleHistoryChange);
     }
   }
+
+  /**
+   * モーダルが開いている時にブラウザを閉じようとした際の警告を設定します
+   */
+  function setupModalCloseWarning() {
+    window.addEventListener('beforeunload', (e) => {
+      // モーダルが開いているかチェック
+      const hasOpenModal = isAnyModalOpen();
+
+      if (hasOpenModal) {
+        // ブラウザ標準の確認ダイアログを表示
+        e.preventDefault();
+        e.returnValue = ''; // Chrome では空文字列を設定する必要がある
+        return ''; // 一部のブラウザ用
+      }
+    });
+  }
+
+  /**
+   * 開いているモーダル要素を取得します（優先順位順にソート）
+   * @param {boolean} sorted - 優先順位でソートするか（デフォルト: false）
+   * @returns {Array<HTMLElement>} 開いているモーダル要素の配列
+   */
+  function getOpenModals(sorted = false) {
+    // 1. dialog要素で開いているものを取得
+    const dialogModals = Array.from(document.querySelectorAll('dialog[open], dialog.active'));
+
+    // 2. classに'modal'が含まれ、かつ表示されている要素を取得
+    const modalElements = Array.from(document.querySelectorAll('[class*="modal"]'));
+    const visibleModals = modalElements.filter(modal => {
+      // activeクラスがある、またはdisplayがnone以外の場合は開いていると判断
+      const isActive = modal.classList.contains('active');
+      const computedStyle = window.getComputedStyle(modal);
+      const isVisible = computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden';
+
+      return isActive || isVisible;
+    });
+
+    // 重複を除去してマージ
+    const allModals = [...new Set([...dialogModals, ...visibleModals])];
+
+    // ソートが必要な場合
+    if (sorted && allModals.length > 0) {
+      allModals.sort((a, b) => {
+        const getPriority = (id) => {
+          if (!id) return 0;
+          if (id.startsWith('modal-select-')) return 3;
+          if (id.startsWith('modal-new-')) return 2;
+          if (id.startsWith('modal-detail-')) return 1;
+          return 0;
+        };
+        // 降順ソート (Priorityが高い順)
+        return getPriority(b.id) - getPriority(a.id);
+      });
+    }
+
+    return allModals;
+  }
+
+  /**
+   * 何かしらのモーダルが開いているかチェックします
+   * @returns {boolean} モーダルが開いている場合true
+   */
+  function isAnyModalOpen() {
+    return getOpenModals().length > 0;
+  }
+
+
 
   /**
    * 全データを読み込みます（初回ロード用）
@@ -1046,20 +1115,8 @@
      * @returns {boolean} モーダルを閉じた場合はtrue
      */
     closeTopModal: function (skipUrlUpdate = false) {
-      const openModals = Array.from(document.querySelectorAll('dialog[open], dialog.active'));
+      const openModals = getOpenModals(true); // 優先順位でソート済み
       if (openModals.length === 0) return true;
-
-      // 優先順位でソート
-      openModals.sort((a, b) => {
-        const getPriority = (id) => {
-          if (id.startsWith('modal-select-')) return 3;
-          if (id.startsWith('modal-new-')) return 2;
-          if (id.startsWith('modal-detail-')) return 1;
-          return 0;
-        };
-        // 降順ソート (Priorityが高い順)
-        return getPriority(b.id) - getPriority(a.id);
-      });
 
       const targetModal = openModals[0];
       const modalId = targetModal.id;
@@ -1482,8 +1539,12 @@
                 key: 'Enter',
                 shiftKey: true,
                 handler: function (range) {
+                  // BRタグを挿入
                   this.quill.insertEmbed(range.index, 'softbreak', true, 'user');
-                  this.quill.setSelection(range.index + 1, 'user');
+                  // BRの直後にゼロ幅スペースを挿入してカーソル位置を確保
+                  this.quill.insertText(range.index + 1, '\u200B', 'user');
+                  // カーソルをゼロ幅スペースの後に移動
+                  this.quill.setSelection(range.index + 2, 'user');
                   return false;
                 }
               }

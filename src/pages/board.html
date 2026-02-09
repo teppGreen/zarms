@@ -12,6 +12,7 @@
             lastRenderTimes: {}, // ボードごとの最終レンダリング時刻
             cachedBoardTasks: {}, // ボードごとのタスクデータキャッシュ
             clickHandlers: {}, // ボードごとのクリックハンドラーを保持
+            loadingPromises: {}, // ボードごとの読み込みPromiseを保持
             // マイボードのフィルタ設定
             myBoardFilters: {},
 
@@ -65,6 +66,29 @@
             },
 
             /**
+             * マイボードフィルタを設定（ロードは行わない）
+             */
+            setMyBoardFilters: function (filters) {
+                // 既存のフィルタとマージ、または上書き
+                // filters構造: { members: { ... }, ... }
+                // ここでは部分的な更新を想定してマージする
+                if (filters.members) {
+                    this.myBoardFilters.members = { ...this.myBoardFilters.members, ...filters.members };
+                }
+                // 必要に応じて他のフィールドもマージ処理を追加
+            },
+
+            /**
+             * 指定したボードの読み込み完了を待機
+             */
+            waitForBoardLoad: function (boardId) {
+                if (this.loadingPromises[boardId]) {
+                    return this.loadingPromises[boardId];
+                }
+                return Promise.resolve();
+            },
+
+            /**
              * ボードページコンテナを初期化・再構築（差分更新）
              */
             initialize: function () {
@@ -107,6 +131,10 @@
                                     onblur="App.pages.boards.updateBoardName('${board.id}', this.value, this)">
                                 </div>
                                 <div class="medium"></div>
+                                <button class="circle transparent" id="btn-info-${board.id}">
+                                    <i>info</i>
+                                    <div class="tooltip bottom max"><p id="tooltip-description-${board.id}"></p></div>
+                                </button>
                                 <button class="circle transparent" id="btn-share-${board.id}">
                                     <i>share</i>
                                     <div class="tooltip bottom">共有</div>
@@ -200,6 +228,11 @@
 
                 this.currentBoardId = boardId;
 
+                // 読み込みPromiseを作成
+                let resolveLoad;
+                const loadPromise = new Promise(resolve => resolveLoad = resolve);
+                this.loadingPromises[boardId] = loadPromise;
+
                 // 読み込み中アニメーションを表示
                 if (!isRefresh) {
                     this.renderKanban(boardId, true);
@@ -242,6 +275,12 @@
                     this.renderKanban(boardId, false);
                     hideLoading();
 
+                    // 読み込み完了としてマーク
+                    if (this.loadingPromises[boardId]) {
+                        resolveLoad();
+                        delete this.loadingPromises[boardId];
+                    }
+
                     // isCachedチェック: キャッシュデータの場合はバックグラウンドで最新データを取得
                     if (result?.isCached === true) {
                         console.log(`Board ${boardId}: キャッシュデータ検出。バックグラウンドで最新データを取得中...`);
@@ -279,6 +318,13 @@
                 } catch (error) {
                     console.error('Error loading board tasks:', error);
                     hideLoading();
+
+                    // エラー時もPromiseを解決（待機側が進めるように）
+                    if (this.loadingPromises[boardId]) {
+                        resolveLoad();
+                        delete this.loadingPromises[boardId];
+                    }
+
                     App.utils.error.handle(error);
                 }
             },
@@ -448,13 +494,13 @@
                 if (!container) return;
 
                 const containerId = container.id;
-                
+
                 // containerにIDがない場合は処理をスキップ
                 if (!containerId) {
                     console.warn('[bindCardClick] Container has no ID, skipping event binding');
                     return;
                 }
-                
+
                 // 既存のハンドラーがあれば削除
                 if (this.clickHandlers[containerId]) {
                     container.removeEventListener('click', this.clickHandlers[containerId]);
@@ -648,6 +694,18 @@
             },
 
             setupHeaderEvents: function (board) {
+                // Info Button
+                const btnInfo = document.getElementById(`btn-info-${board.id}`);
+                const tooltipDescription = document.getElementById(`tooltip-description-${board.id}`);
+                if (btnInfo && tooltipDescription) {
+                    // tooltipにdescriptionを表示
+                    tooltipDescription.textContent = board.description || 'ボードの説明を追加';
+
+                    btnInfo.addEventListener('click', () => {
+                        this.openDescriptionModal(board.id);
+                    });
+                }
+
                 // Share Button
                 const btnShare = document.getElementById(`btn-share-${board.id}`);
                 if (btnShare) {
@@ -909,6 +967,7 @@
 
             createTaskCard: function (task) {
                 const displayId = task.display_id ? `#${task.display_id}` : '';
+                const now = new Date();
 
                 // App.state.data.members からメンバー情報を取得
                 const allMembers = App.state.data.members || [];
@@ -916,6 +975,32 @@
                 const processedBy = allMembers.find(m => m.id === task.processed_by);
                 const reviewedBy = allMembers.find(m => m.id === task.reviewed_by);
                 const receivedBy = allMembers.find(m => m.id === task.received_by);
+
+                // 1. 現在のステータスに対応する担当者がユーザーと同じ場合、ボーダーを追加
+                let isCurrentUserAssignee = false;
+                const currentUserId = App.state.userId;
+                if (task.task_status_key === 'TODO' || task.task_status_key === 'IN_PROGRESS') {
+                    isCurrentUserAssignee = task.processed_by === currentUserId;
+                } else if (task.task_status_key === 'IN_REVIEW') {
+                    isCurrentUserAssignee = task.reviewed_by === currentUserId;
+                } else if (task.task_status_key === 'DONE') {
+                    isCurrentUserAssignee = task.received_by === currentUserId;
+                }
+
+                // 2. starts_at または ends_at が超過しているかチェック
+                const isStartsAtOverdue = task.starts_at && new Date(task.starts_at) < now && task.task_status_key === 'TODO';
+                const isEndsAtOverdue = task.ends_at && new Date(task.ends_at) < now && task.task_status_key !== 'DONE';
+                const isOverdue = isStartsAtOverdue || isEndsAtOverdue;
+
+                // 3. 優先度アイコンの設定
+                let priorityIcon = '';
+                if (task.priority_key === 'HIGH') {
+                    priorityIcon = `<i class="circle extra transparent red-text" title="優先度: 高">sprint</i>`;
+                } else if (task.priority_key === 'MEDIUM') {
+                    priorityIcon = `<i class="circle extra transparent" title="優先度: 中">directions_run</i>`;
+                } else if (task.priority_key === 'LOW') {
+                    priorityIcon = `<i class="circle extra transparent" title="優先度: 低">directions_walk</i>`;
+                }
 
                 const assigneeNames = [
                     createdBy ? createdBy.display_name : '',
@@ -975,14 +1060,28 @@
                         <span class="error-text">終了日時を設定してください</span>
                     `;
                 } else {
+                    const overdueClass = isOverdue ? ' error-text' : '';
                     datetimeSpan = `
-                        <span>${formatDateTimeForDisplay(task.starts_at, 'MM/dd(E)') || ''} - ${formatDateTimeForDisplay(task.ends_at, 'MM/dd(E) HH:mm') || ''}</span>
+                        <span class="${overdueClass}">${formatDateTimeForDisplay(task.starts_at, 'MM/dd(E)') || ''} - ${formatDateTimeForDisplay(task.ends_at, 'MM/dd(E) HH:mm') || ''}</span>
                     `;
                 }
 
+                let articleClasses = '';
+                if (isEndsAtOverdue) {
+                    articleClasses += ' error-container';
+                }
+
+                if (isCurrentUserAssignee) {
+                    articleClasses += ' border';
+                    if (isEndsAtOverdue) {
+                        articleClasses += ' error-border';
+                    } else {
+                        articleClasses += ' primary-border';
+                    }
+                }
 
                 return `
-                <article class="kanban-card small-margin padding" data-eid="${task.id}" role="button" style="cursor: move;">
+                <article class="kanban-card elevate small-margin padding${articleClasses}" data-eid="${task.id}" role="button" style="cursor: move;">
                     <div>
                         <span>${displayId} <strong>${escapeHtml(task.name || '')}</strong></span>
                     </div>
@@ -990,10 +1089,104 @@
                         ${datetimeSpan}
                     </div>
                     <div class="tiny-space row">
-                        ${assigneeIcons.join('')}
+                        ${priorityIcon}${assigneeIcons.join('')}
                     </div>
                 </article>
                 `;
+            },
+
+            /**
+             * ボード説明モーダルを開く
+             */
+            openDescriptionModal: function (boardId) {
+                const board = App.state.data.boards.find(b => b.id === boardId);
+                if (!board) return;
+
+                // モーダルが既に存在する場合は削除
+                const existingModal = document.getElementById(`modal-board-description-${boardId}`);
+                if (existingModal) {
+                    existingModal.remove();
+                }
+
+                // モーダルHTMLを生成
+                const modalHtml = `
+                    <dialog id="modal-board-description-${boardId}" class="modal padding no-scroll">
+                        <nav class="small-padding bottom-margin">
+                            <h5 class="max bold">ボードの説明</h5>
+                            <button class="circle transparent" onclick="ui('#modal-board-description-${boardId}')">
+                                <i>close</i>
+                            </button>
+                        </nav>
+                        <div class="field border background scroll large-width small-padding small-round">
+                            <textarea id="textarea-board-description-${boardId}" rows="10" placeholder="ここにボードの説明を入力してください。入力した内容は全員が閲覧できます。">${escapeHtml(board.description || '')}</textarea>
+                        </div>
+                        <nav class="right-align small-padding">
+                            <button class="border" onclick="ui('#modal-board-description-${boardId}')">
+                                <span>キャンセル</span>
+                            </button>
+                            <button onclick="App.pages.boards.saveBoardDescription('${boardId}')">
+                                <span>保存</span>
+                            </button>
+                        </nav>
+                    </dialog>
+                `;
+
+                // モーダルをDOMに追加
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+                // モーダルを開く
+                ui(`#modal-board-description-${boardId}`);
+            },
+
+            /**
+             * ボード説明を保存
+             */
+            saveBoardDescription: async function (boardId) {
+                const textarea = document.getElementById(`textarea-board-description-${boardId}`);
+                if (!textarea) return;
+
+                const newDescription = textarea.value;
+                const board = App.state.data.boards.find(b => b.id === boardId);
+                if (!board) return;
+
+                const oldDescription = board.description;
+
+                // Optimistic UI update
+                board.description = newDescription;
+
+                // tooltipを更新
+                const tooltipDescription = document.getElementById(`tooltip-description-${boardId}`);
+                if (tooltipDescription) {
+                    tooltipDescription.textContent = newDescription || 'ボードの説明を追加';
+                }
+
+                // 左ナビゲーションを再描画
+                if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+                    App.utils.navigation.renderBoardsNavigation();
+                }
+
+                // モーダルを閉じる
+                ui(`#modal-board-description-${boardId}`);
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'update', {
+                        where: { id: ["=", boardId] },
+                        set: { description: newDescription }
+                    }, 'ボードの説明を更新');
+
+                    showSnackbar('ボードの説明を更新しました。', 'success');
+                } catch (error) {
+                    console.error('Failed to update board description:', error);
+                    // ロールバック
+                    board.description = oldDescription;
+                    if (tooltipDescription) {
+                        tooltipDescription.textContent = oldDescription || 'ボードの説明を追加';
+                    }
+                    if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+                        App.utils.navigation.renderBoardsNavigation();
+                    }
+                    alert('ボードの説明の更新に失敗しました');
+                }
             }
         };
     })();
