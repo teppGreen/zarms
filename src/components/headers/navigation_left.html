@@ -1,6 +1,7 @@
 <nav id="left-nav" class="m l left no-wrap small-padding max no-scroll">
     <header class="no-padding no-margin">
-        <img src="https://lh3.googleusercontent.com/d/1G9u8KOX93-PWEdKUwVWvB7WWGIOuQ2wh" alt="ZARMS" class="small-width" onclick="App.utils.navigation.switchTab('home')">
+        <img src="https://lh3.googleusercontent.com/d/1G9u8KOX93-PWEdKUwVWvB7WWGIOuQ2wh" alt="ZARMS" class="small-width"
+            onclick="App.utils.navigation.switchTab('home')">
     </header>
 
     <a id="home-nav" onclick="App.utils.navigation.switchTab('home')">
@@ -106,7 +107,7 @@
                                     console.log(`[switchTab] Throttling loadData for board ${boardId}. forceLoadData: ${forceLoadData}, skipLoadData: ${skipLoadData}. Last render was ${now - lastRender}ms ago.`);
                                     App.pages.boards.currentBoardId = boardId;
                                     isThrottled = true;
-                                    
+
                                     // スロットル時でもイベントハンドラーとSortableを再設定
                                     if (canvas && App.pages.boards.bindCardClick) {
                                         App.pages.boards.bindCardClick(canvas);
@@ -130,7 +131,17 @@
 
                     if (targetPage) {
                         targetPage.style.display = 'block';
-                        await this.loadTabData(tabName);
+
+                        let isBackground = false;
+                        if (tabName === 'home') {
+                            const homeContent = document.getElementById('home-content');
+                            // コンテンツが既に描画されているかチェック
+                            if (homeContent && homeContent.children.length > 0) {
+                                isBackground = true;
+                            }
+                        }
+
+                        await this.loadTabData(tabName, isBackground);
                     } else {
                         alert(`開こうとしたページが見つかりません。削除された可能性があります。\nページID: ${targetPageId}`);
                         // フォールバック: Homeへ
@@ -163,14 +174,19 @@
             /**
              * 通常タブデータを読み込む
              */
-            loadTabData: async function (tabName) {
-                console.log(`loadTabData called for: ${tabName}`);
-                showLoading();
+            loadTabData: async function (tabName, isBackground = false) {
+                console.log(`loadTabData called for: ${tabName}, isBackground: ${isBackground}`);
+
+                if (!isBackground) {
+                    showLoading();
+                }
 
                 if (App.pages[tabName] && App.pages[tabName].loadData) {
-                    await App.pages[tabName].loadData();
+                    await App.pages[tabName].loadData(isBackground);
                 } else {
-                    hideLoading();
+                    if (!isBackground) {
+                        hideLoading();
+                    }
                 }
             },
 
@@ -337,8 +353,11 @@
                 // text class: Inactiveなら薄くするなどのスタイルがあれば適用(ここではopacity-textを使用してみる)
                 const textClass = !board.is_active ? 'secondary-text' : 'left-align';
 
+                // descriptionをtitle属性用に変換（改行を&#13;&#10;に変換）
+                const titleAttr = board.description ? ` title="${escapeHtml(board.description).replace(/\n/g, '&#13;&#10;')}"` : '';
+
                 return `
-                        <a onclick="App.utils.navigation.switchTab('${boardTabName}')" data-board-id="${board.id}">
+                        <a onclick="App.utils.navigation.switchTab('${boardTabName}')" data-board-id="${board.id}"${titleAttr}>
                             <i class="${textClass}">${icon}</i>
                             <span class="${textClass}">${this.formatBoardName(board.name || '')}</span>
                         </a>

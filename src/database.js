@@ -10,39 +10,39 @@
  * データベース操作のエラー
  */
 class DatabaseError extends Error {
-  constructor(message, operation, tableName, details = null) {
-    super(message);
-    this.name = 'DatabaseError';
-    this.operation = operation;
-    this.tableName = tableName;
-    this.details = details;
-    this.timestamp = new Date().toISOString();
-  }
+    constructor(message, operation, tableName, details = null) {
+        super(message);
+        this.name = 'DatabaseError';
+        this.operation = operation;
+        this.tableName = tableName;
+        this.details = details;
+        this.timestamp = new Date().toISOString();
+    }
 }
 
 /**
  * バリデーションエラー
  */
 class ValidationError extends Error {
-  constructor(message, field = null, value = null) {
-    super(message);
-    this.name = 'ValidationError';
-    this.field = field;
-    this.value = value;
-    this.timestamp = new Date().toISOString();
-  }
+    constructor(message, field = null, value = null) {
+        super(message);
+        this.name = 'ValidationError';
+        this.field = field;
+        this.value = value;
+        this.timestamp = new Date().toISOString();
+    }
 }
 
 /**
  * キャッシュ操作のエラー
  */
 class CacheError extends Error {
-  constructor(message, key = null) {
-    super(message);
-    this.name = 'CacheError';
-    this.key = key;
-    this.timestamp = new Date().toISOString();
-  }
+    constructor(message, key = null) {
+        super(message);
+        this.name = 'CacheError';
+        this.key = key;
+        this.timestamp = new Date().toISOString();
+    }
 }
 
 // ============================================
@@ -75,7 +75,7 @@ const CacheManager = {
             throw new CacheError(`Failed to get cache: ${error.message}`, key);
         }
     },
-    
+
     /**
      * キャッシュに値を保存します
      * @param {string} key - キャッシュキー
@@ -100,7 +100,7 @@ const CacheManager = {
             throw new CacheError(`Failed to put cache: ${error.message}`, key);
         }
     },
-    
+
     /**
      * キャッシュを無効化します
      * @param {string} key - キャッシュキー
@@ -548,7 +548,25 @@ function bulkInsert(userId, sheetName, records) {
 
     try {
         const headers = getTableHeaders(sheetName);
-        const preparedData = records.map(record => prepareNewData(userId, sheetName, record));
+
+        // display_idが存在する場合、最初に次のシリアル番号を取得
+        let nextDisplayId = null;
+        if (headers.includes('display_id')) {
+            nextDisplayId = getNextSerial(sheetName, 'display_id');
+        }
+
+        // 各レコードを準備（display_idは手動で設定）
+        const preparedData = records.map((record, index) => {
+            const newData = prepareNewData(userId, sheetName, record);
+
+            // display_idを順次インクリメント
+            if (nextDisplayId !== null) {
+                newData['display_id'] = nextDisplayId + index;
+            }
+
+            return newData;
+        });
+
         const values = preparedData.map(record => convertRecordToArray(record, headers));
 
         const request = {
@@ -892,38 +910,38 @@ function handleDatabaseProcess(userId, tableName, operation, dataObject, remark,
                         console.warn('[handleDatabaseProcess] Cache storage failed:', cacheError);
                     }
                     return { data: result, isCached: false };
-                    
+
                 case 'insert':
                     result = insert(userId, tableName, dataObject);
                     createLog(userId, tableName, dataObject, operation, remark);
                     invalidateTableCache(tableName);
                     break;
-                    
+
                 case 'bulkinsert':
                     result = bulkInsert(userId, tableName, dataObject);
                     createLog(userId, tableName, dataObject, operation, remark);
                     invalidateTableCache(tableName);
                     break;
-                    
+
                 case 'update':
                     result = update(userId, tableName, dataObject);
                     createLog(userId, tableName, dataObject, operation, remark);
                     invalidateTableCache(tableName);
                     break;
-                    
+
                 case 'remove':
                     result = remove(tableName, dataObject);
                     createLog(userId, tableName, dataObject, operation, remark);
                     invalidateTableCache(tableName);
                     break;
-                    
+
                 default:
                     throw new ValidationError(`Unsupported operation: ${operation}`, 'operation', operation);
             }
 
             console.log(`[handleDatabaseProcess] ${operation} on ${tableName} completed successfully`);
             return result;
-            
+
         } catch (error) {
             // データベース操作のエラーをラップ
             throw new DatabaseError(
@@ -943,7 +961,7 @@ function handleDatabaseProcess(userId, tableName, operation, dataObject, remark,
             timestamp: error.timestamp || new Date().toISOString(),
             stack: error.stack
         });
-        
+
         // エラーを再スロー
         throw error;
     }
@@ -982,17 +1000,17 @@ function getSheet(ss, sheetName) {
  * 依存関係の注入ポイント（テスト用）
  */
 const DatabaseDependencies = {
-  spreadsheetService: {
-    openById: (id) => SpreadsheetApp.openById(id),
-    getActiveSpreadsheet: () => SpreadsheetApp.getActiveSpreadsheet()
-  },
-  cacheService: {
-    getScriptCache: () => CacheService.getScriptCache(),
-    getUserCache: () => CacheService.getUserCache()
-  },
-  utilitiesService: {
-    getUuid: () => Utilities.getUuid()
-  }
+    spreadsheetService: {
+        openById: (id) => SpreadsheetApp.openById(id),
+        getActiveSpreadsheet: () => SpreadsheetApp.getActiveSpreadsheet()
+    },
+    cacheService: {
+        getScriptCache: () => CacheService.getScriptCache(),
+        getUserCache: () => CacheService.getUserCache()
+    },
+    utilitiesService: {
+        getUuid: () => Utilities.getUuid()
+    }
 };
 
 /**
@@ -1000,24 +1018,24 @@ const DatabaseDependencies = {
  * @param {Object} mockDependencies - モック化された依存関係
  */
 function setDatabaseDependencies(mockDependencies) {
-  Object.assign(DatabaseDependencies, mockDependencies);
+    Object.assign(DatabaseDependencies, mockDependencies);
 }
 
 /**
  * 依存関係を元に戻します
  */
 function resetDatabaseDependencies() {
-  DatabaseDependencies.spreadsheetService = {
-    openById: (id) => SpreadsheetApp.openById(id),
-    getActiveSpreadsheet: () => SpreadsheetApp.getActiveSpreadsheet()
-  };
-  DatabaseDependencies.cacheService = {
-    getScriptCache: () => CacheService.getScriptCache(),
-    getUserCache: () => CacheService.getUserCache()
-  };
-  DatabaseDependencies.utilitiesService = {
-    getUuid: () => Utilities.getUuid()
-  };
+    DatabaseDependencies.spreadsheetService = {
+        openById: (id) => SpreadsheetApp.openById(id),
+        getActiveSpreadsheet: () => SpreadsheetApp.getActiveSpreadsheet()
+    };
+    DatabaseDependencies.cacheService = {
+        getScriptCache: () => CacheService.getScriptCache(),
+        getUserCache: () => CacheService.getUserCache()
+    };
+    DatabaseDependencies.utilitiesService = {
+        getUuid: () => Utilities.getUuid()
+    };
 }
 
 /**
@@ -1065,7 +1083,8 @@ function prepareNewData(userId, sheetName, dataObject) {
     if (headers.includes(`updated_by`)) newData[`updated_by`] = userId;
     if (headers.includes(`updated_at`)) newData[`updated_at`] = now;
     if (headers.includes(`id`) && !dataObject.id) newData[`id`] = generateUuid();
-    if (headers.includes(`display_id`)) newData[`display_id`] = getNextSerial(sheetName, `display_id`);
+    // display_idが既に設定されていない場合のみ、新しいシリアル番号を取得
+    if (headers.includes(`display_id`) && !dataObject.display_id) newData[`display_id`] = getNextSerial(sheetName, `display_id`);
 
     console.log(`[prepareNewData] newData: ${JSON.stringify(newData)}`);
     return newData;
