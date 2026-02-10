@@ -1156,11 +1156,26 @@ function invalidateTableCache(tableName) {
  * 投稿者情報を付与して返します。
  *
  * @param {string} userId - 現在のユーザーID
- * @returns {Object} { comments: Array, tasks: Array }
+ * @param {boolean} forceRefresh - キャッシュを無視して強制再取得するか
+ * @returns {Object} { comments: Array, isCached: boolean }
  *   comments: コメントデータ（投稿者情報付き）
- *   tasks: 関連タスク情報（id, name, display_id, board_id）
  */
-function getCommentNavData(userId) {
+function getCommentNavData(userId, forceRefresh = false) {
+    const cacheKey = `comment_nav_data_${userId}`;
+    const cachePublicRange = 'script';
+
+    // selectかつforceRefreshがfalseの場合、キャッシュを使用
+    if (!forceRefresh) {
+        try {
+            const cached = CacheManager.get(cacheKey, cachePublicRange);
+            if (cached) {
+                return { comments: cached, isCached: true };
+            }
+        } catch (cacheError) {
+            console.warn('[getCommentNavData] Cache retrieval failed:', cacheError);
+        }
+    }
+
     try {
         if (!userId) {
             throw new ValidationError('userId is required', 'userId', userId);
@@ -1266,7 +1281,14 @@ function getCommentNavData(userId) {
             return dateB - dateA;
         });
 
-        return sanitizeForClient({ comments: enrichedComments });
+        // 9. キャッシュに保存
+        try {
+            CacheManager.put(cacheKey, enrichedComments, cachePublicRange);
+        } catch (cacheError) {
+            console.warn('[getCommentNavData] Cache storage failed:', cacheError);
+        }
+
+        return sanitizeForClient({ comments: enrichedComments, isCached: false });
     } catch (error) {
         console.error('[getCommentNavData] Error:', error);
         throw error;
