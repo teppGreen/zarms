@@ -28,6 +28,9 @@
                 if (!isRefresh) {
                     this.renderContent();
                     hideLoading();
+                } else {
+                    // タブ切り替え時などはヘッダー（最終更新日時など）のみ先に更新
+                    this.updateHeader();
                 }
 
                 try {
@@ -72,6 +75,9 @@
                     this.renderMemberRanking(logs);
                     this.renderBoardRanking(boardTasks);
 
+                    // データの読み込み完了時刻でヘッダーを最終更新
+                    this.updateHeader();
+
                     // キャッシュヒット時の再取得（バックグラウンド）
                     if (!isRefresh && (tasksRes?.isCached || logsRes?.isCached || boardTasksRes?.isCached)) {
                         console.log('[Home] Cached data detected. Refreshing in background...');
@@ -90,10 +96,6 @@
             },
 
             renderContent: function () {
-                const greeting = this.getGreeting();
-                const formattedDate = formatDateTimeForDisplay(new Date(), 'yyyy年MM月dd日(E) HH:mm');
-                const daysUntilEvent = calculateDaysUntil(EVENT_CONFIG.FESTIVAL_DATE);
-
                 const container = document.getElementById('home-content');
                 if (!container) return;
 
@@ -102,15 +104,15 @@
                 container.innerHTML = `
                     <header class="small-margin no-padding">
                         <div class="row no-margin no-padding">
-                            <h2 class="small bold">${greeting}、${activeUser.display_name}さん｡</h2>
+                            <h2 id="home-greeting" class="small bold"></h2>
                             <div class="max"></div>
                             <div class="row no-margin no-padding tiny-space secondary-text" title="このページの最終更新">
                                 <i>update</i>
-                                <span class="font-number">${formattedDate}</span>
+                                <span id="home-last-updated" class="font-number"></span>
                             </div>
                         </div>
                         <div class="large-text">
-                            <p>リアル会場0日目(準備日)まで、残り${daysUntilEvent}日です。</p>
+                            <p id="home-event-countdown"></p>
                         </div>
                     </header>
 
@@ -161,6 +163,21 @@
                         </div>
                     </div>
                 `;
+                this.updateHeader();
+            },
+
+            updateHeader: function () {
+                const greeting = this.getGreeting();
+                const formattedDate = formatDateTimeForDisplay(new Date(), 'yyyy年MM月dd日(E) HH:mm');
+                const daysUntilEvent = calculateDaysUntil(EVENT_CONFIG.FESTIVAL_DATE);
+
+                const greetingEl = document.getElementById('home-greeting');
+                const lastUpdatedEl = document.getElementById('home-last-updated');
+                const countdownEl = document.getElementById('home-event-countdown');
+
+                if (greetingEl) greetingEl.textContent = `${greeting}、${activeUser.display_name}さん｡`;
+                if (lastUpdatedEl) lastUpdatedEl.textContent = formattedDate;
+                if (countdownEl) countdownEl.textContent = `リアル会場0日目(準備日)まで、残り${daysUntilEvent}日です。`;
             },
 
             getGreeting: function () {
@@ -418,13 +435,13 @@
                         const member = getMember(item.userId);
                         const name = member ? member.display_name : '不明';
                         const photo = member ? member.profile_photo_url : null;
-                        
+
                         // 同率順位の対応: 前の項目と件数を比較
                         if (index > 0 && ranking[index - 1].count !== item.count) {
                             currentRank = index + 1;
                         }
                         const rank = currentRank;
-                        
+
                         // 現在のユーザーの行にfillクラスを追加
                         const isCurrentUser = item.userId === App.state.userId;
                         const rowClass = isCurrentUser ? 'fill' : '';
@@ -496,7 +513,7 @@
                     ranking.forEach((item, index) => {
                         const board = getBoard(item.boardId);
                         const name = board ? board.name : '不明';
-                        
+
                         // 同率順位の対応: 前の項目と件数を比較
                         if (index > 0 && ranking[index - 1].count !== item.count) {
                             currentRank = index + 1;
