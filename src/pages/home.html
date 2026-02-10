@@ -418,6 +418,10 @@
                         const name = member ? member.display_name : '不明';
                         const photo = member ? member.profile_photo_url : null;
                         const rank = index + 1;
+                        
+                        // 現在のユーザーの行にfillクラスを追加
+                        const isCurrentUser = item.userId === App.state.userId;
+                        const rowClass = isCurrentUser ? 'fill' : '';
 
                         let rankBadge = `<span>${rank}</span>`;
 
@@ -426,7 +430,7 @@
                             : `<i class="small">account_circle</i>`;
 
                         html += `
-                            <tr style="cursor: pointer;" onclick="App.pages.home.openMyBoardForMember('${item.userId}')">
+                            <tr class="${rowClass}" style="cursor: pointer;" onclick="App.pages.home.openMyBoardForMember('${item.userId}')">
                                 <td class="center-align font-number">${rankBadge}</td>
                                 <td>
                                     <div class="row left-align tiny-space">
