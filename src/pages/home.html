@@ -492,10 +492,16 @@
                     const boards = App.state.data.boards || [];
                     const getBoard = (id) => boards.find(b => b.id === id);
 
+                    let currentRank = 1;
                     ranking.forEach((item, index) => {
                         const board = getBoard(item.boardId);
                         const name = board ? board.name : '不明';
-                        const rank = index + 1;
+                        
+                        // 同率順位の対応: 前の項目と件数を比較
+                        if (index > 0 && ranking[index - 1].count !== item.count) {
+                            currentRank = index + 1;
+                        }
+                        const rank = currentRank;
 
                         html += `
                             <tr style="cursor: pointer;" onclick="App.utils.navigation.switchTab('board-${item.boardId}')">
