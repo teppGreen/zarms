@@ -159,7 +159,7 @@
                 const appsHtml = apps.map(app => {
 
                     return `
-                        <article class="background small-round small-margin row" onclick="window.open('${app.url}', '_blank', 'noopener noreferrer')" style="cursor: pointer;">
+                        <article class="background no-elevate small-round small-margin row" onclick="window.open('${app.url}', '_blank', 'noopener noreferrer')" style="cursor: pointer;">
                             <img class="square tiny small-round" src="https:\/\/t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${app.url}&size=128"
                                 alt="${app.name}">
                             <span class="no-wrap">${app.name}</span>
@@ -313,7 +313,7 @@
                     let html = '<div class="padding center-align secondary-text small-text"><span>あなたが担当者 かつ ステータスが「完了」以外のタスクに作成されたコメント（新着順）</span></div>';
                     html += comments.map(comment => {
                         const isRead = savedData[comment.id] === true;
-                        const readClass = isRead ? 'surface-container' : 'background';
+                        const readClass = isRead ? 'background' : 'error-container';
                         const readIcon = isRead ? 'mark_email_read' : 'mark_email_unread';
 
                         // プロフィール写真
@@ -330,7 +330,7 @@
                         const plainContent = comment.content ? comment.content.substring(0, 80) : '';
 
                         return `
-                            <article class="padding top-align row small-margin small-round ${readClass}" style="cursor: pointer;"
+                            <article class="no-elevate padding top-align row small-margin small-round ${readClass}" style="cursor: pointer;"
                                onclick="App.utils.header.comments.openComment('${comment.id}', '${comment.task_id}', '${comment.task_board_id}')">
                                 <div><i class="circle extra">${avatarHtml}</i></div>
                                 <div class="max">
