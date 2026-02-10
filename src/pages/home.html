@@ -413,11 +413,17 @@
                     const members = App.state.data.members || [];
                     const getMember = (id) => members.find(m => m.id === id);
 
+                    let currentRank = 1;
                     ranking.forEach((item, index) => {
                         const member = getMember(item.userId);
                         const name = member ? member.display_name : '不明';
                         const photo = member ? member.profile_photo_url : null;
-                        const rank = index + 1;
+                        
+                        // 同率順位の対応: 前の項目と件数を比較
+                        if (index > 0 && ranking[index - 1].count !== item.count) {
+                            currentRank = index + 1;
+                        }
+                        const rank = currentRank;
                         
                         // 現在のユーザーの行にfillクラスを追加
                         const isCurrentUser = item.userId === App.state.userId;
