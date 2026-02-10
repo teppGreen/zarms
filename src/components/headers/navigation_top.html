@@ -197,6 +197,8 @@
             comments: {
                 /** キャッシュされたコメントデータ */
                 cachedComments: null,
+                /** 最終更新日時 */
+                lastUpdatedAt: null,
                 /** 初回ロード済みフラグ */
                 isLoaded: false,
                 /** ロード中フラグ（重複呼び出し防止） */
@@ -243,18 +245,25 @@
 
                     try {
                         console.log('[Comments] Loading data... forceRefresh:', forceRefresh);
-                        const result = await callGAS('getCommentNavData', App.state.userId);
+                        const result = await callGAS('getCommentNavData', App.state.userId, forceRefresh);
 
                         const comments = result?.comments || [];
                         this.cachedComments = comments;
                         this.isLoaded = true;
+                        this.lastUpdatedAt = new Date();
 
                         // 描画
                         this.render(comments);
+
+                        // キャッシュデータだった場合、バックグラウンドで最新データを取得して再描画
+                        if (!forceRefresh && result?.isCached === true) {
+                            console.log('[Comments] Cache detected. Fetching fresh data in background...');
+                            setTimeout(() => this.loadData(true), 100);
+                        }
                     } catch (error) {
                         console.error('[Comments] Error loading data:', error);
                         const container = document.getElementById('comments-list');
-                        if (container) {
+                        if (container && !this.cachedComments) {
                             container.innerHTML = '<div class="padding center-align error-text"><i>error_outline</i><span>コメントの読み込みに失敗しました</span></div>';
                         }
                     } finally {
@@ -266,33 +275,30 @@
                  * 未読チェックとボタンバッジの更新
                  * @param {Array} comments - コメントデータ
                  */
-                checkAndUpdateBadge: function (comments) {
-                    const savedData = App.state.getUserProperty('comment_read_status', {});
-                    const savedIds = Object.keys(savedData);
-                    const currentIds = comments.map(c => c.id);
+                checkAndUpdateBadge: function (comments, statusOverride = null) {
+                    // 現在の既読状態を取得
+                    const oldStatus = statusOverride || App.state.getUserProperty('comment_read_status', {});
+                    // 1. 保存前に一旦プロパティ内を空にする（新しいオブジェクトとして作成）
+                    const newStatus = {};
 
-                    let newCount = 0;
-
-                    // 既読データに新しいコメントIDを追加（未読として）
-                    currentIds.forEach(id => {
-                        if (!(id in savedData)) {
-                            savedData[id] = false; // false = 未読
-                            newCount++;
-                        }
+                    // 2. 描画しているコメントを改めて取得して、格納する
+                    // 引数のcomments、またはキャッシュされているコメントを使用
+                    const targetComments = comments || this.cachedComments || [];
+                    targetComments.forEach(comment => {
+                        // 以前の状態があれば引き継ぎ、なければ未読(false)
+                        newStatus[comment.id] = (comment.id in oldStatus) ? oldStatus[comment.id] : false;
                     });
 
-                    if (newCount > 0) {
-                        App.state.saveUserProperty('comment_read_status', savedData);
-                    }
+                    // 3. 格納（保存）
+                    App.state.saveUserProperty('comment_read_status', newStatus);
 
-                    // 未読数 = 新規コメント数 + 既存の未読コメント数
-                    const existingUnreadCount = Object.values(savedData).filter(v => v === false).length;
-                    const totalUnreadCount = existingUnreadCount;
+                    // 未読数（badge用）の計算
+                    const totalUnreadCount = Object.values(newStatus).filter(v => v === false).length;
 
                     const badge = document.getElementById('comments-badge');
                     if (badge) {
                         badge.textContent = totalUnreadCount;
-                        totalUnreadCount > 0 ? badge.style.display = '' : badge.style.display = 'none';
+                        badge.style.display = totalUnreadCount > 0 ? '' : 'none';
                     }
                 },
 
@@ -303,6 +309,9 @@
                 render: function (comments) {
                     const container = document.getElementById('comments-list');
                     if (!container) return;
+
+                    // バッジ更新とデータのクリーンアップを先に実行
+                    this.checkAndUpdateBadge(comments);
 
                     if (!comments || comments.length === 0) {
                         container.innerHTML = '<div class="padding center-align secondary-text"><i>info</i><span>コメントはありません</span></div>';
@@ -353,8 +362,13 @@
                         `;
                     }).join('');
 
+                    // 最終更新日時の追加
+                    if (this.lastUpdatedAt) {
+                        const timeStr = formatDateTimeForDisplay(this.lastUpdatedAt, 'yyyy/MM/dd(E) HH:mm');
+                        html += `<div class="row padding no-margin center-align secondary-text small-text tiny-space"><i class="small">update</i><span>最終更新: ${timeStr}</span></div>`;
+                    }
+
                     container.innerHTML = html;
-                    this.checkAndUpdateBadge(comments);
                 },
 
                 /**
@@ -382,7 +396,9 @@
                 toggleReadStatus: function (commentId) {
                     const savedData = App.state.getUserProperty('comment_read_status', {});
                     savedData[commentId] = !savedData[commentId]; // true ↔ false をトグル
-                    App.state.saveUserProperty('comment_read_status', savedData);
+
+                    // 更新後の状態を渡してクリーンアップと保存を実行
+                    this.checkAndUpdateBadge(this.cachedComments, savedData);
 
                     // 描画を更新
                     if (this.cachedComments) {
@@ -397,7 +413,9 @@
                 markAsRead: function (commentId) {
                     const savedData = App.state.getUserProperty('comment_read_status', {});
                     savedData[commentId] = true;
-                    App.state.saveUserProperty('comment_read_status', savedData);
+
+                    // 更新後の状態を渡してクリーンアップと保存を実行
+                    this.checkAndUpdateBadge(this.cachedComments, savedData);
                 }
             }
         };
