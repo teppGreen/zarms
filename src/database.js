@@ -1146,6 +1146,134 @@ function invalidateTableCache(tableName) {
 }
 
 // ============================================
+// Comment Navigation Data
+// 責任: コメント通知用データの取得・加工
+// ============================================
+
+/**
+ * コメント通知用のデータを取得します
+ * ユーザーが関与するアクティブタスクに紐づくコメントを取得し、
+ * 投稿者情報を付与して返します。
+ *
+ * @param {string} userId - 現在のユーザーID
+ * @returns {Object} { comments: Array, tasks: Array }
+ *   comments: コメントデータ（投稿者情報付き）
+ *   tasks: 関連タスク情報（id, name, display_id, board_id）
+ */
+function getCommentNavData(userId) {
+    try {
+        if (!userId) {
+            throw new ValidationError('userId is required', 'userId', userId);
+        }
+
+        // 1. アクティブなタスクを取得（task_status_key が DONE ではない）
+        const tasksResult = select(TABLE_NAMES.TASKS, {
+            where: { task_status_key: ['!=', 'DONE'] }
+        });
+
+        if (!tasksResult || tasksResult.length === 0) {
+            return { comments: [], tasks: [] };
+        }
+
+        // 2. ユーザーが関与するタスクをフィルタリング
+        //    created_by / processed_by / reviewed_by / received_by のいずれかが userId
+        //    かつ task_status_key が NULL / 空欄でもないもの
+        const userTasks = tasksResult.filter(task => {
+            const status = task.task_status_key;
+            if (!status || status === '' || status === 'DONE') return false;
+
+            return task.created_by === userId ||
+                task.processed_by === userId ||
+                task.reviewed_by === userId ||
+                task.received_by === userId;
+        });
+
+        if (userTasks.length === 0) {
+            return { comments: [], tasks: [] };
+        }
+
+        // タスクIDのSetを作成（高速検索用）
+        const userTaskIds = new Set(userTasks.map(t => t.id));
+
+        // 3. commentsテーブルから related_table = 'tasks' のコメントを取得
+        const commentsResult = select(TABLE_NAMES.COMMENTS, {
+            where: { related_table: ['=', 'tasks'] }
+        });
+
+        if (!commentsResult || commentsResult.length === 0) {
+            return { comments: [], tasks: [] };
+        }
+
+        // 4. ユーザーのタスクに関連するコメントのみフィルタ
+        const relevantComments = commentsResult.filter(comment =>
+            userTaskIds.has(comment.related_id)
+        );
+
+        if (relevantComments.length === 0) {
+            return { comments: [], tasks: [] };
+        }
+
+        // 5. メンバー情報を取得（投稿者の display_name, profile_photo_url のため）
+        const membersResult = select(TABLE_NAMES.MEMBERS, {});
+        const membersMap = new Map();
+        if (membersResult) {
+            membersResult.forEach(m => {
+                membersMap.set(m.id, {
+                    display_name: m.display_name || m.name || '',
+                    profile_photo_url: m.profile_photo_url || ''
+                });
+            });
+        }
+
+        // 6. タスク情報のMapを作成
+        const tasksMap = new Map();
+        userTasks.forEach(t => {
+            tasksMap.set(t.id, {
+                id: t.id,
+                name: t.name,
+                display_id: t.display_id,
+                board_id: t.board_id,
+                task_status_key: t.task_status_key
+            });
+        });
+
+        // 7. コメントデータを加工（投稿者情報 + タスク情報を付与）
+        const enrichedComments = relevantComments.map(comment => {
+            const memberInfo = membersMap.get(comment.updated_by) || {
+                display_name: '不明',
+                profile_photo_url: ''
+            };
+            const taskInfo = tasksMap.get(comment.related_id) || {};
+
+            return {
+                id: comment.id,
+                content: comment.content,
+                updated_at: comment.updated_at,
+                updated_by: comment.updated_by,
+                display_name: memberInfo.display_name,
+                profile_photo_url: memberInfo.profile_photo_url,
+                task_id: comment.related_id,
+                task_name: taskInfo.name || '',
+                task_display_id: taskInfo.display_id || '',
+                task_board_id: taskInfo.board_id || ''
+            };
+        });
+
+        // 8. updated_at で降順ソート（新しい順）
+        enrichedComments.sort((a, b) => {
+            const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+            const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+            return dateB - dateA;
+        });
+
+        return sanitizeForClient({ comments: enrichedComments });
+    } catch (error) {
+        console.error('[getCommentNavData] Error:', error);
+        throw error;
+    }
+}
+
+// ============================================
 // JSONシリアライズ対策
 // ============================================
 function sanitizeForClient(data) {

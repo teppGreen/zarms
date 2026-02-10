@@ -332,6 +332,11 @@
       // アプリリンクを描画
       App.utils.header.renderApps();
 
+      // コメントデータをバックグラウンドで初期読み込み（他の描画処理に影響なし）
+      if (App.utils.header.comments) {
+        App.utils.header.comments.loadData(false).catch(e => console.warn('[Comments] Background initial load failed:', e));
+      }
+
       hideLoading();
 
       // キャッシュからのデータだった場合、バックグラウンドで最新データを取得して再描画

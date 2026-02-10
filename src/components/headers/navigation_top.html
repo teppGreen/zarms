@@ -93,24 +93,34 @@
 
     <div class="max l"></div>
 
-    <button class="circle large transparent">
-        <i>help</i>
-        <menu id="help-menu" class="left no-wrap">
-            <li><a id="help-link" href="" rel="noopener noreferrer" target="_blank">ヘルプ</a></li>
-            <li><a id="terms-link" href="" rel="noopener noreferrer" target="_blank">利用規約</a></li>
-        </menu>
-    </button>
+    <nav class="left-margin right-margin">
+        <button id="comments-button" class="circle transparent" onclick="App.utils.header.comments.toggle()">
+            <i>comment</i>
+            <span id="comments-badge" class="badge" style="display: none;">0</span>
+            <menu id="comments-menu" class="left no-padding medium-width">
+                <div id="comments-list">
+                    <!-- コメントはクリック時に動的に生成される -->
+                </div>
+            </menu>
+        </button>
 
-    <button class="circle large transparent">
-        <i>apps</i>
-        <menu id="apps-menu" class="left no-wrap no-padding">
-            <article class="background small-margin no-padding scroll">
-                <div id="apps-grid" class="grid tiny-space">
+        <button class="circle transparent">
+            <i>apps</i>
+            <menu id="apps-menu" class="left no-padding medium-width">
+                <div id="apps-grid">
                     <!-- リンクはloadAllData実行時に動的に生成される -->
                 </div>
-            </article>
-        </menu>
-    </button>
+            </menu>
+        </button>
+
+        <button class="circle transparent">
+            <i>help</i>
+            <menu id="help-menu" class="left no-wrap">
+                <li><a id="help-link" href="" rel="noopener noreferrer" target="_blank">ヘルプ</a></li>
+                <li><a id="terms-link" href="" rel="noopener noreferrer" target="_blank">利用規約</a></li>
+            </menu>
+        </button>
+    </nav>
 </nav>
 
 <script>
@@ -141,7 +151,7 @@
                 const apps = App.state.data.apps || [];
 
                 if (apps.length === 0) {
-                    appsGrid.innerHTML = '<div class="s12 center-align"><p>リンクがありません</p></div>';
+                    appsGrid.innerHTML = '<div class="padding center-align row"><p>リンクがありません</p></div>';
                     return;
                 }
 
@@ -149,13 +159,11 @@
                 const appsHtml = apps.map(app => {
 
                     return `
-                        <div class="s4 center-align small-margin">
-                            <button class="transparent small-round vertical" onclick="window.open('${app.url}', '_blank', 'noopener noreferrer')">
-                                <img class="responsive" src="https:/\/t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${app.url}&size=128"
-                                    alt="${app.name}">
-                                <span>${app.name}</span>
-                            </button>
-                        </div>
+                        <article class="background small-round small-margin row" onclick="window.open('${app.url}', '_blank', 'noopener noreferrer')" style="cursor: pointer;">
+                            <img class="square tiny small-round" src="https:\/\/t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${app.url}&size=128"
+                                alt="${app.name}">
+                            <span class="no-wrap">${app.name}</span>
+                        </article>
                     `;
                 }).join('');
 
@@ -182,6 +190,216 @@
                     dropdown.classList.remove('show');
                 }
             },
+
+            // ============================================
+            // コメント通知機能
+            // ============================================
+            comments: {
+                /** キャッシュされたコメントデータ */
+                cachedComments: null,
+                /** 初回ロード済みフラグ */
+                isLoaded: false,
+                /** ロード中フラグ（重複呼び出し防止） */
+                isLoading: false,
+
+                /**
+                 * コメントメニューの表示切替とデータロード
+                 */
+                toggle: function () {
+                    const container = document.getElementById('comments-list');
+                    if (!container) return;
+
+                    if (this.isLoaded && this.cachedComments) {
+                        // ロード済み: キャッシュデータを即時描画し、バックグラウンドで最新データを取得
+                        this.render(this.cachedComments);
+                        this.loadData(true);
+                    } else {
+                        // 未ロード: シマーを表示してデータ取得
+                        this.showShimmer(container);
+                        this.loadData(false);
+                    }
+                },
+
+                /**
+                 * シマーエフェクトを表示
+                 */
+                showShimmer: function (container) {
+                    container.innerHTML = `
+                        <div class="center padding center-align row small-space">
+                            <progress class="circle indeterminate small"></progress>
+                            <span>読み込み中...</span>
+                        </div>
+                    `
+                },
+
+                /**
+                 * データを取得して描画
+                 * @param {boolean} forceRefresh - キャッシュを無視して強制再取得するか
+                 * @returns {Promise}
+                 */
+                loadData: async function (forceRefresh = false) {
+                    if (this.isLoading && !forceRefresh) return;
+                    this.isLoading = true;
+
+                    try {
+                        console.log('[Comments] Loading data... forceRefresh:', forceRefresh);
+                        const result = await callGAS('getCommentNavData', App.state.userId);
+
+                        const comments = result?.comments || [];
+                        this.cachedComments = comments;
+                        this.isLoaded = true;
+
+                        // 描画
+                        this.render(comments);
+                    } catch (error) {
+                        console.error('[Comments] Error loading data:', error);
+                        const container = document.getElementById('comments-list');
+                        if (container) {
+                            container.innerHTML = '<div class="padding center-align error-text"><i>error_outline</i><span>コメントの読み込みに失敗しました</span></div>';
+                        }
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                /**
+                 * 未読チェックとボタンバッジの更新
+                 * @param {Array} comments - コメントデータ
+                 */
+                checkAndUpdateBadge: function (comments) {
+                    const savedData = App.state.getUserProperty('comment_read_status', {});
+                    const savedIds = Object.keys(savedData);
+                    const currentIds = comments.map(c => c.id);
+
+                    let newCount = 0;
+
+                    // 既読データに新しいコメントIDを追加（未読として）
+                    currentIds.forEach(id => {
+                        if (!(id in savedData)) {
+                            savedData[id] = false; // false = 未読
+                            newCount++;
+                        }
+                    });
+
+                    if (newCount > 0) {
+                        App.state.saveUserProperty('comment_read_status', savedData);
+                    }
+
+                    // 未読数 = 新規コメント数 + 既存の未読コメント数
+                    const existingUnreadCount = Object.values(savedData).filter(v => v === false).length;
+                    const totalUnreadCount = existingUnreadCount;
+
+                    const badge = document.getElementById('comments-badge');
+                    if (badge) {
+                        badge.textContent = totalUnreadCount;
+                        totalUnreadCount > 0 ? badge.style.display = '' : badge.style.display = 'none';
+                    }
+                },
+
+                /**
+                 * コメント一覧を描画
+                 * @param {Array} comments - コメントデータ
+                 */
+                render: function (comments) {
+                    const container = document.getElementById('comments-list');
+                    if (!container) return;
+
+                    if (!comments || comments.length === 0) {
+                        container.innerHTML = '<div class="padding center-align secondary-text"><i>info</i><span>コメントはありません</span></div>';
+                        return;
+                    }
+
+                    const savedData = App.state.getUserProperty('comment_read_status', {});
+                    let html = '<div class="padding center-align secondary-text small-text"><span>あなたが担当者 かつ ステータスが「完了」以外のタスクに作成されたコメント（新着順）</span></div>';
+                    html += comments.map(comment => {
+                        const isRead = savedData[comment.id] === true;
+                        const readClass = isRead ? 'surface-container' : 'background';
+                        const readIcon = isRead ? 'mark_email_read' : 'mark_email_unread';
+
+                        // プロフィール写真
+                        const avatarHtml = comment.profile_photo_url
+                            ? `<img class="responsive" src="${comment.profile_photo_url}" alt="${escapeHtml(comment.display_name)}">`
+                            : `account_circle`;
+
+                        // 更新日時のフォーマット
+                        const updatedAt = comment.updated_at
+                            ? formatDateTimeForDisplay(comment.updated_at, 'MM/dd HH:mm')
+                            : '';
+
+                        // コメント内容（HTMLタグを除去して表示）
+                        const plainContent = comment.content ? comment.content.substring(0, 80) : '';
+
+                        return `
+                            <article class="padding top-align row small-margin small-round ${readClass}" style="cursor: pointer;"
+                               onclick="App.utils.header.comments.openComment('${comment.id}', '${comment.task_id}', '${comment.task_board_id}')">
+                                <div><i class="circle extra">${avatarHtml}</i></div>
+                                <div class="max">
+                                    <div class="row">
+                                        <span class="bold small-text">${escapeHtml(comment.display_name)}</span>
+                                        <span class="small-text secondary-text font-number">${updatedAt}</span>
+                                    </div>
+                                    <div class="small-text secondary-text">${escapeHtml(comment.task_name)} <span class="font-number secondary-text">#${comment.task_display_id}</span></div>
+                                    <div class="tiny-space"></div>
+                                    <div class="small-text">${escapeHtml(plainContent)}</div>
+                                </div>
+                                <div>
+                                    <button class="transparent circle small no-margin"
+                                        onclick="event.stopPropagation(); App.utils.header.comments.toggleReadStatus('${comment.id}')"
+                                        title="${isRead ? '未読にする' : '既読にする'}">
+                                    <i class="small">${readIcon}</i>
+                                    </button>
+                                </div>
+                            </article>
+                        `;
+                    }).join('');
+
+                    container.innerHTML = html;
+                    this.checkAndUpdateBadge(comments);
+                },
+
+                /**
+                 * コメントをクリックしてタスクを開く
+                 * @param {string} commentId - コメントID
+                 * @param {string} taskId - タスクID
+                 * @param {string} boardId - ボードID
+                 */
+                openComment: function (commentId, taskId, boardId) {
+                    ui('#comments-menu');
+
+                    // 既読にマーク
+                    this.markAsRead(commentId);
+
+                    // タスクを開く（home.htmlのopenTaskFromHomeを再利用）
+                    if (App.pages.home && App.pages.home.openTaskFromHome) {
+                        App.pages.home.openTaskFromHome(taskId, boardId);
+                    }
+                },
+
+                /**
+                 * コメントの既読/未読状態をトグル
+                 * @param {string} commentId - コメントID
+                 */
+                toggleReadStatus: function (commentId) {
+                    const savedData = App.state.getUserProperty('comment_read_status', {});
+                    savedData[commentId] = !savedData[commentId]; // true ↔ false をトグル
+                    App.state.saveUserProperty('comment_read_status', savedData);
+
+                    // 描画を更新
+                    if (this.cachedComments) {
+                        this.render(this.cachedComments);
+                    }
+                },
+
+                /**
+                 * コメントを既読にマーク（openComment用）
+                 * @param {string} commentId - コメントID
+                 */
+                markAsRead: function (commentId) {
+                    const savedData = App.state.getUserProperty('comment_read_status', {});
+                    savedData[commentId] = true;
+                    App.state.saveUserProperty('comment_read_status', savedData);
+                }
+            }
         };
     })();
 
