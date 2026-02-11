@@ -2089,12 +2089,25 @@
           App.utils.url.updateParams(newParams, false);
         }
 
+        const targetBoardId = boardId || 'my-board';
+
+        // マイボードの場合は新しいナビゲーションを使用
+        if (targetBoardId === 'my-board') {
+          if (App.utils.navigation && App.utils.navigation.navigateToMyBoardWithTaskName) {
+            await App.utils.navigation.navigateToMyBoardWithTaskName(taskId);
+            return;
+          }
+        }
+
         // ボードタブに切り替え
         if (App.utils.navigation && App.utils.navigation.switchTab) {
           // ボードの読み込みを待つ
-          await App.utils.navigation.switchTab(`board-${boardId || 'my-board'}`);
-          // タスクを開く
-          this.open(taskId, false);
+          await App.utils.navigation.switchTab(`board-${targetBoardId}`);
+
+          // タスクを開く処理（共通関数を使用）
+          if (App.utils.navigation && App.utils.navigation.tryOpenTask) {
+            await App.utils.navigation.tryOpenTask(taskId, targetBoardId);
+          }
         }
       },
 
