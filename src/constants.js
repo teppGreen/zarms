@@ -124,8 +124,8 @@ const EXTERNAL_URLS = {
   MEMBER_SPREADSHEET: 'https://docs.google.com/spreadsheets/d/1Jwq5klCWFMNqSURHk2JrbF43X4JTy5I7M5aBE3uDVNw/edit?gid=1456439787',
   CONTACT_FORM: 'https://forms.gle/afXzsGKxvm9qVG4G9',
   SOUMU_DOCUMENT: 'https://docs.google.com/document/d/1BXpWaVsyJChC-rSDgjEvH33s_5FvXiaimvHIYxBTxoY/preview?tab=t.ox00ab3wnxmq',
-  LOGO_IMAGE: 'https://lh3.googleusercontent.com/d/1G9u8KOX93-PWEdKUwVWvB7WWGIOuQ2wh',
-  ZARMS_IMAGE: 'https://lh3.googleusercontent.com/d/17EMQ6GE9Nu-P7xc2y32rHudx6vy86zi8',
+  LOGO_IMAGE: 'https://i.gyazo.com/5c4f146e5ec5efdf571670f6b318e309.png',
+  FAVICON_IMAGE: 'https://i.gyazo.com/89db588b11cf08f2d14ee3ece99c22dd.png',
   HELP_SITE: 'https://sites.google.com/student.zen.ac.jp/zarms/help',
   TERMS_SITE: 'https://sites.google.com/student.zen.ac.jp/zarms/terms',
   GEMINI_GEMS_TASK_ADD: 'https://gemini.google.com/gem/1_GKJoSvkttvu4Nr1GnmX44OqKOZuWkwR'
