@@ -11,7 +11,8 @@
         directories: [],
         members: [],
         tasks: [],
-        apps: []
+        apps: [],
+        systemUpdates: []
       },
 
       userId: null, // 現在のユーザーのID（uuid）
@@ -125,6 +126,11 @@
     // 自動更新を開始
     // TODO: 本番デプロイ時にコメントアウトを外すこと
     startAutoRefresh();
+
+    // システムアップデートの1時間ごとの自動更新を開始
+    if (App.utils.header.systemUpdates) {
+      App.utils.header.systemUpdates.startAutoRefresh();
+    }
   }
 
   /**
@@ -307,7 +313,7 @@
   async function loadAllData() {
     try {
       // boards, apps, members テーブルから並列でデータ取得
-      const [boardsResult, appsResult, membersResult, directoriesResult] = await Promise.all([
+      const [boardsResult, appsResult, membersResult, directoriesResult, systemUpdatesResult] = await Promise.all([
         callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {
           columns: ['id', 'display_id', 'name', 'description', 'is_active'],
           orderBy: { name: 'asc' }
@@ -318,7 +324,10 @@
         }),
         callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {
           // where: { is_active: ["=", true] }
-        })
+        }),
+        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SYSTEM_UPDATES, 'select', {
+          orderBy: { created_at: 'desc' }
+        }, null, true)
       ]);
 
       // 結果からデータを取得（キャッシュ情報を含む可能性がある）
@@ -326,17 +335,20 @@
       let apps = appsResult?.data || appsResult || [];
       let members = membersResult?.data || membersResult || [];
       let directories = directoriesResult?.data || directoriesResult || [];
+      let systemUpdates = systemUpdatesResult?.data || systemUpdatesResult || [];
 
       // App.stateに保存
       console.log('Boards fetched (minimal):', boards);
       console.log('Apps fetched:', apps);
       console.log('Members fetched:', members);
       console.log('Directories fetched:', directories);
+      console.log('SystemUpdates fetched:', systemUpdates);
 
       App.state.data.boards = boards;
       App.state.data.apps = apps;
       App.state.data.members = members;
       App.state.data.directories = directories;
+      App.state.data.systemUpdates = systemUpdates;
 
       // tasks, directoriesは各タブを開いた時に取得するため、ここでは空配列で初期化
       App.state.data.tasks = [];
@@ -353,6 +365,13 @@
 
       // アプリリンクを描画
       App.utils.header.renderApps();
+
+      // システムアップデートデータをキャッシュに反映
+      if (App.utils.header.systemUpdates) {
+        App.utils.header.systemUpdates.cachedUpdates = systemUpdates;
+        App.utils.header.systemUpdates.isLoaded = true;
+        App.utils.header.systemUpdates.lastUpdatedAt = new Date();
+      }
 
       // コメントデータをバックグラウンドで初期読み込み（他の描画処理に影響なし）
       if (App.utils.header.comments) {

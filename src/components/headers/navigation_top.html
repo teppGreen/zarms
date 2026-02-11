@@ -119,6 +119,15 @@
                 <li><a id="terms-link" href="" rel="noopener noreferrer" target="_blank">利用規約</a></li>
             </menu>
         </button>
+
+        <button id="system-info-button" class="circle transparent" onclick="App.utils.header.systemUpdates.toggle()">
+            <i>info</i>
+            <menu id="system-info-menu" class="left no-padding medium-width">
+                <div id="system-info-list">
+                    <!-- アップデート情報はloadAllData実行時に動的に生成される -->
+                </div>
+            </menu>
+        </button>
     </nav>
 </nav>
 
@@ -334,7 +343,7 @@
                             ? formatDateTimeForDisplay(comment.updated_at, 'MM/dd HH:mm')
                             : '';
 
-                        
+
                         const contentLengthLimit = 75;
                         // コメント内容（最初の80文字まで、改行はスペースに置き換え）
                         let plainContent = comment.content ? comment.content : '';
@@ -426,6 +435,148 @@
                     // 更新後の状態を渡してクリーンアップと保存を実行
                     this.checkAndUpdateBadge(this.cachedComments, savedData);
                 }
+            }
+        };
+
+        // ============================================
+        // システムアップデート通知機能
+        // ============================================
+        App.utils.header.systemUpdates = {
+            /** キャッシュされたアップデートデータ */
+            cachedUpdates: null,
+            /** 最終更新日時 */
+            lastUpdatedAt: null,
+            /** 初回ロード済みフラグ */
+            isLoaded: false,
+            /** 1時間更新用のインターバルID */
+            autoRefreshInterval: null,
+
+            /**
+             * メニューの表示切替（キャッシュデータの即時描画のみ）
+             */
+            toggle: function () {
+                const container = document.getElementById('system-info-list');
+                if (!container) return;
+
+                if (this.isLoaded && this.cachedUpdates) {
+                    // ロード済み: キャッシュデータを即時描画（都度更新はしない）
+                    this.render(this.cachedUpdates);
+                } else {
+                    // 未ロード: シマーを表示してデータ取得
+                    this.showShimmer(container);
+                    this.loadData();
+                }
+            },
+
+            /**
+             * シマーエフェクトを表示
+             */
+            showShimmer: function (container) {
+                container.innerHTML = `
+                    <div class="center padding center-align row small-space">
+                        <progress class="circle indeterminate small"></progress>
+                        <span>読み込み中...</span>
+                    </div>
+                `;
+            },
+
+            /**
+             * データを取得して描画（常にキャッシュを無視して最新データを取得）
+             * @returns {Promise}
+             */
+            loadData: async function () {
+                try {
+                    console.log('[SystemUpdates] Loading data...');
+                    const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SYSTEM_UPDATES, 'select', {
+                        orderBy: { created_at: 'desc' }
+                    }, null, true);
+
+                    const updates = result?.data || result || [];
+                    this.cachedUpdates = updates;
+                    this.isLoaded = true;
+                    this.lastUpdatedAt = new Date();
+
+                    // 描画
+                    this.render(updates);
+                } catch (error) {
+                    console.error('[SystemUpdates] Error loading data:', error);
+                    const container = document.getElementById('system-info-list');
+                    if (container && !this.cachedUpdates) {
+                        container.innerHTML = '<div class="padding center-align error-text"><i>error_outline</i><span>アップデート情報の読み込みに失敗しました</span></div>';
+                    }
+                }
+            },
+
+            /**
+             * アップデート一覧を描画
+             * @param {Array} updates - アップデートデータ
+             */
+            render: function (updates) {
+                const container = document.getElementById('system-info-list');
+                if (!container) return;
+
+                // ZARMSの基本説明をトップに表示
+                let html = `
+                    <div class="padding">
+                        <div class="row tiny-space">
+                            <i class="small">info</i>
+                            <span class="bold">ZARMSについて</span>
+                        </div>
+                        <span class="small-text">${UI_TEXT.SYSTEM_DESCRIPTION}</span>
+                    </div>
+                `;
+
+                if (!updates || updates.length === 0) {
+                    html += '<div class="padding center-align row tiny-space secondary-text"><i>info</i><span>アップデート情報はありません</span></div>';
+                } else {
+                    html += updates.map(update => {
+                        // アップデート日時のフォーマット
+                        const createdAt = update.created_at
+                            ? formatDateTimeForDisplay(update.created_at, 'yyyy/MM/dd')
+                            : '';
+
+                        // 説明文の改行を反映
+                        const description = update.description
+                            ? escapeHtml(update.description).replace(/\n/g, '<br>')
+                            : '';
+
+                        return `
+                            <article class="no-elevate padding top-align small-margin small-round background">
+                                <div>
+                                    <div class="row">
+                                        <span class="bold small-text font-number">${escapeHtml(update.version || '')}</span>
+                                        <span class="small-text secondary-text font-number">${createdAt}</span>
+                                    </div>
+                                    <div class="bold small-text">${escapeHtml(update.title || '')}</div>
+                                    <div class="tiny-space"></div>
+                                    <div class="small-text">${description}</div>
+                                </div>
+                            </article>
+                        `;
+                    }).join('');
+                }
+
+                // 最終更新日時の追加
+                if (this.lastUpdatedAt) {
+                    const timeStr = formatDateTimeForDisplay(this.lastUpdatedAt, 'yyyy/MM/dd(E) HH:mm');
+                    html += `<div class="row padding no-margin center-align secondary-text small-text tiny-space"><i class="small">update</i><span>最終更新: ${timeStr}</span></div>`;
+                }
+
+                container.innerHTML = html;
+            },
+
+            /**
+             * 1時間ごとの自動更新を開始
+             */
+            startAutoRefresh: function () {
+                if (this.autoRefreshInterval) {
+                    clearInterval(this.autoRefreshInterval);
+                }
+                // 1時間 = 3600000ms
+                this.autoRefreshInterval = setInterval(() => {
+                    console.log('[SystemUpdates] Auto-refreshing...');
+                    this.loadData();
+                }, 3600000);
             }
         };
     })();
