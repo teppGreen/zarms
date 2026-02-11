@@ -33,7 +33,7 @@ function doGet(e) {
 
   return template.evaluate()
     .setTitle('ZARMS')
-    .setFaviconUrl('https://drive.google.com/uc?id=' + FAVICON_FILE_ID + '&.png')
+    .setFaviconUrl(EXTERNAL_URLS.FAVICON_IMAGE)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
