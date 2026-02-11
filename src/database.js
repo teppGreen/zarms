@@ -555,9 +555,9 @@ function bulkInsert(userId, sheetName, records) {
             nextDisplayId = getNextSerial(sheetName, 'display_id');
         }
 
-        // 各レコードを準備（display_idは手動で設定）
+        // 各レコードを準備（一括挿入時は個別の採番をスキップ）
         const preparedData = records.map((record, index) => {
-            const newData = prepareNewData(userId, sheetName, record);
+            const newData = prepareNewData(userId, sheetName, record, true);
 
             // display_idを順次インクリメント
             if (nextDisplayId !== null) {
@@ -1073,7 +1073,7 @@ function getNextSerial(sheetName, columnName) {
     }
 }
 
-function prepareNewData(userId, sheetName, dataObject) {
+function prepareNewData(userId, sheetName, dataObject, skipSerial = false) {
     const headers = getTableHeaders(sheetName);
     const newData = { ...dataObject };
 
@@ -1083,8 +1083,14 @@ function prepareNewData(userId, sheetName, dataObject) {
     if (headers.includes(`updated_by`)) newData[`updated_by`] = userId;
     if (headers.includes(`updated_at`)) newData[`updated_at`] = now;
     if (headers.includes(`id`) && !dataObject.id) newData[`id`] = generateUuid();
-    // display_idが既に設定されていない場合のみ、新しいシリアル番号を取得
-    if (headers.includes(`display_id`) && !dataObject.display_id) newData[`display_id`] = getNextSerial(sheetName, `display_id`);
+
+    // display_idが未設定、または空文字、または「#」の場合に新しいシリアル番号を取得
+    const needsSerial = headers.includes(`display_id`) &&
+        (!dataObject.display_id || dataObject.display_id === '' || dataObject.display_id === '#');
+
+    if (needsSerial && !skipSerial) {
+        newData[`display_id`] = getNextSerial(sheetName, `display_id`);
+    }
 
     console.log(`[prepareNewData] newData: ${JSON.stringify(newData)}`);
     return newData;
