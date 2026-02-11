@@ -22,7 +22,8 @@ const TABLE_NAMES = {
   MEMBER_ASSIGNMENTS: 'member_assignments',
   TASKS: 'tasks',
   LISTS: 'lists',
-  FILES: 'files'
+  FILES: 'files',
+  SYSTEM_UPDATES: 'system_updates'
 };
 
 const DIRECTORY_TYPES = {
@@ -67,7 +68,8 @@ const TABLE_HEADERS = {
   TASKS: ['id', 'display_id', 'parent_task_id', 'board_id', 'name', 'description', 'starts_at', 'ends_at', 'task_status_key', 'priority_key', 'processed_by', 'reviewed_by', 'received_by', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   LISTS: ['id', 'index', 'task_id', 'is_done', 'name', 'assign_to', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   LINKS: ['id', 'index', 'task_id', 'label', 'url', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
-  FILES: ['id', 'index', 'task_id', 'gfile_id', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at']
+  FILES: ['id', 'index', 'task_id', 'gfile_id', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
+  SYSTEM_UPDATES: ['id', 'version', 'title', 'description', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at']
 };
 
 // ============================================
@@ -153,6 +155,7 @@ const AUTH_CONFIG = {
 const UI_TEXT = {
   APP_TITLE: 'ZARMS',
   APP_DESCRIPTION: '大学祭実行委員会の業務システム「ZARMS」へようこそ！',
+  SYSTEM_DESCRIPTION: 'ZARMS（ザームス）は、大学祭実行委員会の業務を効率化するためのタスク管理システムです。ボードごとにタスクを管理し、メンバー間での進捗共有やコメントによるコミュニケーションをサポートします。',
   LOADING_MESSAGE: 'お待ちください',
   ERROR_USER_NOT_FOUND: 'ユーザーが見つかりませんでした',
   ERROR_ACCESS_DENIED: 'アクセス権限がありません',
