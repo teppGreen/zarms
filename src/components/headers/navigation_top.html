@@ -335,8 +335,12 @@
                             ? formatDateTimeForDisplay(comment.updated_at, 'MM/dd HH:mm')
                             : '';
 
-                        // コメント内容（HTMLタグを除去して表示）
-                        const plainContent = comment.content ? comment.content.substring(0, 80) : '';
+                        // コメント内容（最初の80文字まで、改行はスペースに置き換え）
+                        let plainContent = comment.content ? comment.content : '';
+                        // 改行をスペースに置き換え（プレビューなので）
+                        plainContent = plainContent.replace(/\r\n/g, ' ').replace(/\n/g, ' ');
+                        // 80文字でトリミング
+                        plainContent = plainContent.substring(0, 80);
 
                         return `
                             <article class="no-elevate padding top-align row small-margin small-round ${readClass}" style="cursor: pointer;"
