@@ -886,6 +886,24 @@
   }
 
   /**
+   * テキストをHTMLエスケープした後、改行を<br>タグに変換します
+   * @param {string} text - 変換する文字列
+   * @returns {string} エスケープされ、改行が<br>タグに変換された文字列
+   */
+  function escapeHtmlWithLineBreaks(text) {
+    if (text === null || text === undefined) {
+      return '';
+    }
+    
+    // まずHTMLエスケープを実行
+    const escaped = escapeHtml(text);
+    
+    // 改行文字を<br>タグに変換
+    // \r\nと\nの両方に対応
+    return escaped.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+  }
+
+  /**
    * URLをサニタイズします。安全なスキーム（http, https, mailto, tel）と相対URLのみを許可します。
    * @param {string} url - サニタイズするURL
    * @returns {string} サニタイズされたURL。安全でない場合は空文字を返します。
