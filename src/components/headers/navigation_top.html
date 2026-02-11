@@ -83,7 +83,6 @@
     <div class="field medium-width round prefix border" id="search-container">
         <i class="front" style="cursor: pointer;" onclick="App.utils.search.handleSearchClick()">search</i>
         <input placeholder="検索" id="search-input" onkeydown="App.utils.search.handleSearchKeydown(event)"
-            oninput="App.utils.search.handleSearchInput(event)" onfocus="App.utils.search.handleSearchFocus(event)"
             onblur="App.utils.search.handleSearchBlur(event)">
         <div class="l tooltip right round left-padding right-padding">
             <p>タスク名を検索します</p>
@@ -151,7 +150,7 @@
                 const apps = App.state.data.apps || [];
 
                 if (apps.length === 0) {
-                    appsGrid.innerHTML = '<div class="padding center-align row"><p>リンクがありません</p></div>';
+                    appsGrid.innerHTML = '<div class="padding center-align row"><i class="tiny">info</i><span>リンクがありません</span></div>';
                     return;
                 }
 
@@ -159,7 +158,7 @@
                 const appsHtml = apps.map(app => {
 
                     return `
-                        <article class="background no-elevate small-round small-margin row" onclick="window.open('${app.url}', '_blank', 'noopener noreferrer')" style="cursor: pointer;">
+                        <article class="background no-elevate small-round small-margin row" onclick="window.open('${app.url}', '_blank', 'noopener noreferrer')">
                             <img class="square tiny small-round" src="https:\/\/t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${app.url}&size=128"
                                 alt="${app.name}">
                             <span class="no-wrap">${app.name}</span>
@@ -349,7 +348,7 @@
                         }
 
                         return `
-                            <article class="no-elevate padding top-align row small-margin small-round ${readClass}" style="cursor: pointer;"
+                            <article class="no-elevate padding top-align row small-margin small-round ${readClass}"
                                onclick="App.utils.header.comments.openComment('${comment.id}', '${comment.task_id}', '${comment.task_board_id}')">
                                 <div><i class="circle extra">${avatarHtml}</i></div>
                                 <div class="max">
@@ -436,135 +435,6 @@
         if (!App.utils) App.utils = {};
 
         App.utils.search = {
-            showIdSearchLoading: function () {
-                const container = document.getElementById('id-search-container');
-                if (container) {
-                    container.classList.add('id-search-loading');
-                }
-            },
-
-            hideIdSearchLoading: function () {
-                const container = document.getElementById('id-search-container');
-                if (container) {
-                    container.classList.remove('id-search-loading');
-                }
-            },
-
-            clearIdSearchInput: function () {
-                const input = document.getElementById('id-search-input');
-                if (!input) return;
-
-                input.value = '';
-                input.placeholder = 'ID検索';
-            },
-
-            // ID検索の共通処理
-            executeIdSearch: function (searchValue) {
-                if (!searchValue) return;
-
-                // 1. "P0001-W0001" 形式の対応 (最後のIDをターゲットにする)
-                const parts = searchValue.split('-');
-                const targetCode = parts[parts.length - 1];
-
-                // 検索実行
-                App.utils.search.showIdSearchLoading();
-                callGAS('searchByCode', targetCode)
-                    .then(result => {
-                        App.utils.search.hideIdSearchLoading();
-
-                        // 検索ボックスからフォーカスを外す
-                        const input = document.getElementById('id-search-input');
-                        if (input) {
-                            input.blur();
-                            input.value = searchValue; // 入力値はそのまま保持
-                        }
-
-                        if (!result) {
-                            alert('該当するデータが見つかりません');
-                            return;
-                        }
-
-                        const { item, tableName } = result;
-
-                        // テーブル名に応じた処理
-                        if (tableName === TABLE_NAMES.TASKS) {
-                            App.pages.taskDetail.openDetailModal(item.id);
-                        } else if (tableName === TABLE_NAMES.CREATIVES) {
-                            App.overlays.creativeDetail.openDetailModal(item.id);
-                        } else if (tableName === TABLE_NAMES.PLANS) {
-                            App.pages.planDetail.openDetailModal(item.id);
-                        } else if (tableName === TABLE_NAMES.KNOWLEDGES) {
-                            App.pages.knowledgeDetail.openDetailModal(item.id);
-                        } else {
-                            console.log('Unknown table for search result:', tableName);
-                            alert('このIDタイプの詳細は表示できません: ' + tableName);
-                        }
-                    })
-                    .catch(error => {
-                        App.utils.search.hideIdSearchLoading();
-                        App.utils.error.handle(error);
-                    });
-            },
-
-            handleIdSearchClick: function () {
-                const input = document.getElementById('id-search-input');
-                if (!input) return;
-
-                const searchValue = input.value.trim();
-                App.utils.search.executeIdSearch(searchValue);
-            },
-
-            handleIdSearchFocus: function (event) {
-                const input = event.target;
-                console.log('[DEBUG] handleIdSearchFocus triggered');
-            },
-
-            handleIdSearchBlur: function (event) {
-                const input = event.target;
-                console.log('[DEBUG] handleIdSearchBlur triggered', {
-                    value: input.value,
-                    activeElement: document.activeElement,
-                    isInputFocused: document.activeElement === input
-                });
-            },
-
-            handleIdSearchInput: function (event) {
-                const input = event.target;
-                let value = input.value;
-
-                // 全角英数字を半角に変換
-                value = value.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function (s) {
-                    return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-                });
-
-                // 小文字を大文字に変換
-                value = value.toUpperCase();
-
-                // 許可された文字以外を削除 (ハイフンは許可)
-                value = value.replace(/[^A-Z0-9-]/g, '');
-
-                if (input.value !== value) {
-                    input.value = value;
-                }
-            },
-
-            handleIdSearchKeydown: function (event) {
-                if (event.key === 'Enter' && !event.isComposing) {
-                    event.preventDefault();
-                    const input = event.target;
-                    const searchValue = input.value.trim();
-                    App.utils.search.executeIdSearch(searchValue);
-                }
-            },
-
-            /**
-             * 検索入力時のハンドラー（リアルタイム候補表示）
-             * 現在は無効化（マイボード検索のみ使用）
-             */
-            handleSearchInput: function (event) {
-                // 何もしない（旧システムの検索結果表示を無効化）
-            },
-
             /**
              * キーダウンハンドラー（Enter検索）
              */
@@ -573,14 +443,6 @@
                     event.preventDefault();
                     App.utils.search.handleSearchClick();
                 }
-            },
-
-            /**
-             * フォーカスハンドラー
-             * 現在は無効化（マイボード検索のみ使用）
-             */
-            handleSearchFocus: function (event) {
-                // 何もしない（旧システムの検索結果表示を無効化）
             },
 
             /**
@@ -618,146 +480,6 @@
 
                     // 3. 検索（データ再読み込み）
                     await App.pages.boards.loadData('my-board', false);
-                }
-            },
-
-            /**
-             * ID検索の実行
-             */
-            performIdSearch: function (searchValue) {
-                const parts = searchValue.split('-');
-                const targetCode = parts[parts.length - 1];
-
-                showLoading();
-                callGAS('searchByCode', targetCode)
-                    .then(result => {
-                        hideLoading();
-
-                        if (!result) {
-                            alert('該当するデータが見つかりません');
-                            return;
-                        }
-
-                        const { item, tableName } = result;
-                        App.utils.search.openDetailModal({ item, tableName, id: item.id });
-                    })
-                    .catch(error => {
-                        hideLoading();
-                        App.utils.error.handle(error);
-                    });
-            },
-
-            /**
-             * テキスト検索の実行（フロントエンドデータから検索）
-             */
-            performTextSearch: function (searchValue, searchTarget) {
-                const results = [];
-                const searchLower = searchValue.toLowerCase();
-
-                // 検索対象のテーブルとフィールドを定義
-                const searchConfigs = [
-                    { data: App.state.data.creatives, tableName: TABLE_NAMES.CREATIVES, fields: ['title', 'display_id'] },
-                    { data: App.state.data.plans, tableName: TABLE_NAMES.PLANS, fields: ['title', 'display_id'] },
-                    { data: App.state.data.tasks, tableName: TABLE_NAMES.TASKS, fields: ['title', 'display_id'] },
-                    { data: App.state.data.members, tableName: TABLE_NAMES.MEMBERS, fields: ['display_name', 'email'] }
-                ];
-
-                searchConfigs.forEach(config => {
-                    if (!config.data) return;
-
-                    config.data.forEach(item => {
-                        let matches = false;
-
-                        if (searchTarget === 'all') {
-                            // すべてのフィールドを検索
-                            matches = config.fields.some(field => {
-                                const value = item[field];
-                                return value && value.toString().toLowerCase().includes(searchLower);
-                            });
-                        } else if (searchTarget === 'title') {
-                            // タイトルのみ検索
-                            const titleField = config.fields.find(f => f.includes('title') || f.includes('display_name'));
-                            if (titleField) {
-                                const value = item[titleField];
-                                matches = value && value.toString().toLowerCase().includes(searchLower);
-                            }
-                        }
-
-                        if (matches) {
-                            results.push({
-                                item: item,
-                                tableName: config.tableName,
-                                id: item.id,
-                                displayText: `[${config.tableName}] ${item.display_id || item.id}: ${item.title || item.display_name || item.email || ''}`
-                            });
-                        }
-                    });
-                });
-
-                return results.slice(0, 20); // 最大20件
-            },
-
-            /**
-             * 検索結果をドロップダウンに表示
-             */
-            displaySearchResults: function (results) {
-                const resultsMenu = document.getElementById('search-results-menu');
-                if (!resultsMenu) return;
-
-                // 既存の結果（入力項目以外）を削除
-                // 最初のliは入力フィールドなので残す
-                const listItems = resultsMenu.querySelectorAll('li');
-                for (let i = 1; i < listItems.length; i++) {
-                    resultsMenu.removeChild(listItems[i]);
-                }
-
-                if (results.length === 0) {
-                    resultsMenu.classList.add('active');
-                    return;
-                }
-
-                // 新しい結果を追加
-                const newResultsHtml = results.map(result => {
-                    return `
-                                <li><i>open_in_new</i><a style="cursor: pointer;" onclick='App.utils.search.openDetailModalFromSearch(${JSON.stringify(result).replace(/'/g, "\\'")}); event.stopPropagation();'>
-                                    <span class="small-text">${escapeHtml(result.displayText)}</span>
-                                </a></li>
-                    `;
-                }).join('');
-
-                resultsMenu.insertAdjacentHTML('beforeend', newResultsHtml);
-
-                resultsMenu.style.display = 'block';
-            },
-
-            /**
-             * 検索結果から詳細モーダルを開く（グローバル関数）
-             */
-            openDetailModalFromSearch: function (result) {
-                App.utils.search.openDetailModal(result);
-                const resultsMenu = document.getElementById('search-results-menu');
-                if (resultsMenu) resultsMenu.style.display = 'none';
-                const input = document.getElementById('search-input');
-                if (input) input.value = '';
-            },
-
-            /**
-             * テーブル名に応じた詳細モーダルを開く
-             */
-            openDetailModal: function (result) {
-                const { tableName, id } = result;
-
-                if (tableName === TABLE_NAMES.CREATIVES && App.overlays.creativeDetail) {
-                    App.overlays.creativeDetail.open(id);
-                } else if (tableName === TABLE_NAMES.PLANS && App.overlays.planDetail) {
-                    App.overlays.planDetail.open(id);
-                } else if (tableName === TABLE_NAMES.TASKS && App.overlays.taskDetail) {
-                    App.overlays.taskDetail.open(id);
-                } else if (tableName === TABLE_NAMES.MEMBERS && App.overlays.memberDetail) {
-                    App.overlays.memberDetail.open(id);
-                } else {
-                    console.log('Unknown table for search result:', tableName);
-                    alert('このテーブルの詳細は表示できません: ' + tableName);
                 }
             }
         };
