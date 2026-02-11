@@ -136,15 +136,37 @@
 
     // タスク詳細モーダル
     if (params.modal === 'task-detail' && params.task_id) {
-      const currentBoardId = App.pages.boards?.currentBoardId;
-      const boardTasks = (currentBoardId && App.pages.boards?.cachedBoardTasks?.[currentBoardId]) || [];
-      const task = boardTasks.find(t => t.id === params.task_id);
+      // マイボードの場合（board_id='my-board'）、またはボードIDが指定されていない場合は
+      // マイボードとして扱い、フィルタリングして表示
+      if (!params.board_id || params.board_id === 'my-board') {
+        if (App.utils.navigation && App.utils.navigation.navigateToMyBoardWithTaskName) {
+          App.utils.navigation.navigateToMyBoardWithTaskName(params.task_id);
+          return;
+        }
+      }
 
-      if (task) {
-        App.modals.taskDetail.open(params.task_id, true); // trueでURL更新をスキップ
+      const currentBoardId = params.board_id || App.pages.boards?.currentBoardId;
+      if (!currentBoardId) {
+        // ボードIDが特定できない場合はそのままopen（エラー処理はopenに任せる）
+        App.modals.taskDetail.open(params.task_id, true);
+        return;
+      }
+
+      // 共通関数を使用してタスクを開く
+      if (App.utils.navigation && App.utils.navigation.tryOpenTask) {
+        // まずボードに遷移する (データロードはスキップし、tryOpenTaskに任せる)
+        if (App.utils.navigation.switchTab) {
+          (async () => {
+            await App.utils.navigation.switchTab(`board-${currentBoardId}`, false, false, true);
+            // 遷移後にタスクを開く
+            await App.utils.navigation.tryOpenTask(params.task_id, currentBoardId);
+          })();
+        } else {
+          App.utils.navigation.tryOpenTask(params.task_id, currentBoardId);
+        }
       } else {
-        console.error('Task not found for ID:', params.task_id);
-        console.log(`App.pages.boards?.cachedBoardTasks:`, App.pages.boards?.cachedBoardTasks);
+        // 万が一関数がない場合はフォールバック
+        App.modals.taskDetail.open(params.task_id, true);
       }
     }
     // メンバー詳細モーダル
@@ -894,10 +916,10 @@
     if (text === null || text === undefined) {
       return '';
     }
-    
+
     // まずHTMLエスケープを実行
     const escaped = escapeHtml(text);
-    
+
     // 改行文字を<br>タグに変換
     // \r\nと\nの両方に対応
     return escaped.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
