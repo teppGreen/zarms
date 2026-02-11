@@ -131,10 +131,6 @@
                                     onblur="App.pages.boards.updateBoardName('${board.id}', this.value, this)">
                                 </div>
                                 <div class="medium"></div>
-                                <button class="circle transparent" id="btn-info-${board.id}">
-                                    <i>info</i>
-                                    <div class="tooltip bottom max"><p id="tooltip-description-${board.id}"></p></div>
-                                </button>
                                 <button class="circle transparent" id="btn-share-${board.id}">
                                     <i>share</i>
                                     <div class="tooltip bottom">共有</div>
@@ -146,6 +142,10 @@
                                 <button class="circle transparent" id="btn-star-${board.id}">
                                     <i>star_border</i>
                                     <div class="tooltip bottom">スター</div>
+                                </button>
+                                <button class="circle transparent" id="btn-info-${board.id}">
+                                    <i>info</i>
+                                    <div class="tooltip bottom">ボードの<br>説明</div>
                                 </button>
                             </nav>
                         </header>
@@ -696,11 +696,7 @@
             setupHeaderEvents: function (board) {
                 // Info Button
                 const btnInfo = document.getElementById(`btn-info-${board.id}`);
-                const tooltipDescription = document.getElementById(`tooltip-description-${board.id}`);
-                if (btnInfo && tooltipDescription) {
-                    // tooltipにdescriptionを表示
-                    tooltipDescription.textContent = board.description || 'ボードの説明を追加';
-
+                if (btnInfo) {
                     btnInfo.addEventListener('click', () => {
                         this.openDescriptionModal(board.id);
                     });
@@ -1148,12 +1144,6 @@
 
                 // Optimistic UI update
                 board.description = newDescription;
-
-                // tooltipを更新
-                const tooltipDescription = document.getElementById(`tooltip-description-${boardId}`);
-                if (tooltipDescription) {
-                    tooltipDescription.textContent = newDescription || 'ボードの説明を追加';
-                }
 
                 // 左ナビゲーションを再描画
                 if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
