@@ -394,6 +394,111 @@
                     console.log('[changeH1] h1 found:', h1);
                     h1.innerHTML = '<h1 class="font-title error margin" style="font-size: 1.75rem;">DEV-MODE</h1>';
                 }
+            },
+
+            /**
+             * 指定したタスクを開く（キャッシュになければリフレッシュして再試行）
+             * @param {string} taskId - タスクID
+             * @param {string} boardId - ボードID
+             */
+            tryOpenTask: async function (taskId, boardId) {
+                if (!taskId || !boardId) return;
+
+                // データをロード（まずはキャッシュ優先）
+                await App.pages.boards.loadData(boardId, false);
+
+                // ロード完了後、タスクが存在するか確認
+                let boardTasks = (App.pages.boards.cachedBoardTasks && App.pages.boards.cachedBoardTasks[boardId]) || [];
+                let targetTask = boardTasks.find(t => t.id === taskId);
+
+                if (targetTask) {
+                    // タスクが見つかった場合はモーダルを開く
+                    if (App.modals && App.modals.taskDetail && App.modals.taskDetail.open) {
+                        console.log(`[tryOpenTask] Task found in cache, opening: ${taskId}`);
+                        App.modals.taskDetail.open(taskId, false);
+                    }
+                } else {
+                    // タスクが見つからない場合は強制リフレッシュして再確認
+                    console.log(`[tryOpenTask] Task not found in cache, refreshing board ${boardId}...`);
+                    if (App.pages.boards.loadData) {
+                        await App.pages.boards.loadData(boardId, true);
+                    }
+
+                    // 再度確認
+                    boardTasks = (App.pages.boards.cachedBoardTasks && App.pages.boards.cachedBoardTasks[boardId]) || [];
+                    targetTask = boardTasks.find(t => t.id === taskId);
+
+                    if (targetTask) {
+                        // リフレッシュ後に見つかった場合
+                        if (App.modals && App.modals.taskDetail && App.modals.taskDetail.open) {
+                            console.log(`[tryOpenTask] Task found after refresh, opening: ${taskId}`);
+                            App.modals.taskDetail.open(taskId, false);
+                        }
+                    } else {
+                        // それでも見つからない場合
+                        if (App.modals && App.modals.taskDetail && App.modals.taskDetail.open) {
+                            console.warn(`[tryOpenTask] Task still not found after refresh: ${taskId}`);
+                            App.modals.taskDetail.open(taskId, false);
+                        }
+                    }
+                }
+            },
+
+            /**
+             * 指定したタスク名でマイボードをフィルタして表示
+             * @param {string} taskId - タスクID
+             */
+            navigateToMyBoardWithTaskName: async function (taskId) {
+                if (!taskId) return;
+
+                // 即座にマイボードへ遷移（ロードはスキップ）
+                await this.switchTab('board-my-board', false, false, true);
+
+                // シマーエフェクトを即座に表示
+                if (App.pages.boards && App.pages.boards.renderKanban) {
+                    App.pages.boards.renderKanban('my-board', true);
+                }
+
+                // タスクを検索
+                // まずキャッシュから検索
+                let task = App.state.data.tasks ? App.state.data.tasks.find(t => t.id === taskId) : null;
+                let taskName = task ? task.name : null;
+
+                // キャッシュにない、または詳細が必要な場合はサーバーから取得（handleDatabaseProcessを使用）
+                if (!taskName) {
+                    try {
+                        const response = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
+                            where: { id: ["=", taskId] }
+                        }, null, true); // forceRefresh=true
+
+                        if (response && response.data && response.data.length > 0) {
+                            taskName = response.data[0].name;
+                        }
+                    } catch (e) {
+                        console.error('[navigateToMyBoardWithTaskName] Failed to fetch task:', e);
+                    }
+                }
+
+                if (!taskName) {
+                    console.warn('[navigateToMyBoardWithTaskName] Task name not found for ID:', taskId);
+                    // タスク名が見つからない場合でも、とりあえずマイボードは開く（フィルタなし）
+                }
+
+                // フィルタを設定
+                if (App.pages.boards) {
+                    // フィルタを初期化（自分に関連するタスク）
+                    App.pages.boards.initializeMyBoardFilters(true);
+
+                    if (taskName) {
+                        // タイトルフィルタを設定
+                        App.pages.boards.myBoardFilters.title = taskName;
+                        App.pages.boards.myBoardFilters.titleMatchMode = 'contains'; // 部分一致
+                        console.log(`[navigateToMyBoardWithTaskName] Set filter title: ${taskName}`);
+                    }
+
+                    // タスクを開く処理（共通関数を使用）
+                    await this.tryOpenTask(taskId, 'my-board');
+                }
             }
         };
         App.utils.navigation.renderLoadingPlaceholders();

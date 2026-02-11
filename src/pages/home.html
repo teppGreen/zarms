@@ -323,6 +323,14 @@
 
                 const targetBoardId = boardId || 'my-board';
 
+                // マイボードの場合は新しいナビゲーションを使用
+                if (targetBoardId === 'my-board') {
+                    if (App.utils.navigation && App.utils.navigation.navigateToMyBoardWithTaskName) {
+                        await App.utils.navigation.navigateToMyBoardWithTaskName(taskId);
+                        return;
+                    }
+                }
+
                 // URLパラメータを更新してボードに移動
                 if (App.utils.url && App.utils.url.updateParams) {
                     const newParams = {
@@ -341,8 +349,10 @@
                         await App.pages.boards.waitForBoardLoad(targetBoardId);
                     }
 
-                    // ボードのロード完了後にタスクを開く
-                    App.modals.taskDetail.open(taskId, false);
+                    // タスクを開く処理（共通関数を使用）
+                    if (App.utils.navigation && App.utils.navigation.tryOpenTask) {
+                        await App.utils.navigation.tryOpenTask(taskId, targetBoardId);
+                    }
                 }
             },
 
