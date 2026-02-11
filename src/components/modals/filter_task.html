@@ -40,7 +40,7 @@
                     <i>person_add</i>
                     <span>追加</span>
                 </button>
-                <div id="filter-members-created-by" class="row wrap top-align">
+                <div id="filter-members-created-by" class="row tiny-space wrap top-align">
                     <!-- Chips will be rendered here -->
                 </div>
             </div>
@@ -52,7 +52,7 @@
                     <i>person_add</i>
                     <span>追加</span>
                 </button>
-                <div id="filter-members-processed-by" class="row wrap top-align">
+                <div id="filter-members-processed-by" class="row tiny-space wrap top-align">
                     <!-- Chips will be rendered here -->
                 </div>
             </div>
@@ -64,7 +64,7 @@
                     <i>person_add</i>
                     <span>追加</span>
                 </button>
-                <div id="filter-members-reviewed-by" class="row wrap top-align">
+                <div id="filter-members-reviewed-by" class="row tiny-space wrap top-align">
                     <!-- Chips will be rendered here -->
                 </div>
             </div>
@@ -76,7 +76,7 @@
                     <i>person_add</i>
                     <span>追加</span>
                 </button>
-                <div id="filter-members-received-by" class="row wrap top-align">
+                <div id="filter-members-received-by" class="row tiny-space wrap top-align">
                     <!-- Chips will be rendered here -->
                 </div>
             </div>
@@ -84,7 +84,7 @@
             <div class="row">
                 <label class="checkbox">
                     <input type="checkbox" id="filter-processed-by-include-list-members">
-                    <span>「進行者」に設定した人をリストの担当者からも検索する</span>
+                    <span>「進行者」に設定した人をリストの担当者からも検索</span>
                 </label>
             </div>
         </div>
@@ -148,13 +148,15 @@
             selectMembers: function (role) {
                 this.currentRole = role;
                 const currentFilters = App.pages.boards?.myBoardFilters;
-                const preSelected = currentFilters?.members?.[role] || [];
+                const currentMembers = currentFilters?.members?.[role] || [];
 
                 App.modals.selectMembers.open({
                     multiSelect: true,
-                    preSelected: preSelected,
+                    preSelected: [], // 追加モードのため既存選択は表示しない
                     callback: (selectedIds) => {
-                        this.updateMemberSelection(role, selectedIds);
+                        // 既存メンバーと新規選択メンバーを結合
+                        const mergedIds = Array.from(new Set([...currentMembers, ...selectedIds]));
+                        this.updateMemberSelection(role, mergedIds);
                     }
                 });
             },
@@ -242,7 +244,7 @@
              * メンバーチップを再描画します
              * @param {string} role - ロール（'created_by', 'processed_by'など）
              */
-            renderMemberChips: function(role) {
+            renderMemberChips: function (role) {
                 const filters = App.pages.boards?.myBoardFilters;
                 if (!filters || !filters.members || !filters.members[role]) {
                     return;
