@@ -12,7 +12,7 @@
       cachedTasks: [],
       cachedMembers: {},
       currentFilters: {
-        status: [],
+        status: ['TODO', 'IN_PROGRESS', 'IN_REVIEW'], // デフォルトでDONE以外を表示
         priority: [],
         assignee: null
       },
@@ -24,10 +24,9 @@
         console.log('[MobileBoard] Loading data... isRefresh:', isRefresh);
 
         try {
-          // マイボードのタスクを取得
+          // マイボードのタスクを取得（全ステータスを取得し、フィルタで制御）
           const tasksQuery = {
             where: {
-              task_status_key: ['!=', 'DONE'],
               processed_by: ['=', App.state.userId]
             }
           };
