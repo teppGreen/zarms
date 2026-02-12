@@ -27,6 +27,95 @@
 
       /**
        * タスク詳細モーダルを開く
+       * @param {string} taskId - タスクID
+       * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
+       */
+      create: async function (promptTempValue = '') {
+        const promptValue = prompt('新しいタスクの名前', promptTempValue);
+
+        if (!promptValue) {
+          return;
+        } else if (promptValue === '') {
+          alert('タスク名を入力してください');
+          return;
+        }
+
+        await delay(100);
+
+        const userId = App.state.userId;
+        const taskId = crypto.randomUUID();
+        let boardId = 'my-board';
+
+        const defaultTask = {
+          id: taskId,
+          display_id: '#', // サーバーレスポンス待ち
+          name: promptValue,
+          description: '',
+          task_status_key: 'TODO',
+          priority_key: 'MEDIUM',
+          board_id: boardId,
+          starts_at: formatDateTimeForInput(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 1, 10, 0)),
+          ends_at: formatDateTimeForInput(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 2, 18, 0)),
+          created_by: activeUser.id,
+          processed_by: activeUser.id, // 作成者がデフォルト
+          reviewed_by: activeUser.id, // 作成者がデフォルト
+          received_by: activeUser.id, // 作成者がデフォルト
+          // Display fields for UI
+          created_by_display_name: activeUser.display_name,
+          created_by_profile_photo_url: activeUser.profile_photo_url,
+          reviewed_by_display_name: activeUser.display_name,
+          reviewed_by_profile_photo_url: activeUser.profile_photo_url,
+          received_by_display_name: activeUser.display_name,
+          received_by_profile_photo_url: activeUser.profile_photo_url,
+          processed_by_display_name: activeUser.display_name,
+          processed_by_profile_photo_url: activeUser.profile_photo_url
+        };
+
+        // ローカルデータに追加
+        if (!App.state.data.tasks) {
+          App.state.data.tasks = [];
+        }
+        App.state.data.tasks.push(defaultTask);
+
+        // カレントボードタスクにも追加
+        if (App.pages.mobileBoards && App.pages.mobileBoards.cachedTasks) {
+          const cache = App.pages.mobileBoards.cachedTasks;
+          if (Array.isArray(cache)) {
+            cache.push(defaultTask);
+            App.pages.mobileBoards.renderTasks();
+          }
+        }
+
+        // モーダルを開く
+        this.open(taskId, false, true);
+
+        // サーバーに保存
+        callGAS('handleDatabaseProcess', userId, TABLE_NAMES.TASKS, 'insert', defaultTask)
+          .then(result => {
+            if (result && result.data && result.data.display_id) {
+              // サーバー生成のdisplay_idで更新
+              defaultTask.display_id = result.data.display_id;
+
+              // モーダルが開いていればUI更新
+              if (this.currentId === taskId) {
+                const displayIdEl = document.getElementById('task-display-id');
+                if (displayIdEl) displayIdEl.textContent = `#${defaultTask.display_id}`;
+                this.setupLinkCopyButton(defaultTask);
+                // オリジナルデータも更新（dirtyチェック用）
+                if (this.originalData) {
+                  this.originalData.display_id = result.data.display_id;
+                }
+              }
+            }
+          })
+          .catch(err => {
+            console.error('Failed to create task on server:', err);
+            showSnackbar('タスクの作成に失敗しました', 'error');
+          });
+      },
+
+      /**
+       * タスク詳細モーダルを開く
        */
       open: async function (taskId) {
         console.log('[MobileTaskDetail] Opening task:', taskId);
