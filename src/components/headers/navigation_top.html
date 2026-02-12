@@ -9,7 +9,7 @@
         <menu id="new-button-dropdown" class="s m bottom transparent no-wrap"
             onclick="App.utils.header.closeNewButtonDropdown()">
             <li>
-                <button class="fill large-elevate" onclick="App.modals.taskDetail.create()">
+                <button class="fill large-elevate" onclick="App.modals.newTask.open()">
                     <i>add_task</i>
                     <span>タスク</span>
                     <div class="tooltip right round left-padding right-padding">
@@ -41,33 +41,14 @@
         </menu>
 
         <!-- デスクトップ用 -->
-        <nav class="l primary group split">
-            <button class="left-round large" onclick="App.modals.taskDetail.create()">
-                <i>add_task</i>
-                <span>タスク</span>
-                <div class="tooltip right round left-padding right-padding">
-                    <p>新しいタスクを作成します</p>
-                    <span><i class="tiny no-padding no-margin">keyboard_option_key</i>T</span>
-                </div>
-            </button>
-            <button class="right-round square large">
-                <i>keyboard_arrow_down</i>
-                <menu class="right no-wrap">
-                    <li>
-                        <a onclick="App.modals.taskDetail.create()">
-                            <i>add</i>
-                            <span>タスクを作成する</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a onclick="App.modals.newTask.open()">
-                            <i>auto_awesome</i>
-                            <span>タスク作成アシスタント</span>
-                        </a>
-                    </li>
-                </menu>
-            </button>
-        </nav>
+        <button class="l primary large round" onclick="App.modals.newTask.open()">
+            <i>add_task</i>
+            <span>タスク</span>
+            <div class="tooltip right round left-padding right-padding">
+                <p>新しいタスクを作成します</p>
+                <span><i class="tiny no-padding no-margin">keyboard_option_key</i>T</span>
+            </div>
+        </button>
 
         <button class="l large round border" onclick="App.pages.boards.createBoard()">
             <i>create_new_folder</i>
@@ -522,7 +503,7 @@
                             <i class="small">info</i>
                             <span class="bold">ZARMSについて</span>
                         </div>
-                        <span class="small-text">${UI_TEXT.SYSTEM_DESCRIPTION}</span>
+                        <p class="small-text">${UI_TEXT.SYSTEM_DESCRIPTION}</p>
                     </div>
                 `;
 
@@ -532,7 +513,7 @@
                     html += updates.map(update => {
                         // アップデート日時のフォーマット
                         const createdAt = update.created_at
-                            ? formatDateTimeForDisplay(update.created_at, 'yyyy/MM/dd')
+                            ? formatDateTimeForDisplay(update.created_at, 'yyyy/MM/dd(E)')
                             : '';
 
                         // 説明文の改行を反映
@@ -543,11 +524,13 @@
                         return `
                             <article class="no-elevate padding top-align small-margin small-round background">
                                 <div>
-                                    <div class="row">
-                                        <span class="bold small-text font-number">${escapeHtml(update.version || '')}</span>
-                                        <span class="small-text secondary-text font-number">${createdAt}</span>
+                                    <div class="row no-margin tiny-space">
+                                        <span class="small-text secondary-text">${createdAt}</span>
                                     </div>
-                                    <div class="bold small-text">${escapeHtml(update.title || '')}</div>
+                                    <div class="row bold no-margin tiny-space small-text">
+                                        <span class="font-number">${escapeHtml(update.version || '')}</span>
+                                        <span>${escapeHtml(update.title || '')}</span>
+                                    </div>
                                     <div class="tiny-space"></div>
                                     <div class="small-text">${description}</div>
                                 </div>
