@@ -29,6 +29,10 @@
           <input type="checkbox" id="filter-status-in-review" value="IN_REVIEW">
           <span>確認中</span>
         </label>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-status-done" value="DONE">
+          <span>完了</span>
+        </label>
       </fieldset>
 
       <!-- 優先度 -->
@@ -90,6 +94,7 @@
         document.getElementById('filter-status-todo').checked = filters.status.includes('TODO');
         document.getElementById('filter-status-in-progress').checked = filters.status.includes('IN_PROGRESS');
         document.getElementById('filter-status-in-review').checked = filters.status.includes('IN_REVIEW');
+        document.getElementById('filter-status-done').checked = filters.status.includes('DONE');
 
         // 優先度
         document.getElementById('filter-priority-low').checked = filters.priority.includes('LOW');
@@ -110,6 +115,9 @@
         }
         if (document.getElementById('filter-status-in-review')?.checked) {
           statusFilters.push('IN_REVIEW');
+        }
+        if (document.getElementById('filter-status-done')?.checked) {
+          statusFilters.push('DONE');
         }
 
         const priorityFilters = [];
@@ -140,16 +148,17 @@
        * フィルタをリセット
        */
       reset: function () {
-        // すべてのチェックボックスをオフ
-        document.getElementById('filter-status-todo').checked = false;
-        document.getElementById('filter-status-in-progress').checked = false;
-        document.getElementById('filter-status-in-review').checked = false;
+        // デフォルトの状態に戻す（DONE以外をチェック）
+        document.getElementById('filter-status-todo').checked = true;
+        document.getElementById('filter-status-in-progress').checked = true;
+        document.getElementById('filter-status-in-review').checked = true;
+        document.getElementById('filter-status-done').checked = false;
         document.getElementById('filter-priority-low').checked = false;
         document.getElementById('filter-priority-medium').checked = false;
         document.getElementById('filter-priority-high').checked = false;
 
-        // フィルタをリセット
-        App.pages.mobileBoard.currentFilters.status = [];
+        // フィルタをデフォルトに戻す
+        App.pages.mobileBoard.currentFilters.status = ['TODO', 'IN_PROGRESS', 'IN_REVIEW'];
         App.pages.mobileBoard.currentFilters.priority = [];
 
         // タスク一覧を再描画
