@@ -110,8 +110,11 @@
         const processedBy = this.cachedMembers[task.processed_by];
         const assigneeName = processedBy ? escapeHtml(processedBy.display_name) : '未設定';
 
+        // task.idをエスケープ（onclick属性内で使用）
+        const escapedTaskId = escapeHtml(task.id);
+
         return `
-          <article class="mobile-task-card small-margin padding" onclick="App.pages.mobileBoard.openTask('${task.id}')">
+          <article class="mobile-task-card small-margin padding" onclick="App.pages.mobileBoard.openTask('${escapedTaskId}')">
             <div class="row">
               <div class="max">
                 <h6 class="small">${escapeHtml(task.name)}</h6>
