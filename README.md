@@ -69,21 +69,26 @@ zarms/
 │   ├── components/         # 再利用可能なUIコンポーネント
 │   │   ├── headers/        # ヘッダー関連（ナビゲーション）
 │   │   ├── modals/         # 各種モーダル（タスク作成、詳細、選択画面など）
-│   │   │   ├── mobile_*.html  # モバイル版専用モーダル
 │   │   └── popups/         # ポップアップ通知など
 │   ├── pages/              # 各ページのメインコンテンツ
 │   │   ├── board.html      # ボード画面
 │   │   ├── calendar.html   # カレンダー画面
 │   │   ├── home.html       # ダッシュボード（ホーム）画面
-│   │   ├── members.html    # メンバー一覧画面
-│   │   └── mobile_board.html  # モバイル版ボード画面
+│   │   └── members.html    # メンバー一覧画面
+│   ├── mobile/             # モバイル版専用ファイル
+│   │   ├── board.html      # モバイル版ボード画面
+│   │   ├── detail_task.html  # モバイル版タスク詳細画面
+│   │   ├── new_task.html   # モバイル版タスク作成画面
+│   │   ├── quill_editor.html  # モバイル版クイルエディタ画面
+│   │   ├── filter_task.html  # モバイル版フィルタタスク画面
+│   │   ├── menu.html       # モバイル版メニュー画面
+│   │   ├── js.html         # モバイル版フロントエンドロジック
+│   │   └── index.html      # モバイル版のベースHTML
 │   ├── constants.js        # 定数定義（テーブル名、設定値など）
 │   ├── database.js         # データベース操作（Spreadsheet連携）ロジック
 │   ├── main.js             # GASエントリーポイント（doGet, ルーティング）
 │   ├── index.html          # アプリケーションのベースHTML
-│   ├── mobile_index.html   # モバイル版のベースHTML
 │   ├── js.html             # フロントエンドロジック（JavaScript）
-│   ├── mobile_js.html      # モバイル版フロントエンドロジック
 │   └── css.html            # 追加スタイルシート
 ├── docs/                   # ドキュメント関連
 └── README.md               # 本ファイル

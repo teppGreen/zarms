@@ -75,7 +75,7 @@ function loadMobileApp(urlParams) {
     const activeUser = getMemberByEmail(activeUserEmail);
     
     // モバイル版のテンプレートをロード
-    const template = HtmlService.createTemplateFromFile('mobile_index');
+    const template = HtmlService.createTemplateFromFile('mobile/index');
     template.templateVariables = {
       activeUser: activeUser,
       isDevelopment: isDevelopment(urlParams),
