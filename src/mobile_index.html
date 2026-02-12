@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link href="https://cdn.jsdelivr.net/npm/beercss@4.0.6/dist/cdn/beer.min.css" rel="stylesheet" />
+  <script type="module" src="https://cdn.jsdelivr.net/npm/beercss@4.0.6/dist/cdn/beer.min.js"></script>
+  <script type="module"
+    src="https://cdn.jsdelivr.net/npm/material-dynamic-colors@1.1.4/dist/cdn/material-dynamic-colors.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.bubble.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+  <script>
+    window.App = {
+      pages: {},
+      overlays: {},
+      utils: {},
+      constants: {},
+      modals: {},
+      state: {
+        data: {}
+      }
+    };
+  </script>
+  <link rel="preconnect" href="https:\/\/fonts.googleapis.com">
+  <link rel="preconnect" href="https:\/\/fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Google+Sans:opsz,wght@17..18,600&family=Roboto+Mono:wght@500&display=swap"
+    rel="stylesheet">
+  <?!= include('css'); ?>
+  <style>
+    /* モバイル専用の最小限のスタイル */
+    body {
+      overflow-x: hidden;
+    }
+
+    .mobile-task-card {
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .mobile-task-card:active {
+      background-color: var(--surface-variant);
+    }
+  </style>
+</head>
+
+<body class="light">
+  <?!= include('components/popups/error'); ?>
+
+  <div>
+    <!-- モバイル用ヘッダー -->
+    <header class="fixed">
+      <nav>
+        <button class="circle transparent" id="mobile-menu-btn">
+          <i>menu</i>
+        </button>
+        <h6 class="max" id="mobile-header-title">マイボード</h6>
+        <button class="circle transparent" id="mobile-filter-btn">
+          <i>filter_list</i>
+        </button>
+        <button class="circle transparent" id="mobile-new-task-btn">
+          <i>add</i>
+        </button>
+      </nav>
+    </header>
+
+    <!-- メインコンテンツエリア -->
+    <main class="padding top-margin">
+      <?!= include('pages/mobile_board'); ?>
+
+      <!-- モーダル -->
+      <?!= include('components/modals/mobile_detail_task'); ?>
+      <?!= include('components/modals/mobile_new_task'); ?>
+      <?!= include('components/modals/mobile_quill_editor'); ?>
+      <?!= include('components/modals/mobile_filter_task'); ?>
+      <?!= include('components/modals/mobile_menu'); ?>
+    </main>
+  </div>
+
+  <div id="global-snackbar" class="snackbar top"></div>
+
+  <script>
+    const templateVariables = <?!= JSON.stringify(templateVariables) ?>;
+  </script>
+  <?!= include('mobile_js') ?>
+</body>
+
+</html>

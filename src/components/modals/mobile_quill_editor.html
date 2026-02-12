@@ -1,0 +1,147 @@
+<!-- モバイル版Quillエディタモーダル -->
+<dialog id="modal-mobile-quill-editor" class="modal max">
+  <div class="surface-container padding">
+    <!-- ヘッダー -->
+    <nav class="row">
+      <button class="circle transparent" onclick="App.modals.mobileQuillEditor.close()">
+        <i>arrow_back</i>
+      </button>
+      <h6 class="max">説明を編集</h6>
+      <button class="circle transparent" onclick="App.modals.mobileQuillEditor.save()">
+        <i>check</i>
+      </button>
+    </nav>
+
+    <!-- エディタエリア -->
+    <div id="mobile-quill-editor" class="top-margin" style="min-height: 400px; background: white;">
+      <!-- Quillエディタがここに描画される -->
+    </div>
+  </div>
+</dialog>
+
+<script>
+  (function () {
+    App.modals.mobileQuillEditor = {
+      quillInstance: null,
+      originalContent: '',
+
+      /**
+       * Quillエディタモーダルを開く
+       */
+      open: function (content) {
+        console.log('[MobileQuillEditor] Opening editor');
+
+        const dialog = document.getElementById('modal-mobile-quill-editor');
+        if (!dialog) {
+          console.error('[MobileQuillEditor] Dialog not found');
+          return;
+        }
+
+        this.originalContent = content || '';
+
+        dialog.classList.add('active');
+
+        // Quillエディタの初期化（少し遅延させて確実にDOMに追加されてから）
+        setTimeout(() => {
+          this.initQuill();
+        }, 100);
+      },
+
+      /**
+       * Quillエディタを初期化
+       */
+      initQuill: function () {
+        const container = document.getElementById('mobile-quill-editor');
+        if (!container) {
+          console.error('[MobileQuillEditor] Container not found');
+          return;
+        }
+
+        // 既存のエディタをクリア
+        container.innerHTML = '';
+
+        // Quillエディタを作成
+        this.quillInstance = new Quill('#mobile-quill-editor', {
+          theme: 'bubble',
+          placeholder: 'タスクの説明を入力してください...',
+          modules: {
+            toolbar: [
+              ['bold', 'italic', 'underline', 'strike'],
+              ['blockquote', 'code-block'],
+              [{ 'header': 1 }, { 'header': 2 }],
+              [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+              [{ 'script': 'sub' }, { 'script': 'super' }],
+              [{ 'indent': '-1' }, { 'indent': '+1' }],
+              [{ 'direction': 'rtl' }],
+              [{ 'size': ['small', false, 'large', 'huge'] }],
+              [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+              [{ 'color': [] }, { 'background': [] }],
+              [{ 'font': [] }],
+              [{ 'align': [] }],
+              ['clean'],
+              ['link']
+            ]
+          }
+        });
+
+        // コンテンツを設定
+        if (this.originalContent) {
+          this.quillInstance.root.innerHTML = this.originalContent;
+        }
+
+        console.log('[MobileQuillEditor] Quill initialized');
+      },
+
+      /**
+       * 保存
+       */
+      save: function () {
+        if (!this.quillInstance) {
+          console.error('[MobileQuillEditor] Quill instance not found');
+          return;
+        }
+
+        // HTMLコンテンツを取得
+        const newContent = this.quillInstance.root.innerHTML;
+
+        // タスク詳細の description を更新
+        if (App.modals.mobileTaskDetail.currentTask) {
+          App.modals.mobileTaskDetail.currentTask.description = newContent;
+          App.modals.mobileTaskDetail.markAsChanged();
+        }
+
+        showSnackbar('説明を更新しました（保存ボタンを押してください）');
+
+        // モーダルを閉じる
+        this.close();
+      },
+
+      /**
+       * モーダルを閉じる
+       */
+      close: function () {
+        const dialog = document.getElementById('modal-mobile-quill-editor');
+        if (dialog) {
+          dialog.classList.remove('active');
+        }
+
+        // URLパラメータから削除
+        const url = new URL(window.location.href);
+        url.searchParams.delete('editor');
+        window.history.pushState({ task: App.modals.mobileTaskDetail.currentTask?.id }, '', url.toString());
+
+        // Quillインスタンスをクリーンアップ
+        if (this.quillInstance) {
+          this.quillInstance = null;
+        }
+
+        // タスク詳細を再描画
+        if (App.modals.mobileTaskDetail.currentTask) {
+          App.modals.mobileTaskDetail.renderTaskDetail(App.modals.mobileTaskDetail.currentTask);
+        }
+
+        return true;
+      }
+    };
+  })();
+</script>

@@ -1,0 +1,218 @@
+<script>
+  // グローバル変数
+  const { TABLE_NAMES, DIRECTORY_TYPES, TASK_STATUS, UI_TEXT, activeUser } = templateVariables;
+
+  // App.state の初期化
+  (function () {
+    App.state = {
+      data: {
+        boards: [],
+        members: [],
+        tasks: []
+      },
+
+      userId: null,
+      userProperties: templateVariables.userProperties || {},
+      isDevelopment: templateVariables.isDevelopment,
+
+      get: function (tableName) {
+        return this.data[tableName];
+      },
+
+      set: function (tableName, data) {
+        this.data[tableName] = data;
+      }
+    };
+  })();
+
+  window.onload = initializeMobileApp;
+
+  /**
+   * モバイルアプリを初期化
+   */
+  async function initializeMobileApp() {
+    console.log('[MobileApp] Initializing...');
+
+    // ユーザーIDを設定
+    if (activeUser && activeUser.id) {
+      App.state.userId = activeUser.id;
+    }
+
+    // URLパラメータから状態を復元
+    restoreStateFromURL();
+
+    // ブラウザ履歴のハンドラーを設定
+    setupBrowserHistoryHandlers();
+
+    // ヘッダーボタンのイベント設定
+    setupHeaderButtons();
+
+    // データを読み込み
+    await loadMobileData();
+
+    console.log('[MobileApp] Initialization complete');
+  }
+
+  /**
+   * モバイルデータを読み込み
+   */
+  async function loadMobileData() {
+    try {
+      // ボード一覧を取得
+      const boardsRes = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {
+        where: { is_active: ['=', true] }
+      }, null, false);
+      App.state.data.boards = boardsRes?.data || boardsRes || [];
+
+      // マイボードのデータを読み込み
+      await App.pages.mobileBoard.loadData();
+
+    } catch (error) {
+      console.error('[MobileApp] Error loading data:', error);
+      showSnackbar('データの読み込みに失敗しました');
+    }
+  }
+
+  /**
+   * URLパラメータから状態を復元
+   */
+  function restoreStateFromURL() {
+    const url = new URL(window.location.href);
+    const taskId = url.searchParams.get('task');
+    const editor = url.searchParams.get('editor');
+
+    if (taskId) {
+      // タスク詳細を開く
+      setTimeout(() => {
+        App.modals.mobileTaskDetail.open(taskId);
+
+        // エディタも開く場合
+        if (editor === 'description') {
+          setTimeout(() => {
+            App.modals.mobileTaskDetail.openQuillEditor();
+          }, 500);
+        }
+      }, 500);
+    }
+  }
+
+  /**
+   * ブラウザ履歴のハンドラーを設定
+   */
+  function setupBrowserHistoryHandlers() {
+    window.addEventListener('popstate', function (event) {
+      console.log('[MobileApp] Popstate event:', event.state);
+
+      const url = new URL(window.location.href);
+      const taskId = url.searchParams.get('task');
+      const editor = url.searchParams.get('editor');
+
+      // エディタが開いている場合は閉じる
+      const editorDialog = document.getElementById('modal-mobile-quill-editor');
+      if (editorDialog && editorDialog.classList.contains('active')) {
+        if (!editor) {
+          App.modals.mobileQuillEditor.close();
+          return;
+        }
+      }
+
+      // タスク詳細が開いている場合
+      const taskDialog = document.getElementById('modal-mobile-detail-task');
+      if (taskDialog && taskDialog.classList.contains('active')) {
+        if (!taskId) {
+          // タスク詳細を閉じる
+          App.modals.mobileTaskDetail.close(true);
+          return;
+        }
+      }
+
+      // タスクを開く
+      if (taskId && (!taskDialog || !taskDialog.classList.contains('active'))) {
+        App.modals.mobileTaskDetail.open(taskId);
+      }
+    });
+  }
+
+  /**
+   * ヘッダーボタンのイベント設定
+   */
+  function setupHeaderButtons() {
+    // メニューボタン
+    const menuBtn = document.getElementById('mobile-menu-btn');
+    if (menuBtn) {
+      menuBtn.addEventListener('click', function () {
+        App.modals.mobileMenu.open();
+      });
+    }
+
+    // フィルタボタン
+    const filterBtn = document.getElementById('mobile-filter-btn');
+    if (filterBtn) {
+      filterBtn.addEventListener('click', function () {
+        App.modals.mobileFilter.open();
+      });
+    }
+
+    // 新規タスクボタン
+    const newTaskBtn = document.getElementById('mobile-new-task-btn');
+    if (newTaskBtn) {
+      newTaskBtn.addEventListener('click', function () {
+        App.modals.mobileNewTask.open();
+      });
+    }
+  }
+
+  /**
+   * Google Apps Scriptの関数を呼び出す
+   */
+  async function callGAS(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        [functionName](...args);
+    });
+  }
+
+  /**
+   * HTMLエスケープ
+   */
+  function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    };
+    return String(text).replace(/[&<>"']/g, m => map[m]);
+  }
+
+  /**
+   * スナックバーを表示
+   */
+  function showSnackbar(message, duration = 3000) {
+    const snackbar = document.getElementById('global-snackbar');
+    if (!snackbar) return;
+
+    snackbar.textContent = message;
+    snackbar.classList.add('active');
+
+    setTimeout(() => {
+      snackbar.classList.remove('active');
+    }, duration);
+  }
+
+  /**
+   * ローディングを表示\/非表示
+   */
+  function showLoading() {
+    \/\/ モバイル版では簡易的な実装
+    console.log('[MobileApp] Loading...');
+  }
+
+  function hideLoading() {
+    console.log('[MobileApp] Loading complete');
+  }
+</script>

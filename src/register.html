@@ -266,6 +266,36 @@
         // Initialize listeners
         setupInputListeners();
 
+        // モバイル検出: Beer CSSのsクラスが適用される条件 (< 600px) をチェック
+        function isMobileDevice() {
+            return window.innerWidth < 600;
+        }
+
+        // force_desktopフラグのチェック
+        function isForceDesktop() {
+            try {
+                return localStorage.getItem('force_desktop') === 'true';
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // モバイルの場合はモバイル版にリダイレクト（force_desktopがfalseの場合のみ）
+        if (isMobileDevice() && !isForceDesktop()) {
+            console.log('モバイルデバイスを検出しました。モバイル版にリダイレクトします。');
+            google.script.run
+                .withSuccessHandler(function (html) {
+                    document.open();
+                    document.write(html);
+                    document.close();
+                })
+                .withFailureHandler(function (error) {
+                    console.error("loadMobileApp failed:", error);
+                    // エラー時は通常版を継続
+                })
+                .loadMobileApp(urlParams);
+        }
+
         function checkMaintenance() {
             return false; //開発中なのでメンテナンスはしない
 
