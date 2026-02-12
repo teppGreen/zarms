@@ -279,6 +279,11 @@
 
     // ソートが必要な場合
     if (sorted && allModals.length > 0) {
+      // 各要素にDOM内のインデックスを付与（後方ほど大きい値）
+      const allDialogs = Array.from(document.querySelectorAll('dialog'));
+      const domIndexMap = new Map();
+      allDialogs.forEach((el, i) => domIndexMap.set(el, i));
+
       allModals.sort((a, b) => {
         const getPriority = (id) => {
           if (!id) return 0;
@@ -287,8 +292,19 @@
           if (id.startsWith('modal-detail-')) return 1;
           return 0;
         };
-        // 降順ソート (Priorityが高い順)
-        return getPriority(b.id) - getPriority(a.id);
+
+        const priorityA = getPriority(a.id);
+        const priorityB = getPriority(b.id);
+
+        // 優先度が異なる場合は優先度の高い順
+        if (priorityA !== priorityB) {
+          return priorityB - priorityA;
+        }
+
+        // 同一優先度の場合はDOM順の逆順（後方に配置されたものが上＝先に閉じるべき）
+        const indexA = domIndexMap.get(a) ?? 0;
+        const indexB = domIndexMap.get(b) ?? 0;
+        return indexB - indexA;
       });
     }
 
@@ -605,7 +621,7 @@
       // 新規タスク作成
       if (!e.isComposing && e.altKey && e.code === 'KeyT') {
         e.preventDefault();
-        App.modals.taskDetail.create();
+        App.modals.newTask.open();
       }
 
       // 新規ボード作成
@@ -1164,8 +1180,49 @@
     },
 
     /**
+     * モーダルIDからApp.modals内の対応するオブジェクトを自動解決する
+     * 例: 'modal-new-task-preview' -> App.modals.newTaskPreview
+     *     'modal-detail-task' -> App.modals.taskDetail
+     *     'modal-new-task' -> App.modals.newTask
+     * @param {string} modalId - モーダルのID
+     * @returns {Object|null} 対応するApp.modalsオブジェクト
+     */
+    resolveModalHandler: function (modalId) {
+      if (!modalId || !modalId.startsWith('modal-')) return null;
+
+      // 'modal-' プレフィックスを除去
+      const rawName = modalId.replace(/^modal-/, '');
+
+      // IDパターンからApp.modalsのキーを解決するマッピング
+      // パターン: 'type-name(-suffix)' -> 対応するApp.modalsのキー
+      const patterns = [
+        // detail系: 'detail-task' -> 'taskDetail', 'detail-member' -> 'memberDetail'
+        { regex: /^detail-(.+)$/, transform: (m) => m[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase()) + 'Detail' },
+        // new系: 'new-task-preview' -> 'newTaskPreview', 'new-task' -> 'newTask', 'new-comment' -> 'newComment'
+        { regex: /^new-(.+)$/, transform: (m) => 'new' + m[1].split('-').map((s, i) => s.charAt(0).toUpperCase() + s.slice(1)).join('') },
+        // select系: 'select-members' -> 'selectMembers'
+        { regex: /^select-(.+)$/, transform: (m) => 'select' + m[1].split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('') },
+        // filter系: 'filter-task' -> 'filterTask'
+        { regex: /^filter-(.+)$/, transform: (m) => 'filter' + m[1].split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('') },
+      ];
+
+      for (const pattern of patterns) {
+        const match = rawName.match(pattern.regex);
+        if (match) {
+          const key = pattern.transform(match);
+          if (App.modals[key]) {
+            return App.modals[key];
+          }
+        }
+      }
+
+      return null;
+    },
+
+    /**
      * 最も優先度の高いモーダルを1つ閉じる
-     * 優先順位: 'modal-select-' > 'modal-detail-' > その他
+     * 優先順位: 'modal-select-' > 'modal-new-' > 'modal-detail-' > その他
+     * 同一優先度の場合はDOM内で後方に配置されたものから先に閉じる
      * @param {boolean} skipUrlUpdate - URL更新をスキップするかどうか
      * @returns {boolean} モーダルを閉じた場合はtrue
      */
@@ -1177,35 +1234,36 @@
       const modalId = targetModal.id;
       console.log(`[closeTopModal] Closing ${modalId}, skipUrlUpdate: ${skipUrlUpdate}`);
 
-      // 各種具体的なモーダル閉じる処理
-      if (modalId.startsWith('modal-detail-task') && App.modals.taskDetail && App.modals.taskDetail.close) {
-        const closed = App.modals.taskDetail.close(skipUrlUpdate);
-        return closed;
-      } else if (modalId === 'modal-detail-member') {
-        if (App.modals.memberDetail && App.modals.memberDetail.close) {
-          const closed = App.modals.memberDetail.close(skipUrlUpdate);
-          return closed;
-        } else {
-          // 汎用的な閉じる処理
-          if (typeof ui === 'function') {
-            // Beer CSS
-            ui(`#${modalId}`);
-          } else if (typeof targetModal.close === 'function') {
-            try {
-              targetModal.close();
-            } catch (e) {
-              targetModal.removeAttribute('open');
-              targetModal.classList.remove('active');
-            }
-          } else {
-            targetModal.classList.remove('active');
-            targetModal.removeAttribute('open');
-          }
+      // App.modalsから対応するハンドラを自動解決
+      const handler = this.resolveModalHandler(modalId);
+
+      if (handler) {
+        // closePreview メソッドがある場合（プレビュー系モーダル）
+        if (typeof handler.closePreview === 'function' && modalId.includes('-preview')) {
+          handler.closePreview();
+          return true;
         }
-        return true;
+
+        // close メソッドがある場合はそれを使う
+        if (typeof handler.close === 'function') {
+          const result = handler.close(skipUrlUpdate);
+          return result !== false; // falseが返された場合のみfalse扱い
+        }
       }
 
-      // その他のモーダルの場合もデフォルトで閉じる
+      // ハンドラが見つからない場合は汎用的な閉じ処理
+      targetModal.classList.remove('active');
+      targetModal.removeAttribute('open');
+
+      // all-overlayを使用しているモーダルの場合、他にモーダルが開いていなければoverlayも閉じる
+      const remainingModals = getOpenModals(false);
+      if (remainingModals.length === 0) {
+        const allOverlay = document.getElementById('all-overlay');
+        if (allOverlay) allOverlay.classList.remove('active');
+        const overlay = document.getElementById('overlay');
+        if (overlay) overlay.classList.remove('active');
+      }
+
       return true;
     }
   };
