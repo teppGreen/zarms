@@ -1,0 +1,250 @@
+<div id="mobile-board">
+  <!-- タスク一覧表示エリア -->
+  <div id="mobile-tasks-container" class="large-padding">
+    <!-- JavaScriptで動的に生成 -->
+  </div>
+</div>
+
+<script>
+  (function () {
+    App.pages.mobileBoard = {
+      // データのキャッシュ
+      cachedTasks: [],
+      cachedMembers: {},
+      currentFilters: {
+        status: [],
+        priority: [],
+        assignee: null
+      },
+
+      /**
+       * データを読み込んでタスク一覧を表示
+       */
+      loadData: async function (isRefresh = false) {
+        console.log('[MobileBoard] Loading data... isRefresh:', isRefresh);
+
+        try {
+          // マイボードのタスクを取得
+          const tasksQuery = {
+            where: {
+              task_status_key: ['!=', 'DONE'],
+              processed_by: ['=', App.state.userId]
+            }
+          };
+
+          const tasksRes = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', tasksQuery, null, isRefresh);
+          const tasks = tasksRes?.data || tasksRes || [];
+
+          // メンバー情報も取得（担当者名表示用）
+          const membersRes = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {}, null, isRefresh);
+          const members = membersRes?.data || membersRes || [];
+
+          // メンバー情報を辞書化
+          this.cachedMembers = {};
+          members.forEach(m => {
+            this.cachedMembers[m.id] = m;
+          });
+
+          // キャッシュ更新
+          this.cachedTasks = tasks;
+
+          // 描画
+          this.renderTasks(tasks);
+
+          // キャッシュヒット時の再取得（バックグラウンド）
+          if (!isRefresh && (tasksRes?.isCached || membersRes?.isCached)) {
+            console.log('[MobileBoard] Cached data detected. Refreshing in background...');
+            setTimeout(() => {
+              this.loadData(true);
+            }, 100);
+          }
+
+        } catch (error) {
+          console.error('[MobileBoard] Error loading data:', error);
+          this.showError('データの読み込みに失敗しました');
+        }
+      },
+
+      /**
+       * タスク一覧を描画
+       */
+      renderTasks: function (tasks) {
+        const container = document.getElementById('mobile-tasks-container');
+        if (!container) return;
+
+        // フィルタリング
+        let filteredTasks = this.filterTasks(tasks);
+
+        // ソート: 期限が近い順（home.htmlのロジックを使用）
+        filteredTasks = this.sortTasks(filteredTasks);
+
+        // 描画
+        let html = '';
+        if (filteredTasks.length === 0) {
+          html = `
+            <article class="padding center-align">
+              <i class="extra secondary-text">inbox</i>
+              <p class="secondary-text">タスクはありません</p>
+            </article>
+          `;
+        } else {
+          filteredTasks.forEach(task => {
+            html += this.renderTaskCard(task);
+          });
+        }
+
+        container.innerHTML = html;
+      },
+
+      /**
+       * タスクカードを描画
+       */
+      renderTaskCard: function (task) {
+        const statusText = TASK_STATUS[task.task_status_key] || task.task_status_key;
+        const priorityText = { LOW: '低', MEDIUM: '中', HIGH: '高' }[task.priority_key] || '-';
+        
+        // 期限情報の計算
+        const deadlineInfo = this.getDeadlineInfo(task);
+        
+        // 担当者情報
+        const processedBy = this.cachedMembers[task.processed_by];
+        const assigneeName = processedBy ? escapeHtml(processedBy.display_name) : '未設定';
+
+        return `
+          <article class="mobile-task-card small-margin padding" onclick="App.pages.mobileBoard.openTask('${task.id}')">
+            <div class="row">
+              <div class="max">
+                <h6 class="small">${escapeHtml(task.name)}</h6>
+                <p class="small-text secondary-text">#${task.display_id}</p>
+              </div>
+              <div>
+                <span class="chip small ${deadlineInfo.class}">${deadlineInfo.text}</span>
+              </div>
+            </div>
+            <div class="row top-margin">
+              <span class="chip small transparent">${statusText}</span>
+              <span class="chip small transparent">優先度: ${priorityText}</span>
+              <div class="max"></div>
+              <span class="small-text secondary-text">${assigneeName}</span>
+            </div>
+          </article>
+        `;
+      },
+
+      /**
+       * 期限情報を取得
+       */
+      getDeadlineInfo: function (task) {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        const isTodo = task.task_status_key === 'TODO';
+        const targetDateStr = isTodo ? task.starts_at : task.ends_at;
+        
+        let text = '-';
+        let cssClass = '';
+        
+        if (targetDateStr) {
+          const targetDate = new Date(targetDateStr);
+          const targetDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+          
+          const diffTime = targetDay - today;
+          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+          
+          const suffix = isTodo ? '開始' : '終了';
+          
+          if (diffDays === 0) {
+            text = `本日${suffix}`;
+            cssClass = 'warning-text';
+          } else if (diffDays > 0) {
+            text = `${diffDays}日後${suffix}`;
+          } else {
+            text = `${Math.abs(diffDays)}日前${suffix}`;
+            cssClass = 'error-text bold';
+          }
+        }
+        
+        return { text, class: cssClass };
+      },
+
+      /**
+       * タスクをソート
+       */
+      sortTasks: function (tasks) {
+        return tasks.slice().sort((a, b) => {
+          const getKeys = (t) => {
+            const isTodo = t.task_status_key === 'TODO';
+            if (isTodo) {
+              return {
+                primary: t.starts_at || '9999-12-31T23:59:59',
+                secondary: t.ends_at || '9999-12-31T23:59:59'
+              };
+            } else {
+              return {
+                primary: t.ends_at || '9999-12-31T23:59:59',
+                secondary: t.starts_at || '9999-12-31T23:59:59'
+              };
+            }
+          };
+
+          const kA = getKeys(a);
+          const kB = getKeys(b);
+
+          if (kA.primary !== kB.primary) return kA.primary.localeCompare(kB.primary);
+          return kA.secondary.localeCompare(kB.secondary);
+        });
+      },
+
+      /**
+       * タスクをフィルタリング
+       */
+      filterTasks: function (tasks) {
+        return tasks.filter(task => {
+          // ステータスフィルタ
+          if (this.currentFilters.status.length > 0) {
+            if (!this.currentFilters.status.includes(task.task_status_key)) {
+              return false;
+            }
+          }
+
+          // 優先度フィルタ
+          if (this.currentFilters.priority.length > 0) {
+            if (!this.currentFilters.priority.includes(task.priority_key)) {
+              return false;
+            }
+          }
+
+          return true;
+        });
+      },
+
+      /**
+       * タスク詳細を開く
+       */
+      openTask: function (taskId) {
+        // URLパラメータを更新（ブラウザ履歴に追加）
+        const url = new URL(window.location.href);
+        url.searchParams.set('task', taskId);
+        window.history.pushState({ task: taskId }, '', url.toString());
+
+        // タスク詳細モーダルを開く
+        App.modals.mobileTaskDetail.open(taskId);
+      },
+
+      /**
+       * エラー表示
+       */
+      showError: function (message) {
+        const container = document.getElementById('mobile-tasks-container');
+        if (!container) return;
+
+        container.innerHTML = `
+          <article class="padding center-align">
+            <i class="extra error-text">error</i>
+            <p class="error-text">${escapeHtml(message)}</p>
+          </article>
+        `;
+      }
+    };
+  })();
+</script>

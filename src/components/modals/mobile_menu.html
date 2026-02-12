@@ -1,0 +1,109 @@
+<!-- モバイル版メニューモーダル -->
+<dialog id="modal-mobile-menu" class="modal max left">
+  <div class="surface-container padding">
+    <!-- ヘッダー -->
+    <nav class="row">
+      <h6 class="max">メニュー</h6>
+      <button class="circle transparent" onclick="App.modals.mobileMenu.close()">
+        <i>close</i>
+      </button>
+    </nav>
+
+    <!-- ユーザー情報 -->
+    <div id="mobile-menu-user" class="top-margin padding">
+      <!-- JavaScriptで動的に生成 -->
+    </div>
+
+    <!-- メニュー項目 -->
+    <div class="top-margin">
+      <a class="row padding" onclick="App.modals.mobileMenu.reloadPage()">
+        <i>refresh</i>
+        <span class="max">再読み込み</span>
+      </a>
+      <a class="row padding" onclick="App.modals.mobileMenu.switchToDesktop()">
+        <i>computer</i>
+        <span class="max">デスクトップ版に切り替え</span>
+      </a>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  (function () {
+    App.modals.mobileMenu = {
+      /**
+       * メニューモーダルを開く
+       */
+      open: function () {
+        console.log('[MobileMenu] Opening modal');
+
+        const dialog = document.getElementById('modal-mobile-menu');
+        if (!dialog) {
+          console.error('[MobileMenu] Dialog not found');
+          return;
+        }
+
+        // ユーザー情報を表示
+        this.renderUserInfo();
+
+        dialog.classList.add('active');
+      },
+
+      /**
+       * ユーザー情報を描画
+       */
+      renderUserInfo: function () {
+        const container = document.getElementById('mobile-menu-user');
+        if (!container) return;
+
+        const user = templateVariables.activeUser;
+        if (!user) return;
+
+        container.innerHTML = `
+          <div class="row">
+            <img src="${escapeHtml(user.profile_photo_url)}" class="circle medium" alt="${escapeHtml(user.display_name)}">
+            <div class="max left-padding">
+              <p class="bold">${escapeHtml(user.display_name)}</p>
+              <p class="small-text secondary-text">${escapeHtml(user.email || '')}</p>
+            </div>
+          </div>
+        `;
+      },
+
+      /**
+       * ページを再読み込み
+       */
+      reloadPage: function () {
+        window.location.reload();
+      },
+
+      /**
+       * デスクトップ版に切り替え
+       */
+      switchToDesktop: function () {
+        if (confirm('デスクトップ版に切り替えますか？\n\n※デスクトップ版は画面サイズが小さい場合、正しく表示されない可能性があります。')) {
+          // ローカルストレージにフラグを保存
+          try {
+            localStorage.setItem('force_desktop', 'true');
+          } catch (e) {
+            console.error('Failed to set localStorage:', e);
+          }
+          
+          // ページをリロード
+          window.location.reload();
+        }
+      },
+
+      /**
+       * モーダルを閉じる
+       */
+      close: function () {
+        const dialog = document.getElementById('modal-mobile-menu');
+        if (dialog) {
+          dialog.classList.remove('active');
+        }
+        return true;
+      }
+    };
+  })();
+</script>
