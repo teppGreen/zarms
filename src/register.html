@@ -280,21 +280,8 @@
             }
         }
 
-        // モバイルの場合はモバイル版にリダイレクト（force_desktopがfalseの場合のみ）
-        if (isMobileDevice() && !isForceDesktop()) {
-            console.log('モバイルデバイスを検出しました。モバイル版にリダイレクトします。');
-            google.script.run
-                .withSuccessHandler(function (html) {
-                    document.open();
-                    document.write(html);
-                    document.close();
-                })
-                .withFailureHandler(function (error) {
-                    console.error("loadMobileApp failed:", error);
-                    // エラー時は通常版を継続
-                })
-                .loadMobileApp(urlParams);
-        }
+        // モバイル検出フラグ
+        const shouldLoadMobile = isMobileDevice() && !isForceDesktop();
 
         function checkMaintenance() {
             return false; //開発中なのでメンテナンスはしない
@@ -312,8 +299,39 @@
         // ページ読み込み時にメンテナンス時間をチェック、問題なければアクセス権限チェックを実行
         if (checkMaintenance()) {
             showMaintenanceStep();
+        } else if (shouldLoadMobile) {
+            // モバイル版をロード
+            console.log('モバイルデバイスを検出しました。モバイル版にリダイレクトします。');
+            checkAccessAndLoadMobile();
         } else {
+            // デスクトップ版をロード
             checkAccess();
+        }
+
+        function checkAccessAndLoadMobile() {
+            google.script.run
+                .withSuccessHandler(function () {
+                    // スプレッドシートのアクセス権限がある
+                    console.log(`スプレッドシートのアクセス権限がある（モバイル版）\nメールアドレス${activeUserEmail}`);
+                    google.script.run
+                        .withSuccessHandler(function (html) {
+                            document.open();
+                            document.write(html);
+                            document.close();
+                        })
+                        .withFailureHandler(function (error) {
+                            console.error("loadMobileApp failed:", error);
+                            // エラー時は入力ステップを表示
+                            showInputStep();
+                        })
+                        .loadMobileApp(urlParams);
+                })
+                .withFailureHandler(function (error) {
+                    // アクセス失敗 -> ステップ0 (エラー) を表示
+                    console.error("Access check failed:", error);
+                    showAccessErrorStep();
+                })
+                .getSpreadsheet();
         }
 
         function checkAccess() {
