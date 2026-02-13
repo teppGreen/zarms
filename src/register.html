@@ -266,22 +266,11 @@
         // Initialize listeners
         setupInputListeners();
 
-        // モバイル検出: Beer CSSのsクラスが適用される条件 (< 600px) をチェック
+        // モバイル検出: Beer CSSのsクラスが適用される条件をチェック
         function isMobileDevice() {
-            return window.innerWidth < 600;
+            const breackPoint_S = 600;
+            return window.innerWidth <= breackPoint_S;
         }
-
-        // force_desktopフラグのチェック
-        function isForceDesktop() {
-            try {
-                return localStorage.getItem('force_desktop') === 'true';
-            } catch (e) {
-                return false;
-            }
-        }
-
-        // モバイル検出フラグ
-        const shouldLoadMobile = isMobileDevice() && !isForceDesktop();
 
         function checkMaintenance() {
             return false; //開発中なのでメンテナンスはしない
@@ -299,7 +288,7 @@
         // ページ読み込み時にメンテナンス時間をチェック、問題なければアクセス権限チェックを実行
         if (checkMaintenance()) {
             showMaintenanceStep();
-        } else if (shouldLoadMobile) {
+        } else if (isMobileDevice()) {
             // モバイル版をロード
             console.log('モバイルデバイスを検出しました。モバイル版にリダイレクトします。');
             checkAccessAndLoadMobile();
