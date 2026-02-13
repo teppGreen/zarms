@@ -32,37 +32,33 @@
 <body class="light">
   <?!= include('components/popups/error'); ?>
 
-  <div>
-    <!-- モバイル用ヘッダー -->
-    <header class="fixed">
-      <nav>
-        <button class="circle transparent" id="mobile-menu-btn">
-          <i>menu</i>
-        </button>
-        <h6 class="max" id="mobile-header-title">マイボード</h6>
-        <button class="circle transparent" id="mobile-filter-btn">
-          <i>filter_list</i>
-        </button>
-        <button class="circle transparent" id="mobile-new-task-btn">
-          <i>add</i>
-        </button>
-      </nav>
-    </header>
-
+  <div class="surface-container">
     <!-- メインコンテンツエリア -->
-    <main class="padding top-margin">
+    <main class="padding">
       <?!= include('mobile/board'); ?>
-
-      <!-- モーダル -->
       <?!= include('mobile/detail_task'); ?>
       <?!= include('mobile/quill_editor'); ?>
       <?!= include('mobile/filter_task'); ?>
-      <?!= include('mobile/menu'); ?>
     </main>
+
+    <footer class="fixed transparent">
+      <div class="left-padding right-padding">
+        <div class="inverse-surface round large-elevate padding large-margin">
+          <div class="left-padding right-padding row">
+            <h1 class="max font-title" style="font-size: 1.75rem;">ZARMS</h1>
+            <button class="circle transparent" id="mobile-filter-btn" onclick="App.modals.mobileFilter.open()">
+              <i>filter_list</i>
+            </button>
+            <button class="circle transparent" id="mobile-new-task-btn" onclick="App.modals.mobileTaskDetail.create()">
+              <i>add</i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <div id="global-snackbar" class="snackbar top"></div>
   </div>
-
-  <div id="global-snackbar" class="snackbar top"></div>
-
   <script>
     const templateVariables = <?!= JSON.stringify(templateVariables) ?>;
   </script>

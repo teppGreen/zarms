@@ -1,6 +1,6 @@
 <div id="mobile-board">
   <!-- タスク一覧表示エリア -->
-  <div id="mobile-tasks-container" class="large-padding">
+  <div id="mobile-tasks-container">
     <!-- JavaScriptで動的に生成 -->
   </div>
 </div>
@@ -101,10 +101,10 @@
       renderTaskCard: function (task) {
         const statusText = TASK_STATUS[task.task_status_key] || task.task_status_key;
         const priorityText = { LOW: '低', MEDIUM: '中', HIGH: '高' }[task.priority_key] || '-';
-        
+
         // 期限情報の計算
         const deadlineInfo = this.getDeadlineInfo(task);
-        
+
         // 担当者情報
         const processedBy = this.cachedMembers[task.processed_by];
         const assigneeName = processedBy ? escapeHtml(processedBy.display_name) : '未設定';
@@ -139,22 +139,22 @@
       getDeadlineInfo: function (task) {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        
+
         const isTodo = task.task_status_key === 'TODO';
         const targetDateStr = isTodo ? task.starts_at : task.ends_at;
-        
+
         let text = '-';
         let cssClass = '';
-        
+
         if (targetDateStr) {
           const targetDate = new Date(targetDateStr);
           const targetDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
-          
+
           const diffTime = targetDay - today;
           const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-          
+
           const suffix = isTodo ? '開始' : '終了';
-          
+
           if (diffDays === 0) {
             text = `本日${suffix}`;
             cssClass = 'warning-text';
@@ -165,7 +165,7 @@
             cssClass = 'error-text bold';
           }
         }
-        
+
         return { text, class: cssClass };
       },
 
