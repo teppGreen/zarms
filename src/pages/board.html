@@ -389,27 +389,45 @@
                             ).join('');
                         } else {
                             const columnTasks = boardTasks.filter(column.filter);
-                            // starts_at、ends_atの順にソート
+                            // ソート実行
                             columnTasks.sort((a, b) => {
-                                // starts_atで比較（nullは最後）
-                                if (!a.starts_at && !b.starts_at) {
-                                    // 両方nullの場合、ends_atで比較
+                                if (column.id === 'done') {
+                                    // 完了列の場合：ends_at、starts_atの順に降順（新しいものが上、nullは最後）
+                                    if (!a.ends_at && !b.ends_at) {
+                                        if (!a.starts_at && !b.starts_at) return 0;
+                                        if (!a.starts_at) return 1;
+                                        if (!b.starts_at) return -1;
+                                        return new Date(b.starts_at) - new Date(a.starts_at);
+                                    }
+                                    if (!a.ends_at) return 1;
+                                    if (!b.ends_at) return -1;
+                                    const endsDiff = new Date(b.ends_at) - new Date(a.ends_at);
+                                    if (endsDiff !== 0) return endsDiff;
+                                    if (!a.starts_at && !b.starts_at) return 0;
+                                    if (!a.starts_at) return 1;
+                                    if (!b.starts_at) return -1;
+                                    return new Date(b.starts_at) - new Date(a.starts_at);
+                                } else {
+                                    // その他の列：starts_at、ends_atの順に昇順（古いものが上、nullは最後）
+                                    if (!a.starts_at && !b.starts_at) {
+                                        // 両方nullの場合、ends_atで比較
+                                        if (!a.ends_at && !b.ends_at) return 0;
+                                        if (!a.ends_at) return 1;
+                                        if (!b.ends_at) return -1;
+                                        return new Date(a.ends_at) - new Date(b.ends_at);
+                                    }
+                                    if (!a.starts_at) return 1;
+                                    if (!b.starts_at) return -1;
+
+                                    const startsDiff = new Date(a.starts_at) - new Date(b.starts_at);
+                                    if (startsDiff !== 0) return startsDiff;
+
+                                    // starts_atが同じ場合、ends_atで比較（nullは最後）
                                     if (!a.ends_at && !b.ends_at) return 0;
                                     if (!a.ends_at) return 1;
                                     if (!b.ends_at) return -1;
                                     return new Date(a.ends_at) - new Date(b.ends_at);
                                 }
-                                if (!a.starts_at) return 1;
-                                if (!b.starts_at) return -1;
-
-                                const startsDiff = new Date(a.starts_at) - new Date(b.starts_at);
-                                if (startsDiff !== 0) return startsDiff;
-
-                                // starts_atが同じ場合、ends_atで比較（nullは最後）
-                                if (!a.ends_at && !b.ends_at) return 0;
-                                if (!a.ends_at) return 1;
-                                if (!b.ends_at) return -1;
-                                return new Date(a.ends_at) - new Date(b.ends_at);
                             });
                             itemsHtml = columnTasks.map(task => this.createTaskCard(task)).join('');
                             countText = columnTasks.length;
