@@ -1218,7 +1218,10 @@ function getCommentNavData(userId, forceRefresh = false) {
 
         // 3. commentsテーブルから related_table = 'tasks' のコメントを取得
         const commentsResult = select(TABLE_NAMES.COMMENTS, {
-            where: { related_table: ['=', 'tasks'] }
+            where: {
+                related_table: ['=', 'tasks'],
+                created_by: ['!=', userId]
+            }
         });
 
         if (!commentsResult || commentsResult.length === 0) {
