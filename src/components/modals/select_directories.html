@@ -24,12 +24,21 @@
                 <label>組織タイプ</label>
             </div>
         </div>
+
+        <!-- 全選択チェックボックス (複数選択時のみ表示) -->
+        <div id="directory-select-all-container" class="row middle-align split-margin" style="display: none;">
+            <label class="checkbox">
+                <input type="checkbox" id="directory-select-all-checkbox"
+                    onchange="App.modals.selectDirectories.toggleSelectAll(this.checked)">
+                <span>すべて選択</span>
+            </label>
+        </div>
     </header>
 
     <div>
         <article class="padding medium no-elevate scroll">
             <!-- 結果リスト（ツリー構造） -->
-            <div id="directory-results-container">
+            <div id="directory-results-container" class="large-line">
                 <table id="directory-tree-table" class="">
                     <tbody id="directory-tree-body">
                         <!-- ツリー行は動的生成 -->
@@ -57,6 +66,7 @@
             expandedNodes: {}, // 展開状態を保持
             searchTerm: '',
             selectedType: '',
+            displayedIds: [], // 表示されているノードのID
 
             open: function (options = {}) {
                 this.callback = options.callback || null;
@@ -65,6 +75,7 @@
                 this.expandedNodes = {}; // リセット
                 this.searchTerm = '';
                 this.selectedType = '';
+                this.displayedIds = [];
 
                 // 検索入力をリセット
                 const searchInput = document.getElementById('directory-search-input');
@@ -162,6 +173,9 @@
                 const tbody = document.getElementById('directory-tree-body');
                 if (!tbody) return;
 
+                // Reset displayed IDs
+                this.displayedIds = [];
+
                 // ツリー構造を構築
                 const tree = this.buildTree(this.allDirectories);
 
@@ -198,6 +212,9 @@
                     if (hasFilter && !((matchesSearch && matchesType) || hasMatchingDescendant(node))) {
                         return;
                     }
+
+                    // このノードは表示される
+                    self.displayedIds.push(node.id);
 
                     const hasChildren = node.children && node.children.length > 0;
                     // フィルタありの場合はデフォルト展開
@@ -259,6 +276,28 @@
                 } else {
                     tbody.innerHTML = html;
                 }
+
+                self.updateSelectAllCheckbox();
+            },
+
+            updateSelectAllCheckbox: function () {
+                const container = document.getElementById('directory-select-all-container');
+                const checkbox = document.getElementById('directory-select-all-checkbox');
+
+                if (this.multiSelect && container) {
+                    container.style.display = '';
+
+                    if (this.displayedIds.length > 0 && checkbox) {
+                        const allSelected = this.displayedIds.every(id => this.selectedIds.includes(id));
+                        checkbox.checked = allSelected;
+                        checkbox.disabled = false;
+                    } else if (checkbox) {
+                        checkbox.checked = false;
+                        checkbox.disabled = true;
+                    }
+                } else if (container) {
+                    container.style.display = 'none';
+                }
             },
 
             /**
@@ -267,6 +306,23 @@
             toggleNode: function (nodeId) {
                 const currentState = this.expandedNodes[nodeId];
                 this.expandedNodes[nodeId] = currentState === false ? true : false;
+                this.renderTree();
+            },
+
+            toggleSelectAll: function (checked) {
+                if (!this.multiSelect) return;
+
+                if (checked) {
+                    // 表示されているものをすべて選択
+                    this.displayedIds.forEach(id => {
+                        if (!this.selectedIds.includes(id)) {
+                            this.selectedIds.push(id);
+                        }
+                    });
+                } else {
+                    // 表示されているものの選択を解除
+                    this.selectedIds = this.selectedIds.filter(id => !this.displayedIds.includes(id));
+                }
                 this.renderTree();
             },
 
@@ -280,6 +336,9 @@
                 } else {
                     this.selectedIds = checked ? [id] : [];
                 }
+                // Update checkbox state (re-render or just call update)
+                // Re-rendering is safest for consistency
+                this.renderTree();
             },
 
             confirm: function () {
