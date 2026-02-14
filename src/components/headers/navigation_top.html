@@ -6,8 +6,7 @@
             onclick="App.utils.header.toggleNewButtonDropdown(event)">
             <i>add</i>
         </button>
-        <menu id="new-button-dropdown" class="s m right no-wrap"
-            onclick="App.utils.header.closeNewButtonDropdown()">
+        <menu id="new-button-dropdown" class="s m right no-wrap" onclick="App.utils.header.closeNewButtonDropdown()">
             <li>
                 <a onclick="App.modals.taskDetail.create()">
                     <i>add_task</i>
@@ -93,6 +92,19 @@
         </button>
     </nav>
 </nav>
+
+<!-- システムアップデート通知モーダル（閉じる手段なし） -->
+<dialog id="modal-system-update" class="modal max large-padding">
+    <div class="large-margin large-padding center-align">
+        <h5 class="bold">アップデートがあります</h5>
+        <p>新しいZARMSを使うために、ページを更新してください</p>
+        <button class="primary extra large-margin responsive" onclick="App.utils.header.systemUpdates.reloadPage(this)">
+            <i>refresh</i>
+            <span>更新</span>
+        </button>
+    </div>
+</dialog>
+
 
 <script>
     (function () {
@@ -455,6 +467,16 @@
                     }, null, true);
 
                     const updates = result?.data || result || [];
+
+                    // 既にデータがキャッシュされている場合、変更を検出
+                    if (this.cachedUpdates && this.isLoaded) {
+                        if (this.hasDataChanged(this.cachedUpdates, updates)) {
+                            console.log('[SystemUpdates] データ変更を検出。更新モーダルを表示します。');
+                            this.showUpdateModal();
+                            return; // モーダル表示後はデータ更新・描画をスキップ
+                        }
+                    }
+
                     this.cachedUpdates = updates;
                     this.isLoaded = true;
                     this.lastUpdatedAt = new Date();
@@ -468,6 +490,42 @@
                         container.innerHTML = '<div class="padding center-align error-text"><i>error_outline</i><span>アップデート情報の読み込みに失敗しました</span></div>';
                     }
                 }
+            },
+
+            /**
+             * 前回と今回のデータを比較して変更があるかどうかを判定
+             * @param {Array} oldData - 前回取得したデータ
+             * @param {Array} newData - 今回取得したデータ
+             * @returns {boolean} 変更がある場合true
+             */
+            hasDataChanged: function (oldData, newData) {
+                if (oldData.length !== newData.length) return true;
+                return JSON.stringify(oldData) !== JSON.stringify(newData);
+            },
+
+            /**
+             * システムアップデートモーダルを表示（閉じる手段なし）
+             */
+            showUpdateModal: function () {
+                const modal = document.getElementById('modal-system-update');
+                if (modal) {
+                    ui('#modal-system-update');
+                }
+            },
+
+            /**
+             * ページをリロード（register.htmlのreloadPageと同じ処理）
+             * @param {HTMLElement} btn - クリックされたボタン要素
+             */
+            reloadPage: function (btn) {
+                if (btn) {
+                    const icon = btn.querySelector('i');
+                    if (icon) {
+                        icon.outerHTML = '<progress class="circle indeterminate small"></progress>';
+                    }
+                    btn.disabled = true;
+                }
+                window.open(scriptUrl, '_top');
             },
 
             /**
@@ -542,6 +600,27 @@
                     console.log('[SystemUpdates] Auto-refreshing...');
                     this.loadData();
                 }, 3600000);
+            },
+
+            // ============================================
+            // テスト用: コンソールから実行可能
+            // App.utils.header.systemUpdates.simulateUpdate()
+            // ============================================
+            /**
+             * [テスト用] キャッシュデータを改変してloadDataを呼び出し、
+             * 変更検出→モーダル表示の挙動をテストします。
+             * ブラウザの開発者コンソールから以下のコマンドで実行:
+             *   App.utils.header.systemUpdates.simulateUpdate()
+             */
+            simulateUpdate: function () {
+                if (!this.cachedUpdates || !this.isLoaded) {
+                    console.warn('[SystemUpdates:TEST] まだデータがロードされていません。先にinfoボタンをクリックしてデータをロードしてください。');
+                    return;
+                }
+                console.log('[SystemUpdates:TEST] キャッシュデータを改変してloadDataを呼び出します...');
+                // キャッシュに存在しないダミーレコードを追加して、loadDataで差分を検出させる
+                this.cachedUpdates = [...this.cachedUpdates, { id: 'test-dummy', title: 'テスト用更新', version: '0.0.0', created_at: new Date().toISOString() }];
+                this.loadData();
             }
         };
     })();
