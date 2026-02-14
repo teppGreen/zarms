@@ -1252,11 +1252,16 @@
       }
 
       // ハンドラが見つからない場合は汎用的な閉じ処理
-      targetModal.classList.remove('active');
-      targetModal.removeAttribute('open');
+      if (typeof ui === 'function') {
+        ui(`#${modalId}`);
+      } else {
+        targetModal.classList.remove('active');
+        targetModal.removeAttribute('open');
+      }
 
       // all-overlayを使用しているモーダルの場合、他にモーダルが開いていなければoverlayも閉じる
       const remainingModals = getOpenModals(false);
+
       if (remainingModals.length === 0) {
         const allOverlay = document.getElementById('all-overlay');
         if (allOverlay) allOverlay.classList.remove('active');
