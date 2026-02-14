@@ -93,33 +93,54 @@
       App.state.userId = activeUser.id;
     }
 
-    // 全データを読み込み
-    await loadAllData();
+    // 全データを読み込み（バックグラウンド更新のPromiseを受け取る）
+    const backgroundUpdatePromise = await loadAllData();
     App.utils.navigation.changeH1();
 
     // データ読み込み前にホームページを表示（ユーザーがタブを切り替えられるようにする）
-    // URLパラメータがある場合はそれを使用、ない場合はhomeを表示
-    console.log('[initializeApp] URL params:', urlParams);
-    let initialTab = 'home';
-    let hasUrlParams = false;
-
-    if (urlParams.tab) {
-      if (urlParams.tab === 'board') {
-        if (urlParams.board_id) {
-          hasUrlParams = true;
-          initialTab = 'board-' + urlParams.board_id;
-        }
-      } else {
-        hasUrlParams = true;
-        initialTab = urlParams.tab;
-      }
-    }
-
+    // まずは必ずHomeを表示
     App.pages.home.loadData();
-    await App.utils.navigation.switchTab(initialTab, true); // trueでURL更新をスキップ
+    await App.utils.navigation.switchTab('home', true);
+
+    console.log('[initializeApp] URL params:', urlParams);
+
+    // URLパラメータに基づいて遷移判定
+    if (urlParams.tab === 'board' && urlParams.board_id) {
+      const targetBoardId = urlParams.board_id;
+      console.log('[initializeApp] Board requested:', targetBoardId);
+
+      // キャッシュ無視の読み込みがある場合は待機
+      if (backgroundUpdatePromise) {
+        console.log('[initializeApp] Waiting for background update to ensure board list is fresh...');
+        await backgroundUpdatePromise;
+        console.log('[initializeApp] Background update finished');
+      }
+
+      // ボードの存在確認
+      const boards = App.state.data.boards || [];
+      const targetBoard = boards.find(b => b.id === targetBoardId || b.display_id === targetBoardId);
+
+      if (targetBoard) {
+        console.log('[initializeApp] Board found, switching:', targetBoard);
+        await App.utils.navigation.switchTab('board-' + targetBoard.id, true);
+      } else {
+        console.warn('[initializeApp] Board not found:', targetBoardId);
+        // ブラウザのアラートで通知
+        alert('ボードが見つかりませんでした\nID: ' + targetBoardId);
+      }
+
+    } else if (urlParams.tab && urlParams.tab !== 'home') {
+      // その他のタブの場合
+      await App.utils.navigation.switchTab(urlParams.tab, true);
+    }
 
     // モーダルパラメータがある場合は該当のモーダルを開く
     if (urlParams.modal) {
+      // タスク詳細の場合は最新データを待機
+      if (urlParams.modal === 'task-detail' && backgroundUpdatePromise) {
+        console.log('[initializeApp] Waiting for background update before opening task modal...');
+        await backgroundUpdatePromise;
+      }
       openModalFromParams(urlParams);
     }
 
@@ -396,88 +417,97 @@
 
       hideLoading();
 
+      let backgroundUpdatePromise = null;
+
       // キャッシュからのデータだった場合、バックグラウンドで最新データを取得して再描画
       if (boardsResult?.isCached === true || appsResult?.isCached === true || membersResult?.isCached === true || directoriesResult?.isCached === true) {
         console.log('キャッシュデータを検出。バックグラウンドで最新データを取得中...');
-        setTimeout(async () => {
-          try {
-            const promises = [];
 
-            if (boardsResult?.isCached === true) {
-              promises.push(
-                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {
-                  columns: ['id', 'display_id', 'name', 'description', 'is_active'],
-                  orderBy: { name: 'asc' }
-                }, null, true)
-              );
-            } else {
-              promises.push(Promise.resolve(boardsResult));
-            }
+        backgroundUpdatePromise = new Promise((resolve) => {
+          setTimeout(async () => {
+            try {
+              const promises = [];
 
-            if (appsResult?.isCached === true) {
-              promises.push(
-                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.APPS, 'select', {}, null, true)
-              );
-            } else {
-              promises.push(Promise.resolve(appsResult));
-            }
+              if (boardsResult?.isCached === true) {
+                promises.push(
+                  callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {
+                    columns: ['id', 'display_id', 'name', 'description', 'is_active'],
+                    orderBy: { name: 'asc' }
+                  }, null, true)
+                );
+              } else {
+                promises.push(Promise.resolve(boardsResult));
+              }
 
-            if (membersResult?.isCached === true) {
-              promises.push(
-                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {}, null, true)
-              );
-            } else {
-              promises.push(Promise.resolve(membersResult));
-            }
+              if (appsResult?.isCached === true) {
+                promises.push(
+                  callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.APPS, 'select', {}, null, true)
+                );
+              } else {
+                promises.push(Promise.resolve(appsResult));
+              }
 
-            if (directoriesResult?.isCached === true) {
-              promises.push(
-                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {}, null, true)
-              );
-            } else {
-              promises.push(Promise.resolve(directoriesResult));
-            }
+              if (membersResult?.isCached === true) {
+                promises.push(
+                  callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {}, null, true)
+                );
+              } else {
+                promises.push(Promise.resolve(membersResult));
+              }
 
-            const [freshBoardsResult, freshAppsResult, freshMembersResult, freshDirectoriesResult] = await Promise.all(promises);
-            const freshBoards = freshBoardsResult?.data || freshBoardsResult || [];
-            const freshApps = freshAppsResult?.data || freshAppsResult || [];
-            const freshMembers = freshMembersResult?.data || freshMembersResult || [];
-            const freshDirectories = freshDirectoriesResult?.data || freshDirectoriesResult || [];
+              if (directoriesResult?.isCached === true) {
+                promises.push(
+                  callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {}, null, true)
+                );
+              } else {
+                promises.push(Promise.resolve(directoriesResult));
+              }
 
-            App.state.data.boards = freshBoards;
-            App.state.data.apps = freshApps;
-            App.state.data.members = freshMembers;
-            App.state.data.directories = freshDirectories;
+              const [freshBoardsResult, freshAppsResult, freshMembersResult, freshDirectoriesResult] = await Promise.all(promises);
+              const freshBoards = freshBoardsResult?.data || freshBoardsResult || [];
+              const freshApps = freshAppsResult?.data || freshAppsResult || [];
+              const freshMembers = freshMembersResult?.data || freshMembersResult || [];
+              const freshDirectories = freshDirectoriesResult?.data || freshDirectoriesResult || [];
 
-            // ナビゲーションを更新
-            if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
-              // 現在のアクティブなボードIDを取得
-              const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#boards-nav a.active');
-              const activeBoardId = activeLink ? activeLink.dataset.boardId : null;
+              App.state.data.boards = freshBoards;
+              App.state.data.apps = freshApps;
+              App.state.data.members = freshMembers;
+              App.state.data.directories = freshDirectories;
 
-              App.utils.navigation.renderBoardsNavigation();
+              // ナビゲーションを更新
+              if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+                // 現在のアクティブなボードIDを取得
+                const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#boards-nav a.active');
+                const activeBoardId = activeLink ? activeLink.dataset.boardId : null;
 
-              // アクティブ状態を復元
-              if (activeBoardId) {
-                const newActiveLink = document.querySelector(`a[data-board-id="${activeBoardId}"]`);
-                if (newActiveLink) {
-                  newActiveLink.classList.add('active');
+                App.utils.navigation.renderBoardsNavigation();
+
+                // アクティブ状態を復元
+                if (activeBoardId) {
+                  const newActiveLink = document.querySelector(`a[data-board-id="${activeBoardId}"]`);
+                  if (newActiveLink) {
+                    newActiveLink.classList.add('active');
+                  }
                 }
               }
+
+              App.pages.boards.initialize();
+
+              if (appsResult?.isCached === true) {
+                App.utils.header.renderApps();
+              }
+
+              console.log('バックグラウンド更新完了');
+            } catch (error) {
+              console.error('バックグラウンド更新エラー:', error);
+            } finally {
+              resolve();
             }
-
-            App.pages.boards.initialize();
-
-            if (appsResult?.isCached === true) {
-              App.utils.header.renderApps();
-            }
-
-            console.log('バックグラウンド更新完了');
-          } catch (error) {
-            console.error('バックグラウンド更新エラー:', error);
-          }
-        }, 100); // 100ms後に実行（メインUIの表示を優先）
+          }, 100); // 100ms後に実行（メインUIの表示を優先）
+        });
       }
+
+      return backgroundUpdatePromise;
 
 
     } catch (error) {
