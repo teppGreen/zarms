@@ -627,19 +627,38 @@
       /**
        * タスクを削除
        */
-      deleteTask: function () {
+      deleteTask: function (targetTaskId = null) {
+        const id = targetTaskId || this.currentId;
+        if (!id) return;
+
+        // 対象タスクのデータを取得
+        let itemToDelete = null;
+        if (targetTaskId && targetTaskId !== this.currentId) {
+          // グローバルデータまたはボードキャッシュから検索
+          if (App.state.data.tasks) {
+            itemToDelete = App.state.data.tasks.find(t => t.id === targetTaskId);
+          }
+          if (!itemToDelete && App.pages.boards && App.pages.boards.currentBoardId) {
+            const cache = App.pages.boards.cachedBoardTasks[App.pages.boards.currentBoardId];
+            if (cache) {
+              itemToDelete = cache.find(t => t.id === targetTaskId);
+            }
+          }
+        } else {
+          itemToDelete = this.currentItem;
+        }
+
         if (!confirm('このタスクを削除しますか？')) {
           return;
         }
 
-        // 変更フラグをクリア
-        this.isDirty = false;
-
-        const id = this.currentId;
-        const currentItem = this.currentItem;
-
-        // モーダルを閉じる
-        this.close(false, true);
+        // モーダルで開いているタスクを削除する場合はモーダルを閉じる
+        if (!targetTaskId || targetTaskId === this.currentId) {
+          // 変更フラグをクリア
+          this.isDirty = false;
+          // モーダルを閉じる
+          this.close(false, true);
+        }
 
         showSnackbar('タスクを削除しました', 'success');
 
@@ -652,8 +671,9 @@
         }
 
         // ボードキャッシュからも削除
-        if (currentItem && currentItem.board_id && App.pages.boards && App.pages.boards.cachedBoardTasks) {
-          const cache = App.pages.boards.cachedBoardTasks[currentItem.board_id];
+        const boardId = itemToDelete ? itemToDelete.board_id : null;
+        if (boardId && App.pages.boards && App.pages.boards.cachedBoardTasks) {
+          const cache = App.pages.boards.cachedBoardTasks[boardId];
           if (cache) {
             const cacheIndex = cache.findIndex(t => t.id === id);
             if (cacheIndex > -1) {
@@ -661,7 +681,7 @@
             }
             // カンバン再描画
             if (App.pages.boards.renderKanban) {
-              App.pages.boards.renderKanban(currentItem.board_id);
+              App.pages.boards.renderKanban(boardId);
             }
           }
         }
@@ -1163,30 +1183,40 @@
         btnCopyLink.parentNode.replaceChild(newBtn, btnCopyLink);
 
         newBtn.addEventListener('click', () => {
-          const currentParams = App.utils.url.getParams();
-          const url = `${scriptUrl}?tab=${currentParams.tab || 'board'}&board_id=${task.board_id}&modal=task-detail&task_id=${task.id}`;
-          const text = `[タスク#${task.display_id}] ${task.name} | ZARMS`;
+          this.shareTask(task);
+        });
+      },
 
-          const htmlContent = `<a href="${url}">[タスク#${task.display_id}] ${escapeHtml(task.name)} | ZARMS</a>`;
-          const textContent = `${text}\n${url}`;
+      /**
+       * タスクを共有
+       * @param {Object} task - タスクオブジェクト
+       */
+      shareTask: function (task) {
+        if (!task) return;
 
-          const blobHtml = new Blob([htmlContent], { type: "text/html" });
-          const blobText = new Blob([textContent], { type: "text/plain" });
+        const currentParams = App.utils.url.getParams();
+        const url = `${scriptUrl}?tab=${currentParams.tab || 'board'}&board_id=${task.board_id}&modal=task-detail&task_id=${task.id}`;
+        const text = `[タスク#${task.display_id}] ${task.name} | ZARMS`;
 
-          const data = [new ClipboardItem({
-            ["text/html"]: blobHtml,
-            ["text/plain"]: blobText
-          })];
+        const htmlContent = `<a href="${url}">[タスク#${task.display_id}] ${escapeHtml(task.name)} | ZARMS</a>`;
+        const textContent = `${text}\n${url}`;
 
-          navigator.clipboard.write(data).then(() => {
-            showSnackbar('このタスクへのリンクをコピーしました。', 'success');
-          }).catch(err => {
-            console.error('Clipboard write failed', err);
-            navigator.clipboard.writeText(textContent).then(() => {
-              showSnackbar('リンクをコピーしました（テキスト形式）', 'success');
-            }).catch(() => {
-              showSnackbar('リンクのコピーに失敗しました', 'error');
-            });
+        const blobHtml = new Blob([htmlContent], { type: "text/html" });
+        const blobText = new Blob([textContent], { type: "text/plain" });
+
+        const data = [new ClipboardItem({
+          ["text/html"]: blobHtml,
+          ["text/plain"]: blobText
+        })];
+
+        navigator.clipboard.write(data).then(() => {
+          showSnackbar('このタスクへのリンクをコピーしました。', 'success');
+        }).catch(err => {
+          console.error('Clipboard write failed', err);
+          navigator.clipboard.writeText(textContent).then(() => {
+            showSnackbar('リンクをコピーしました（テキスト形式）', 'success');
+          }).catch(() => {
+            showSnackbar('リンクのコピーに失敗しました', 'error');
           });
         });
       },
@@ -1203,81 +1233,105 @@
         const newBtn = btnDuplicate.cloneNode(true);
         btnDuplicate.parentNode.replaceChild(newBtn, btnDuplicate);
 
-        newBtn.addEventListener('click', async () => {
+        newBtn.addEventListener('click', () => {
+          this.duplicateTask(task);
+        });
+      },
+
+      /**
+       * タスクを複製
+       * @param {Object} task - タスクオブジェクト
+       */
+      duplicateTask: async function (task) {
+        if (!task) return;
+
+        // モーダルが開いているかつ、対象が現在のタスクの場合
+        const isCurrentTask = this.currentId === task.id;
+        if (isCurrentTask) {
           const result = await this.close(false, false, true);
-          if (!result) {
-            return;
-          }
+          if (!result) return;
+        }
 
-          const promptValue = prompt('新しいタスク名', task.name + ' のコピー');
+        const promptValue = prompt('新しいタスク名', task.name + ' のコピー');
 
-          // キャンセル(null)または空文字の場合は中断
-          if (promptValue === null) {
-            return;
-          } else if (promptValue === '') {
-            alert('タスク名を入力してください');
-            return;
-          }
+        // キャンセル(null)または空文字の場合は中断
+        if (promptValue === null) {
+          return;
+        } else if (promptValue === '') {
+          alert('タスク名を入力してください');
+          return;
+        }
 
+        // モーダルが開いているかつ、対象が現在のタスクの場合、完全に閉じる
+        if (isCurrentTask) {
           this.close(false, true);
-          // 現在のタスクデータをコピー
-          const newTask = { ...task };
+        }
 
-          // 新しい値を設定
-          newTask.name = promptValue;
-          newTask.id = crypto.randomUUID();
-          newTask.display_id = '#';
-          newTask.created_at = new Date().toISOString();
-          newTask.updated_at = new Date().toISOString();
-          newTask.updated_by = App.state.userId;
-          newTask.created_by = App.state.userId;
-          newTask.created_by_display_name = activeUser.display_name;
-          newTask.created_by_profile_photo_url = activeUser.profile_photo_url;
+        // 現在のタスクデータをコピー
+        const newTask = { ...task };
 
-          // ローカルデータに追加
-          if (!App.state.data.tasks) {
-            App.state.data.tasks = [];
+        // 新しい値を設定
+        newTask.name = promptValue;
+        newTask.id = crypto.randomUUID();
+        newTask.display_id = '#';
+        newTask.created_at = new Date().toISOString();
+        newTask.updated_at = new Date().toISOString();
+        newTask.updated_by = App.state.userId;
+        newTask.created_by = App.state.userId;
+        newTask.created_by_display_name = activeUser.display_name;
+        newTask.created_by_profile_photo_url = activeUser.profile_photo_url;
+
+        // ローカルデータに追加
+        if (!App.state.data.tasks) {
+          App.state.data.tasks = [];
+        }
+        App.state.data.tasks.push(newTask);
+
+        // ボードキャッシュにも追加 (表示中のボードと同じであれば、またはMy Board表示中であれば)
+        const currentBoardId = App.pages.boards && App.pages.boards.currentBoardId;
+        if (currentBoardId && (newTask.board_id === currentBoardId || currentBoardId === 'my-board')) {
+          const cache = App.pages.boards.cachedBoardTasks[currentBoardId];
+          if (Array.isArray(cache)) {
+            cache.push(newTask);
+            console.log('newTask is added to cachedBoardTasks', currentBoardId, newTask.id);
           }
-          App.state.data.tasks.push(newTask);
+        }
 
-          // ボードキャッシュにも追加 (表示中のボードと同じであれば、またはMy Board表示中であれば)
-          const currentBoardId = App.pages.boards && App.pages.boards.currentBoardId;
-          if (currentBoardId && (newTask.board_id === currentBoardId || currentBoardId === 'my-board')) {
-            const cache = App.pages.boards.cachedBoardTasks[currentBoardId];
-            if (Array.isArray(cache)) {
-              cache.push(newTask);
-              console.log('newTask is added to cachedBoardTasks', currentBoardId, newTask.id);
-            }
-          }
+        if (currentBoardId && App.pages.boards && App.pages.boards.renderKanban) {
+          App.pages.boards.renderKanban(currentBoardId);
+        }
 
-          await new Promise(resolve => setTimeout(resolve, 500));
-          this.open(newTask.id, false, true);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        this.open(newTask.id, false, true);
 
-          // サーバーに保存
-          callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'insert', newTask)
-            .then(result => {
-              if (result && result.data && result.data.display_id) {
-                // サーバー生成のdisplay_idで更新
-                newTask.display_id = result.data.display_id;
+        // サーバーに保存
+        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'insert', newTask)
+          .then(result => {
+            if (result && result.data && result.data.display_id) {
+              // サーバー生成のdisplay_idで更新
+              newTask.display_id = result.data.display_id;
 
-                // モーダルが開いていればUI更新
-                if (this.currentId === newTask.id) {
-                  const displayIdEl = document.getElementById('task-display-id');
-                  if (displayIdEl) displayIdEl.textContent = `#${newTask.display_id}`;
+              // モーダルが開いていればUI更新
+              if (this.currentId === newTask.id) {
+                const displayIdEl = document.getElementById('task-display-id');
+                if (displayIdEl) displayIdEl.textContent = `#${newTask.display_id}`;
 
-                  this.setupLinkCopyButton(newTask);
+                this.setupLinkCopyButton(newTask);
 
-                  if (this.originalData) {
-                    this.originalData.display_id = result.data.display_id;
-                  }
+                if (this.originalData) {
+                  this.originalData.display_id = result.data.display_id;
                 }
               }
-            })
-            .catch(err => {
-              console.error('Failed to duplicate task:', err);
-              showSnackbar('タスクの複製に失敗しました', 'error');
-            });
-        });
+
+              if (currentBoardId && App.pages.boards && App.pages.boards.renderKanban) {
+                App.pages.boards.renderKanban(currentBoardId);
+              }
+            }
+          })
+          .catch(err => {
+            console.error('Failed to duplicate task:', err);
+            showSnackbar('タスクの複製に失敗しました', 'error');
+          });
       },
 
       /**
