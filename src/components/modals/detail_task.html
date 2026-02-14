@@ -449,6 +449,12 @@
         }
 
         this.loadComments(taskId);
+
+        // トップナビゲーションの通知コメントを既読にする
+        if (App.utils.header && App.utils.header.comments && App.utils.header.comments.markCommentsAsReadByTaskId) {
+          App.utils.header.comments.markCommentsAsReadByTaskId(taskId);
+        }
+
         this.loadLists(taskId);
         this.loadRelatedTasks(taskId);
         this.loadFiles(taskId);

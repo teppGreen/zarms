@@ -409,6 +409,36 @@
 
                     // 更新後の状態を渡してクリーンアップと保存を実行
                     this.checkAndUpdateBadge(this.cachedComments, savedData);
+                },
+
+                /**
+                 * 指定したタスクに関連する未読コメントをすべて既読にする
+                 * @param {string} taskId - タスクID
+                 */
+                markCommentsAsReadByTaskId: function (taskId) {
+                    // キャッシュが無い場合は何もしない（「表示されていない」とみなす）
+                    if (!this.cachedComments || this.cachedComments.length === 0) {
+                        return;
+                    }
+
+                    const savedData = App.state.getUserProperty('comment_read_status', {});
+                    let hasChanges = false;
+
+                    this.cachedComments.forEach(comment => {
+                        // タスクIDが一致 かつ 未読の場合
+                        if (comment.task_id === taskId && savedData[comment.id] !== true) {
+                            savedData[comment.id] = true;
+                            hasChanges = true;
+                        }
+                    });
+
+                    if (hasChanges) {
+                        console.log(`[Comments] Marked comments for task ${taskId} as read.`);
+                        // 更新後の状態を渡してクリーンアップと保存を実行
+                        this.checkAndUpdateBadge(this.cachedComments, savedData);
+                        // 描画を更新（メニューが開いている可能性があるため）
+                        this.render(this.cachedComments);
+                    }
                 }
             }
         };
