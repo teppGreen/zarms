@@ -136,6 +136,7 @@ const EXTERNAL_URLS = {
  */
 const EVENT_CONFIG = {
   FESTIVAL_DATE: '2026-04-24', // リアル会場0日目（準備日）
+  TEMPORARILY_MAINTENANCE: false,
   MAINTENANCE_HOURS: {
     START: 2,  // JST 2:00
     END: 5     // JST 5:00

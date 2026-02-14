@@ -59,19 +59,21 @@
                         <img class="large" src="https://i.gyazo.com/89db588b11cf08f2d14ee3ece99c22dd.png" alt="ZARMS">
                     </div>
                     <h2 class="bold small">メンテナンス中</h2>
-                    <p>現在、システムメンテナンスを行っております。<br>毎日午前2時〜午前5時の間はご利用いただけません。何卒ご了承ください。</p>
                 </div>
                 <div class="s12 m12 l6 large-padding medium-height large-width left-align">
                     <div class="row tiny-space">
                         <i class="extra error-text">build</i>
                     </div>
-                    <p class="large-text bold">メンテナンス中です</p>
-                    <p class="secondary-text">
-                        <span>ご不便をおかけしますが、メンテナンス終了までしばらくお待ちください。</span>
+                    <p class="large-text error-text bold">システムをご利用いただけません</p>
+                    <p>
+                        <!-- <span>毎日午前2時〜午前5時の間は、メンテナンスのためご利用いただけません。<br>
+                            ご不便をおかけしますが、メンテナンス終了までしばらくお待ちください。</span> -->
+                        <span>現在、臨時のメンテナンスを行っております。<br>
+                        ご不便をおかけしますが、再開までしばらくお待ちください。</span>
                     </p>
                     <div class="absolute right bottom large-padding">
                         <nav>
-                            <button onclick="location.reload()" class="primary extra">
+                            <button onclick="reloadPage(this)" class="primary extra">
                                 <i>refresh</i>
                                 <span>再読み込み</span>
                             </button>
@@ -267,7 +269,7 @@
         setupInputListeners();
 
         function checkMaintenance() {
-            return false; //開発中なのでメンテナンスはしない
+            return EVENT_CONFIG.TEMPORARILY_MAINTENANCE;
 
             const now = new Date();
             const jstHours = (now.getUTCHours() + 9) % 24;
