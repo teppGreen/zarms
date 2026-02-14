@@ -15,9 +15,18 @@
             onkeydown="if(event.key === 'Enter' && !event.isComposing) { event.preventDefault(); App.modals.selectTasks.searchTasks(); }">
     </div>
 
+    <!-- 全選択チェックボックス (複数選択時のみ表示) -->
+    <div id="task-select-all-container" class="row left-align margin" style="display: none;">
+        <label class="checkbox">
+            <input type="checkbox" id="task-select-all-checkbox"
+                onchange="App.modals.selectTasks.toggleSelectAll(this.checked)">
+            <span>すべて選択</span>
+        </label>
+    </div>
+
     <!-- 結果リスト -->
     <article id="task-results-container"
-        class="scroll large-width medium-height small-padding small-round small-line background no-elevate">
+        class="scroll large-width medium-height small-padding small-round extra-line background no-elevate">
         <!-- 動的に生成 -->
     </article>
 
@@ -44,6 +53,11 @@
 
                 await ui('#modal-select-tasks');
                 const input = document.getElementById('task-search-input');
+
+                // Reset select all checkbox visibility
+                const selectAllContainer = document.getElementById('task-select-all-container');
+                if (selectAllContainer) selectAllContainer.style.display = 'none';
+
                 input.focus();
                 input.select();
             },
@@ -65,7 +79,7 @@
                         orderBy: {
                             ['display_id']: 'desc'
                         }
-                    },null,true);
+                    }, null, true);
 
                     this.searchResults = results?.data || [];
                     this.renderResults();
@@ -98,7 +112,27 @@
 
             renderResults: function () {
                 const container = document.getElementById('task-results-container');
+                const selectAllContainer = document.getElementById('task-select-all-container');
+                const selectAllCheckbox = document.getElementById('task-select-all-checkbox');
+
                 if (!container) return;
+
+                // 全選択チェックボックスの表示制御
+                if (this.multiSelect && selectAllContainer) {
+                    selectAllContainer.style.display = '';
+
+                    // 全選択状態の更新
+                    if (this.searchResults.length > 0 && selectAllCheckbox) {
+                        const allSelected = this.searchResults.every(t => this.selectedIds.includes(t.id));
+                        selectAllCheckbox.checked = allSelected;
+                        selectAllCheckbox.disabled = false;
+                    } else if (selectAllCheckbox) {
+                        selectAllCheckbox.checked = false;
+                        selectAllCheckbox.disabled = true;
+                    }
+                } else if (selectAllContainer) {
+                    selectAllContainer.style.display = 'none';
+                }
 
                 // 検索結果が0件の場合
                 if (this.searchResults.length === 0) {
@@ -114,7 +148,7 @@
                     const safeId = escapeHtmlAttribute(task.id);
 
                     return `
-                        <div><label class="${this.multiSelect ? 'checkbox' : 'radio'} row middle-align small-space">
+                        <div><label class="${this.multiSelect ? 'checkbox' : 'radio'} left-align small-space">
                             <input type="${this.multiSelect ? 'checkbox' : 'radio'}" 
                                 name="task-select" 
                                 value="${safeId}" 
@@ -129,6 +163,24 @@
                 }).join('');
             },
 
+            toggleSelectAll: function (checked) {
+                if (!this.multiSelect) return;
+
+                if (checked) {
+                    // 表示されているタスクをすべて選択
+                    this.searchResults.forEach(task => {
+                        if (!this.selectedIds.includes(task.id)) {
+                            this.selectedIds.push(task.id);
+                        }
+                    });
+                } else {
+                    // 表示されているタスクの選択を解除
+                    const searchIds = this.searchResults.map(t => t.id);
+                    this.selectedIds = this.selectedIds.filter(id => !searchIds.includes(id));
+                }
+                this.renderResults();
+            },
+
             toggleSelection: function (id, checked) {
                 if (this.multiSelect) {
                     if (checked && !this.selectedIds.includes(id)) {
@@ -136,6 +188,7 @@
                     } else if (!checked) {
                         this.selectedIds = this.selectedIds.filter(sid => sid !== id);
                     }
+                    this.renderResults();
                 } else {
                     this.selectedIds = checked ? [id] : [];
                 }
