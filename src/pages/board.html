@@ -12,6 +12,7 @@
             lastRenderTimes: {}, // ボードごとの最終レンダリング時刻
             cachedBoardTasks: {}, // ボードごとのタスクデータキャッシュ
             clickHandlers: {}, // ボードごとのクリックハンドラーを保持
+            contextMenuHandlers: {}, // ボードごとのコンテキストメニューハンドラーを保持
             loadingPromises: {}, // ボードごとの読み込みPromiseを保持
             // マイボードのフィルタ設定
             myBoardFilters: {},
@@ -453,7 +454,7 @@
                 container.innerHTML = html;
 
                 if (!isLoading) {
-                    this.bindCardClick(container);
+                    this.bindCardEvents(container);
                     this.setupSortable(boardId);
                 }
             },
@@ -506,16 +507,16 @@
             },
 
             /**
-             * カードクリック時の処理（イベント委譲版）
+             * カードのイベント設定（クリック、右クリック）
              */
-            bindCardClick: function (container) {
+            bindCardEvents: function (container) {
                 if (!container) return;
 
                 const containerId = container.id;
 
                 // containerにIDがない場合は処理をスキップ
                 if (!containerId) {
-                    console.warn('[bindCardClick] Container has no ID, skipping event binding');
+                    console.warn('[bindCardEvents] Container has no ID, skipping event binding');
                     return;
                 }
 
@@ -523,10 +524,40 @@
                 if (this.clickHandlers[containerId]) {
                     container.removeEventListener('click', this.clickHandlers[containerId]);
                 }
+                if (this.contextMenuHandlers[containerId]) {
+                    container.removeEventListener('contextmenu', this.contextMenuHandlers[containerId]);
+                }
 
                 // 新しいハンドラーを作成
-                const handler = (e) => {
-                    // カードまたはその子要素がクリックされたかチェック
+                const clickHandler = (e) => {
+                    // メニュー項目のクリック処理
+                    const menuItem = e.target.closest('li[data-action]');
+                    if (menuItem) {
+                        e.stopPropagation();
+                        // 親のカードを取得
+                        const card = menuItem.closest('.kanban-card');
+                        if (card) {
+                            const action = menuItem.dataset.action;
+                            const taskId = card.dataset.eid;
+                            this.handleCardAction(action, taskId);
+
+                            // メニューを閉じる
+                            const menu = card.querySelector('menu');
+                            if (menu) menu.classList.remove('active');
+                        }
+                        return;
+                    }
+
+                    // メニュー内のクリックはイベント伝播を止める（カードクリック扱いしない）
+                    if (e.target.closest('menu')) {
+                        e.stopPropagation();
+                        return;
+                    }
+
+                    // どこかをクリックしたら全てのメニューを閉じる
+                    document.querySelectorAll('.kanban-card menu.active').forEach(m => m.classList.remove('active'));
+
+                    // カードクリック処理
                     const card = e.target.closest('.kanban-card');
                     if (card) {
                         const taskId = card.dataset.eid;
@@ -536,9 +567,29 @@
                     }
                 };
 
+                const contextMenuHandler = (e) => {
+                    const card = e.target.closest('.kanban-card');
+                    if (card) {
+                        e.preventDefault();
+                        e.stopPropagation(); // 他の要素のイベント発火を防ぐ
+
+                        // 他のメニューを閉じる
+                        document.querySelectorAll('.kanban-card menu.active').forEach(m => m.classList.remove('active'));
+
+                        const taskId = card.dataset.eid;
+                        const menu = document.getElementById(`context-menu-${taskId}`);
+                        if (menu) {
+                            menu.classList.add('active');
+                        }
+                    }
+                };
+
                 // ハンドラーを保存して追加
-                this.clickHandlers[containerId] = handler;
-                container.addEventListener('click', handler);
+                this.clickHandlers[containerId] = clickHandler;
+                this.contextMenuHandlers[containerId] = contextMenuHandler; // 保存
+
+                container.addEventListener('click', clickHandler);
+                container.addEventListener('contextmenu', contextMenuHandler);
             },
 
             /**
@@ -1090,7 +1141,7 @@
                 }
 
                 return `
-                <article class="kanban-card elevate small-margin padding${articleClasses}" data-eid="${task.id}" role="button" style="cursor: move;">
+                <article class="kanban-card elevate small-margin padding${articleClasses}" data-eid="${task.id}" role="button" style="cursor: move; position: relative;">
                     <div>
                         <span>${displayId} <strong>${escapeHtml(task.name || '')}</strong></span>
                     </div>
@@ -1100,6 +1151,20 @@
                     <div class="tiny-space row">
                         ${priorityIcon}${assigneeIcons.join('')}
                     </div>
+                    <menu class="surface-container-lowest small-round no-line small-margin no-wrap min" id="context-menu-${task.id}">
+                        <li class="row no-margin" data-action="share">
+                            <i>share</i>
+                            <span>共有</span>
+                        </li>
+                        <li class="row no-margin" data-action="duplicate">
+                            <i>content_copy</i>
+                            <span>複製</span>
+                        </li>
+                        <li class="row no-margin" data-action="delete">
+                            <i>delete</i>
+                            <span>削除</span>
+                        </li>
+                    </menu>
                 </article>
                 `;
             },
@@ -1190,6 +1255,34 @@
                     }
                     alert('ボードの説明の更新に失敗しました');
                 }
+            }
+            ,
+
+            handleCardAction: function (action, taskId) {
+                // タスクオブジェクトを取得
+                let task = this.getTaskById(taskId);
+                if (!task) return;
+
+                if (action === 'share') {
+                    App.modals.taskDetail.shareTask(task);
+                } else if (action === 'duplicate') {
+                    App.modals.taskDetail.duplicateTask(task);
+                } else if (action === 'delete') {
+                    App.modals.taskDetail.deleteTask(taskId);
+                }
+            },
+
+            getTaskById: function (taskId) {
+                const boardId = this.currentBoardId;
+                if (boardId && this.cachedBoardTasks[boardId]) {
+                    const item = this.cachedBoardTasks[boardId].find(t => t.id === taskId);
+                    if (item) return item;
+                }
+                // フォールバック: グローバルキャッシュ
+                if (App.state.data.tasks) {
+                    return App.state.data.tasks.find(t => t.id === taskId);
+                }
+                return null;
             }
         };
     })();
