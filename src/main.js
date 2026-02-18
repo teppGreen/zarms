@@ -200,30 +200,35 @@ function getScriptUrl() {
  * @returns {boolean} 開発モードの場合true
  */
 function isDevelopment(urlParams) {
-  // 1. 引数の urlParams に use_prod_db=true が含まれている場合は強制的に false を返す
-  if (urlParams && urlParams.use_prod_db === 'true') {
-    return false;
-  }
-
-  // 2. UserProperties (doGetで保存したもの) をチェック
   try {
-    const useProdDb = PropertiesService.getUserProperties().getProperty('USE_PROD_DB');
-    if (useProdDb === 'true') {
+    // 1. 引数の urlParams に use_prod_db=true が含まれている場合は強制的に false を返す
+    if (urlParams && urlParams.use_prod_db === 'true') {
       return false;
     }
-  } catch (e) {
-    console.warn('[isDevelopment] Failed to access UserProperties', e);
-  }
 
-  const REGEX = /^https:\/\/script\.google\.com\/a\/.*\/dev.*$/;
-  const url = ScriptApp.getService().getUrl();
+    // 2. UserProperties (doGetで保存したもの) をチェック
+    try {
+      const useProdDb = PropertiesService.getUserProperties().getProperty('USE_PROD_DB');
+      if (useProdDb === 'true') {
+        return false;
+      }
+    } catch (e) {
+      console.warn('[isDevelopment] Failed to access UserProperties', e);
+    }
 
-  // 3. URL自体に直接含まれている可能性も考慮
-  if (url.indexOf('use_prod_db=true') !== -1) {
+    const REGEX = /^https:\/\/script\.google\.com\/a\/.*\/dev.*$/;
+    const url = ScriptApp.getService().getUrl();
+
+    // 3. URL自体に直接含まれている可能性も考慮
+    if (url.indexOf('use_prod_db=true') !== -1) {
+      return false;
+    }
+
+    const result = REGEX.test(url);
+    console.log('[isDevelopment]', url, result, 'urlParams:', urlParams);
+    return result;
+  } catch (error) {
+    console.error('[isDevelopment] Error:', error);
     return false;
   }
-
-  const result = REGEX.test(url);
-  console.log('[isDevelopment]', url, result, 'urlParams:', urlParams);
-  return result;
 }

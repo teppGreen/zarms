@@ -97,11 +97,6 @@
     const backgroundUpdatePromise = await loadAllData();
     App.utils.navigation.changeH1();
 
-    // データ読み込み前にホームページを表示（ユーザーがタブを切り替えられるようにする）
-    // まずは必ずHomeを表示
-    App.pages.home.loadData();
-    await App.utils.navigation.switchTab('home', true);
-
     console.log('[initializeApp] URL params:', urlParams);
 
     // URLパラメータに基づいて遷移判定
@@ -117,7 +112,7 @@
       }
 
       // ボードの存在確認
-      const boards = [...App.state.data.boards, { id: 'my-board', display_id: 'my-board' }];
+      const boards = [...(App.state.data.boards || []), { id: 'my-board', display_id: 'my-board', name: 'My Board' }];
       const targetBoard = boards.find(b => b.id === targetBoardId || b.display_id === targetBoardId);
 
       if (targetBoard) {
@@ -127,11 +122,18 @@
         console.warn('[initializeApp] Board not found:', targetBoardId);
         // ブラウザのアラートで通知
         alert('ボードが見つかりませんでした\nID: ' + targetBoardId);
+        // ボードが見つからない場合はHomeを表示
+        App.pages.home.loadData();
+        await App.utils.navigation.switchTab('home', true);
       }
 
     } else if (urlParams.tab && urlParams.tab !== 'home') {
       // その他のタブの場合
       await App.utils.navigation.switchTab(urlParams.tab, true);
+    } else {
+      // タブ指定がない、またはhomeの場合
+      App.pages.home.loadData();
+      await App.utils.navigation.switchTab('home', true);
     }
 
     // モーダルパラメータがある場合は該当のモーダルを開く
@@ -151,6 +153,12 @@
     // システムアップデートの1時間ごとの自動更新を開始
     if (App.utils.header.systemUpdates) {
       App.utils.header.systemUpdates.startAutoRefresh();
+    }
+
+    // 初期ローディングを削除
+    const initialLoading = document.getElementById('initial-loading');
+    if (initialLoading) {
+      initialLoading.remove();
     }
   }
 
