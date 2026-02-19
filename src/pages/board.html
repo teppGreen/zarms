@@ -442,7 +442,7 @@
                                         <div class="max"></div>
                                         <span class="tiny">${countText}</span>
                                     </div>
-                                    <div class="s12 scroll large-height no-padding kanban-column-items" data-status-id="${column.id}" data-board-id="${boardId}" id="kanban-${boardId}-${column.id}-list">
+                                    <div class="s12 scroll no-padding kanban-column-items" data-status-id="${column.id}" data-board-id="${boardId}" id="kanban-${boardId}-${column.id}-list">
                                         ${itemsHtml}
                                     </div>
                                 </div>
@@ -452,6 +452,37 @@
                 ].join('');
 
                 container.innerHTML = html;
+
+                // 高さ計算と適用
+                try {
+                    const mainElement = document.querySelector('main');
+                    const columnItems = container.querySelectorAll('.kanban-column-items');
+
+                    if (mainElement && columnItems.length > 0) {
+                        const windowHeight = window.innerHeight;
+
+                        // main要素の下部余白（マージン + パディング）を計算
+                        const mainStyle = window.getComputedStyle(mainElement);
+                        const marginBottom = parseFloat(mainStyle.marginBottom) || 0;
+                        const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
+                        // 安全マージンを追加（ブラウザのUIや微妙なズレを考慮）
+                        const buffer = 16;
+                        const offsetBottom = marginBottom + paddingBottom + buffer;
+
+                        columnItems.forEach(item => {
+                            const rect = item.getBoundingClientRect();
+                            // 上端位置が正しく取得できている場合のみ計算
+                            if (rect.top > 0) {
+                                const newHeight = windowHeight - rect.top - offsetBottom;
+                                if (newHeight > 0) {
+                                    item.style.height = `${newHeight}px`;
+                                }
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.error('Height calculation failed:', e);
+                }
 
                 if (!isLoading) {
                     this.bindCardEvents(container);
