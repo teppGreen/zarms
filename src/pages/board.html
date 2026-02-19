@@ -227,7 +227,9 @@
                     return;
                 }
 
-                this.currentBoardId = boardId;
+                if (!isRefresh || !this.currentBoardId) {
+                    this.currentBoardId = boardId;
+                }
 
                 // 読み込みPromiseを作成
                 let resolveLoad;
@@ -362,13 +364,16 @@
                     }
                 ];
 
-                // 既存のSortableインスタンスを破棄
-                Object.values(this.sortableInstances || {}).forEach(instance => {
-                    if (instance && typeof instance.destroy === 'function') {
-                        instance.destroy();
+                // 既存のSortableインスタンスを破棄（当該ボードの列のみ）
+                columns.forEach(column => {
+                    const listId = `kanban-${boardId}-${column.id}-list`;
+                    if (this.sortableInstances && this.sortableInstances[listId]) {
+                        if (typeof this.sortableInstances[listId].destroy === 'function') {
+                            this.sortableInstances[listId].destroy();
+                        }
+                        delete this.sortableInstances[listId];
                     }
                 });
-                this.sortableInstances = {};
 
                 // ローカルキャッシュから取得（loadDataでJOIN済み）
                 const boardTasks = this.cachedBoardTasks[boardId] || [];
