@@ -46,6 +46,9 @@ function doGet(e) {
  * @returns {string} HTMLコンテンツ
  */
 function loadMainApp(activeUser, urlParams) {
+  // 初期データを一括取得（CacheServiceを活用）して埋め込む
+  const initialData = _prefetchInitialData(activeUser.id);
+
   const template = HtmlService.createTemplateFromFile('index');
   template.templateVariables = {
     activeUser: activeUser,
@@ -54,10 +57,112 @@ function loadMainApp(activeUser, urlParams) {
     DIRECTORY_TYPES: DIRECTORY_TYPES,
     TASK_STATUS: TASK_STATUS,
     UI_TEXT: UI_TEXT,
-    userProperties: PropertiesService.getUserProperties().getProperties()
+    userProperties: PropertiesService.getUserProperties().getProperties(),
+    initialData: initialData  // 事前取得したデータを埋め込む
   };
 
   return template.evaluate().getContent();
+}
+
+// ============================================
+// 初期データ一括取得（register.html用）
+// GAS呼び出し1回で 認証チェック + ユーザー取得 + 初期データ取得 を行う
+// ============================================
+
+/**
+ * アプリ起動に必要な全情報を一括取得します（高速化）
+ * register.htmlからの複数回のgoogle.script.run呼び出しを1回にまとめます。
+ * @param {string} email - 現在のユーザーのメールアドレス
+ * @param {Object} urlParams - URLパラメータ
+ * @returns {Object} {
+ *   status: 'ok' | 'unauthorized' | 'not_registered',
+ *   activeUser: Object|null,     // 認証済みメンバー情報
+ *   mainAppHtml: string|null,    // loadMainApp() で生成されたHTML（statusがokの場合）
+ *   error: string|null
+ * }
+ */
+function getInitialAppData(email, urlParams) {
+  try {
+    // 1. スプレッドシートへのアクセス権限確認（throws if no access）
+    getSpreadsheet();
+  } catch (e) {
+    return { status: 'unauthorized', activeUser: null, mainAppHtml: null, error: e.message };
+  }
+
+  try {
+    // 2. メールアドレスからメンバー情報を取得
+    const activeUser = getMemberByEmail(email);
+
+    // 3. アプリのメインHTMLを生成（初期データも埋め込み）
+    const mainAppHtml = loadMainApp(activeUser, urlParams);
+
+    return { status: 'ok', activeUser: activeUser, mainAppHtml: mainAppHtml, error: null };
+  } catch (e) {
+    // ユーザーが見つからない場合はサインアップ画面へ
+    const isNotFound = e.name === 'ValidationError' || (e.message && e.message.includes('not found'));
+    if (isNotFound) {
+      return { status: 'not_registered', activeUser: null, mainAppHtml: null, error: null };
+    }
+    return { status: 'unauthorized', activeUser: null, mainAppHtml: null, error: e.message };
+  }
+}
+
+/**
+ * アプリ起動に必要なマスタデータを一括事前取得（CacheService活用）
+ * @param {string} userId - ユーザーID
+ * @returns {Object} { boards, apps, members, directories, systemUpdates, isCached }
+ */
+function _prefetchInitialData(userId) {
+  const queries = [
+    {
+      key: 'boards',
+      tableName: TABLE_NAMES.BOARDS,
+      operation: 'select',
+      dataObject: { orderBy: { name: 'asc' } },
+      forceRefresh: false
+    },
+    {
+      key: 'apps',
+      tableName: TABLE_NAMES.APPS,
+      operation: 'select',
+      dataObject: {},
+      forceRefresh: false
+    },
+    {
+      key: 'members',
+      tableName: TABLE_NAMES.MEMBERS,
+      operation: 'select',
+      dataObject: {},
+      forceRefresh: false
+    },
+    {
+      key: 'directories',
+      tableName: TABLE_NAMES.DIRECTORIES,
+      operation: 'select',
+      dataObject: {},
+      forceRefresh: false
+    },
+    {
+      key: 'systemUpdates',
+      tableName: TABLE_NAMES.SYSTEM_UPDATES,
+      operation: 'select',
+      dataObject: { orderBy: { created_at: 'desc' } },
+      forceRefresh: true  // 常に最新を取得
+    }
+  ];
+
+  const batchResult = handleBatchDatabaseProcess(userId, queries);
+  const r = batchResult.results || {};
+
+  return {
+    boards: (r.boards?.data || r.boards || []),
+    apps: (r.apps?.data || r.apps || []),
+    members: (r.members?.data || r.members || []),
+    directories: (r.directories?.data || r.directories || []),
+    systemUpdates: (r.systemUpdates?.data || r.systemUpdates || []),
+    // いずれかがキャッシュから取得された場合 true
+    isCached: !batchResult.hasAnyUncached
+  };
 }
 
 // ============================================

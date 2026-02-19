@@ -69,7 +69,7 @@
                         <!-- <span>毎日午前2時〜午前5時の間は、メンテナンスのためご利用いただけません。<br>
                             ご不便をおかけしますが、メンテナンス終了までしばらくお待ちください。</span> -->
                         <span>現在、臨時のメンテナンスを行っております。<br>
-                        ご不便をおかけしますが、再開までしばらくお待ちください。</span>
+                            ご不便をおかけしますが、再開までしばらくお待ちください。</span>
                     </p>
                     <div class="absolute right bottom large-padding">
                         <nav>
@@ -287,36 +287,33 @@
         } else {
             checkAccess();
         }
-
         function checkAccess() {
             google.script.run
-                .withSuccessHandler(function () {
-                    // スプレッドシートのアクセス権限がある
-                    console.log(`スプレッドシートのアクセス権限がある\nメールアドレス${activeUserEmail}`);
-                    google.script.run
-                        .withSuccessHandler(function (activeUser) {
-                            google.script.run
-                                .withSuccessHandler(function (html) {
-                                    document.open();
-                                    document.write(html);
-                                    document.close();
-                                })
-                                .withFailureHandler(function (error) {
-                                    console.error("loadMainApp failed:", error);
-                                })
-                                .loadMainApp(activeUser, urlParams);
-                        })
-                        .withFailureHandler(function (error) {
-                            showInputStep();
-                        })
-                        .getMemberByEmail(activeUserEmail);
+                .withSuccessHandler(function (result) {
+                    if (!result || result.status === 'unauthorized') {
+                        console.error('getInitialAppData failed:', result?.error);
+                        showAccessErrorStep();
+                        return;
+                    }
+                    if (result.status === 'not_registered') {
+                        showInputStep();
+                        return;
+                    }
+                    // status === 'ok': メインアプリHTMLに書き替え
+                    if (result.mainAppHtml) {
+                        document.open();
+                        document.write(result.mainAppHtml);
+                        document.close();
+                    } else {
+                        console.error('getInitialAppData: mainAppHtml is empty');
+                        showAccessErrorStep();
+                    }
                 })
                 .withFailureHandler(function (error) {
-                    // アクセス失敗 -> ステップ0 (エラー) を表示
-                    console.error("Access check failed:", error);
+                    console.error('getInitialAppData failed:', error);
                     showAccessErrorStep();
                 })
-                .getSpreadsheet();
+                .getInitialAppData(activeUserEmail, urlParams);
         }
 
         function showStep(id) {
