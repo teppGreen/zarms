@@ -872,15 +872,23 @@
             this.isDirty = false;
           }
 
-          // メンバーフィールドが更新された場合はボードデータを再読み込み
-          const memberFieldsUpdated = ['processed_by', 'reviewed_by', 'received_by'].some(role => updates.hasOwnProperty(role));
+          // ── cachedBoardTasks も更新（updateLocalDataはApp.state.data.tasksのみ更新するため）──
           const boardId = currentItem.board_id;
+          if (boardId && App.pages.boards && App.pages.boards.cachedBoardTasks) {
+            const cache = App.pages.boards.cachedBoardTasks[boardId];
+            if (Array.isArray(cache)) {
+              const cachedTask = cache.find(t => t.id === id);
+              if (cachedTask) {
+                Object.assign(cachedTask, updates);
+              }
+            }
+          }
+
+          // メンバーフィールドが更新された場合はボードデータを再読み込み（JOINデータを更新するため）
+          const memberFieldsUpdated = ['processed_by', 'reviewed_by', 'received_by'].some(role => updates.hasOwnProperty(role));
 
           if (memberFieldsUpdated && boardId && App.pages.boards && App.pages.boards.loadData) {
-            // JOINデータを含むボードデータを再読み込み
             App.pages.boards.loadData(boardId, true).then(() => {
-              // currentItemは参照なので、loadDataでリストが書き換わると参照が切れる可能性があるが、
-              // IDで最新のものを探し直すことができる
               if (this.currentId === id) {
                 const updatedTask = App.pages.boards.cachedBoardTasks[boardId]?.find(t => t.id === id);
                 if (updatedTask) {
@@ -888,7 +896,7 @@
                   this.originalData = { ...updatedTask };
                   // アバターを再描画
                   const members = App.state.data.members || [];
-                  const getMember = (id) => members.find(m => m.id === id);
+                  const getMember = (memberId) => members.find(m => m.id === memberId);
                   ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
                     const member = getMember(updatedTask[role]);
                     this.renderMemberAvatar(role, member?.display_name, member?.profile_photo_url);
@@ -897,9 +905,10 @@
               }
             });
           } else if (boardId && App.pages.boards && App.pages.boards.renderKanban) {
-            // メンバーフィールド以外の更新の場合はカンバンのみ再描画（Optimistic UIの確認）
+            // メンバーフィールド以外の更新はカンバンを再描画（Optimistic UIの反映）
             App.pages.boards.renderKanban(boardId);
           }
+
         } catch (error) {
           console.error('[TaskDetail] Update exception:', error);
           showSnackbar('更新に失敗しました', 'error');
@@ -907,51 +916,21 @@
           Object.assign(currentItem, originalData);
           rollbackLocalData(TABLE_NAMES.TASKS, id, originalData);
 
+          // cachedBoardTasks もロールバック
+          if (originalData.board_id && App.pages.boards && App.pages.boards.cachedBoardTasks) {
+            const rollbackCache = App.pages.boards.cachedBoardTasks[originalData.board_id];
+            if (Array.isArray(rollbackCache)) {
+              const rollbackTask = rollbackCache.find(t => t.id === id);
+              if (rollbackTask) {
+                Object.assign(rollbackTask, originalData);
+              }
+            }
+          }
+
           // カンバン再描画して元に戻す
           if (originalData.board_id && App.pages.boards && App.pages.boards.renderKanban) {
             App.pages.boards.renderKanban(originalData.board_id);
           }
-          return;
-        }
-
-        console.log('[TaskDetail] Update successful');
-        showSnackbar('変更を保存しました。', 'success');
-
-        // もしこのタスクのモーダルが再度開かれていたら、内部状態を更新
-        if (this.currentId === id) {
-          this.originalData = { ...currentItem };
-          this.originalLists = JSON.parse(JSON.stringify(this.currentLists));
-          this.deletedListIds = [];
-          this.isDirty = false;
-        }
-
-        // メンバーフィールドが更新された場合はボードデータを再読み込み
-        const memberFieldsUpdated = ['processed_by', 'reviewed_by', 'received_by'].some(role => updates.hasOwnProperty(role));
-        const boardId = currentItem.board_id;
-
-        if (memberFieldsUpdated && boardId && App.pages.boards && App.pages.boards.loadData) {
-          // JOINデータを含むボードデータを再読み込み
-          App.pages.boards.loadData(boardId, true).then(() => {
-            // currentItemは参照なので、loadDataでリストが書き換わると参照が切れる可能性があるが、
-            // IDで最新のものを探し直すことができる
-            if (this.currentId === id) {
-              const updatedTask = App.pages.boards.cachedBoardTasks[boardId]?.find(t => t.id === id);
-              if (updatedTask) {
-                this.currentItem = updatedTask;
-                this.originalData = { ...updatedTask };
-                // アバターを再描画
-                const members = App.state.data.members || [];
-                const getMember = (id) => members.find(m => m.id === id);
-                ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
-                  const member = getMember(updatedTask[role]);
-                  this.renderMemberAvatar(role, member?.display_name, member?.profile_photo_url);
-                });
-              }
-            }
-          });
-        } else if (boardId && App.pages.boards && App.pages.boards.renderKanban) {
-          // メンバーフィールド以外の更新の場合はカンバンのみ再描画（Optimistic UIの確認）
-          App.pages.boards.renderKanban(boardId);
         }
       },
 

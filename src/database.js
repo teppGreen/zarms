@@ -969,6 +969,57 @@ function handleDatabaseProcess(userId, tableName, operation, dataObject, remark,
 }
 
 // ============================================
+// Batch Database Process Function
+// ============================================
+
+/**
+ * 複数のデータベース操作を一括処理します（バッチ処理）
+ * フロントエンドからの複数回の google.script.run 呼び出しを1回に削減するための関数。
+ * 各クエリは handleDatabaseProcess と同様に CacheService を使用します。
+ *
+ * @param {string} userId - ユーザーID
+ * @param {Array<Object>} queries - クエリ配列
+ *   各クエリの形式: {
+ *     key: string,            // 結果を識別するためのキー（呼び出し元で使用）
+ *     tableName: string,      // テーブル名
+ *     operation: string,      // 操作種別（現在は 'select' のみ）
+ *     dataObject: Object,     // クエリオブジェクト
+ *     forceRefresh: boolean   // キャッシュを無視するか
+ *   }
+ * @returns {Object} { [key]: { data: Array, isCached: boolean }, ... }
+ */
+function handleBatchDatabaseProcess(userId, queries) {
+    if (!queries || !Array.isArray(queries) || queries.length === 0) {
+        return {};
+    }
+
+    const results = {};
+    let hasAnyUncached = false;
+
+    queries.forEach(query => {
+        try {
+            const { key, tableName, operation, dataObject, forceRefresh } = query;
+            if (!key || !tableName || !operation) {
+                console.warn('[handleBatchDatabaseProcess] Invalid query, skipping:', query);
+                return;
+            }
+
+            const result = handleDatabaseProcess(userId, tableName, operation, dataObject || {}, null, forceRefresh || false);
+            results[key] = result;
+
+            if (result && result.isCached === false) {
+                hasAnyUncached = true;
+            }
+        } catch (error) {
+            console.error(`[handleBatchDatabaseProcess] Error for query ${query.key}:`, error);
+            results[query.key] = { data: [], isCached: false, error: error.message };
+        }
+    });
+
+    return { results, hasAnyUncached };
+}
+
+// ============================================
 // Helper Functions
 // ============================================
 

@@ -1,7 +1,7 @@
 <script>
   // グローバル変数
   // urlParams, EVENT_CONFIG, AUTH_CONFIG, EXTERNAL_URLS は既にregister.htmlで定義済みなので、再定義不要
-  const { TABLE_NAMES, DIRECTORY_TYPES, TASK_STATUS, UI_TEXT, activeUser } = templateVariables;
+  const { TABLE_NAMES, DIRECTORY_TYPES, TASK_STATUS, UI_TEXT, activeUser, initialData } = templateVariables;
 
   // App.state の初期化とデータ管理用関数の定義
   (function () {
@@ -352,162 +352,121 @@
 
   /**
    * 全データを読み込みます（初回ロード用）
-   * boards, apps, members, directoriesを並列で取得します
-   * @returns {Promise<void>}
+   * サーバーサイドで埋め込まれた initialData がある場合はそれを即座に反映します。
+   * データがキャッシュ由来の場合のみ、バックグラウンドで最新データを取得します。
+   * @returns {Promise<Promise|null>} バックグラウンド更新のPromise（なければnull）
    */
   async function loadAllData() {
     try {
-      // boards, apps, members テーブルから並列でデータ取得
-      const [boardsResult, appsResult, membersResult, directoriesResult, systemUpdatesResult] = await Promise.all([
-        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {
-          columns: ['id', 'display_id', 'name', 'description', 'is_active'],
-          orderBy: { name: 'asc' }
-        }),
-        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.APPS, 'select', {}),
-        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {
-          // where: { is_active: ["=", true] } // 全部FALSEになっちゃう不具合　一旦コメントアウト
-        }),
-        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {
-          // where: { is_active: ["=", true] }
-        }),
-        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SYSTEM_UPDATES, 'select', {
-          orderBy: { created_at: 'desc' }
-        }, null, true)
-      ]);
+      // ── Step 1: サーバー埋め込みデータを即座に反映（GAS呼び出しなし）───────────────────
+      const embedded = (typeof initialData !== 'undefined') ? initialData : null;
 
-      // 結果からデータを取得（キャッシュ情報を含む可能性がある）
-      let boards = boardsResult?.data || boardsResult || [];
-      let apps = appsResult?.data || appsResult || [];
-      let members = membersResult?.data || membersResult || [];
-      let directories = directoriesResult?.data || directoriesResult || [];
-      let systemUpdates = systemUpdatesResult?.data || systemUpdatesResult || [];
+      let boards = [];
+      let apps = [];
+      let members = [];
+      let directories = [];
+      let systemUpdates = [];
+      let wasCached = false;
 
-      // App.stateに保存
-      console.log('Boards fetched (minimal):', boards);
-      console.log('Apps fetched:', apps);
-      console.log('Members fetched:', members);
-      console.log('Directories fetched:', directories);
-      console.log('SystemUpdates fetched:', systemUpdates);
+      if (embedded) {
+        boards = embedded.boards || [];
+        apps = embedded.apps || [];
+        members = embedded.members || [];
+        directories = embedded.directories || [];
+        systemUpdates = embedded.systemUpdates || [];
+        wasCached = embedded.isCached || false;
+        console.log('[loadAllData] Server-embedded initialData (isCached:', wasCached, ')');
+      } else {
+        // フォールバック: initialData が埋め込まれていない場合（旧来どおり並列GAS呼び出し）
+        console.log('[loadAllData] No embedded initialData. Fetching via GAS...');
+        const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, [
+          { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: false },
+          { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh: false },
+          { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: false },
+          { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: false },
+          { key: 'systemUpdates', tableName: TABLE_NAMES.SYSTEM_UPDATES, operation: 'select', dataObject: { orderBy: { created_at: 'desc' } }, forceRefresh: true }
+        ]);
+        const r = batchResult?.results || {};
+        boards = r.boards?.data || r.boards || [];
+        apps = r.apps?.data || r.apps || [];
+        members = r.members?.data || r.members || [];
+        directories = r.directories?.data || r.directories || [];
+        systemUpdates = r.systemUpdates?.data || r.systemUpdates || [];
+        wasCached = !batchResult?.hasAnyUncached;
+      }
 
+      // ── Step 2: App.state に反映 ──────────────────────────────────────────────────────
       App.state.data.boards = boards;
       App.state.data.apps = apps;
       App.state.data.members = members;
       App.state.data.directories = directories;
       App.state.data.systemUpdates = systemUpdates;
-
-      // tasks, directoriesは各タブを開いた時に取得するため、ここでは空配列で初期化
       App.state.data.tasks = [];
 
-      // ナビゲーションとボードページを更新（キャッシュデータで先に描画）
+      // ── Step 3: 即座にUIを描画（Render-First） ──────────────────────────────────────────
       App.utils.navigation.renderBoardsNavigation();
       App.pages.boards.initialize();
-
-      // マイボードフィルタを初期化（デフォルト: 現在のユーザー）
       App.pages.boards.initializeMyBoardFilters();
-
-      // メンバー
       App.pages.members.loadData(true);
-
-      // アプリリンクを描画
       App.utils.header.renderApps();
 
-      // システムアップデートデータをキャッシュに反映
       if (App.utils.header.systemUpdates) {
         App.utils.header.systemUpdates.cachedUpdates = systemUpdates;
         App.utils.header.systemUpdates.isLoaded = true;
         App.utils.header.systemUpdates.lastUpdatedAt = new Date();
       }
 
-      // コメントデータをバックグラウンドで初期読み込み（他の描画処理に影響なし）
       if (App.utils.header.comments) {
-        App.utils.header.comments.loadData(false).catch(e => console.warn('[Comments] Background initial load failed:', e));
+        App.utils.header.comments.loadData(false).catch(e =>
+          console.warn('[Comments] Background initial load failed:', e)
+        );
       }
 
       hideLoading();
 
+      // ── Step 4: キャッシュ由来のデータの場合、バックグラウンドで最新化 ─────────────────────
       let backgroundUpdatePromise = null;
 
-      // キャッシュからのデータだった場合、バックグラウンドで最新データを取得して再描画
-      if (boardsResult?.isCached === true || appsResult?.isCached === true || membersResult?.isCached === true || directoriesResult?.isCached === true) {
-        console.log('キャッシュデータを検出。バックグラウンドで最新データを取得中...');
+      if (wasCached) {
+        console.log('[loadAllData] キャッシュデータを検出。バックグラウンドで最新データを取得中...');
 
         backgroundUpdatePromise = new Promise((resolve) => {
           setTimeout(async () => {
             try {
-              const promises = [];
-
-              if (boardsResult?.isCached === true) {
-                promises.push(
-                  callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {
-                    columns: ['id', 'display_id', 'name', 'description', 'is_active'],
-                    orderBy: { name: 'asc' }
-                  }, null, true)
-                );
-              } else {
-                promises.push(Promise.resolve(boardsResult));
-              }
-
-              if (appsResult?.isCached === true) {
-                promises.push(
-                  callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.APPS, 'select', {}, null, true)
-                );
-              } else {
-                promises.push(Promise.resolve(appsResult));
-              }
-
-              if (membersResult?.isCached === true) {
-                promises.push(
-                  callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {}, null, true)
-                );
-              } else {
-                promises.push(Promise.resolve(membersResult));
-              }
-
-              if (directoriesResult?.isCached === true) {
-                promises.push(
-                  callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {}, null, true)
-                );
-              } else {
-                promises.push(Promise.resolve(directoriesResult));
-              }
-
-              const [freshBoardsResult, freshAppsResult, freshMembersResult, freshDirectoriesResult] = await Promise.all(promises);
-              const freshBoards = freshBoardsResult?.data || freshBoardsResult || [];
-              const freshApps = freshAppsResult?.data || freshAppsResult || [];
-              const freshMembers = freshMembersResult?.data || freshMembersResult || [];
-              const freshDirectories = freshDirectoriesResult?.data || freshDirectoriesResult || [];
+              // 1回のGAS呼び出しにバッチ化
+              const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, [
+                { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: true },
+                { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh: true },
+                { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: true },
+                { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: true }
+              ]);
+              const r = batchResult?.results || {};
+              const freshBoards = r.boards?.data || r.boards || [];
+              const freshApps = r.apps?.data || r.apps || [];
+              const freshMembers = r.members?.data || r.members || [];
+              const freshDirectories = r.directories?.data || r.directories || [];
 
               App.state.data.boards = freshBoards;
               App.state.data.apps = freshApps;
               App.state.data.members = freshMembers;
               App.state.data.directories = freshDirectories;
 
-              // ナビゲーションを更新
-              if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
-                // 現在のアクティブなボードIDを取得
-                const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#boards-nav a.active');
-                const activeBoardId = activeLink ? activeLink.dataset.boardId : null;
-
-                App.utils.navigation.renderBoardsNavigation();
-
-                // アクティブ状態を復元
-                if (activeBoardId) {
-                  const newActiveLink = document.querySelector(`a[data-board-id="${activeBoardId}"]`);
-                  if (newActiveLink) {
-                    newActiveLink.classList.add('active');
-                  }
-                }
+              // ナビゲーションを更新（アクティブ状態を保持）
+              const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#boards-nav a.active');
+              const activeBoardId = activeLink ? activeLink.dataset.boardId : null;
+              App.utils.navigation.renderBoardsNavigation();
+              if (activeBoardId) {
+                const newActiveLink = document.querySelector(`a[data-board-id="${activeBoardId}"]`);
+                if (newActiveLink) newActiveLink.classList.add('active');
               }
 
               App.pages.boards.initialize();
+              App.utils.header.renderApps();
+              App.pages.members.loadData(true);
 
-              if (appsResult?.isCached === true) {
-                App.utils.header.renderApps();
-              }
-
-              console.log('バックグラウンド更新完了');
+              console.log('[loadAllData] バックグラウンド更新完了');
             } catch (error) {
-              console.error('バックグラウンド更新エラー:', error);
+              console.error('[loadAllData] バックグラウンド更新エラー:', error);
             } finally {
               resolve();
             }
@@ -517,13 +476,14 @@
 
       return backgroundUpdatePromise;
 
-
     } catch (error) {
-      console.error('データ読み込みエラー:', error);
+      console.error('[loadAllData] データ読み込みエラー:', error);
       hideLoading();
       App.utils.error.handle(error);
+      return null;
     }
   }
+
 
   // 自動データ更新
   let autoRefreshInterval = null;
