@@ -224,7 +224,8 @@ function parseWhereClause(whereClause, headersMap) {
         if (typeof value === 'string') {
             escapedValue = `'${value.replace(/'/g, "\\'")}'`;
         } else if (value instanceof Date) {
-            escapedValue = `'${value.toISOString()}'`;
+            const dateStr = Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+            escapedValue = `datetime '${dateStr}'`;
         }
 
         // boolean型かつ等価比較の場合、文字列(TRUE/FALSE)としても検索する（GVizの型推論対策）
