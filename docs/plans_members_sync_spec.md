@@ -76,7 +76,8 @@
 ### 4.1 `value` 判定ルール
 
 1. 直接参照（Read/Write）  
-   条件: `=` 始まり、単純セル参照（例: `='基本'!$C$5`）
+   条件: `=` 始まり、**単一セル参照のみ**（例: `='基本'!$C$5`、`='基本'!C5）
+   - `A1:A5` のような範囲参照・名前付き範囲は直接参照として扱わない
    - Downstream: 参照先セルへ書き込み
    - Upstream: 参照先セル編集を DB へ反映
 
@@ -103,6 +104,9 @@
 
 ```javascript
 class ConfigParser {
+  // @param {GoogleAppsScript.Spreadsheet.Range} editedRange
+  // @return {{table: string, key: string, id: string}[]}
+  // マッピング未検出時は空配列を返し、設定不正時のみ Error を送出
   // editedRange に該当する { table, key, id } を返す
   // 矩形範囲編集時は複数要素
   findDbTargets(editedRange) {}
@@ -128,9 +132,10 @@ class ConfigParser {
 
 ### 5.4 排他制御・ループ対策
 
-- `LockService` による同期処理の排他
+- `LockService` は `waitLock(30000)` を上限に取得し、取得失敗時はリトライせず終了
 - Installable Trigger 利用時は実行ユーザー起因の再入をガード
-- 再入ガードは `PropertiesService` に短寿命の実行フラグ（例: `sync_in_progress_<sheetId>`）を保存し、開始時チェック・終了時削除で実装
+- 再入ガードは `PropertiesService` に短寿命フラグ（例: `sync_in_progress_<sheetId>`）を保存し、開始時チェック・終了時削除で実装
+- フラグには開始時刻を併記し、閾値（例: 120 秒）超過時は失効扱いで自動復旧
 - `setValue` による再発火前提差異を考慮し、明示ガードを保持
 
 ## 6. シート別設計メモ
@@ -160,4 +165,4 @@ class ConfigParser {
 - 企画と個別シート ID の保持先（`plans.document_url` 等）
 - `名簿` タブ空行の取り扱い（固定行か動的範囲か）
 
-上記 3 点は実装着手前に確定し、本仕様へ追記する。
+上記 3 点は **Phase 1 開始ゲート** とし、未確定のまま実装を開始しない。
