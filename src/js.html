@@ -104,16 +104,20 @@
       const targetBoardId = urlParams.board_id;
       console.log('[initializeApp] Board requested:', targetBoardId);
 
-      // キャッシュ無視の読み込みがある場合は待機
-      if (backgroundUpdatePromise) {
-        console.log('[initializeApp] Waiting for background update to ensure board list is fresh...');
+      // ボードの存在確認 (まずは現在のデータで確認)
+      let boards = [...(App.state.data.boards || []), { id: 'my-board', display_id: 'my-board', name: 'My Board' }];
+      let targetBoard = boards.find(b => b.id === targetBoardId || b.display_id === targetBoardId);
+
+      // キャッシュにない、かつバックグラウンド更新中の場合は待機
+      if (!targetBoard && backgroundUpdatePromise) {
+        console.log('[initializeApp] Board not found in cache. Waiting for background update...');
         await backgroundUpdatePromise;
         console.log('[initializeApp] Background update finished');
-      }
 
-      // ボードの存在確認
-      const boards = [...(App.state.data.boards || []), { id: 'my-board', display_id: 'my-board', name: 'My Board' }];
-      const targetBoard = boards.find(b => b.id === targetBoardId || b.display_id === targetBoardId);
+        // 更新後のデータで再確認
+        boards = [...(App.state.data.boards || []), { id: 'my-board', display_id: 'my-board', name: 'My Board' }];
+        targetBoard = boards.find(b => b.id === targetBoardId || b.display_id === targetBoardId);
+      }
 
       if (targetBoard) {
         console.log('[initializeApp] Board found, switching:', targetBoard);
@@ -424,55 +428,56 @@
 
       hideLoading();
 
-      // ── Step 4: キャッシュ由来のデータの場合、バックグラウンドで最新化 ─────────────────────
+      // ── Step 4: バックグラウンドで最新データを取得（常に実行） ─────────────────────────────
+      // ユーザー要望により、キャッシュの有無に関わらず、初期描画後に必ず最新データを再取得して更新する
       let backgroundUpdatePromise = null;
 
-      if (wasCached) {
-        console.log('[loadAllData] キャッシュデータを検出。バックグラウンドで最新データを取得中...');
+      console.log('[loadAllData] 初期表示完了。バックグラウンドで最新データを全取得します...');
 
-        backgroundUpdatePromise = new Promise((resolve) => {
-          setTimeout(async () => {
-            try {
-              // 1回のGAS呼び出しにバッチ化
-              const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, [
-                { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: true },
-                { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh: true },
-                { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: true },
-                { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: true }
-              ]);
-              const r = batchResult?.results || {};
-              const freshBoards = r.boards?.data || r.boards || [];
-              const freshApps = r.apps?.data || r.apps || [];
-              const freshMembers = r.members?.data || r.members || [];
-              const freshDirectories = r.directories?.data || r.directories || [];
+      backgroundUpdatePromise = new Promise((resolve) => {
+        setTimeout(async () => {
+          try {
+            // 1回のGAS呼び出しにバッチ化
+            const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, [
+              { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: true },
+              { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh: true },
+              { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: true },
+              { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: true }
+            ]);
+            const r = batchResult?.results || {};
+            const freshBoards = r.boards?.data || r.boards || [];
+            const freshApps = r.apps?.data || r.apps || [];
+            const freshMembers = r.members?.data || r.members || [];
+            const freshDirectories = r.directories?.data || r.directories || [];
 
-              App.state.data.boards = freshBoards;
-              App.state.data.apps = freshApps;
-              App.state.data.members = freshMembers;
-              App.state.data.directories = freshDirectories;
+            App.state.data.boards = freshBoards;
+            App.state.data.apps = freshApps;
+            App.state.data.members = freshMembers;
+            App.state.data.directories = freshDirectories;
 
-              // ナビゲーションを更新（アクティブ状態を保持）
-              const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#boards-nav a.active');
-              const activeBoardId = activeLink ? activeLink.dataset.boardId : null;
-              App.utils.navigation.renderBoardsNavigation();
-              if (activeBoardId) {
-                const newActiveLink = document.querySelector(`a[data-board-id="${activeBoardId}"]`);
-                if (newActiveLink) newActiveLink.classList.add('active');
-              }
-
-              App.pages.boards.initialize();
-              App.utils.header.renderApps();
-              App.pages.members.loadData(true);
-
-              console.log('[loadAllData] バックグラウンド更新完了');
-            } catch (error) {
-              console.error('[loadAllData] バックグラウンド更新エラー:', error);
-            } finally {
-              resolve();
+            // ナビゲーションを更新（アクティブ状態を保持）
+            const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#boards-nav a.active');
+            const activeBoardId = activeLink ? activeLink.dataset.boardId : null;
+            App.utils.navigation.renderBoardsNavigation();
+            if (activeBoardId) {
+              const newActiveLink = document.querySelector(`a[data-board-id="${activeBoardId}"]`);
+              if (newActiveLink) newActiveLink.classList.add('active');
             }
-          }, 100); // 100ms後に実行（メインUIの表示を優先）
-        });
-      }
+
+            // ボードUI定義を再初期化（新しいボードが追加された場合などのため）
+            App.pages.boards.initialize();
+
+            App.utils.header.renderApps();
+            App.pages.members.loadData(true);
+
+            console.log('[loadAllData] バックグラウンド更新完了');
+          } catch (error) {
+            console.error('[loadAllData] バックグラウンド更新エラー:', error);
+          } finally {
+            resolve();
+          }
+        }, 100); // 100ms後に実行（メインUIの表示を優先）
+      });
 
       return backgroundUpdatePromise;
 
@@ -531,6 +536,11 @@
       }
 
       App.state.set('boards', boardsResult?.data || []);
+
+      // ボード定義を更新（新しいボードのタブなどが生成されるようにする）
+      // 現在のタブに関わらず実行
+      App.pages.boards.initialize();
+
       // ナビゲーションを更新
       if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
         // 現在のアクティブなボードIDを取得
@@ -566,7 +576,6 @@
 
       // タブ種別に応じて必要なデータのみを取得
       if (tabId === 'tab-board') {
-        App.pages.boards.initialize();
         // ボードページ: 表示中のボードのタスクのみを取得
         const activeBoardDiv = document.querySelector('#tab-board > div[style*="display: block"]');
         if (activeBoardDiv && activeBoardDiv.id) {
