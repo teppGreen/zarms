@@ -14,7 +14,7 @@
 
 ### 2.1 Master DB（Single Source of Truth）
 
-- 役割: データの正
+- 役割: データの正本（唯一の正確な情報源）
 - 運用: 原則として管理者のみ直接編集
 - 想定テーブル:
   - `plans`: 企画基本情報
@@ -130,6 +130,7 @@ class ConfigParser {
 
 - `LockService` による同期処理の排他
 - Installable Trigger 利用時は実行ユーザー起因の再入をガード
+- 再入ガードは `PropertiesService` に短寿命の実行フラグ（例: `sync_in_progress_<sheetId>`）を保存し、開始時チェック・終了時削除で実装
 - `setValue` による再発火前提差異を考慮し、明示ガードを保持
 
 ## 6. シート別設計メモ
