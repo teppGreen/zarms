@@ -882,6 +882,14 @@
                 Object.assign(cachedTask, updates);
               }
             }
+            // my-boardのキャッシュも更新
+            const myBoardCache = App.pages.boards.cachedBoardTasks['my-board'];
+            if (Array.isArray(myBoardCache)) {
+              const myBoardTask = myBoardCache.find(t => t.id === id);
+              if (myBoardTask) {
+                Object.assign(myBoardTask, updates);
+              }
+            }
           }
 
           // メンバーフィールドが更新された場合はボードデータを再読み込み（JOINデータを更新するため）
@@ -904,9 +912,15 @@
                 }
               }
             });
+            if (App.pages.boards.currentBoardId === 'my-board') {
+              App.pages.boards.loadData('my-board', true);
+            }
           } else if (boardId && App.pages.boards && App.pages.boards.renderKanban) {
             // メンバーフィールド以外の更新はカンバンを再描画（Optimistic UIの反映）
             App.pages.boards.renderKanban(boardId);
+            if (App.pages.boards.currentBoardId === 'my-board') {
+              App.pages.boards.renderKanban('my-board');
+            }
           }
 
         } catch (error) {
