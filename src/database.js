@@ -832,11 +832,18 @@ function generateCacheKey(tableName, dataObject) {
     const dataStr = JSON.stringify(sortedData);
     const hash = hashString(dataStr);
 
-    const baseKey = `db_${tableName}_${hash}`;
+    let prefix = '';
+    // SPREADSHEET_IDがDEV_SPREADSHEET_IDの場合は、キーにdev_をつける
+    const devSpreadsheetId = scriptProperties.getProperty('DEV_SPREADSHEET_ID');
+    if (devSpreadsheetId && SPREADSHEET_ID === devSpreadsheetId) {
+        prefix = 'dev_';
+    }
+
+    const baseKey = `${prefix}db_${tableName}_${hash}`;
 
     if (baseKey.length > CACHE_CONFIG.MAX_KEY_LENGTH) {
         // 長すぎる場合はテーブル名とハッシュのみ
-        return `db_${tableName.substring(0, 50)}_${hash}`;
+        return `${prefix}db_${tableName.substring(0, 50)}_${hash}`;
     }
 
     return baseKey;
