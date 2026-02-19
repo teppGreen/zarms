@@ -10,6 +10,7 @@ if (isDevelopment()) {
 } else {
   SPREADSHEET_ID = scriptProperties.getProperty('SPREADSHEET_ID');
 }
+const QUESTION_SPREADSHEET_ID = scriptProperties.getProperty('QUESTION_SPREADSHEET_ID');
 
 const TABLE_NAMES = {
   LOGS: 'logs',
@@ -23,7 +24,8 @@ const TABLE_NAMES = {
   TASKS: 'tasks',
   LISTS: 'lists',
   FILES: 'files',
-  SYSTEM_UPDATES: 'system_updates'
+  SYSTEM_UPDATES: 'system_updates',
+  QUESTIONS: 'questions',
 };
 
 const DIRECTORY_TYPES = {
@@ -69,7 +71,8 @@ const TABLE_HEADERS = {
   LISTS: ['id', 'index', 'task_id', 'is_done', 'name', 'assign_to', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   LINKS: ['id', 'index', 'task_id', 'label', 'url', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   FILES: ['id', 'index', 'task_id', 'gfile_id', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
-  SYSTEM_UPDATES: ['id', 'version', 'title', 'description', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at']
+  SYSTEM_UPDATES: ['id', 'version', 'title', 'description', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
+  QUESTIONS: ['id', 'question_number', 'created_at', 'question_category', 'question_content', 'remark', 'created_by', 'updated_by', 'updated_at']
 };
 
 // ============================================
@@ -119,16 +122,16 @@ const COLUMN_IDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 
  * 外部URL設定
  */
 const EXTERNAL_URLS = {
-  ADD_CALENDAR: "https://calendar.google.com/calendar/u/0?cid=Y182ODEyOWNkMjU3YWE4MDU4YTE3NjAwZjVlYmFlNTg1OWZlOGE3NzEwNGFlZDkxOWQyMWU1OGZjZDQ1NmQ4MTEzQGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20",
-  CALENDAR: 'https://calendar.google.com/calendar/embed?wkst=2&ctz=Asia%2FTokyo&showPrint=0&mode=WEEK&showCalendars=0&showTitle=0&src=Y182ODEyOWNkMjU3YWE4MDU4YTE3NjAwZjVlYmFlNTg1OWZlOGE3NzEwNGFlZDkxOWQyMWU1OGZjZDQ1NmQ4MTEzQGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20&color=%23f09300',
-  MEMBER_SPREADSHEET: 'https://docs.google.com/spreadsheets/d/1Jwq5klCWFMNqSURHk2JrbF43X4JTy5I7M5aBE3uDVNw/edit?gid=1456439787',
-  CONTACT_FORM: 'https://forms.gle/afXzsGKxvm9qVG4G9',
-  SOUMU_DOCUMENT: 'https://docs.google.com/document/d/1BXpWaVsyJChC-rSDgjEvH33s_5FvXiaimvHIYxBTxoY/preview?tab=t.ox00ab3wnxmq',
-  LOGO_IMAGE: 'https://i.gyazo.com/5c4f146e5ec5efdf571670f6b318e309.png',
-  FAVICON_IMAGE: 'https://i.gyazo.com/89db588b11cf08f2d14ee3ece99c22dd.png',
-  HELP_SITE: 'https://sites.google.com/student.zen.ac.jp/zarms/help',
-  TERMS_SITE: 'https://sites.google.com/student.zen.ac.jp/zarms/terms',
-  GEMINI_GEMS_TASK_ADD: 'https://gemini.google.com/gem/1_GKJoSvkttvu4Nr1GnmX44OqKOZuWkwR'
+  ADD_CALENDAR: scriptProperties.getProperty('EXTERNAL_URLS.ADD_CALENDAR'),
+  CALENDAR: scriptProperties.getProperty('EXTERNAL_URLS.CALENDAR'),
+  MEMBER_SPREADSHEET: scriptProperties.getProperty('EXTERNAL_URLS.MEMBER_SPREADSHEET'),
+  CONTACT_FORM: scriptProperties.getProperty('EXTERNAL_URLS.CONTACT_FORM'),
+  LOGO_IMAGE: scriptProperties.getProperty('EXTERNAL_URLS.LOGO_IMAGE'),
+  FAVICON_IMAGE: scriptProperties.getProperty('EXTERNAL_URLS.FAVICON_IMAGE'),
+  HELP_SITE: scriptProperties.getProperty('EXTERNAL_URLS.HELP_SITE'),
+  TERMS_SITE: scriptProperties.getProperty('EXTERNAL_URLS.TERMS_SITE'),
+  GEMINI_GEMS_TASK_ADD: scriptProperties.getProperty('EXTERNAL_URLS.GEMINI_GEMS_TASK_ADD'),
+  ZARMS_WEB: scriptProperties.getProperty('EXTERNAL_URLS.ZARMS_WEB'),
 };
 
 /**
@@ -164,3 +167,17 @@ const UI_TEXT = {
   SUCCESS_DELETED: '削除しました',
   SUCCESS_CREATED: '作成しました'
 };
+
+/**
+ * 問い合わせ用のデフォルト値
+ */
+const TASK_BY_QUESTION_DEFAULT_VALUES = {
+  board_id: scriptProperties.getProperty('BOARDS.QUESTION'),
+  created_by: scriptProperties.getProperty('MEMBERS.HELPDESK_UNIT_LEADER'),
+  processed_by: scriptProperties.getProperty('MEMBERS.HELPDESK_UNIT_LEADER'),
+  reviewed_by: scriptProperties.getProperty('MEMBERS.MANAGEMENT_GROUP_STAFF'),
+  received_by: scriptProperties.getProperty('MEMBERS.MANAGEMENT_GROUP_STAFF'),
+  task_status_key: 'TODO',
+  remark: 'システムが自動作成',
+  priority_key: 'MEDIUM',
+}
