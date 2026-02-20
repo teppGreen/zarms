@@ -324,6 +324,11 @@ function isDevelopment(urlParams) {
     const REGEX = /^https:\/\/script\.google\.com\/a\/.*\/dev.*$/;
     const url = ScriptApp.getService().getUrl();
 
+    if (!url) {
+      console.log('[isDevelopment] url is null (likely running as library or bound script)');
+      return false; // または環境に応じたデフォルト値
+    }
+
     // 3. URL自体に直接含まれている可能性も考慮
     if (url.indexOf('use_prod_db=true') !== -1) {
       return false;
