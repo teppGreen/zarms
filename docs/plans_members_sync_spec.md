@@ -16,27 +16,15 @@
 
 - 役割: データの正本（唯一の正確な情報源）
 - 運用: 原則として管理者のみ直接編集
-- スキーマ定義（以下に書いてあるものに限らない。`docs/database_schema.mmd` に準拠すること。）:
-  - `plans`: 企画基本情報テーブル
+- スキーマ定義（詳細は `docs/database_schema.mmd` に準拠すること）:
+  - `plans`: 企画基本情報テーブル（**今回の同期対象**）
     - 主キー: `id` (UUID)
     - 識別・状態情報: `plan_number`, `zarms_code`, `plan_status`, `plan_type`
     - 基本テキスト: `name`, `description`, `plan_tags`, `plan_categories`
     - 数値情報: `estimated_staff_count`, `actual_staff_count` 等
-    - リンク情報: `sheet_url` (個別シートのURLとして利用可能), `folder_url`, `slack_channel_url`
-    - その他メタ情報多数（選考情報、出展者情報等）
-  - `members`: 人物マスタテーブル
-    - 主キー: `id` (UUID)
-    - 基本情報: `email`, `name`, `display_name`, `slack_profile_url`, `profile_photo_url`
-  - `plan_assignments`: 企画アサインメントテーブル
-    - 主キー: `id` (UUID)
-    - 関連情報: `plan_id` (対象企画ID), `member_id` (対象メンバー), `role` (代表者、副代表者等の役割)
-    - 論理削除: `is_active`（`false` で無効）
-  - `directory_assignments`: 組織アサインメントテーブル
-    - 主キー: `id` (UUID)
-    - 関連情報: `directory_id` (対象組織ID), `member_id` (対象メンバー), `role` (役割)
-  - `directories`: 組織情報テーブル
-    - 主キー: `id` (UUID)
-    - 基本情報: `name`, `slack_channel_url`, `gfolder_id`
+    - リンク情報: `sheet_url`, `folder_url`, `slack_channel_url`
+    - その他メタ情報: `created_by`, `exhibitor_directory` 等（※これらは他のテーブルへのリレーションを持たず、単純な値として管理・同期する）
+  - ※ `members`, `plan_assignments` 等のテーブルは存在するが、本同期仕様の初期実装範囲からは除外する。
 
 ### 2.2 企画管理一覧（List View）
 
@@ -52,8 +40,8 @@
 - 役割: 各企画担当者向け編集
 - 想定シート:
   - `基本`（単一セル中心。該当の `plans` レコード1件に対する詳細情報を表示・編集）
-  - `名簿`（1:N リスト。該当企画に関する `members` と `plan_assignments` 情報を表示・編集）
-  - `_config`（マッピング定義。この個別シート専用の1枚。`基本` タブ・`名簿` タブ両方の定義をまとめて記載する。）
+  - `_config`（マッピング定義。`基本` タブの定義を記載する。）
+- ※ `名簿` タブ（1:N アサインメント管理）の同期実装は後回しとする。
 
 ## 3. 同期アーキテクチャ
 
@@ -95,14 +83,15 @@
 | `key` | Master DBの連携先カラム | `name`, `plan_status`, `estimated_staff_count` |
 | `range` | 書き込み/読み取り先のセル参照（数式） | `='基本'!$C$8`, `='企画'!$A$1` |
 | `value` | `field_type: system` の場合の固定値 | `p20261001`（一覧シートでのID確保用など） |
-| `field_type` | 制御メタ情報 | `system`, `input`, `header` |
+| `field_type` | 制御メタ情報 | `system`, `two-way-sync`, `header` |
 
 | `field_type` | 意味 | Upstream 動作 | Downstream 動作 |
 | --- | --- | --- | --- |
 | `system` | 同期処理に必要な識別情報（一覧シートでのID列など）。`value` に固定値を持つ。 | **同期対象外**（スキップ） | **同期対象外**（スキップ） |
-| `input` | ユーザーが編集するデータ列。 | `range` が指すセルの値を Master DB に書き込む | Master DB の値を書き込む。<br>・`range` がある場合: 該当セルへ書き込む<br>・`range` が空の場合: `_config` シートの自身の `value` 列へ書き込む |
+| `two-way-sync` | ユーザーが編集・閲覧するデータ列（双方の変更が同期される）。 | `range` が指すセルの値を Master DB に書き込む | Master DB の値を書き込む。<br>・`range` がある場合: 該当セルへ書き込む<br>・`range` が空の場合: `_config` シートの自身の `value` 列へ書き込む |
+| `downstream-only` | Master DBからの一方通行でUIに反映するデータ列。UI側の変更は破棄される。 | **同期対象外**（Master DBに上書きしない） | Master DB の値を書き込む。<br>・`range` がある場合: 該当セルへ書き込む<br>・`range` が空の場合: `_config` シートの自身の `value` 列へ書き込む |
 | `header` | ヘッダー行のセルを指し示す。データの列位置を取得するための参照。 | **同期対象外**（列位置の特定にのみ使用） | **同期対象外**（列位置の特定にのみ使用） |
-| `flag` | 個別シート側でのみ操作するフラグ用データ列。 | `range` が指すセルの値を Master DB に書き込む | **同期対象外**（Master DBから上書きしない） |
+| `upstream-only` | UI側（個別シート等）でのみ操作し、Master DBへ一方通行で反映するデータ列。 | `_config` シートの自身の `value` 列、または `range` の値を Master DB に書き込む | **同期対象外**（Master DBから上書きしない） |
 
 ### 4.2 `range` 参照式の解釈ルール
 
@@ -117,12 +106,13 @@
 ### 4.3 一覧シートにおける行特定ロジック
 
 一覧シート（`企画` シート等）では、`field_type: system` かつ `key: id` の行から「ID 列」の列位置を取得する。
-Upstream / Downstream ともに、この ID 列を検索キーとして対象の行番号を特定してから、各 `input` 列のセルを読み書きする。
+Upstream / Downstream ともに、この ID 列を検索キーとして対象の行番号を特定してから、各データ列（`two-way-sync` など）のセルを読み書きする。
 
 ### 4.4 個別シートにおける ID 解決ロジック
 
-個別シート（`基本` タブ、`名簿` タブの双方）では、Master DBでの `plans.id` をシート上に記載しない。
-Upstreamの同期処理を実行する際、`SpreadsheetApp.getActiveSpreadsheet().getId()` などの情報を用いて Master DB の `plans` テーブルを検索し、`sheet_url` カラムに対象スプレッドシートのIDが含まれているレコードの `plans.id` を取得して対象レコードを特定する。
+個別シート（`基本` タブ）では、Master DBでの `plans.id` をシート上に記載しない。
+Upstreamの同期処理を実行する際、`SpreadsheetApp.getActiveSpreadsheet().getUrl()` などの情報を用いて Master DB の `plans` テーブルを検索し、`sheet_url` カラムに対象スプレッドシートのIDが含まれているレコードの `plans.id` を取得して対象レコードを特定する。
+また、`created_by` や `exhibitor_directory` などのカラムについても、他のテーブルとのリレーションは考慮せず、`plans` テーブル内の単純な属性値として同期を行う。
 
 ## 5. GAS 実装要件
 
@@ -156,7 +146,7 @@ class ConfigParser {
   findDbTargets(editedRange) {}
 
   // @return {{ table: string, key: string, range: { sheet: string, col: number, row: number } | null, rowNumber: number }[]}
-  // Downstream: field_type = 'input' の全マッピングを返す（range未指定もあるため null を許容。rowNumberは_configシート自体の行番号）
+  // Downstream: field_type = 'two-way-sync' または 'downstream-only' の全マッピングを返す（range未指定もあるため null を許容。rowNumberは_configシート自体の行番号）
   getAllInputMappings() {}
 
   // @return {{ table: string, key: string, col: number }[]}
@@ -170,7 +160,7 @@ class ConfigParser {
 - 対象: 一覧 / 個別シート（バウンドスクリプトから `ZARMS.handleOnEdit(e)` として呼び出し）
 - 手順:
   1. `e.range` を取得
-  2. 編集されたシート名を確認し、`_config` 上に対応する `field_type: input` のマッピングが存在しない場合はスキップ
+  2. 編集されたシート名を確認し、`_config` 上に対応する `field_type: two-way-sync` または `upstream-only` のマッピングが存在しない場合はスキップ
   3. 行単位へ正規化（矩形編集対応）
   4. 各行/セル単位で `ConfigParser.findDbTargets()` により更新対象（`table`, `key`, `id`）を特定。IDがシート上から取得できない（個別シートの）場合は、現在操作中のスプレッドシートのURL等を用いて Master DB の `plans` テーブルの `sheet_url` を検索し、ID を動的に特定する。
   5. `field_type: system` のセルは処理をスキップ
@@ -182,17 +172,18 @@ class ConfigParser {
 - 手順:
   1. `ScriptProperties` から `last_sync_downstream`（ISO 8601 形式）を取得。未設定の場合はすべてのレコードを対象とする。
   2. 処理開始時刻を変数に保存
-  3. `plans`, `members`, `plan_assignments` 等の各テーブルから `updated_at > last_sync_downstream` のレコードを取得
+  3. `plans` テーブルから `updated_at > last_sync_downstream` のレコードを取得
      - **注意**: `updated_at` の検索条件に使用する日時は必ず `Date.toISOString()` を用いて **ISO 8601形式**（文字列）に変換してからクエリ（`['>', lastSyncStr]` 等）を実行すること。
+     - ※ 現在の実装フェーズでは `members`, `plan_assignments` 等の更新チェックは不要。
   4. **一覧シートへの反映**:
      - 一覧シートの `SpreadsheetApp.openByUrl(listViewUrl)` で接続
      - `_config` を読み込み `ConfigParser.resolveHeaderMappings()` で列位置を解決
      - `field_type: system, key: id` 列を検索キーに、対象レコードの行番号を特定
-     - 各 `field_type: input` 列のセルを更新
+     - 各 `field_type: two-way-sync` および `downstream-only` 列のセルを更新
   5. **個別シートへの反映**（`table = 'plans'` のレコードのみ）:
      - `plans.sheet_url` から `SpreadsheetApp.openByUrl(sheetUrl)` で接続
      - `_config` を読み込み `ConfigParser.getAllInputMappings()` で対象セルを解決
-     - 各対象について、`field_type` が `input` のもので値を書き込む（`flag` 型はスキップ）
+     - 各対象について、`field_type` が `two-way-sync` または `downstream-only` のもので値を書き込む（`upstream-only` 型はスキップ）
      - `range` が空欄の場合は `_config` シート上の該当する行の `value` 列へ書き込む
   6. 処理完了後、`ScriptProperties` の `last_sync_downstream` を手順 2 で保存した処理開始時刻で更新
 
@@ -251,57 +242,21 @@ function onChange(e) {
 
 ### 6.1 個別シート
 
-- 当面: `基本` タブの単一セル同期を優先。`plans` テーブルのカラム（例: `name`, `description`, `slack_channel_url`, 集計項目など）をセルごとに直接マッピングする。
-- Phase 3: `名簿` タブ（1:N）の実装。`members` および `plan_assignments` テーブルに対して、動的範囲方式で複数レコードの追加・更新・削除を同期する設計を追加。
+- `基本` タブの単一セル同期を優先。`plans` テーブルのカラム（例: `name`, `description`, `slack_channel_url`, `exhibitor_directory` など）をセルごとに直接マッピングする。
+- ※ `created_by` や `exhibitor_directory` はリレーション先を参照せず、セルに入力された値をそのまま Master DB の `plans` テーブルに書き込む。
+- **後回し項目**: `名簿` タブ（1:N）の実装。`members` および `plan_assignments` テーブルの同期設計は将来フェーズで実施。
 
 ### 6.2 一覧シート
 
 - `field_type: system, key: id` 列（例: 非表示の A 列に `plans.id` を配置）を主キー参照に利用
 - `_config` で列ごとの DB マッピングを定義し、行ベース（1 行 = 1 企画レコード）で `plans` テーブルを同期
 
-### 6.3 名簿タブ（1:N 同期）の詳細仕様
+## 6.3 【後回し】名簿タブ（1:N 同期）の詳細仕様
 
-個別シート内の `名簿` タブにおける、`members` および `plan_assignments` の複数レコード処理方針を以下のように定義する。
+※ 本セクションの内容は実装を一旦保留とする。将来的に `members` / `plan_assignments` の同期を再開する際の参考として残す。
 
-#### 列構成
+---
 
-`名簿` タブには以下 7 列が存在し、その先頭に `plan_assignments.id`（非表示）を設ける。
-
-| 列 | 内容 | `field_type` | `key` | 必須 |
-| --- | --- | --- | --- | --- |
-| （非表示） | `plan_assignments.id` | `system` | `id` | — |
-| 1 | 表示名 | `input` | `display_name`（`members`） | ✅ |
-| 2 | Slack ID | `input` | `slack_profile_url`（`members`） | ✅ |
-| 3 | メールアドレス | `input` | `email`（`members`） | ✅ |
-| 4 | 企画内役割 | `input` | `role`（`plan_assignments`） | ✅ |
-| 5 | スタッフパス | `input` | `staff_pass`（`members` 等） | ✅ |
-| 6 | 備考 | `input` | `remark` | — |
-
-> 「備考」列のみ必須入力ではない。その他の 5 列（表示名、Slack ID、メールアドレス、企画内役割、スタッフパス）はすべて必須入力とする。
-
-#### 1. データ範囲と同期の方向性
-
-- **Downstream 専用アーキテクチャ**: `名簿`タブはユーザーによる直接編集（Upstream同期）をサポートしない**表示専用（Read-only）領域**として運用する。ユーザーは別の登録フォーム（システム外等）を通じてMaster DBに情報を登録する。
-- **動的範囲の採用**: `_config` において `field_type: header`（または `input`/`system` などの `range` 定義）行から「データ開始行」を算出する（ヘッダー行の次の行以降）。
-- **完全入れ替え（Clear & Rewrite）**: `runDownstreamSync()` 実行時、該当する企画の `is_active: true` なアサインメント情報をMaster DBから取得し、対象シートのデータ領域をクリア（`clearContent`）した上で一括書き込み（`setValues`）を行うことで、常にMaster DBの情報を正本とした整合性を保つ。
-
-#### 2. 新規作成時の処理（`registerPlanMember`）
-
-`名簿` タブのデータソースとなるMaster DB側へレコードを直接登録・アサインするためのヘルパー関数 `registerPlanMember(planId, memberData, assignmentData)` をライブラリ側（`sync_utils.js`）で提供する。別システムやフォーム送信のハンドラーからこの関数を呼び出すことで、以下のようにアトミックに処理される。
-
-1. **メンバー特定または新規作成**:
-   - `members` テーブルを `email` で検索する。
-   - 一致するレコードがあれば、その `members.id` を取得し、付随する情報（表示名など）を安全に更新する。
-   - 一致しなければ、新規 UUID を生成し `members` テーブルに追加する。
-2. **アサインメント作成**:
-   - 新規 UUID を生成し、`plan_id` と `member_id` を紐付けた `plan_assignments` の新規レコードを追加する（`is_active: true`）。
-   - すでに同企画にアサインされている場合は、役割等の更新と `is_active: true` への復帰（再登録）を行う。
-
-#### 3. 削除（関連付け解除）の扱い
-
-- Master DB 上でレコードの物理削除は行わず、`plan_assignments` レコードの `is_active` を `false` に更新する論理削除として扱う。
-- Downstream同期は `is_active: true` のデータのみを描画するため、論理削除されたメンバーは次回の同期時にUI上から自動的に消去される。
-- `members` テーブルのレコード自体は削除しない。企画から外れたメンバーは `members` テーブルに残り続ける。
 
 ## 7. 開発フェーズ
 
@@ -311,11 +266,14 @@ function onChange(e) {
 2. **Phase 2 (List Sync)**
    一覧シート（対象: `plans` テーブル全域）と Master DB の双方向同期
 
-3. **Phase 3 (Complex Data)**
-   `名簿` タブ（対象: `members`, `plan_assignments`）など 1:N 関連データの同期
+3. **Phase 3 (Polishing & Robustness)**
+   エラーハンドリング、排他制御の強化、運用環境への適用
 
 4. **Phase 4 (Documentation & Setup Guide)**
-   実装完了後、各 UI スプレッドシートの構築・初期設定をまとめた「スプレッドシート設定手順書」を作成する。記載内容:
+   実装完了後、各 UI スプレッドシートの構築・初期設定をまとめた「スプレッドシート設定手順書」を作成する。
+
+5. **Future (Complex Data)**
+   `名簿` タブ（対象: `members`, `plan_assignments`）など 1:N 関連データの同期検討
    - `_config` シートの設定例（一覧シート用・個別シート用）
    - トリガー設定手順（Master DB上の定期実行Downstreamトリガー、一覧・個別シート上の `onEdit` インストーラブルトリガー等）
    - `ZARMS` ライブラリの導入手順（各バウンドスクリプトでの最新バージョン設定と `handleOnEdit` 呼び出し）
@@ -362,13 +320,12 @@ function onChange(e) {
 企画ごとに作成される個別シートは、以下の要領で準備する。
 1. タブの構成:
    - `基本`: 企画の単一情報（詳細、ステータス、メモ等）を記載。
-   - `名簿`: 所属メンバーの一覧を表示するためのRead-only領域。事前にヘッダーおよび非表示ID列（A列など）を記述しておく。
    - `_config`: マッピング設定用タブ。
 2. `_config` の設定例（基本タブ）:
-   - `field_type: input` かつ、`range` に単一セル（例: `='基本'!$C$5`）を指定。
-3. `_config` の設定例（名簿タブ 1:N用）:
-   - `field_type: system`, `key: id`, `range: ='名簿'!$A$2` (非表示のID列、ヘッダーの次の行)
-   - その他の列 (`role`, `display_name`, `email` 等): `field_type: input` かつ、`range: ='名簿'!$B$2` などの行指定付き単一セル参照でデータ開始行を指示する。
+   - `field_type: two-way-sync` かつ、`range` に単一セル（例: `='基本'!$C$5`）を指定。
+3. `_config` の設定例（一覧シートと同様）:
+   - 対象としたい `plans` テーブルのカラムに対応するセル参照を設定する。
+   - `exhibitor_directory` や `created_by` も必要に応じて `two-way-sync` または `upstream-only` として定義可能。
 4. URLの登録:
    - Master DB側で、`plans` テーブルの対象レコードの `sheet_url` カラムに作製したスプレッドシートのURLを記録する。これにより同期の紐付けが完了する。
 
