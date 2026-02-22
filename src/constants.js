@@ -132,6 +132,7 @@ const EXTERNAL_URLS = {
   TERMS_SITE: scriptProperties.getProperty('EXTERNAL_URLS.TERMS_SITE'),
   GEMINI_GEMS_TASK_ADD: scriptProperties.getProperty('EXTERNAL_URLS.GEMINI_GEMS_TASK_ADD'),
   ZARMS_WEB: scriptProperties.getProperty('EXTERNAL_URLS.ZARMS_WEB'),
+  MASCOT_MAIN_IMAGE: scriptProperties.getProperty('EXTERNAL_URLS.MASCOT_MAIN_IMAGE'),
 };
 
 /**
@@ -158,8 +159,8 @@ const AUTH_CONFIG = {
  */
 const UI_TEXT = {
   APP_TITLE: 'ZARMS',
-  APP_DESCRIPTION: '大学祭実行委員会の業務システム「ZARMS」へようこそ！',
-  SYSTEM_DESCRIPTION: 'ZARMS（ザームス）は、大学祭実行委員会の業務を効率化するためのタスク管理システムです。ボードごとにタスクを管理し、メンバー間での進捗共有やコメントによるコミュニケーションをサポートします。',
+  APP_DESCRIPTION: '展軸祭実行委員会の業務システム「ZARMS」へようこそ！',
+  SYSTEM_DESCRIPTION: 'ZARMS（ザームス）は、展軸祭実行委員会の業務を効率化するためのタスク管理システムです。ボードごとにタスクを管理し、メンバー間での進捗共有やコメントによるコミュニケーションをサポートします。',
   LOADING_MESSAGE: 'お待ちください',
   ERROR_USER_NOT_FOUND: 'ユーザーが見つかりませんでした',
   ERROR_ACCESS_DENIED: 'アクセス権限がありません',
