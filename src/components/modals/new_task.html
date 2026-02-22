@@ -637,7 +637,6 @@
                 }
 
                 try {
-                    showLoading();
                     showSnackbar('タスクを作成中です。画面を開いたままお待ちください。');
                     const btn = document.getElementById('new-task-create-btn');
                     if (btn) {
@@ -660,12 +659,10 @@
 
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'bulkinsert', tasksToCreate);
 
-                    hideLoading();
                     App.modals.newTask.close();
                     showSnackbar(`${tasksToCreate.length}件のタスクを作成しました`, 'success');
                     await App.utils.navigation.switchTab('board-' + boardId, false, true);
                 } catch (error) {
-                    hideLoading();
                     console.error('タスク一括作成エラー:', error);
                     showSnackbar('タスクの作成に失敗しました: ' + error.message, 'error');
                 }

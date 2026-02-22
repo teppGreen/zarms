@@ -176,17 +176,8 @@
              */
             loadTabData: async function (tabName, isBackground = false) {
                 console.log(`loadTabData called for: ${tabName}, isBackground: ${isBackground}`);
-
-                if (!isBackground) {
-                    showLoading();
-                }
-
                 if (App.pages[tabName] && App.pages[tabName].loadData) {
                     await App.pages[tabName].loadData(isBackground);
-                } else {
-                    if (!isBackground) {
-                        hideLoading();
-                    }
                 }
             },
 
