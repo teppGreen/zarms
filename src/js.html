@@ -426,8 +426,6 @@
         );
       }
 
-      hideLoading();
-
       // ── Step 4: バックグラウンドで最新データを取得（常に実行） ─────────────────────────────
       // ユーザー要望により、キャッシュの有無に関わらず、初期描画後に必ず最新データを再取得して更新する
       let backgroundUpdatePromise = null;
@@ -483,7 +481,6 @@
 
     } catch (error) {
       console.error('[loadAllData] データ読み込みエラー:', error);
-      hideLoading();
       App.utils.error.handle(error);
       return null;
     }
@@ -711,16 +708,11 @@
         args: args,
         timestamp: new Date().toISOString()
       };
-
-      showLoading();
-
       google.script.run
         .withSuccessHandler(function (result) {
-          hideLoading();
           resolve(result);
         })
         .withFailureHandler(function (error) {
-          hideLoading();
           reject(error);
         })
       [functionName](...args);
@@ -795,14 +787,14 @@
    */
   function showLoading() {
     if (loadingTimeout) clearTimeout(loadingTimeout);
-    document.body.style.cursor = 'wait';
+    document.body.style.cursor = 'progress';
   }
 
   /**
    * ローディング表示を非表示にします
    */
   function hideLoading() {
-    document.body.style.cursor = '';
+    document.body.style.cursor = 'auto';
   }
 
   /**

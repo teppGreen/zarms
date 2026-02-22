@@ -223,7 +223,6 @@
 
             loadData: async function (boardId, isRefresh = false) {
                 if (!boardId) {
-                    hideLoading();
                     return;
                 }
 
@@ -276,7 +275,6 @@
 
                     // カンバンを表示（まずキャッシュデータで描画）
                     this.renderKanban(boardId, false);
-                    hideLoading();
 
                     // 読み込み完了としてマーク
                     if (this.loadingPromises[boardId]) {
@@ -320,7 +318,6 @@
                     }
                 } catch (error) {
                     console.error('Error loading board tasks:', error);
-                    hideLoading();
 
                     // エラー時もPromiseを解決（待機側が進めるように）
                     if (this.loadingPromises[boardId]) {
@@ -337,7 +334,6 @@
                 const container = document.getElementById(containerId);
 
                 if (!container) {
-                    hideLoading();
                     return;
                 }
 
@@ -714,7 +710,6 @@
                     return;
                 }
 
-                showLoading();
                 try {
                     const cleanItem = {
                         name: promptValue,
@@ -747,8 +742,6 @@
                 } catch (error) {
                     console.error('Failed to create board:', error);
                     App.utils.error.handle(error);
-                } finally {
-                    hideLoading();
                 }
             },
 

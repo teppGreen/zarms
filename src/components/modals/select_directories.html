@@ -82,7 +82,6 @@
                 if (searchInput) searchInput.value = '';
 
                 // directoriesDataをロード（毎回取得）
-                showLoading();
                 callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {})
                     .then(async result => {
                         let directories = result?.data || result || [];
@@ -96,7 +95,6 @@
 
                         this.allDirectories = directories;
                         this.render();
-                        hideLoading();
                         ui('#modal-select-directories');
 
                         // 共通処理を使用
