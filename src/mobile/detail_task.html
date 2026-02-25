@@ -188,19 +188,19 @@
         content.innerHTML = `
           <!-- タスク名 -->
           <div class="field label border">
-            <input type="text" id="mobile-task-name" value="${escapeHtml(task.name)}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+            <input type="text" placeholder="" id="mobile-task-name" value="${escapeHtml(task.name)}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
             <label>タスク名</label>
           </div>
 
           <!-- ボード -->
           <div class="field label border top-margin">
-            <input type="text" value="${boardName}" readonly>
+            <input type="text" placeholder="" value="${boardName}" readonly>
             <label>ボード</label>
           </div>
 
           <!-- ステータス -->
           <div class="field label border top-margin">
-            <select id="mobile-task-status" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+            <select id="mobile-task-status" placeholder="" onchange="App.modals.mobileTaskDetail.markAsChanged()">
               <option value="TODO" ${task.task_status_key === 'TODO' ? 'selected' : ''}>未着手</option>
               <option value="IN_PROGRESS" ${task.task_status_key === 'IN_PROGRESS' ? 'selected' : ''}>進行中</option>
               <option value="IN_REVIEW" ${task.task_status_key === 'IN_REVIEW' ? 'selected' : ''}>確認中</option>
@@ -211,7 +211,7 @@
 
           <!-- 優先度 -->
           <div class="field label border top-margin">
-            <select id="mobile-task-priority" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+            <select id="mobile-task-priority" placeholder="" onchange="App.modals.mobileTaskDetail.markAsChanged()">
               <option value="LOW" ${task.priority_key === 'LOW' ? 'selected' : ''}>低</option>
               <option value="MEDIUM" ${task.priority_key === 'MEDIUM' ? 'selected' : ''}>中</option>
               <option value="HIGH" ${task.priority_key === 'HIGH' ? 'selected' : ''}>高</option>
@@ -221,31 +221,31 @@
 
           <!-- 開始日時 -->
           <div class="field label border top-margin">
-            <input type="datetime-local" id="mobile-task-starts-at" value="${task.starts_at || ''}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+            <input type="datetime-local" placeholder="" id="mobile-task-starts-at" value="${task.starts_at || ''}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
             <label>開始日時</label>
           </div>
 
           <!-- 終了日時 -->
           <div class="field label border top-margin">
-            <input type="datetime-local" id="mobile-task-ends-at" value="${task.ends_at || ''}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+            <input type="datetime-local" placeholder="" id="mobile-task-ends-at" value="${task.ends_at || ''}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
             <label>終了日時</label>
           </div>
 
           <!-- 担当者 -->
           <div class="field label border top-margin">
-            <input type="text" value="${processedBy ? escapeHtml(processedBy.display_name) : '未設定'}" readonly>
+            <input type="text" placeholder="" value="${processedBy ? escapeHtml(processedBy.display_name) : '未設定'}" readonly>
             <label>担当者</label>
           </div>
 
           <!-- レビュー担当者 -->
           <div class="field label border top-margin">
-            <input type="text" value="${reviewedBy ? escapeHtml(reviewedBy.display_name) : '未設定'}" readonly>
+            <input type="text" placeholder="" value="${reviewedBy ? escapeHtml(reviewedBy.display_name) : '未設定'}" readonly>
             <label>レビュー担当者</label>
           </div>
 
           <!-- 説明（プレビュー） -->
           <div class="field label border top-margin" onclick="App.modals.mobileTaskDetail.openQuillEditor()">
-            <textarea readonly rows="3">${descriptionPreview}</textarea>
+            <textarea placeholder="" readonly rows="3">${descriptionPreview}</textarea>
             <label>説明（タップして編集）</label>
           </div>
 
