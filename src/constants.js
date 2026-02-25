@@ -4,12 +4,7 @@
 
 const scriptProperties = PropertiesService.getScriptProperties();
 const FAVICON_FILE_ID = scriptProperties.getProperty('FAVICON_FILE_ID');
-let SPREADSHEET_ID;
-if (isDevelopment()) {
-  SPREADSHEET_ID = scriptProperties.getProperty('DEV_SPREADSHEET_ID');
-} else {
-  SPREADSHEET_ID = scriptProperties.getProperty('SPREADSHEET_ID');
-}
+const SPREADSHEET_ID = scriptProperties.getProperty('SPREADSHEET_ID');
 
 const TABLE_NAMES = {
   LOGS: 'logs',
