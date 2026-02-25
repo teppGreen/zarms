@@ -106,9 +106,18 @@ zarms/
 - GASのscriptPropertiesにて Spreadsheet ID などの環境変数が定義されています。
 
 ### デプロイ手順
-ソースコードの変更をGASプロジェクトへ反映させるには、CLASPコマンドを使用します。
+
+本プロジェクトでは、開発環境（dev）と本番環境（prod）を分けてデプロイできます。
 
 ```bash
-# コードのプッシュ
-clasp push
+# 開発環境へデプロイ
+npm run deploy:dev
+
+# 本番環境へデプロイ
+npm run deploy:prod
+
+# 開発環境で自動プッシュ（監視モード）
+npm run watch:dev
 ```
+
+※ 初回利用前に、`src/.clasp-dev.json` と `src/.clasp-prod.json` の `scriptId` が正しいか確認してください。
