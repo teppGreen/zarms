@@ -10,7 +10,6 @@
     App.pages.mobileBoard = {
       // データのキャッシュ
       cachedTasks: [],
-      cachedMembers: {},
       currentFilters: {
         status: ['TODO', 'IN_PROGRESS', 'IN_REVIEW'], // デフォルトでDONE以外を表示
         priority: [],
@@ -24,6 +23,16 @@
         console.log('[MobileBoard] Loading data... isRefresh:', isRefresh);
 
         try {
+          // 読み込み中アニメーションを表示
+          if (!isRefresh) {
+            const container = document.getElementById('mobile-tasks-container');
+            if (container) {
+              container.innerHTML = Array(4).fill(0).map((_, i) =>
+                `<article class="shimmer-loading small-margin no-elevate" style="height: 120px; animation-delay: ${i * 0.1}s; cursor: not-allowed;"></article>`
+              ).join('');
+            }
+          }
+
           // マイボードのタスクを取得（全ステータスを取得し、フィルタで制御）
           const tasksQuery = {
             where: {
@@ -34,16 +43,6 @@
           const tasksRes = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', tasksQuery, null, isRefresh);
           const tasks = tasksRes?.data || tasksRes || [];
 
-          // メンバー情報も取得（担当者名表示用）
-          const membersRes = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {}, null, isRefresh);
-          const members = membersRes?.data || membersRes || [];
-
-          // メンバー情報を辞書化
-          this.cachedMembers = {};
-          members.forEach(m => {
-            this.cachedMembers[m.id] = m;
-          });
-
           // キャッシュ更新
           this.cachedTasks = tasks;
 
@@ -51,7 +50,7 @@
           this.renderTasks(tasks);
 
           // キャッシュヒット時の再取得（バックグラウンド）
-          if (!isRefresh && (tasksRes?.isCached || membersRes?.isCached)) {
+          if (!isRefresh && tasksRes?.isCached) {
             console.log('[MobileBoard] Cached data detected. Refreshing in background...');
             setTimeout(() => {
               this.loadData(true);
@@ -81,7 +80,7 @@
         let html = '';
         if (filteredTasks.length === 0) {
           html = `
-            <article class="padding center-align">
+            <article class="padding center-align no-elevate">
               <i class="extra secondary-text">inbox</i>
               <p class="secondary-text">タスクはありません</p>
             </article>
@@ -106,15 +105,24 @@
         const deadlineInfo = this.getDeadlineInfo(task);
 
         // 担当者情報
-        const processedBy = this.cachedMembers[task.processed_by];
+        const members = App.state.data.members || [];
+        const processedBy = members.find(m => m.id === task.processed_by);
         const assigneeName = processedBy ? escapeHtml(processedBy.display_name) : '未設定';
+
+        let avatarHtml = '';
+        if (processedBy && processedBy.profile_photo_url) {
+          avatarHtml = `<i class="circle small no-margin"><img src="${escapeHtml(processedBy.profile_photo_url)}" class="responsive" alt="${assigneeName}"></i>`;
+        } else {
+          const initial = assigneeName !== '未設定' ? assigneeName.charAt(0).toUpperCase() : '?';
+          avatarHtml = `<i class="circle small no-margin primary-container"><span>${initial}</span></i>`;
+        }
 
         // task.idをエスケープ（onclick属性内で使用）
         const escapedTaskId = escapeHtml(task.id);
 
         return `
-          <article class="mobile-task-card small-margin padding" onclick="App.pages.mobileBoard.openTask('${escapedTaskId}')">
-            <div class="row">
+          <article class="no-elevate small-margin padding" onclick="App.pages.mobileBoard.openTask('${escapedTaskId}')">
+            <div class="row top-align">
               <div class="max">
                 <h6 class="small">${escapeHtml(task.name)}</h6>
                 <p class="small-text secondary-text">#${task.display_id}</p>
@@ -122,12 +130,6 @@
               <div>
                 <span class="chip small ${deadlineInfo.class}">${deadlineInfo.text}</span>
               </div>
-            </div>
-            <div class="row top-margin">
-              <span class="chip small transparent">${statusText}</span>
-              <span class="chip small transparent">優先度: ${priorityText}</span>
-              <div class="max"></div>
-              <span class="small-text secondary-text">${assigneeName}</span>
             </div>
           </article>
         `;
