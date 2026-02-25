@@ -7,7 +7,7 @@
  * 編集イベント
  * @param {GoogleAppsScript.Events.SheetsOnEdit} e
  */
-function onEdit(e) {
+function onEditFunction(e) {
     if (typeof ZARMS !== 'undefined' && ZARMS.handleOnEdit) {
         ZARMS.handleOnEdit(e);
     }
@@ -17,7 +17,7 @@ function onEdit(e) {
  * スプレッドシートを開いたときのイベント
  * @param {GoogleAppsScript.Events.SheetsOnOpen} e
  */
-function onOpen(e) {
+function onOpenFunction(e) {
     if (typeof ZARMS !== 'undefined' && ZARMS.handleOnOpen) {
         ZARMS.handleOnOpen(e);
     }
@@ -27,7 +27,7 @@ function onOpen(e) {
  * シートの構造が変更されたときのイベント
  * @param {GoogleAppsScript.Events.SheetsOnChange} e
  */
-function onChange(e) {
+function onChangeFunction(e) {
     if (typeof ZARMS !== 'undefined' && ZARMS.handleOnChange) {
         ZARMS.handleOnChange(e);
     }
@@ -47,19 +47,19 @@ function setupTriggers() {
     }
 
     // onOpenトリガーの設定
-    ScriptApp.newTrigger('onOpen')
+    ScriptApp.newTrigger('onOpenFunction')
         .forSpreadsheet(sheet)
         .onOpen()
         .create();
 
     // onEditトリガーの設定
-    ScriptApp.newTrigger('onEdit')
+    ScriptApp.newTrigger('onEditFunction')
         .forSpreadsheet(sheet)
         .onEdit()
         .create();
 
     // onChangeトリガーの設定
-    ScriptApp.newTrigger('onChange')
+    ScriptApp.newTrigger('onChangeFunction')
         .forSpreadsheet(sheet)
         .onChange()
         .create();
