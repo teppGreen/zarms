@@ -3,17 +3,14 @@
   <div class="surface padding small-round">
     <!-- ヘッダー -->
     <nav class="row">
-      <button class="circle transparent" onclick="App.modals.mobileQuillEditor.close()">
+      <button class="circle transparent" onclick="App.modals.mobileQuillEditor.save()">
         <i>arrow_back</i>
       </button>
       <h6 class="max">説明を編集</h6>
-      <button class="circle transparent" onclick="App.modals.mobileQuillEditor.save()">
-        <i>check</i>
-      </button>
     </nav>
 
     <!-- エディタエリア -->
-    <div id="mobile-quill-editor" class="top-margin" style="min-height: 400px; background: white;">
+    <div id="mobile-quill-editor" class="top-margin border large-height">
       <!-- Quillエディタがここに描画される -->
     </div>
   </div>
@@ -67,19 +64,8 @@
           modules: {
             toolbar: [
               ['bold', 'italic', 'underline', 'strike'],
-              ['blockquote', 'code-block'],
-              [{ 'header': 1 }, { 'header': 2 }],
               [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-              [{ 'script': 'sub' }, { 'script': 'super' }],
-              [{ 'indent': '-1' }, { 'indent': '+1' }],
-              [{ 'direction': 'rtl' }],
-              [{ 'size': ['small', false, 'large', 'huge'] }],
-              [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-              [{ 'color': [] }, { 'background': [] }],
-              [{ 'font': [] }],
-              [{ 'align': [] }],
-              ['clean'],
-              ['link']
+              ['link', 'clean']
             ]
           }
         });
@@ -109,8 +95,6 @@
           App.modals.mobileTaskDetail.currentTask.description = newContent;
           App.modals.mobileTaskDetail.markAsChanged();
         }
-
-        showSnackbar('説明を更新しました（保存ボタンを押してください）');
 
         // モーダルを閉じる
         this.close();
