@@ -57,9 +57,7 @@
     try {
       // ボード一覧とメンバー一覧を取得
       const [boardsRes, membersRes] = await Promise.all([
-        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {
-          where: { is_active: ['=', true] }
-        }, null, false),
+        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {}, null, false),
         callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {}, null, true)
       ]);
 
