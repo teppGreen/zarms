@@ -14,6 +14,8 @@
             clickHandlers: {}, // ボードごとのクリックハンドラーを保持
             contextMenuHandlers: {}, // ボードごとのコンテキストメニューハンドラーを保持
             loadingPromises: {}, // ボードごとの読み込みPromiseを保持
+            isResizeHandlerBound: false,
+            resizeRafId: null,
             // マイボードのフィルタ設定
             myBoardFilters: {},
 
@@ -178,6 +180,7 @@
 
                 // マイボード用のコンテナ生成
                 this.initializeMyBoard(container);
+                this.setupResizeHandler();
             },
 
             initializeMyBoard: function (container) {
@@ -270,6 +273,7 @@
 
                     // ボード固有のタスクキャッシュに保存
                     this.cachedBoardTasks[boardId] = tasks;
+                    this.mergeTasksIntoGlobalCache(tasks);
 
                     console.log(`Board ${boardId} tasks loaded:`, tasks.length);
 
@@ -307,6 +311,7 @@
                                 }
 
                                 this.cachedBoardTasks[boardId] = freshTasks;
+                                this.mergeTasksIntoGlobalCache(freshTasks);
                                 console.log(`Board ${boardId} tasks refreshed:`, freshTasks.length);
 
                                 // 最新データでカンバンを再描画
@@ -378,6 +383,7 @@
                 if (!isLoading) {
                     this.lastRenderTimes[boardId] = Date.now();
                 }
+                const memberMap = new Map((App.state.data.members || []).map(member => [member.id, member]));
 
                 const html = [
                     '<div class="grid no-space">',
@@ -431,7 +437,7 @@
                                     return new Date(a.ends_at) - new Date(b.ends_at);
                                 }
                             });
-                            itemsHtml = columnTasks.map(task => this.createTaskCard(task)).join('');
+                            itemsHtml = columnTasks.map(task => this.createTaskCard(task, memberMap)).join('');
                             countText = columnTasks.length;
                         }
 
@@ -454,36 +460,7 @@
 
                 container.innerHTML = html;
 
-                // 高さ計算と適用
-                try {
-                    const mainElement = document.querySelector('main');
-                    const columnItems = container.querySelectorAll('.kanban-column-items');
-
-                    if (mainElement && columnItems.length > 0) {
-                        const windowHeight = window.innerHeight;
-
-                        // main要素の下部余白（マージン + パディング）を計算
-                        const mainStyle = window.getComputedStyle(mainElement);
-                        const marginBottom = parseFloat(mainStyle.marginBottom) || 0;
-                        const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
-                        // 安全マージンを追加（ブラウザのUIや微妙なズレを考慮）
-                        const buffer = 16;
-                        const offsetBottom = marginBottom + paddingBottom + buffer;
-
-                        columnItems.forEach(item => {
-                            const rect = item.getBoundingClientRect();
-                            // 上端位置が正しく取得できている場合のみ計算
-                            if (rect.top > 0) {
-                                const newHeight = windowHeight - rect.top - offsetBottom;
-                                if (newHeight > 0) {
-                                    item.style.height = `${newHeight}px`;
-                                }
-                            }
-                        });
-                    }
-                } catch (e) {
-                    console.error('Height calculation failed:', e);
-                }
+                this.applyColumnHeights(boardId);
 
                 if (!isLoading) {
                     this.bindCardEvents(container);
@@ -545,6 +522,7 @@
                 if (!container) return;
 
                 const containerId = container.id;
+                const boardId = containerId.replace('kanban-canvas-', '');
 
                 // containerにIDがない場合は処理をスキップ
                 if (!containerId) {
@@ -594,6 +572,7 @@
                     if (card) {
                         const taskId = card.dataset.eid;
                         if (taskId && App.modals.taskDetail) {
+                            this.currentBoardId = boardId;
                             App.modals.taskDetail.open(taskId);
                         }
                     }
@@ -1059,16 +1038,16 @@
                 });
             },
 
-            createTaskCard: function (task) {
+            createTaskCard: function (task, memberMap = null) {
                 const displayId = task.display_id ? `#${task.display_id}` : '';
                 const now = new Date();
 
                 // App.state.data.members からメンバー情報を取得
-                const allMembers = App.state.data.members || [];
-                const createdBy = allMembers.find(m => m.id === task.created_by);
-                const processedBy = allMembers.find(m => m.id === task.processed_by);
-                const reviewedBy = allMembers.find(m => m.id === task.reviewed_by);
-                const receivedBy = allMembers.find(m => m.id === task.received_by);
+                const membersById = memberMap || new Map((App.state.data.members || []).map(member => [member.id, member]));
+                const createdBy = membersById.get(task.created_by);
+                const processedBy = membersById.get(task.processed_by);
+                const reviewedBy = membersById.get(task.reviewed_by);
+                const receivedBy = membersById.get(task.received_by);
 
                 // 1. 現在のステータスに対応する担当者がユーザーと同じ場合、ボーダーを追加
                 let isCurrentUserAssignee = false;
@@ -1307,11 +1286,75 @@
                     const item = this.cachedBoardTasks[boardId].find(t => t.id === taskId);
                     if (item) return item;
                 }
+                for (const tasks of Object.values(this.cachedBoardTasks)) {
+                    const item = tasks.find(t => t.id === taskId);
+                    if (item) return item;
+                }
                 // フォールバック: グローバルキャッシュ
                 if (App.state.data.tasks) {
                     return App.state.data.tasks.find(t => t.id === taskId);
                 }
                 return null;
+            },
+
+            setupResizeHandler: function () {
+                if (this.isResizeHandlerBound) return;
+                this.isResizeHandlerBound = true;
+
+                window.addEventListener('resize', () => {
+                    if (this.resizeRafId) {
+                        cancelAnimationFrame(this.resizeRafId);
+                    }
+                    this.resizeRafId = requestAnimationFrame(() => {
+                        const boardId = this.currentBoardId;
+                        if (!boardId) return;
+                        this.applyColumnHeights(boardId);
+                    });
+                });
+            },
+
+            applyColumnHeights: function (boardId) {
+                const container = document.getElementById(`kanban-canvas-${boardId}`);
+                if (!container) return;
+
+                try {
+                    const mainElement = document.querySelector('main');
+                    const columnItems = container.querySelectorAll('.kanban-column-items');
+                    if (!mainElement || columnItems.length === 0) return;
+
+                    const windowHeight = window.innerHeight;
+                    const mainStyle = window.getComputedStyle(mainElement);
+                    const marginBottom = parseFloat(mainStyle.marginBottom) || 0;
+                    const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
+                    const offsetBottom = marginBottom + paddingBottom + 16;
+
+                    columnItems.forEach(item => {
+                        const rect = item.getBoundingClientRect();
+                        if (rect.top <= 0) return;
+                        const newHeight = windowHeight - rect.top - offsetBottom;
+                        if (newHeight > 0) {
+                            item.style.height = `${newHeight}px`;
+                        }
+                    });
+                } catch (e) {
+                    console.error('Height calculation failed:', e);
+                }
+            },
+
+            mergeTasksIntoGlobalCache: function (tasks) {
+                if (!Array.isArray(tasks) || tasks.length === 0) return;
+                if (!App.state.data) App.state.data = {};
+                if (!Array.isArray(App.state.data.tasks)) App.state.data.tasks = [];
+
+                const taskIndex = new Map(App.state.data.tasks.map((task, index) => [task.id, index]));
+                tasks.forEach(task => {
+                    const existingIndex = taskIndex.get(task.id);
+                    if (existingIndex !== undefined) {
+                        App.state.data.tasks[existingIndex] = task;
+                    } else {
+                        App.state.data.tasks.push(task);
+                    }
+                });
             }
         };
     })();
