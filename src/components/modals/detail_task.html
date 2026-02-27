@@ -291,6 +291,12 @@
         const boardTasks = (currentBoardId && App.pages.boards?.cachedBoardTasks?.[currentBoardId]) || [];
         let task = boardTasks.find(t => t.id === taskId);
 
+        // キャッシュに見つからない場合、他ボードのキャッシュから検索
+        if (!task && App.pages.boards?.cachedBoardTasks) {
+          const allBoardTasks = Object.values(App.pages.boards.cachedBoardTasks).flat();
+          task = allBoardTasks.find(t => t.id === taskId);
+        }
+
         // キャッシュに見つからない場合、グローバルデータから検索（My Boardなどでキャッシュに含まれていない場合への対策）
         if (!task && App.state.data.tasks) {
           task = App.state.data.tasks.find(t => t.id === taskId);
