@@ -143,96 +143,16 @@ function runDownstreamSync() {
             try {
                 console.log(`[Downstream] Processing list view: ${listViewSpreadsheetId}`);
                 const listViewSs = SpreadsheetApp.openById(listViewSpreadsheetId);
-                const listParser = new ConfigParser(listViewSs);
-                const headerResult = listParser.resolveHeaderMappings();
-                const systemIdCol = listParser.getSystemIdColumn();
+                const listLockKey = `sync_in_progress_${listViewSpreadsheetId}`;
 
-                if (headerResult.sheetName && systemIdCol) {
-                    const dataSheet = listViewSs.getSheetByName(headerResult.sheetName);
-                    if (dataSheet) {
-                        const lastRow = dataSheet.getLastRow();
-
-                        // ID列からデータ行の行番号マップを構築
-                        const idRowMap = {};
-                        if (lastRow >= headerResult.dataStartRow) {
-                            const idRange = dataSheet.getRange(
-                                headerResult.dataStartRow,
-                                systemIdCol.col,
-                                lastRow - headerResult.dataStartRow + 1,
-                                1
-                            );
-                            const idValues = idRange.getValues();
-                            idValues.forEach((row, i) => {
-                                if (row[0]) {
-                                    idRowMap[row[0]] = headerResult.dataStartRow + i;
-                                }
-                            });
-                        }
-
-                        // 再入ガードフラグを設定
-                        const listLockKey = `sync_in_progress_${listViewSpreadsheetId}`;
-                        let hasUpdates = false;
-                        // 新規行は既存データの末尾、またはデータ開始行から追加
-                        let nextNewRow = Math.max(lastRow + 1, headerResult.dataStartRow);
-
-                        for (const plan of plans) {
-                            const targetRow = idRowMap[plan.id];
-
-                            if (targetRow) {
-                                // 既存行の更新
-                                for (const mapping of headerResult.mappings) {
-                                    const newValue = plan[mapping.key];
-                                    if (newValue === undefined) continue;
-
-                                    const cell = dataSheet.getRange(targetRow, mapping.col);
-                                    const currentValue = cell.getValue();
-
-                                    if (currentValue !== newValue) {
-                                        if (!hasUpdates) {
-                                            props.setProperty(listLockKey, new Date().toISOString());
-                                            hasUpdates = true;
-                                        }
-                                        cell.setValue(newValue);
-                                    }
-                                }
-                            } else {
-                                // 新規行の追加: Master DB にレコードがあるが一覧シートに未登録の場合
-                                if (!hasUpdates) {
-                                    props.setProperty(listLockKey, new Date().toISOString());
-                                    hasUpdates = true;
-                                }
-
-                                console.log(`[Downstream] Adding new row for plan ${plan.id} at row ${nextNewRow}`);
-
-                                // system ID 列に plan.id を書き込む
-                                dataSheet.getRange(nextNewRow, systemIdCol.col).setValue(plan.id);
-
-                                // header マッピングに基づいて各データ列の値を設定
-                                for (const mapping of headerResult.mappings) {
-                                    const newValue = plan[mapping.key];
-                                    if (newValue === undefined) continue;
-                                    dataSheet.getRange(nextNewRow, mapping.col).setValue(newValue);
-                                }
-
-                                nextNewRow++;
-                            }
-                        }
-
-                        // 書き込みがあった場合のみ flush とフラグ解除
-                        if (hasUpdates) {
-                            try {
-                                SpreadsheetApp.flush();
-                            } finally {
-                                props.deleteProperty(listLockKey);
-                            }
-                        }
-
-                        console.log(`[Downstream] List view sync completed.`);
-                    } else {
-                        console.warn(`[Downstream] Data sheet "${headerResult.sheetName}" not found in list view.`);
-                    }
-                } else {
-                    console.warn('[Downstream] List view _config is missing header mappings or system id column.');
+                // 再入ガードフラグを設定
+                props.setProperty(listLockKey, new Date().toISOString());
+                try {
+                    // syncPlansToListView（sheet_generator.js）に処理を委譲
+                    syncPlansToListView(plans, listViewSs);
+                    console.log(`[Downstream] List view sync completed.`);
+                } finally {
+                    props.deleteProperty(listLockKey);
                 }
             } catch (err) {
                 console.error('Error processing downstream for list view:', err);
@@ -245,63 +165,18 @@ function runDownstreamSync() {
             if (!plan.sheet_url) continue;
 
             try {
-                // 個別シートを開く
                 const individualSpreadsheet = SpreadsheetApp.openByUrl(plan.sheet_url);
-                const parser = new ConfigParser(individualSpreadsheet);
-
-                // ============================================
-                // 3.1 `基本` タブ (単一セルマッピング) への反映
-                // ============================================
-                const mappings = parser.getAllInputMappings();
-
-                let hasBasicUpdates = false;
                 const targetSheetId = individualSpreadsheet.getId();
                 const lockKey = `sync_in_progress_${targetSheetId}`;
 
-                for (const mapping of mappings) {
-                    if (mapping.table === 'plans') {
-                        const targetKey = mapping.key;
-                        const newValue = plan[targetKey];
+                // 再入ガードフラグを設定
+                props.setProperty(lockKey, new Date().toISOString());
 
-                        // newValue が undefined (カラムに存在しない) の場合はスキップ
-                        if (newValue === undefined) continue;
-
-                        let sheet, cell;
-                        if (mapping.range && mapping.range.sheet) {
-                            sheet = individualSpreadsheet.getSheetByName(mapping.range.sheet);
-                            if (!sheet) continue;
-                            cell = sheet.getRange(mapping.range.row, mapping.range.col);
-                        } else {
-                            // range が空欄の場合は _config シートの value 列自身に書き込む
-                            sheet = individualSpreadsheet.getSheetByName('_config');
-
-                            // mapping.valueColIndex が正しく取得できているか、かつ1以上かを確認する
-                            if (!sheet || !mapping.valueColIndex || mapping.valueColIndex < 1) {
-                                console.warn(`Missing value column index for mapping key: ${mapping.key}`);
-                                continue;
-                            }
-                            cell = sheet.getRange(mapping.rowNumber, mapping.valueColIndex);
-                        }
-
-                        const currentValue = cell.getValue();
-
-                        // 値が異なる場合のみ上書き (不要な編集イベントのトリガー回避のため)
-                        if (currentValue !== newValue) {
-                            if (!hasBasicUpdates) {
-                                props.setProperty(lockKey, new Date().toISOString());
-                                hasBasicUpdates = true;
-                            }
-                            cell.setValue(newValue);
-                        }
-                    }
-                }
-
-                if (hasBasicUpdates) {
-                    try {
-                        SpreadsheetApp.flush();
-                    } finally {
-                        props.deleteProperty(lockKey); // 基本タブの更新終わったらロック解除
-                    }
+                try {
+                    // syncPlanToIndividualSheet（sheet_generator.js）に処理を委譲
+                    syncPlanToIndividualSheet(plan, individualSpreadsheet);
+                } finally {
+                    props.deleteProperty(lockKey);
                 }
             } catch (err) {
                 console.error(`Error processing downstream for plan ${plan.id}:`, err);

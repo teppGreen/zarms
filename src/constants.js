@@ -12,6 +12,7 @@ if (isDevelopment()) {
 }
 const QUESTION_SPREADSHEET_ID = scriptProperties.getProperty('QUESTION_SPREADSHEET_ID');
 const LIST_VIEW_SPREADSHEET_ID = scriptProperties.getProperty('LIST_VIEW_SPREADSHEET_ID');
+const INDIVIDUAL_SHEET_TEMPLATE_ID = scriptProperties.getProperty('INDIVIDUAL_SHEET_TEMPLATE_ID');
 
 const TABLE_NAMES = {
   LOGS: 'logs',
