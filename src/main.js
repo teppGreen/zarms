@@ -64,6 +64,39 @@ function loadMainApp(activeUser, urlParams) {
   return template.evaluate().getContent();
 }
 
+/**
+ * モバイル版アプリケーションをロードします
+ * 認証済みユーザーに対してモバイル版アプリケーション画面を返します
+ * @param {Object} urlParams - URLパラメータ
+ * @returns {string} HTMLコンテンツ
+ */
+function loadMobileApp(urlParams) {
+  // まず、現在のユーザーを取得
+  const activeUserEmail = Session.getActiveUser().getEmail();
+  
+  try {
+    // ユーザー情報を取得
+    const activeUser = getMemberByEmail(activeUserEmail);
+    
+    // モバイル版のテンプレートをロード
+    const template = HtmlService.createTemplateFromFile('mobile/index');
+    template.templateVariables = {
+      activeUser: activeUser,
+      isDevelopment: isDevelopment(urlParams),
+      TABLE_NAMES: TABLE_NAMES,
+      DIRECTORY_TYPES: DIRECTORY_TYPES,
+      TASK_STATUS: TASK_STATUS,
+      UI_TEXT: UI_TEXT,
+      userProperties: PropertiesService.getUserProperties().getProperties()
+    };
+    
+    return template.evaluate().getContent();
+  } catch (error) {
+    console.error('[loadMobileApp] Error:', error);
+    throw error;
+  }
+}
+
 // ============================================
 // 初期データ一括取得（register.html用）
 // GAS呼び出し1回で 認証チェック + ユーザー取得 + 初期データ取得 を行う
