@@ -7,6 +7,13 @@
 
 <script>
   (function () {
+    const container = document.getElementById('mobile-tasks-container');
+    if (container) {
+      container.innerHTML = Array(4).fill(0).map((_, i) =>
+        `<article class="shimmer-loading small-margin no-elevate" style="height: 120px; animation-delay: ${i * 0.1}s; cursor: not-allowed;"></article>`
+      ).join('');
+    }
+
     App.pages.mobileBoard = {
       // データのキャッシュ
       cachedTasks: [],
@@ -119,13 +126,14 @@
 
         // task.idをエスケープ（onclick属性内で使用）
         const escapedTaskId = escapeHtml(task.id);
+        const board = App.state.data.boards.find(b => b.id === task.board_id);
 
         return `
           <article class="no-elevate small-margin padding" onclick="App.pages.mobileBoard.openTask('${escapedTaskId}')">
             <div class="row top-align">
               <div class="max">
-                <h6 class="small">${escapeHtml(task.name)}</h6>
-                <p class="small-text secondary-text">#${task.display_id}</p>
+                <h6 class="small"><span class="secondary-text font-number">#${task.display_id}</span> ${escapeHtml(task.name)}</h6>
+                <span class="small-text top-margin secondary-text">${escapeHtml(board?.name || "マイボード")}</span>
               </div>
               <div>
                 <span class="chip small ${deadlineInfo.class}">${deadlineInfo.text}</span>
