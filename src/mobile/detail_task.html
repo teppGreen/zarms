@@ -207,7 +207,7 @@
         if (!content) return;
 
         // ボード名を取得
-        const boards = App.state.data.boards || [];
+        const boards = [{ id: 'my-board', name: 'マイボード' }, ...App.state.data.boards] || [];
         const board = boards.find(b => b.id === task.board_id);
         const boardName = board ? escapeHtml(board.name) : '未設定';
 
@@ -219,96 +219,102 @@
           const name = m ? escapeHtml(m.display_name) : '未設定';
           let avatarHtml = '';
           if (m && m.profile_photo_url) {
-            avatarHtml = `<i class="circle extra no-margin"><img src="${escapeHtml(m.profile_photo_url)}" class="responsive" alt="${name}"></i>`;
+            avatarHtml = `<img src="${escapeHtml(m.profile_photo_url)}" class="responsive" alt="${name}">`;
           } else {
             const initial = name !== '未設定' ? name.charAt(0).toUpperCase() : '?';
-            avatarHtml = `<i class="circle extra no-margin primary-container"><span>${initial}</span></i>`;
+            avatarHtml = `<i>person</i>`;
           }
           return `
             <div class="s3 center-align no-space">
-              ${avatarHtml}
-              <div><span class="small-text no-margin">${name}</span></div>
-              <div><span class="small-text secondary-text no-margin">${roleName}</span></div>
+              <div class="bottom-margin">
+                <button class="circle no-border transparent" onclick="showSnackbar('モバイル版では担当者を変更できません。デスクトップ版をご利用ください。')">${avatarHtml}</button>
+              </div>
+              <div class="vertical">
+                <span class="small-text no-margin">${name}</span>
+                <span class="small-text secondary-text no-margin">${roleName}</span>
+              </div>
             </div>
           `;
         };
 
-
-
         // descriptionのプレビュー（HTMLタグを除去）
-        const descriptionPreview = this.stripHtmlTags(task.description || '説明なし');
+        const descriptionPreview = this.stripHtmlTags(task.description || '');
 
         content.innerHTML = `
-          <!-- タスク名 -->
-          <div class="field label border">
-            <input type="text" placeholder="" id="mobile-task-name" value="${escapeHtml(task.name)}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
-            <label>タスク名</label>
-          </div>
-
-          <!-- ボード -->
-          <div class="field label border top-margin">
-            <select id="mobile-task-board" onchange="App.modals.mobileTaskDetail.markAsChanged()">
-              ${boards.map(b => `<option value="${escapeHtml(b.id)}" ${b.id === task.board_id ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('')}
-            </select>
-            <label>ボード</label>
-            <i class="right">arrow_drop_down</i>
-          </div>
-
-          <!-- ステータス -->
-          <div class="field label border top-margin">
-            <select id="mobile-task-status" placeholder="" onchange="App.modals.mobileTaskDetail.markAsChanged()">
-              <option value="TODO" ${task.task_status_key === 'TODO' ? 'selected' : ''}>未着手</option>
-              <option value="IN_PROGRESS" ${task.task_status_key === 'IN_PROGRESS' ? 'selected' : ''}>進行中</option>
-              <option value="IN_REVIEW" ${task.task_status_key === 'IN_REVIEW' ? 'selected' : ''}>確認中</option>
-              <option value="DONE" ${task.task_status_key === 'DONE' ? 'selected' : ''}>完了</option>
-            </select>
-            <label>ステータス</label>
-          </div>
-
-          <!-- 優先度 -->
-          <div class="field label border top-margin">
-            <select id="mobile-task-priority" placeholder="" onchange="App.modals.mobileTaskDetail.markAsChanged()">
-              <option value="LOW" ${task.priority_key === 'LOW' ? 'selected' : ''}>低</option>
-              <option value="MEDIUM" ${task.priority_key === 'MEDIUM' ? 'selected' : ''}>中</option>
-              <option value="HIGH" ${task.priority_key === 'HIGH' ? 'selected' : ''}>高</option>
-            </select>
-            <label>優先度</label>
-          </div>
-
-          <!-- 開始日時 -->
-          <div class="field label border top-margin">
-            <input type="datetime-local" placeholder="" id="mobile-task-starts-at" value="${formatDateTimeForInput(task.starts_at)}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
-            <label>開始日時</label>
-          </div>
-
-          <!-- 終了日時 -->
-          <div class="field label border top-margin">
-            <input type="datetime-local" placeholder="" id="mobile-task-ends-at" value="${formatDateTimeForInput(task.ends_at)}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
-            <label>終了日時</label>
-          </div>
-
-          <!-- 担当者一覧 -->
-          <div class="field border top-margin padding">
-            <div class="grid">
-              ${getMemberHtml(task.created_by, '作成者')}
-              ${getMemberHtml(task.processed_by, '進行者')}
-              ${getMemberHtml(task.reviewed_by, '確認者')}
-              ${getMemberHtml(task.received_by, '受領者')}
+          <div class="grid">
+            <!-- タスク名 -->
+            <div class="field small label border s12">
+              <input type="text" placeholder="" id="mobile-task-name" value="${escapeHtml(task.name)}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+              <label>タスク名</label>
             </div>
-          </div>
 
-          <!-- 説明（プレビュー） -->
-          <div class="field label border top-margin" onclick="App.modals.mobileTaskDetail.openQuillEditor()">
-            <textarea placeholder="" readonly rows="3">${descriptionPreview}</textarea>
-            <label>説明</label>
-          </div>
+            <!-- ボード -->
+            <div class="field small label border s12">
+              <select id="mobile-task-board" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+                ${boards.map(b => `<option value="${escapeHtml(b.id)}" ${b.id === task.board_id ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('')}
+              </select>
+              <label>ボード</label>
+              <i class="right">arrow_drop_down</i>
+            </div>
 
-          <!-- 保存ボタン -->
-          <div class="top-margin">
-            <button class="responsive primary extra" onclick="App.modals.mobileTaskDetail.save()">
-              <i>save</i>
-              <span>保存</span>
-            </button>
+            <!-- ステータス -->
+            <div class="field small label border s6">
+              <select id="mobile-task-status" placeholder="" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+                <option value="TODO" ${task.task_status_key === 'TODO' ? 'selected' : ''}>未着手</option>
+                <option value="IN_PROGRESS" ${task.task_status_key === 'IN_PROGRESS' ? 'selected' : ''}>進行中</option>
+                <option value="IN_REVIEW" ${task.task_status_key === 'IN_REVIEW' ? 'selected' : ''}>確認中</option>
+                <option value="DONE" ${task.task_status_key === 'DONE' ? 'selected' : ''}>完了</option>
+              </select>
+              <label>ステータス</label>
+            </div>
+
+            <!-- 優先度 -->
+            <div class="field small label border s6">
+              <select id="mobile-task-priority" placeholder="" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+                <option value="LOW" ${task.priority_key === 'LOW' ? 'selected' : ''}>低</option>
+                <option value="MEDIUM" ${task.priority_key === 'MEDIUM' ? 'selected' : ''}>中</option>
+                <option value="HIGH" ${task.priority_key === 'HIGH' ? 'selected' : ''}>高</option>
+              </select>
+              <label>優先度</label>
+            </div>
+
+            <!-- 開始日時 -->
+            <div class="field small label border s12">
+              <input type="datetime-local" placeholder="" id="mobile-task-starts-at" value="${formatDateTimeForInput(task.starts_at)}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+              <label>開始日時</label>
+            </div>
+
+            <!-- 終了日時 -->
+            <div class="field small label border s12">
+              <input type="datetime-local" placeholder="" id="mobile-task-ends-at" value="${formatDateTimeForInput(task.ends_at)}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+              <label>終了日時</label>
+            </div>
+
+            <!-- 担当者一覧 -->
+            <div class="field border padding s12">
+              <div class="grid">
+                ${getMemberHtml(task.created_by, '作成者')}
+                ${getMemberHtml(task.processed_by, '進行者')}
+                ${getMemberHtml(task.reviewed_by, '確認者')}
+                ${getMemberHtml(task.received_by, '受領者')}
+              </div>
+            </div>
+
+            <!-- 説明（プレビュー） -->
+            <div class="field small label border s12" onclick="App.modals.mobileTaskDetail.openQuillEditor()">
+              <textarea placeholder="" readonly rows="4">${descriptionPreview}</textarea>
+              <label>説明</label>
+            </div>
+
+            <!-- 保存ボタン -->
+            <div class="top-margin s12">
+              <button class="responsive primary large" onclick="App.modals.mobileTaskDetail.save()">
+                <span>変更を保存</span>
+              </button>
+              <button class="responsive top-margin transparent error-text large" onclick="App.modals.mobileTaskDetail.discard()">
+                <span>変更を破棄</span>
+              </button>
+            </div>
           </div>
         `;
 
@@ -351,11 +357,25 @@
       },
 
       /**
+       * 変更を破棄
+       */
+      discard: function () {
+        if (!this.currentTask) return;
+        if (this.hasUnsavedChanges) {
+          if (!confirm(`タスク「${this.currentTask.name}」の変更を破棄しますか？`)) {
+            return;
+          }
+        }
+        return this.close(true);
+      },
+
+      /**
        * 保存
        */
       save: async function () {
         if (!this.currentTask) return;
 
+        const currentTaskId = this.currentTask.id;
         const name = document.getElementById('mobile-task-name')?.value;
         const status = document.getElementById('mobile-task-status')?.value;
         const priority = document.getElementById('mobile-task-priority')?.value;
@@ -397,12 +417,13 @@
         if (globalTask) Object.assign(globalTask, updates);
 
         this.hasUnsavedChanges = false;
+        this.close(true);
         showSnackbar('保存しました');
 
         try {
           await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
             set: updates,
-            where: { id: ['=', this.currentTask.id] }
+            where: { id: ['=', currentTaskId] }
           }, `タスク「${name}」を更新しました`);
 
           // バックグラウンドでボード一覧を最新化
@@ -421,23 +442,22 @@
       deleteTask: async function () {
         if (!this.currentTask) return;
 
-        if (!confirm(`タスク「${this.currentTask.name}」を削除しますか？`)) {
+        const currentTaskId = this.currentTask.id;
+
+        if (!confirm(`タスクを削除しますか？`)) {
           return;
         }
 
+        // モーダルを閉じる
+        this.close(true);
+
         try {
-          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'delete', {
-            where: { id: ['=', this.currentTask.id] }
-          }, `タスク「${this.currentTask.name}」を削除しました`);
-
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'remove', {
+            where: { id: ['=', currentTaskId] }
+          }, `タスクを削除しました`);
           showSnackbar('削除しました');
-
-          // モーダルを閉じる
-          this.close(true);
-
           // データを再読み込み
           await App.pages.mobileBoard.loadData(true);
-
         } catch (error) {
           console.error('[MobileTaskDetail] Delete error:', error);
           showSnackbar('削除に失敗しました: ' + error.message);
@@ -449,8 +469,8 @@
        */
       close: function (skipConfirm = false) {
         if (!skipConfirm && this.hasUnsavedChanges) {
-          if (!confirm('保存されていない変更があります。閉じてもよろしいですか？')) {
-            return false;
+          if (!confirm('変更を保存しますか？')) {
+            return this.save();
           }
         }
 
