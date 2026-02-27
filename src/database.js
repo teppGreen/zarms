@@ -614,23 +614,21 @@ function update(userId, sheetName, query) {
             throw new Error('No records found matching the update criteria');
         }
 
-        // 各レコードを更新
+        // 更新対象のレコードを特定し、書き込み用のデータを収集
         const results = [];
+        const allData = Sheets.Spreadsheets.Values.get(SPREADSHEET_ID, sheetName);
+        if (!allData || !allData.values) {
+            throw new Error(`Failed to retrieve data from ${sheetName}`);
+        }
+
+        const idIndex = headers.indexOf('id');
+        const dataToUpdate = [];
+
         for (const record of targetRecords) {
-            // IDで対象行を特定
-            const idColumn = headersMap['id'];
-            if (!idColumn) {
-                throw new Error('ID column not found in headers map');
-            }
-
-            // 行番号の取得（全データを取得して検索）
-            const allData = Sheets.Spreadsheets.Values.get(SPREADSHEET_ID, sheetName);
+            // 行番号の取得
             let targetRowIndex = -1;
-
             for (let i = 1; i < allData.values.length; i++) {
-                const row = allData.values[i];
-                const idIndex = headers.indexOf('id');
-                if (row[idIndex] === record.id) {
+                if (allData.values[i][idIndex] === record.id) {
                     targetRowIndex = i + 1; // 1-indexed
                     break;
                 }
@@ -642,20 +640,29 @@ function update(userId, sheetName, query) {
 
             // 更新データの準備
             const preparedData = prepareUpdateData(userId, sheetName, query.set);
-            const updatedRecord = { ...record, ...preparedData };
-            const rowData = convertRecordToArray(updatedRecord, headers);
 
-            // 更新の実行
-            const range = `${sheetName}!A${targetRowIndex}:${String.fromCharCode(65 + headers.length - 1)}${targetRowIndex}`;
-            const request = {
-                values: [rowData]
-            };
+            // 変更のあったカラム（+メタデータ）のみをバッチ更新リストに追加
+            // これにより ARRAYFORMULA 等が含まれる列を不必要に上書きして #REF! になるのを防ぐ
+            for (const key in preparedData) {
+                const colId = headersMap[key];
+                if (!colId) continue;
 
-            Sheets.Spreadsheets.Values.update(request, SPREADSHEET_ID, range, {
-                valueInputOption: 'USER_ENTERED'
-            });
+                dataToUpdate.push({
+                    range: `${sheetName}!${colId}${targetRowIndex}`,
+                    values: [[preparedData[key]]]
+                });
+            }
 
             results.push({ id: record.id, success: true });
+        }
+
+        // 全てのレコードの更新を1回のバッチリクエストで実行（高速化）
+        if (dataToUpdate.length > 0) {
+            const batchRequest = {
+                valueInputOption: 'USER_ENTERED',
+                data: dataToUpdate
+            };
+            Sheets.Spreadsheets.Values.batchUpdate(batchRequest, SPREADSHEET_ID);
         }
 
         // キャッシュの無効化
