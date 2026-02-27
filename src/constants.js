@@ -4,7 +4,7 @@
 
 const scriptProperties = PropertiesService.getScriptProperties();
 const FAVICON_FILE_ID = scriptProperties.getProperty('FAVICON_FILE_ID');
-const SPREADSHEET_ID = scriptProperties.getProperty('DEV_SPREADSHEET_ID');
+const SPREADSHEET_ID = scriptProperties.getProperty('SPREADSHEET_ID');
 const QUESTION_SPREADSHEET_ID = scriptProperties.getProperty('QUESTION_SPREADSHEET_ID');
 const LIST_VIEW_SPREADSHEET_ID = scriptProperties.getProperty('LIST_VIEW_SPREADSHEET_ID');
 const INDIVIDUAL_SHEET_TEMPLATE_ID = scriptProperties.getProperty('INDIVIDUAL_SHEET_TEMPLATE_ID');
