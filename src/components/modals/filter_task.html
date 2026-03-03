@@ -149,14 +149,24 @@
                 this.currentRole = role;
                 const currentFilters = App.pages.boards?.myBoardFilters;
                 const currentMembers = currentFilters?.members?.[role] || [];
+                const allRoles = ['created_by', 'processed_by', 'reviewed_by', 'received_by'];
 
                 App.modals.selectMembers.open({
                     multiSelect: true,
                     preSelected: [], // 追加モードのため既存選択は表示しない
+                    showApplyAll: true,
                     callback: (selectedIds) => {
                         // 既存メンバーと新規選択メンバーを結合
                         const mergedIds = Array.from(new Set([...currentMembers, ...selectedIds]));
                         this.updateMemberSelection(role, mergedIds);
+                    },
+                    applyAllCallback: (selectedIds) => {
+                        // 全ロールに対して選択メンバーを追加
+                        allRoles.forEach(r => {
+                            const existingMembers = App.pages.boards?.myBoardFilters?.members?.[r] || [];
+                            const mergedIds = Array.from(new Set([...existingMembers, ...selectedIds]));
+                            this.updateMemberSelection(r, mergedIds);
+                        });
                     }
                 });
             },
