@@ -84,7 +84,7 @@
             <div class="row">
                 <label class="checkbox">
                     <input type="checkbox" id="filter-processed-by-include-list-members">
-                    <span>「進行者」に設定した人をリストの担当者からも検索</span>
+                    <span>｢進行者｣に設定した人をリストの担当者からも検索</span>
                 </label>
             </div>
             <div class="row">
@@ -102,19 +102,21 @@
             <span class="bold small-text">期間</span>
             <div class="grid no-margin no-space">
                 <div class="s5 field border small">
-                    <input type="datetime-local" id="filter-starts-at-from">
+                    <input type="datetime-local" id="filter-starts-at-from" placeholder=" ">
+                    <label>開始日時</label>
                 </div>
                 <div class="s2 middle-align center-align">
                     <span>〜</span>
                 </div>
                 <div class="s5 field border small">
-                    <input type="datetime-local" id="filter-ends-at-to">
+                    <input type="datetime-local" id="filter-ends-at-to" placeholder=" ">
+                    <label>終了日時</label>
                 </div>
             </div>
             <div class="row">
                 <label class="checkbox">
                     <input type="checkbox" id="filter-is-overdue">
-                    <span>タスクの終了日時が現在を超過しているもののみ表示</span>
+                    <span>タスクの｢終了日時｣が現在を超過しているもののみ表示</span>
                 </label>
             </div>
         </div>
@@ -138,8 +140,10 @@
     </div>
 
     <nav class="right-align small-padding">
-        <button class="border round text-primary" onclick="App.modals.filterTask.resetDefaults()">デフォルトに戻す</button>
-        <button class="primary round" onclick="App.modals.filterTask.apply()">適用</button>
+        <a onclick="App.modals.filterTask.resetAll()"><span>リセット</span></a>
+        <div class="max"></div>
+        <button class="border" onclick="ui('#modal-filter-task')">キャンセル</button>
+        <button onclick="App.modals.filterTask.apply()">適用</button>
     </nav>
 </dialog>
 
@@ -344,6 +348,48 @@
 
                 // モーダルを閉じる
                 ui('#modal-filter-task');
+            },
+
+            /**
+             * 全フィルタをリセット（何も選択されていない状態にする）
+             */
+            resetAll: function () {
+                const titleInput = document.getElementById('filter-title-input');
+                const titleMatchSelect = document.getElementById('filter-title-match-select');
+                const startsAtFrom = document.getElementById('filter-starts-at-from');
+                const startsAtTo = document.getElementById('filter-starts-at-to');
+                const endsAtFrom = document.getElementById('filter-ends-at-from');
+                const endsAtTo = document.getElementById('filter-ends-at-to');
+                const overdue = document.getElementById('filter-is-overdue');
+                const includeListMembers = document.getElementById('filter-processed-by-include-list-members');
+                const ballHolderOnly = document.getElementById('filter-ball-holder-only');
+
+                if (titleInput) titleInput.value = '';
+                if (titleMatchSelect) titleMatchSelect.value = 'contains';
+                if (startsAtFrom) startsAtFrom.value = '';
+                if (startsAtTo) startsAtTo.value = '';
+                if (endsAtFrom) endsAtFrom.value = '';
+                if (endsAtTo) endsAtTo.value = '';
+                if (overdue) overdue.checked = false;
+                if (includeListMembers) includeListMembers.checked = false;
+                if (ballHolderOnly) ballHolderOnly.checked = false;
+
+                // メンバーフィルタ・ボードフィルタを空にする
+                if (App.pages.boards) {
+                    App.pages.boards.myBoardFilters.members = {
+                        created_by: [],
+                        processed_by: [],
+                        reviewed_by: [],
+                        received_by: []
+                    };
+                    App.pages.boards.myBoardFilters.boards = [];
+
+                    // チップを再描画
+                    ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
+                        this.renderMemberChips(role);
+                    });
+                    this.renderBoardChips();
+                }
             },
 
             /**
