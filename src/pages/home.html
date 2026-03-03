@@ -21,12 +21,18 @@
             loadData: async function (isRefresh = false) {
                 console.log('[Home] Loading data... isRefresh:', isRefresh);
 
+                // 常にリサイズハンドラーをセットアップ（二重登録防止済み）
+                this.setupResizeHandler();
+
                 if (!isRefresh) {
                     this.renderContent();
                 } else {
                     // タブ切り替え時などはヘッダー（最終更新日時など）のみ先に更新
                     this.updateHeader();
                 }
+
+                // すぐに高さを調整（非表示中に行われたリサイズへの対応）
+                requestAnimationFrame(() => this.applyPanelHeights());
 
                 try {
                     const sevenDaysAgo = new Date();
@@ -70,6 +76,9 @@
                     this.renderNextTasks(tasks);
                     this.renderMemberRanking(logs);
                     this.renderBoardRanking(boardTasks);
+
+                    // 描画後にパネルの高さを調整
+                    this.applyPanelHeights();
 
                     // データの読み込み完了時刻でヘッダーを最終更新
                     this.updateHeader();
@@ -115,7 +124,7 @@
                     <div class="grid no-space">
                         <!-- 2. 次のタスク (Next Tasks) -->
                         <div class="s12 m6 l6 small-margin">
-                            <article class="padding large-height">
+                            <article class="padding">
                                 <nav class="">
                                     <h6 class="small bold">マイタスク</h6>
                                     <div class="max"></div>
@@ -125,35 +134,35 @@
                                     </button>
                                 </nav>
                                 <span class="small-text secondary-text">あなたが次に取りかかるべきタスク</span>
-                                <div id="home-next-tasks" class="shimmer-loading scroll top-margin medium-height">
+                                <div id="home-next-tasks" class="shimmer-loading scroll top-margin ">
                                 </div>
                             </article>
                         </div>
 
                         <!-- 3. メンバーランキング (Member Ranking) -->
                         <div class="s12 m3 l3 small-margin">
-                           <article class="padding large-height">
+                           <article class="padding">
                                 <nav class="">
                                     <h6 class="small bold">メンバーランキング</h6>
                                     <div class="max"></div>
                                     <button class="chip" disabled>直近7日間</button>
                                 </nav>
                                 <span class="small-text secondary-text">期間内のタスクの作成・更新数</span>
-                                <div id="home-member-ranking" class="shimmer-loading scroll top-margin medium-height">
+                                <div id="home-member-ranking" class="shimmer-loading scroll top-margin ">
                                 </div>
                             </article>
                         </div>
 
                         <!-- 4. ボードランキング (Board Ranking) -->
                         <div class="s12 m3 l3 small-margin">
-                           <article class="padding large-height">
+                           <article class="padding">
                                 <nav class="">
                                     <h6 class="small bold">ボードランキング</h6>
                                     <div class="max"></div>
                                     <button class="chip" disabled>直近7日間</button>
                                 </nav>
                                 <span class="small-text secondary-text">期間内に作成・更新されたタスク数</span>
-                                <div id="home-board-ranking" class="shimmer-loading scroll top-margin medium-height">
+                                <div id="home-board-ranking" class="shimmer-loading scroll top-margin ">
                                 </div>
                             </article>
                         </div>
@@ -545,6 +554,70 @@
                     container.classList.remove('shimmer-loading');
                     container.innerHTML = `<div class="padding error-text center-align"><i class="large">error_outline</i><p>${message}</p></div>`;
                 }
+            },
+
+            applyPanelHeights: function () {
+                const panelIds = ['home-next-tasks', 'home-member-ranking', 'home-board-ranking'];
+                try {
+                    const main = document.querySelector('main');
+                    if (!main) return;
+
+                    const windowHeight = window.innerHeight;
+                    const mainStyle = window.getComputedStyle(main);
+                    const mainPaddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
+                    const mainMarginBottom = parseFloat(mainStyle.marginBottom) || 0;
+
+                    // ウィンドウ高さからmainの余白を引いた下端位置を計算
+                    const mainBottomLimit = windowHeight - mainMarginBottom - mainPaddingBottom;
+
+                    panelIds.forEach(id => {
+                        const el = document.getElementById(id);
+                        if (!el) return;
+                        const article = el.closest('article');
+                        if (!article) return;
+
+                        const articleRect = article.getBoundingClientRect();
+                        // 記事がメインコンテナ内に収まるように利用可能な高さを計算
+                        const availableHeightForArticle = mainBottomLimit - articleRect.top;
+
+                        // 記事内の装飾要素（ヘッダー、説明文、パディング、マージン）を計測
+                        const nav = article.querySelector('nav');
+                        const span = article.querySelector('span.small-text');
+                        const articleStyle = window.getComputedStyle(article);
+                        const paddingTop = parseFloat(articleStyle.paddingTop) || 0;
+                        const paddingBottom = parseFloat(articleStyle.paddingBottom) || 0;
+
+                        // 余白やマージンのための微調整 (BeerCSSのデフォルトなどを考慮)
+                        const extraBuffer = 32;
+
+                        const decorationsHeight = (nav ? nav.offsetHeight : 0) +
+                            (span ? span.offsetHeight : 0) +
+                            paddingTop + paddingBottom + extraBuffer;
+
+                        const newHeight = availableHeightForArticle - decorationsHeight;
+                        if (newHeight > 0) {
+                            el.style.height = `${newHeight}px`;
+                        }
+                    });
+                } catch (e) {
+                    console.error('Home panel height calculation failed:', e);
+                }
+            },
+
+            setupResizeHandler: function () {
+                if (this.isResizeHandlerBound) return;
+                this.isResizeHandlerBound = true;
+
+                window.addEventListener('resize', () => {
+                    // Homeタブが表示されている場合のみ再計算
+                    const tab = document.getElementById('tab-home');
+                    if (tab && tab.style.display !== 'none') {
+                        if (this.resizeRafId) cancelAnimationFrame(this.resizeRafId);
+                        this.resizeRafId = requestAnimationFrame(() => {
+                            this.applyPanelHeights();
+                        });
+                    }
+                });
             }
         };
     })();
