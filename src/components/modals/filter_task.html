@@ -120,8 +120,8 @@
             <span class="bold small-text">ボード</span>
             <div class="row tiny-space no-margin">
                 <button class="chip fill" onclick="App.modals.filterTask.selectBoards()">
-                    <i>edit</i>
-                    <span>選択</span>
+                    <i>create_new_folder</i>
+                    <span>追加</span>
                 </button>
                 <div id="filter-boards" class="row wrap">
                     <!-- Board chips will be rendered here -->
@@ -166,13 +166,15 @@
              */
             selectBoards: function () {
                 const currentFilters = App.pages.boards?.myBoardFilters;
-                const preSelected = currentFilters?.boards || [];
+                const currentBoards = currentFilters?.boards || [];
 
                 App.modals.selectBoards.open({
                     multiSelect: true,
-                    preSelected: preSelected,
+                    preSelected: [], // 追加モードのため既存選択は表示しない
                     callback: (selectedIds) => {
-                        this.updateBoardSelection(selectedIds);
+                        // 既存ボードと新規選択ボードを結合
+                        const mergedIds = Array.from(new Set([...currentBoards, ...selectedIds]));
+                        this.updateBoardSelection(mergedIds);
                     }
                 });
             },

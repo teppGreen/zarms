@@ -219,6 +219,23 @@ function parseWhereClause(whereClause, headersMap) {
             throw new Error(`Field '${field}' not found in headers map`);
         }
 
+        // IN演算子: 複数の値をOR条件で展開する
+        // 例: { processed_by: ['in', ['id1', 'id2']] }
+        // → (K = 'id1' OR K = 'id2')
+        if (operator === 'in') {
+            if (!Array.isArray(value) || value.length === 0) {
+                // 空配列の場合は常にfalseとなる条件を生成
+                conditions.push('1 = 0');
+                continue;
+            }
+            const orParts = value.map(v => {
+                const escaped = typeof v === 'string' ? `'${v.replace(/'/g, "\\'")}'` : v;
+                return `${columnId} = ${escaped}`;
+            });
+            conditions.push(`(${orParts.join(' OR ')})`);
+            continue;
+        }
+
         // 値のエスケープ処理
         let escapedValue = value;
         if (typeof value === 'string') {
@@ -262,6 +279,14 @@ function select(sheetName, query = {}) {
         let whereClause = '';
         if (query.where) {
             whereClause = parseWhereClause(query.where, headersMap);
+        }
+        // rawWhere: 生のGViz WHERE文字列（複雑なOR条件など、parseWhereClause では
+        //           表現できない条件を直接渡す場合に使用）
+        // query.where と query.rawWhere が両方指定された場合は AND で結合する
+        if (query.rawWhere) {
+            whereClause = whereClause
+                ? `(${whereClause}) AND (${query.rawWhere})`
+                : query.rawWhere;
         }
 
         // GVizクエリの構築
@@ -1442,5 +1467,214 @@ function getDriveFileInfo(fileId) {
     } catch (e) {
         console.error('ファイル情報取得エラー: ' + e.message);
         throw new Error('ファイル情報の取得に失敗しました: ' + e.message);
+    }
+}
+
+// ============================================
+// My Board Tasks
+// 責任: マイボード用タスクのフィルタリング取得
+// ============================================
+
+/**
+ * マイボード用のタスクをサーバーサイドでフィルタリングして返します。
+ * 全件取得後にサーバーサイドでフィルタリングすることで、
+ * フロントエンドへのデータ転送量を削減します。
+ *
+ * @param {string} userId - ユーザーID
+ * @param {Object} filters - フィルタ条件
+ *   {
+ *     title: string,                          // タイトルキーワード
+ *     titleMatchMode: string,                 // 'contains' | 'not_contains' | 'starts_with' | 'ends_with'
+ *     members: {
+ *       created_by: string[],
+ *       processed_by: string[],
+ *       reviewed_by: string[],
+ *       received_by: string[]
+ *     },
+ *     dateRanges: {
+ *       starts_at: { from: string|null, to: string|null },
+ *       ends_at:   { from: string|null, to: string|null }
+ *     },
+ *     boards: string[],                       // ボードIDの配列（空の場合は全ボード）
+ *     isOverdue: boolean,
+ *     includeListMembers: boolean             // trueの場合、listsのassign_toも検索対象にする
+ *   }
+ * @param {boolean} forceRefresh - キャッシュを無視して強制的に再取得するか
+ * @returns {Object} { data: Array, isCached: boolean }
+ */
+function getMyBoardTasks(userId, filters, forceRefresh) {
+    forceRefresh = forceRefresh || false;
+
+    // キャッシュキーを生成（filtersの内容でユニーク化）
+    const cacheKey = 'my_board_tasks_' + userId + '_' + _hashFilters(filters);
+    const cachePublicRange = 'script';
+
+    if (!forceRefresh) {
+        try {
+            const cached = CacheManager.get(cacheKey, cachePublicRange);
+            if (cached) {
+                return { data: cached, isCached: true };
+            }
+        } catch (e) {
+            console.warn('[getMyBoardTasks] Cache retrieval failed:', e);
+        }
+    }
+
+    try {
+        const tasksHeadersMap = getHeadersMap(TABLE_NAMES.TASKS);
+
+        // ── Step 1: tasks テーブルへのクエリを構築 ──────────────────────────────
+        // メンバーフィルタ（OR 条件）を rawWhere で表現する
+        // 例: (J = 'id1' OR J = 'id2') OR (K = 'id1') OR ...
+        const memberOrParts = [];
+        const roles = ['created_by', 'processed_by', 'reviewed_by', 'received_by'];
+
+        if (filters && filters.members) {
+            for (const role of roles) {
+                const ids = filters.members[role] || [];
+                if (ids.length > 0) {
+                    const colId = tasksHeadersMap[role];
+                    if (!colId) continue;
+                    const orParts = ids.map(id => `${colId} = '${id.replace(/'/g, "\\'")}'`);
+                    memberOrParts.push(`(${orParts.join(' OR ')})`);
+                }
+            }
+        }
+
+        // ── Step 2: includeListMembers が有効かつ processed_by フィルタがある場合
+        //           lists テーブルを取得し、該当する task_id を収集 ────────────
+        const processedByFilter = (filters && filters.members && filters.members.processed_by) || [];
+        const extraTaskIds = [];
+
+        if (filters && filters.includeListMembers && processedByFilter.length > 0) {
+            try {
+                // lists テーブルを assign_to の IN クエリで取得
+                const listsResult = select(TABLE_NAMES.LISTS, {
+                    where: {
+                        assign_to: ['in', processedByFilter]
+                    }
+                });
+                const lists = listsResult || [];
+                lists.forEach(function (list) {
+                    if (list.task_id) extraTaskIds.push(list.task_id);
+                });
+            } catch (e) {
+                console.error('[getMyBoardTasks] Error loading lists:', e);
+            }
+        }
+
+        // lists 経由で見つかったタスクIDも OR 条件に追加
+        if (extraTaskIds.length > 0) {
+            const idColId = tasksHeadersMap['id'];
+            if (idColId) {
+                const listOrParts = extraTaskIds.map(id => `${idColId} = '${id.replace(/'/g, "\\'")}'`);
+                memberOrParts.push(`(${listOrParts.join(' OR ')})`);
+            }
+        }
+
+        // ── Step 3: tasks クエリの WHERE 句を組み立てる ──────────────────────
+        // 各条件の部品（AND で結合する）
+        const andParts = [];
+
+        // メンバーOR条件（いずれかのロールに一致するタスク）
+        if (memberOrParts.length > 0) {
+            andParts.push(`(${memberOrParts.join(' OR ')})`);
+        }
+
+        // ボードフィルタ（IN 条件）
+        if (filters && filters.boards && filters.boards.length > 0) {
+            const boardColId = tasksHeadersMap['board_id'];
+            if (boardColId) {
+                const boardParts = filters.boards.map(id => `${boardColId} = '${id.replace(/'/g, "\\'")}'`);
+                andParts.push(`(${boardParts.join(' OR ')})`);
+            }
+        }
+
+        // タイトルフィルタ（GViz の CONTAINS / STARTS WITH / ENDS WITH / matches を使用）
+        if (filters && filters.title) {
+            const nameColId = tasksHeadersMap['name'];
+            if (nameColId) {
+                const kw = filters.title.replace(/'/g, "\\'");
+                const mode = filters.titleMatchMode || 'contains';
+                if (mode === 'starts_with') {
+                    andParts.push(`${nameColId} STARTS WITH '${kw}'`);
+                } else if (mode === 'ends_with') {
+                    andParts.push(`${nameColId} ENDS WITH '${kw}'`);
+                } else if (mode === 'not_contains') {
+                    andParts.push(`NOT ${nameColId} CONTAINS '${kw}'`);
+                } else {
+                    // contains (default)
+                    andParts.push(`${nameColId} CONTAINS '${kw}'`);
+                }
+            }
+        }
+
+        // 日付範囲フィルタ
+        if (filters && filters.dateRanges) {
+            const dr = filters.dateRanges;
+            const startsColId = tasksHeadersMap['starts_at'];
+            const endsColId = tasksHeadersMap['ends_at'];
+
+            if (startsColId && dr.starts_at && dr.starts_at.from) {
+                andParts.push(`${startsColId} >= '${dr.starts_at.from.replace(/'/g, "\\'")}'`);
+            }
+            if (startsColId && dr.starts_at && dr.starts_at.to) {
+                andParts.push(`${startsColId} <= '${dr.starts_at.to.replace(/'/g, "\\'")}'`);
+            }
+            if (endsColId && dr.ends_at && dr.ends_at.from) {
+                andParts.push(`${endsColId} >= '${dr.ends_at.from.replace(/'/g, "\\'")}'`);
+            }
+            if (endsColId && dr.ends_at && dr.ends_at.to) {
+                andParts.push(`${endsColId} <= '${dr.ends_at.to.replace(/'/g, "\\'")}'`);
+            }
+        }
+
+        // 期限超過フィルタ
+        // isOverdue: ends_at が現在より過去 かつ task_status_key != 'DONE'
+        if (filters && filters.isOverdue) {
+            const endsColId = tasksHeadersMap['ends_at'];
+            const statusColId = tasksHeadersMap['task_status_key'];
+            const nowIso = new Date().toISOString().replace(/'/g, '');
+            if (endsColId && statusColId) {
+                andParts.push(`${endsColId} IS NOT NULL`);
+                andParts.push(`${endsColId} < '${nowIso}'`);
+                andParts.push(`${statusColId} != 'DONE'`);
+            }
+        }
+
+        // ── Step 4: クエリを実行 ────────────────────────────────────────────
+        const tasksQuery = {};
+        if (andParts.length > 0) {
+            tasksQuery.rawWhere = andParts.join(' AND ');
+        }
+
+        const tasksResult = select(TABLE_NAMES.TASKS, tasksQuery);
+        const filteredTasks = tasksResult || [];
+
+        // キャッシュに保存
+        try {
+            CacheManager.put(cacheKey, filteredTasks, cachePublicRange);
+        } catch (e) {
+            console.warn('[getMyBoardTasks] Cache storage failed:', e);
+        }
+
+        return { data: filteredTasks, isCached: false };
+
+    } catch (error) {
+        console.error('[getMyBoardTasks] Error:', error);
+        throw error;
+    }
+}
+
+/**
+ * フィルタオブジェクトを簡易ハッシュ化（キャッシュキー用）
+ * @param {Object} filters
+ * @returns {string}
+ */
+function _hashFilters(filters) {
+    try {
+        return hashString(JSON.stringify(filters || {}));
+    } catch (e) {
+        return 'nohash';
     }
 }
