@@ -56,7 +56,8 @@
                         ends_at: { from: null, to: null }
                     },
                     boards: [],  // Array of board IDs to filter by
-                    isOverdue: false
+                    isOverdue: false,
+                    ballHolderOnly: false
                 };
             },
 
@@ -358,7 +359,11 @@
                 });
 
                 // ローカルキャッシュから取得（loadDataでJOIN済み）
-                const boardTasks = this.cachedBoardTasks[boardId] || [];
+                const rawBoardTasks = this.cachedBoardTasks[boardId] || [];
+                // マイボードの場合はフロントエンドフィルタを適用（ballHolderOnly等）
+                const boardTasks = (boardId === 'my-board' && this.myBoardFilters)
+                    ? this.filterMyBoardTasks(rawBoardTasks)
+                    : rawBoardTasks;
 
                 // 最終レンダリング時刻を更新
                 if (!isLoading) {
@@ -1005,6 +1010,32 @@
                     if (filters.boards && filters.boards.length > 0) {
                         if (!filters.boards.includes(t.board_id)) {
                             return false;
+                        }
+                    }
+
+                    // Ball Holder Filter
+                    // ボールを持っている担当者のみ表示：各ステータスに対応する担当者ロールだけでフィルタ値と照合
+                    if (filters.ballHolderOnly && hasAnyMemberFilter) {
+                        // ステータスに対応する担当者ロールを決定
+                        let ballRole;
+                        if (t.task_status_key === 'TODO' || t.task_status_key === 'IN_PROGRESS') {
+                            ballRole = 'processed_by';
+                        } else if (t.task_status_key === 'IN_REVIEW') {
+                            ballRole = 'reviewed_by';
+                        } else if (t.task_status_key === 'DONE') {
+                            ballRole = 'received_by';
+                        }
+
+                        if (ballRole) {
+                            // ballRoleに対応するフィルタのメンバーリストのみで照合
+                            const ballRoleMembers = filters.members[ballRole] || [];
+                            if (ballRoleMembers.length === 0) {
+                                // ballRoleにフィルタ値なし → 除外
+                                return false;
+                            }
+                            if (!ballRoleMembers.includes(t[ballRole])) {
+                                return false;
+                            }
                         }
                     }
 

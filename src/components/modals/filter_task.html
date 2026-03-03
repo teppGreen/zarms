@@ -87,6 +87,12 @@
                     <span>「進行者」に設定した人をリストの担当者からも検索</span>
                 </label>
             </div>
+            <div class="row">
+                <label class="checkbox">
+                    <input type="checkbox" id="filter-ball-holder-only">
+                    <span>設定した担当者がボールを持っているタスクのみ表示</span>
+                </label>
+            </div>
         </div>
 
         <hr class="max s12">
@@ -108,7 +114,7 @@
             <div class="row">
                 <label class="checkbox">
                     <input type="checkbox" id="filter-is-overdue">
-                    <span>終了日時が現在を超過しているもののみ表示</span>
+                    <span>タスクの終了日時が現在を超過しているもののみ表示</span>
                 </label>
             </div>
         </div>
@@ -302,6 +308,7 @@
                 const endsAtTo = document.getElementById('filter-ends-at-to');
                 const overdue = document.getElementById('filter-is-overdue');
                 const includeListMembers = document.getElementById('filter-processed-by-include-list-members');
+                const ballHolderOnly = document.getElementById('filter-ball-holder-only');
 
                 const filters = {
                     title: titleInput ? titleInput.value : '',
@@ -324,7 +331,8 @@
                     },
                     boards: App.pages.boards?.myBoardFilters?.boards || [],
                     isOverdue: overdue ? overdue.checked : false,
-                    includeListMembers: includeListMembers ? includeListMembers.checked : false
+                    includeListMembers: includeListMembers ? includeListMembers.checked : false,
+                    ballHolderOnly: ballHolderOnly ? ballHolderOnly.checked : false
                 };
 
                 // ボードページにフィルタ設定を保存
@@ -350,6 +358,7 @@
                 const endsAtTo = document.getElementById('filter-ends-at-to');
                 const overdue = document.getElementById('filter-is-overdue');
                 const includeListMembers = document.getElementById('filter-processed-by-include-list-members');
+                const ballHolderOnly = document.getElementById('filter-ball-holder-only');
 
                 if (titleInput) titleInput.value = '';
                 if (titleMatchSelect) titleMatchSelect.value = 'contains';
@@ -359,6 +368,7 @@
                 if (endsAtTo) endsAtTo.value = '';
                 if (overdue) overdue.checked = false;
                 if (includeListMembers) includeListMembers.checked = true;
+                if (ballHolderOnly) ballHolderOnly.checked = false;
 
                 // メンバーフィルタをデフォルトに戻す
                 if (App.pages.boards) {
@@ -394,6 +404,7 @@
                 const endsAtTo = document.getElementById('filter-ends-at-to');
                 const overdue = document.getElementById('filter-is-overdue');
                 const includeListMembers = document.getElementById('filter-processed-by-include-list-members');
+                const ballHolderOnly = document.getElementById('filter-ball-holder-only');
 
                 if (titleInput) titleInput.value = filters.title || '';
                 if (titleMatchSelect) titleMatchSelect.value = filters.titleMatchMode || 'contains';
@@ -413,6 +424,7 @@
 
                 if (overdue) overdue.checked = filters.isOverdue;
                 if (includeListMembers) includeListMembers.checked = filters.includeListMembers || false;
+                if (ballHolderOnly) ballHolderOnly.checked = filters.ballHolderOnly || false;
 
                 // メンバーチップを描画
                 ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
