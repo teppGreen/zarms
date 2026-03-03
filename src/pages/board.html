@@ -244,40 +244,28 @@
                 }
 
                 try {
-                    let query = {};
-                    if (boardId !== 'my-board') {
-                        query = {
+                    let tasks = [];
+                    let result;
+
+                    if (boardId === 'my-board') {
+                        // マイボード: サーバーサイドでフィルタリング済みのタスクを取得
+                        const filters = this.myBoardFilters || {};
+                        result = await callGAS('getMyBoardTasks', App.state.userId, filters, isRefresh);
+                        tasks = result?.data || result || [];
+                    } else {
+                        // 通常ボード: board_id で絞り込んで取得
+                        const query = {
                             where: { board_id: ["=", boardId] }
                         };
-                    }
-
-                    // JOINは使わず、単純なSELECTを実行
-                    const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query, null, isRefresh);
-                    let tasks = result?.data || result || [];
-
-                    // マイボードの場合、リストデータも取得
-                    let lists = [];
-                    if (boardId === 'my-board' && this.myBoardFilters?.includeListMembers) {
-                        try {
-                            const listsResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LISTS, 'select', {}, null, isRefresh);
-                            lists = listsResult?.data || listsResult || [];
-                        } catch (error) {
-                            console.error('Error loading lists:', error);
-                        }
-                    }
-
-                    // マイボードの場合、フロントエンドでさらにフィルタリング
-                    if (boardId === 'my-board') {
-                        tasks = this.filterMyBoardTasks(tasks, lists);
+                        result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query, null, isRefresh);
+                        tasks = result?.data || result || [];
                     }
 
                     // ボード固有のタスクキャッシュに保存
                     this.cachedBoardTasks[boardId] = tasks;
                     this.mergeTasksIntoGlobalCache(tasks);
 
-                    console.log(`Board ${boardId} tasks loaded:`, tasks.length);
-
-                    // カンバンを表示（まずキャッシュデータで描画）
+                    // カンバンを表示
                     this.renderKanban(boardId, false);
 
                     // 読み込み完了としてマーク
@@ -288,38 +276,30 @@
 
                     // isCachedチェック: キャッシュデータの場合はバックグラウンドで最新データを取得
                     if (result?.isCached === true) {
-                        console.log(`Board ${boardId}: キャッシュデータ検出。バックグラウンドで最新データを取得中...`);
                         setTimeout(async () => {
                             try {
-                                const freshResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query, null, true); // forceRefresh = true
-                                let freshTasks = freshResult?.data || freshResult || [];
-
-                                // マイボードの場合、リストデータも再取得
-                                let freshLists = [];
-                                if (boardId === 'my-board' && this.myBoardFilters?.includeListMembers) {
-                                    try {
-                                        const freshListsResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LISTS, 'select', {}, null, true);
-                                        freshLists = freshListsResult?.data || freshListsResult || [];
-                                    } catch (error) {
-                                        console.error('Error loading fresh lists:', error);
-                                    }
-                                }
-
-                                // マイボードの場合のフィルタリング（再取得時）
+                                let freshTasks = [];
                                 if (boardId === 'my-board') {
-                                    freshTasks = this.filterMyBoardTasks(freshTasks, freshLists);
+                                    const filters = this.myBoardFilters || {};
+                                    const freshResult = await callGAS('getMyBoardTasks', App.state.userId, filters, true);
+                                    freshTasks = freshResult?.data || freshResult || [];
+                                } else {
+                                    const query = {
+                                        where: { board_id: ["=", boardId] }
+                                    };
+                                    const freshResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query, null, true);
+                                    freshTasks = freshResult?.data || freshResult || [];
                                 }
 
                                 this.cachedBoardTasks[boardId] = freshTasks;
                                 this.mergeTasksIntoGlobalCache(freshTasks);
-                                console.log(`Board ${boardId} tasks refreshed:`, freshTasks.length);
 
                                 // 最新データでカンバンを再描画
                                 this.renderKanban(boardId, false);
                             } catch (error) {
                                 console.error(`Board ${boardId} background refresh error:`, error);
                             }
-                        }, 100); // 100ms後に実行（メインUIの表示を優先）
+                        }, 100);
                     }
                 } catch (error) {
                     console.error('Error loading board tasks:', error);
@@ -333,6 +313,7 @@
                     App.utils.error.handle(error);
                 }
             },
+
 
             renderKanban: function (boardId, isLoading = false) {
                 const containerId = `kanban-canvas-${boardId}`;
