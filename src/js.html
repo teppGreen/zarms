@@ -3,6 +3,16 @@
   // urlParams, EVENT_CONFIG, AUTH_CONFIG, EXTERNAL_URLS は既にregister.htmlで定義済みなので、再定義不要
   const { TABLE_NAMES, DIRECTORY_TYPES, TASK_STATUS, UI_TEXT, activeUser, initialData } = templateVariables;
 
+  // 本番環境（!isDevelopment）の場合、コンソール出力を抑制
+  if (!templateVariables.isDevelopment) {
+    const noop = () => { };
+    console.log = noop;
+    console.debug = noop;
+    console.info = noop;
+    console.warn = noop;
+    // console.error も抑制したい場合は、上記と同様に noop を代入してください
+  }
+
   // App.state の初期化とデータ管理用関数の定義
   (function () {
     App.state = {

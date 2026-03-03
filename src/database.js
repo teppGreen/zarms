@@ -1416,7 +1416,7 @@ function getOAuthToken() {
         const token = ScriptApp.getOAuthToken();
         return sanitizeForClient(token);
     } catch (e) {
-        Logger.log('OAuthトークン取得エラー: ' + e.message);
+        console.error('OAuthトークン取得エラー: ' + e.message);
         throw new Error('OAuthトークンの取得に失敗しました: ' + e.message);
     }
 }
@@ -1440,7 +1440,7 @@ function getDriveFileInfo(fileId) {
 
         return sanitizeForClient(fileInfo);
     } catch (e) {
-        Logger.log('ファイル情報取得エラー: ' + e.message);
+        console.error('ファイル情報取得エラー: ' + e.message);
         throw new Error('ファイル情報の取得に失敗しました: ' + e.message);
     }
 }
