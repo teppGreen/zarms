@@ -30,7 +30,9 @@
 
     <nav class="right-align small-padding">
         <button class="border" onclick="ui('#modal-select-members')">キャンセル</button>
-        <button onclick="App.modals.selectMembers.confirm()">選択</button>
+        <button id="select-members-apply-all-btn" style="display: none;"
+            onclick="App.modals.selectMembers.confirmAll()">全担当者に適用</button>
+        <button onclick="App.modals.selectMembers.confirm()">適用</button>
     </nav>
 </dialog>
 
@@ -38,15 +40,25 @@
     (function () {
         App.modals.selectMembers = {
             callback: null,
+            applyAllCallback: null,
             selectedIds: [],
             allMembers: [],
             filteredMembers: [],
             multiSelect: false,
+            showApplyAll: false,
 
             open: async function (options = {}) {
                 this.callback = options.callback || null;
+                this.applyAllCallback = options.applyAllCallback || null;
                 this.multiSelect = options.multiSelect || false;
                 this.selectedIds = options.preSelected || [];
+                this.showApplyAll = options.showApplyAll || false;
+
+                // 「全担当者に適用」ボタンの表示制御
+                const applyAllBtn = document.getElementById('select-members-apply-all-btn');
+                if (applyAllBtn) {
+                    applyAllBtn.style.display = this.showApplyAll ? '' : 'none';
+                }
 
                 // App.state.data.members から直接ロード
                 this.allMembers = App.state.data.members || [];
@@ -165,6 +177,21 @@
 
                 if (this.callback && typeof this.callback === 'function') {
                     this.callback(this.selectedIds);
+                }
+
+                ui('#modal-select-members');
+            },
+
+            confirmAll: function () {
+                // 共通処理を使用
+                this.selectedIds = App.utils.modal.getSelectedIds(
+                    '#member-results-container',
+                    'member-select',
+                    this.multiSelect
+                );
+
+                if (this.applyAllCallback && typeof this.applyAllCallback === 'function') {
+                    this.applyAllCallback(this.selectedIds);
                 }
 
                 ui('#modal-select-members');
