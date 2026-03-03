@@ -28,7 +28,8 @@ function doGet(e) {
     activeUserEmail: activeUserEmail,
     EVENT_CONFIG: EVENT_CONFIG,
     AUTH_CONFIG: AUTH_CONFIG,
-    EXTERNAL_URLS: EXTERNAL_URLS
+    EXTERNAL_URLS: EXTERNAL_URLS,
+    UI_CONFIG: UI_CONFIG
   };
 
   return template.evaluate()
