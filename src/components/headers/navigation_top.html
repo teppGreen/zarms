@@ -43,11 +43,12 @@
 
     <!-- 検索バー -->
     <div class="field round prefix border" id="search-container">
-        <i class="front" style="cursor: pointer;" onclick="App.utils.search.handleSearchClick()">search</i>
+        <i id="search-icon" class="front" style="cursor: pointer;"
+            onclick="App.utils.search.handleSearchClick()">search</i>
         <input placeholder="検索" id="search-input" onkeydown="App.utils.search.handleSearchKeydown(event)"
             onblur="App.utils.search.handleSearchBlur(event)">
         <div class="l tooltip right round left-padding right-padding">
-            <p>タスク名を検索します</p>
+            <p>タスク名またはタスク番号を検索します</p>
             <span><i class="tiny no-padding no-margin">keyboard_option_key</i>F</span>
         </div>
     </div>
@@ -100,8 +101,7 @@
         <p>新しいバージョンを使うために、ページを更新してください。</p>
         <div class="grid large-margin">
             <div class="s6">
-                <button tabindex="2" class="primary-container extra responsive"
-                    onclick="ui('#modal-system-update')">
+                <button tabindex="2" class="primary-container extra responsive" onclick="ui('#modal-system-update')">
                     <span class="secondary-text">あとで</span>
                 </button>
             </div>
@@ -703,19 +703,85 @@
 
                 if (!searchValue) return;
 
-                // 1. マイボードタブに移動（既に移動している場合は無視）
-                if (App.utils.navigation && App.utils.navigation.switchTab) {
-                    await App.utils.navigation.switchTab('board-my-board', false, false, true);
-                }
+                // 検索中はアイコンをスピナーに切り替え
+                const searchIcon = document.getElementById('search-icon');
+                const setLoading = (loading) => {
+                    if (!searchIcon) return;
+                    if (loading) {
+                        searchIcon.outerHTML = '<progress id="search-icon" class="circle indeterminate small"></progress>';
+                    } else {
+                        const el = document.getElementById('search-icon');
+                        if (el) el.outerHTML = '<i id="search-icon" class="front" style="cursor: pointer;" onclick="App.utils.search.handleSearchClick()">search</i>';
+                    }
+                };
+                setLoading(true);
 
-                // 2. 検索バーに入力されたタイトルを「含む」タスクとしてフィルタ
-                if (App.pages.boards) {
-                    App.pages.boards.initializeMyBoardFilters(false);
-                    App.pages.boards.myBoardFilters.title = searchValue;
-                    App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
+                try {
+                    // 全角数字を半角に変換してから数値チェック
+                    const normalizedValue = searchValue.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+                    const numericValue = Number(normalizedValue);
+                    const isNumericInput = !isNaN(numericValue) && normalizedValue !== '' && Number.isInteger(numericValue);
 
-                    // 3. 検索（データ再読み込み）
-                    await App.pages.boards.loadData('my-board', false);
+                    // 1. マイボードタブに移動（既に移動している場合は無視）
+                    if (App.utils.navigation && App.utils.navigation.switchTab) {
+                        await App.utils.navigation.switchTab('board-my-board', false, false, true);
+                    }
+
+                    if (isNumericInput) {
+                        // 数値入力の場合: display_id でタスクを特定する
+                        let foundTask = null;
+                        try {
+                            const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
+                                where: { display_id: ['=', numericValue] }
+                            }, null, true);
+                            const tasks = result?.data || result || [];
+                            if (tasks.length > 0) {
+                                foundTask = tasks[0];
+                            }
+                        } catch (e) {
+                            console.error('[Search] display_id 検索エラー:', e);
+                        }
+
+                        if (foundTask && App.pages.boards) {
+                            // 2. 特定したタスク名でマイボードフィルタを適用
+                            App.pages.boards.initializeMyBoardFilters(false);
+                            App.pages.boards.myBoardFilters.title = foundTask.name;
+                            App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
+
+                            // 3. 検索（データ再読み込み）
+                            await App.pages.boards.loadData('my-board', false);
+
+                            // 4. 特定したタスクの詳細画面を開く
+                            if (App.modals.taskDetail) {
+                                App.modals.taskDetail.open(foundTask.id);
+                                return;
+                            }
+                        } else if (App.pages.boards) {
+                            // タスクが見つからなかった場合は数値をそのままタイトル検索にフォールバック
+                            App.pages.boards.initializeMyBoardFilters(false);
+                            App.pages.boards.myBoardFilters.title = searchValue;
+                            App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
+                            await App.pages.boards.loadData('my-board', false);
+                        }
+                    } else {
+                        // 通常の文字列検索
+                        if (App.pages.boards) {
+                            App.pages.boards.initializeMyBoardFilters(false);
+                            App.pages.boards.myBoardFilters.title = searchValue;
+                            App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
+
+                            // 検索（データ再読み込み）
+                            await App.pages.boards.loadData('my-board', false);
+                        }
+                    }
+                    // ヒットが1件のみの場合はタスク詳細を自動で開く
+                    const resultTasks = App.pages.boards.cachedBoardTasks['my-board'] || [];
+                    if (resultTasks.length === 1 && App.modals.taskDetail) {
+                        App.modals.taskDetail.open(resultTasks[0].id);
+                    }
+                } finally {
+                    // 検索完了後（エラー時も含む）アイコンを戻す
+                    setLoading(false);
                 }
             }
         };
