@@ -20,7 +20,13 @@
       currentFilters: {
         status: ['TODO', 'IN_PROGRESS', 'IN_REVIEW'], // デフォルトでDONE以外を表示
         priority: [],
-        assignee: null
+        assigneeRoles: {
+          created_by: false,
+          processed_by: false,
+          reviewed_by: false,
+          received_by: false
+        },
+        ballHolderOnly: false
       },
 
       /**
@@ -40,14 +46,26 @@
             }
           }
 
-          // マイボードのタスクを取得（全ステータスを取得し、フィルタで制御）
-          const tasksQuery = {
-            where: {
-              processed_by: ['=', App.state.userId]
-            }
+          // マイボードのタスクを取得（作成者・進行者・確認者・受領者のいずれかに自分が含まれるタスクを全取得）
+          const myBoardFilters = {
+            title: '',
+            titleMatchMode: 'contains',
+            members: {
+              created_by: [App.state.userId],
+              processed_by: [App.state.userId],
+              reviewed_by: [App.state.userId],
+              received_by: [App.state.userId]
+            },
+            dateRanges: {
+              starts_at: { from: null, to: null },
+              ends_at: { from: null, to: null }
+            },
+            boards: [],
+            isOverdue: false,
+            ballHolderOnly: false
           };
 
-          const tasksRes = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', tasksQuery, null, isRefresh);
+          const tasksRes = await callGAS('getMyBoardTasks', App.state.userId, myBoardFilters, isRefresh);
           const tasks = tasksRes?.data || tasksRes || [];
 
           // キャッシュ更新
@@ -211,6 +229,7 @@
        * タスクをフィルタリング
        */
       filterTasks: function (tasks) {
+        const userId = App.state.userId;
         return tasks.filter(task => {
           // ステータスフィルタ
           if (this.currentFilters.status.length > 0) {
@@ -224,6 +243,27 @@
             if (!this.currentFilters.priority.includes(task.priority_key)) {
               return false;
             }
+          }
+
+          // 担当者ロールフィルタ
+          const roles = this.currentFilters.assigneeRoles || {};
+          const checkedRoles = ['created_by', 'processed_by', 'reviewed_by', 'received_by'].filter(r => roles[r]);
+          if (checkedRoles.length > 0) {
+            const match = checkedRoles.some(role => task[role] === userId);
+            if (!match) return false;
+          }
+
+          // ボールホルダーフィルタ
+          if (this.currentFilters.ballHolderOnly) {
+            let ballRole;
+            if (task.task_status_key === 'TODO' || task.task_status_key === 'IN_PROGRESS') {
+              ballRole = 'processed_by';
+            } else if (task.task_status_key === 'IN_REVIEW') {
+              ballRole = 'reviewed_by';
+            } else if (task.task_status_key === 'DONE') {
+              ballRole = 'received_by';
+            }
+            if (!ballRole || task[ballRole] !== userId) return false;
           }
 
           return true;
