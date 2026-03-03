@@ -52,6 +52,32 @@
         </label>
       </fieldset>
 
+      <!-- 担当者 -->
+      <fieldset class="border top-margin">
+        <legend>担当者</legend>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-assignee-created-by">
+          <span>作成者</span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-assignee-processed-by">
+          <span>進行者</span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-assignee-reviewed-by">
+          <span>確認者</span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-assignee-received-by">
+          <span>受領者</span>
+        </label>
+        <div class="divider"></div>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-ball-holder-only">
+          <span>自分がボールを持っているタスクのみ表示</span>
+        </label>
+      </fieldset>
+
       <!-- 適用ボタン -->
       <div class="top-margin">
         <button class="responsive primary extra" onclick="App.modals.mobileFilter.apply()">
@@ -100,6 +126,16 @@
         document.getElementById('filter-priority-low').checked = filters.priority.includes('LOW');
         document.getElementById('filter-priority-medium').checked = filters.priority.includes('MEDIUM');
         document.getElementById('filter-priority-high').checked = filters.priority.includes('HIGH');
+
+        // 担当者ロール
+        const roles = filters.assigneeRoles || {};
+        document.getElementById('filter-assignee-created-by').checked = !!roles.created_by;
+        document.getElementById('filter-assignee-processed-by').checked = !!roles.processed_by;
+        document.getElementById('filter-assignee-reviewed-by').checked = !!roles.reviewed_by;
+        document.getElementById('filter-assignee-received-by').checked = !!roles.received_by;
+
+        // ボールホルダー
+        document.getElementById('filter-ball-holder-only').checked = !!filters.ballHolderOnly;
       },
 
       /**
@@ -131,9 +167,20 @@
           priorityFilters.push('HIGH');
         }
 
+        const assigneeRoles = {
+          created_by: !!document.getElementById('filter-assignee-created-by')?.checked,
+          processed_by: !!document.getElementById('filter-assignee-processed-by')?.checked,
+          reviewed_by: !!document.getElementById('filter-assignee-reviewed-by')?.checked,
+          received_by: !!document.getElementById('filter-assignee-received-by')?.checked
+        };
+
+        const ballHolderOnly = !!document.getElementById('filter-ball-holder-only')?.checked;
+
         // フィルタを更新
         App.pages.mobileBoard.currentFilters.status = statusFilters;
         App.pages.mobileBoard.currentFilters.priority = priorityFilters;
+        App.pages.mobileBoard.currentFilters.assigneeRoles = assigneeRoles;
+        App.pages.mobileBoard.currentFilters.ballHolderOnly = ballHolderOnly;
 
         // タスク一覧を再描画
         App.pages.mobileBoard.renderTasks(App.pages.mobileBoard.cachedTasks);
@@ -156,10 +203,22 @@
         document.getElementById('filter-priority-low').checked = false;
         document.getElementById('filter-priority-medium').checked = false;
         document.getElementById('filter-priority-high').checked = false;
+        document.getElementById('filter-assignee-created-by').checked = false;
+        document.getElementById('filter-assignee-processed-by').checked = false;
+        document.getElementById('filter-assignee-reviewed-by').checked = false;
+        document.getElementById('filter-assignee-received-by').checked = false;
+        document.getElementById('filter-ball-holder-only').checked = false;
 
         // フィルタをデフォルトに戻す
         App.pages.mobileBoard.currentFilters.status = ['TODO', 'IN_PROGRESS', 'IN_REVIEW'];
         App.pages.mobileBoard.currentFilters.priority = [];
+        App.pages.mobileBoard.currentFilters.assigneeRoles = {
+          created_by: false,
+          processed_by: false,
+          reviewed_by: false,
+          received_by: false
+        };
+        App.pages.mobileBoard.currentFilters.ballHolderOnly = false;
 
         // タスク一覧を再描画
         App.pages.mobileBoard.renderTasks(App.pages.mobileBoard.cachedTasks);
