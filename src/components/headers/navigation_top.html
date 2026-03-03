@@ -82,9 +82,8 @@
             </menu>
         </button>
 
-        <button id="system-info-button" class="fill" onclick="App.utils.header.systemUpdates.toggle()">
+        <button id="system-info-button" class="circle transparent" onclick="App.utils.header.systemUpdates.toggle()">
             <i>info</i>
-            <span>スマホで見やすくなりました (ver1.6)</span>
             <menu id="system-info-menu" class="left no-padding medium-width">
                 <div id="system-info-list">
                     <!-- アップデート情報はloadAllData実行時に動的に生成される -->
@@ -94,15 +93,26 @@
     </nav>
 </nav>
 
-<!-- システムアップデート通知モーダル（閉じる手段なし） -->
+<!-- システムアップデート通知モーダル -->
 <dialog id="modal-system-update" class="modal max large-padding">
     <div class="large-margin large-padding center-align">
-        <h5 class="bold">アップデートがあります</h5>
-        <p>新しいZARMSを使うために、ページを更新してください</p>
-        <button class="primary extra large-margin responsive" onclick="App.utils.header.systemUpdates.reloadPage(this)">
-            <i>refresh</i>
-            <span>更新</span>
-        </button>
+        <h5 class="bold">ZARMSがアップデートされました</h5>
+        <p>新しいバージョンを使うために、ページを更新してください。</p>
+        <div class="grid large-margin">
+            <div class="s6">
+                <button tabindex="2" class="primary-container extra responsive"
+                    onclick="ui('#modal-system-update')">
+                    <span class="secondary-text">あとで</span>
+                </button>
+            </div>
+            <div class="s6">
+                <button tabindex="1" class="primary extra responsive"
+                    onclick="App.utils.header.systemUpdates.reloadPage(this)">
+                    <i>refresh</i>
+                    <span>今すぐ更新する</span>
+                </button>
+            </div>
+        </div>
     </div>
 </dialog>
 
@@ -499,7 +509,6 @@
 
                     const updates = result?.data || result || [];
 
-                    // 既にデータがキャッシュされている場合、変更を検出
                     if (this.cachedUpdates && this.isLoaded) {
                         if (this.hasDataChanged(this.cachedUpdates, updates)) {
                             console.log('[SystemUpdates] データ変更を検出。更新モーダルを表示します。');
@@ -530,12 +539,13 @@
              * @returns {boolean} 変更がある場合true
              */
             hasDataChanged: function (oldData, newData) {
+                if (!oldData || !newData) return false;
                 if (oldData.length !== newData.length) return true;
                 return JSON.stringify(oldData) !== JSON.stringify(newData);
             },
 
             /**
-             * システムアップデートモーダルを表示（閉じる手段なし）
+             * システムアップデートモーダルを表示
              */
             showUpdateModal: function () {
                 const modal = document.getElementById('modal-system-update');
