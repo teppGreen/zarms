@@ -197,7 +197,7 @@ function getBoardEmail_(boardId) {
 function buildNotificationEmail_(task, question, shareUrl, boardEmail) {
     const datetime = Utilities.formatDate(new Date(parseDateSafe_(question.created_at)), 'JST', 'yyyy-MM-dd(E) HH:mm:ss');
     const description = buildTaskDescription_(question, true);
-    const bodyHtml = `${description}<hr><p>この問い合わせは ${datetime} に送信されました。ZARMSは<a href="${shareUrl}" target="_blank" rel="noopener noreferrer">こちら</a></p>`;
+    const bodyHtml = `${description}<hr><p>この問い合わせは ${datetime} に送信されました。ZARMSに<a href="${shareUrl}" target="_blank" rel="noopener noreferrer"> タスク#${task.display_id}</a> として起票済です。</p>`;
 
     return {
         to: boardEmail,
