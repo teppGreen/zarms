@@ -3,11 +3,7 @@
 // ============================================
 
 const scriptProperties = PropertiesService.getScriptProperties();
-const FAVICON_FILE_ID = scriptProperties.getProperty('FAVICON_FILE_ID');
 const SPREADSHEET_ID = scriptProperties.getProperty('SPREADSHEET_ID');
-const QUESTION_SPREADSHEET_ID = scriptProperties.getProperty('QUESTION_SPREADSHEET_ID');
-const LIST_VIEW_SPREADSHEET_ID = scriptProperties.getProperty('LIST_VIEW_SPREADSHEET_ID');
-const INDIVIDUAL_SHEET_TEMPLATE_ID = scriptProperties.getProperty('INDIVIDUAL_SHEET_TEMPLATE_ID');
 
 const TABLE_NAMES = {
   LOGS: 'logs',
@@ -77,7 +73,7 @@ const TABLE_HEADERS = {
 };
 
 // ============================================
-// キャッシュ、再試行、UI設定
+// キャッシュ設定と再試行設定
 // ============================================
 
 /**
@@ -102,72 +98,19 @@ const RETRY_CONFIG = {
 };
 
 /**
- * UI設定
- */
-const UI_CONFIG = {
-  SNACKBAR_DURATION: 3000,  // スナックバー表示時間（ミリ秒）
-  MODAL_FOCUS_DELAY: 50,     // モーダルフォーカスの再試行間隔（ミリ秒）
-  MODAL_FOCUS_MAX_RETRIES: 10 // モーダルフォーカスの最大再試行回数
-};
-
-/**
  * 列ID定数（Excel形式）
  */
 const COLUMN_IDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
 // ============================================
-// 外部URL設定とイベント設定
+// 外部URL設定（バックエンド用）
 // ============================================
 
 /**
  * 外部URL設定
  */
 const EXTERNAL_URLS = {
-  ADD_CALENDAR: scriptProperties.getProperty('EXTERNAL_URLS.ADD_CALENDAR'),
-  CALENDAR: scriptProperties.getProperty('EXTERNAL_URLS.CALENDAR'),
-  MEMBER_SPREADSHEET: scriptProperties.getProperty('EXTERNAL_URLS.MEMBER_SPREADSHEET'),
-  CONTACT_FORM: scriptProperties.getProperty('EXTERNAL_URLS.CONTACT_FORM'),
-  LOGO_IMAGE: scriptProperties.getProperty('EXTERNAL_URLS.LOGO_IMAGE'),
-  FAVICON_IMAGE: scriptProperties.getProperty('EXTERNAL_URLS.FAVICON_IMAGE'),
-  HELP_SITE: scriptProperties.getProperty('EXTERNAL_URLS.HELP_SITE'),
-  TERMS_SITE: scriptProperties.getProperty('EXTERNAL_URLS.TERMS_SITE'),
-  GEMINI_GEMS_TASK_ADD: scriptProperties.getProperty('EXTERNAL_URLS.GEMINI_GEMS_TASK_ADD'),
   ZARMS_WEB: scriptProperties.getProperty('EXTERNAL_URLS.ZARMS_WEB'),
-  MASCOT_MAIN_IMAGE: scriptProperties.getProperty('EXTERNAL_URLS.MASCOT_MAIN_IMAGE'),
-};
-
-/**
- * イベント設定
- */
-const EVENT_CONFIG = {
-  FESTIVAL_DATE: '2026-04-24', // リアル会場0日目（準備日）
-  TEMPORARILY_MAINTENANCE: false,
-  MAINTENANCE_HOURS: {
-    START: 2,  // JST 2:00
-    END: 5     // JST 5:00
-  }
-};
-
-/**
- * 認証設定
- */
-const AUTH_CONFIG = {
-  ALLOWED_DOMAINS: ['student.zen.ac.jp', 'zen.ac.jp']
-};
-
-/**
- * UI表示テキスト
- */
-const UI_TEXT = {
-  APP_TITLE: 'ZARMS',
-  APP_DESCRIPTION: '展軸祭実行委員会の業務システム「ZARMS」へようこそ！',
-  SYSTEM_DESCRIPTION: 'ZARMS（ザームス）は、展軸祭実行委員会の業務を効率化するためのタスク管理システムです。ボードごとにタスクを管理し、メンバー間での進捗共有やコメントによるコミュニケーションをサポートします。',
-  LOADING_MESSAGE: 'お待ちください',
-  ERROR_USER_NOT_FOUND: 'ユーザーが見つかりませんでした',
-  ERROR_ACCESS_DENIED: 'アクセス権限がありません',
-  SUCCESS_SAVED: '保存しました',
-  SUCCESS_DELETED: '削除しました',
-  SUCCESS_CREATED: '作成しました'
 };
 
 /**

@@ -4,19 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/beercss@3.13.1/dist/cdn/beer.min.css" rel="stylesheet">
-    <script type="module" src="https://cdn.jsdelivr.net/npm/beercss@3.13.1/dist/cdn/beer.min.js"></script>
-    <script type="module"
-        src="https://cdn.jsdelivr.net/npm/material-dynamic-colors@1.1.2/dist/cdn/material-dynamic-colors.min.js"></script>
-
     <script src="https://www.gstatic.com/charts/loader.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://apis.google.com/js/picker.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wdth,wght,GRAD,ROND@6..144,-10..0,25..151,1..1000,0..100,0..100&family=Noto+Sans+JP:wght@100..900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap"
-        rel="stylesheet">
     <?!= include('css'); ?>
 </head>
 
@@ -242,8 +232,8 @@
     <script>
         const { activeUserEmail, urlParams, scriptUrl, EVENT_CONFIG, AUTH_CONFIG, EXTERNAL_URLS, UI_CONFIG } = <?!= JSON.stringify(templateVariables) ?>;
 
-        const SLACK_PROFILE_URL_REGEX = /^https:\/\/zen-student\.slack\.com\/team\/U0[A-Z0-9]{9}$/;
-        const DEFAULT_HELPER_TEXT = 'パソコンで<a href="https://zen-student.slack.com/account/profile" tabindex="-1" target="_blank" class="link">Slack プロフィール</a>を開き、︙メニューからコピーしてください。';
+        const SLACK_PROFILE_URL_REGEX = new RegExp(`^https:\/\/${AUTH_CONFIG.SLACK_DOMAIN}\/team\/U0[A-Z0-9]{9}$`);
+        const DEFAULT_HELPER_TEXT = `パソコンで<a href="https://${AUTH_CONFIG.SLACK_DOMAIN}/account/profile" tabindex="-1" target="_blank" class="link">Slack プロフィール</a>を開き、︙メニューからコピーしてください。`;
         const REQUIRED_HELPER_TEXT = `この項目は必須入力です。`;
         const ERROR_HELPER_TEXT = `URLの形式が間違っています。`;
 

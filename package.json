@@ -1,10 +1,20 @@
 {
-    "name": "zarms",
+    "name": "zarms-monorepo",
     "version": "1.0.0",
+    "private": true,
+    "description": "ZARMS Monorepo",
+    "workspaces": [
+        "projects/*"
+    ],
     "scripts": {
-        "deploy:dev": "cd src && cp .clasp-dev.json .clasp.json && clasp push",
-        "deploy:prod": "cd src && cp .clasp-prod.json .clasp.json && clasp push",
-        "watch:dev": "cd src && cp .clasp-dev.json .clasp.json && clasp push --watch"
+        "deploy:db:dev": "npm run deploy:dev -w projects/database",
+        "deploy:db:prod": "npm run deploy:prod -w projects/database",
+        "deploy:frontend:dev": "npm run deploy:dev -w projects/frontend",
+        "deploy:frontend:prod": "npm run deploy:prod -w projects/frontend",
+        "deploy:all:dev": "npm run deploy:db:dev && npm run deploy:frontend:dev",
+        "deploy:all:prod": "npm run deploy:db:prod && npm run deploy:frontend:prod",
+        "watch:db:dev": "npm run watch:dev -w projects/database",
+        "watch:frontend:dev": "npm run watch:dev -w projects/frontend"
     },
     "devDependencies": {
         "@google/clasp": "^2.4.2"
