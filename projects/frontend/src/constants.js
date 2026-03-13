@@ -80,8 +80,7 @@ const EXTERNAL_URLS = {
   CONTACT_FORM: scriptProperties.getProperty('EXTERNAL_URLS.CONTACT_FORM'),
   LOGO_IMAGE: scriptProperties.getProperty('EXTERNAL_URLS.LOGO_IMAGE'),
   FAVICON_IMAGE: scriptProperties.getProperty('EXTERNAL_URLS.FAVICON_IMAGE'),
-  HELP_SITE: scriptProperties.getProperty('EXTERNAL_URLS.HELP_SITE'),
-  TERMS_SITE: scriptProperties.getProperty('EXTERNAL_URLS.TERMS_SITE'),
+  PORTAL_SITE: (scriptProperties.getProperty('EXTERNAL_URLS.PORTAL_SITE') || '').replace(/\/$/, ''),
   GEMINI_GEMS_TASK_ADD: scriptProperties.getProperty('EXTERNAL_URLS.GEMINI_GEMS_TASK_ADD'),
   ZARMS_WEB: scriptProperties.getProperty('EXTERNAL_URLS.ZARMS_WEB'),
   MASCOT_MAIN_IMAGE: scriptProperties.getProperty('EXTERNAL_URLS.MASCOT_MAIN_IMAGE'),
@@ -112,6 +111,7 @@ const AUTH_CONFIG = {
  */
 const UI_TEXT = {
   APP_TITLE: 'ZARMS',
+  APP_COPYRIGHT: '© 2026 展軸祭実行委員会',
   APP_DESCRIPTION: '展軸祭実行委員会の業務システム「ZARMS」へようこそ！',
   SYSTEM_DESCRIPTION: 'ZARMS（ザームス）は、展軸祭実行委員会の業務を効率化するためのタスク管理システムです。ボードごとにタスクを管理し、メンバー間での進捗共有やコメントによるコミュニケーションをサポートします。',
   LOADING_MESSAGE: 'お待ちください',

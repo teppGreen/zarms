@@ -773,15 +773,30 @@ function remove(sheetName, query) {
     }
 }
 
+// ============================================
+// Sheet Info Caching
+// ============================================
+const sheetIdCache = {};
+
 /**
  * シート名からシートIDを取得
  * @param {string} sheetName - シート名
- * @returns {number} シートID
+ * @returns {number|null} シートID
  */
 function getSheetIdByName(sheetName) {
-    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheet = spreadsheet.getSheetByName(sheetName);
-    return sheet.getSheetId();
+    if (sheetIdCache[sheetName] !== undefined) {
+        return sheetIdCache[sheetName];
+    }
+
+    const response = Sheets.Spreadsheets.get(SPREADSHEET_ID);
+    const sheet = response.sheets.find(s => s.properties.title === sheetName);
+    const sheetId = sheet ? sheet.properties.sheetId : null;
+
+    if (sheetId !== null) {
+        sheetIdCache[sheetName] = sheetId;
+    }
+
+    return sheetId;
 }
 
 // ============================================
@@ -1064,21 +1079,21 @@ function handleBatchDatabaseProcess(userId, queries) {
 
 /**
  * スプレッドシートオブジェクトを取得します（権限チェック用）
- * @returns {Spreadsheet} スプレッドシートオブジェクト
+ * @returns {Object} スプレッドシート情報（Advanced Service）
  */
 function getSpreadsheet() { //ページ読み込み時の権限チェックに使用中。データベース操作時には使っていない。
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const ss = Sheets.Spreadsheets.get(SPREADSHEET_ID);
     return ss;
 }
 
 /**
  * シートオブジェクトを取得します
- * @param {Spreadsheet} ss - スプレッドシートオブジェクト
+ * @param {Object} ss - スプレッドシートオブジェクト（Advanced Service）
  * @param {string} sheetName - シート名
- * @returns {Sheet} シートオブジェクト
+ * @returns {Object} シートオブジェクト
  */
 function getSheet(ss, sheetName) {
-    const sheet = ss.getSheetByName(sheetName);
+    const sheet = ss.sheets.find(s => s.properties.title === sheetName);
     return sheet;
 }
 
@@ -1092,8 +1107,7 @@ function getSheet(ss, sheetName) {
  */
 const DatabaseDependencies = {
     spreadsheetService: {
-        openById: (id) => SpreadsheetApp.openById(id),
-        getActiveSpreadsheet: () => SpreadsheetApp.getActiveSpreadsheet()
+        get: (id) => Sheets.Spreadsheets.get(id)
     },
     cacheService: {
         getScriptCache: () => CacheService.getScriptCache(),
@@ -1117,8 +1131,7 @@ function setDatabaseDependencies(mockDependencies) {
  */
 function resetDatabaseDependencies() {
     DatabaseDependencies.spreadsheetService = {
-        openById: (id) => SpreadsheetApp.openById(id),
-        getActiveSpreadsheet: () => SpreadsheetApp.getActiveSpreadsheet()
+        get: (id) => Sheets.Spreadsheets.get(id)
     };
     DatabaseDependencies.cacheService = {
         getScriptCache: () => CacheService.getScriptCache(),
@@ -1291,29 +1304,5 @@ function getOAuthToken() {
     } catch (e) {
         console.error('OAuthトークン取得エラー: ' + e.message);
         throw new Error('OAuthトークンの取得に失敗しました: ' + e.message);
-    }
-}
-
-/**
- * Google DriveのファイルIDからファイル情報を取得
- * @param {string} fileId - Google DriveのファイルID
- * @returns {Object} ファイル情報 { file_id, file_name, file_type, file_url, modified_time }
- */
-function getDriveFileInfo(fileId) {
-    try {
-        const file = DriveApp.getFileById(fileId);
-
-        const fileInfo = {
-            file_id: fileId,
-            file_name: file.getName(),
-            file_type: file.getMimeType(),
-            file_url: file.getUrl(),
-            modified_time: file.getLastUpdated().toISOString()
-        };
-
-        return sanitizeForClient(fileInfo);
-    } catch (e) {
-        console.error('ファイル情報取得エラー: ' + e.message);
-        throw new Error('ファイル情報の取得に失敗しました: ' + e.message);
     }
 }
