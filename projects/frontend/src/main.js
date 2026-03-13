@@ -9,15 +9,6 @@
  * @returns {HtmlOutput} HTMLテンプレート
  */
 function doGet(e) {
-  // force_prod_db パラメータがある場合は UserProperties に保存（google.script.run での判定用）
-  const userProperties = PropertiesService.getUserProperties();
-  if (e.parameter.use_prod_db === 'true') {
-    userProperties.setProperty('USE_PROD_DB', 'true');
-  } else {
-    // パラメータがない場合は、以前の設定が残らないように削除
-    userProperties.deleteProperty('USE_PROD_DB');
-  }
-
   // 現在のユーザーを取得
   const activeUserEmail = Session.getActiveUser().getEmail();
 
@@ -29,6 +20,7 @@ function doGet(e) {
     EVENT_CONFIG: EVENT_CONFIG,
     AUTH_CONFIG: AUTH_CONFIG,
     EXTERNAL_URLS: EXTERNAL_URLS,
+    UI_TEXT: UI_TEXT,
     UI_CONFIG: UI_CONFIG
   };
 
@@ -36,66 +28,40 @@ function doGet(e) {
     .setTitle('ZARMS')
     .setFaviconUrl(EXTERNAL_URLS.FAVICON_IMAGE)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .addMetaTag('apple-mobile-web-app-capable', 'yes')
+    .addMetaTag('mobile-web-app-capable', 'yes')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 /**
  * メインアプリケーションをロードします
  * 認証済みユーザーに対してアプリケーション画面を返します
- * @param {Object} urlParams - URLパラメータ
  * @param {Object} activeUser - 現在のアクティブユーザー情報
+ * @param {Object} urlParams - URLパラメータ
+ * @param {boolean} isMobile - モバイル版かどうか
  * @returns {string} HTMLコンテンツ
  */
-function loadMainApp(activeUser, urlParams) {
-  // 初期データを一括取得（CacheServiceを活用）して埋め込む
-  const initialData = _prefetchInitialData(activeUser.id);
+function loadAppHtml(activeUser, urlParams, isMobile = false) {
+  const templatePath = isMobile ? 'mobile/index' : 'index';
+  const template = HtmlService.createTemplateFromFile(templatePath);
 
-  const template = HtmlService.createTemplateFromFile('index');
-  template.templateVariables = {
+  // テンプレート変数の準備
+  const templateVariables = {
     activeUser: activeUser,
     isDevelopment: isDevelopment(urlParams),
     TABLE_NAMES: TABLE_NAMES,
     DIRECTORY_TYPES: DIRECTORY_TYPES,
     TASK_STATUS: TASK_STATUS,
-    UI_TEXT: UI_TEXT,
-    userProperties: PropertiesService.getUserProperties().getProperties(),
-    initialData: initialData  // 事前取得したデータを埋め込む
+    userProperties: PropertiesService.getUserProperties().getProperties()
   };
 
-  return template.evaluate().getContent();
-}
-
-/**
- * モバイル版アプリケーションをロードします
- * 認証済みユーザーに対してモバイル版アプリケーション画面を返します
- * @param {Object} urlParams - URLパラメータ
- * @returns {string} HTMLコンテンツ
- */
-function loadMobileApp(urlParams) {
-  // まず、現在のユーザーを取得
-  const activeUserEmail = Session.getActiveUser().getEmail();
-
-  try {
-    // ユーザー情報を取得
-    const activeUser = getMemberByEmail(activeUserEmail);
-
-    // モバイル版のテンプレートをロード
-    const template = HtmlService.createTemplateFromFile('mobile/index');
-    template.templateVariables = {
-      activeUser: activeUser,
-      isDevelopment: isDevelopment(urlParams),
-      TABLE_NAMES: TABLE_NAMES,
-      DIRECTORY_TYPES: DIRECTORY_TYPES,
-      TASK_STATUS: TASK_STATUS,
-      UI_TEXT: UI_TEXT,
-      userProperties: PropertiesService.getUserProperties().getProperties()
-    };
-
-    return template.evaluate().getContent();
-  } catch (error) {
-    console.error('[loadMobileApp] Error:', error);
-    throw error;
+  // デスクトップ版の場合のみ初期データを事前取得
+  if (!isMobile) {
+    templateVariables.initialData = _prefetchInitialData(activeUser.id);
   }
+
+  template.templateVariables = templateVariables;
+  return template.evaluate().getContent();
 }
 
 // ============================================
@@ -108,36 +74,37 @@ function loadMobileApp(urlParams) {
  * register.htmlからの複数回のgoogle.script.run呼び出しを1回にまとめます。
  * @param {string} email - 現在のユーザーのメールアドレス
  * @param {Object} urlParams - URLパラメータ
+ * @param {boolean} isMobile - モバイル版かどうか
  * @returns {Object} {
  *   status: 'ok' | 'unauthorized' | 'not_registered',
  *   activeUser: Object|null,     // 認証済みメンバー情報
- *   mainAppHtml: string|null,    // loadMainApp() で生成されたHTML（statusがokの場合）
+ *   appHtml: string|null,        // アプリケーションHTML
  *   error: string|null
  * }
  */
-function getInitialAppData(email, urlParams) {
+function getInitialAppData(email, urlParams, isMobile = false) {
   try {
     // 1. スプレッドシートへのアクセス権限確認（throws if no access）
     getSpreadsheet();
   } catch (e) {
-    return { status: 'unauthorized', activeUser: null, mainAppHtml: null, error: e.message };
+    return { status: 'unauthorized', activeUser: null, appHtml: null, error: e.message };
   }
 
   try {
     // 2. メールアドレスからメンバー情報を取得
     const activeUser = getMemberByEmail(email);
 
-    // 3. アプリのメインHTMLを生成（初期データも埋め込み）
-    const mainAppHtml = loadMainApp(activeUser, urlParams);
+    // 3. アプリのHTMLを生成
+    const appHtml = loadAppHtml(activeUser, urlParams, isMobile);
 
-    return { status: 'ok', activeUser: activeUser, mainAppHtml: mainAppHtml, error: null };
+    return { status: 'ok', activeUser: activeUser, appHtml: appHtml, error: null };
   } catch (e) {
     // ユーザーが見つからない場合はサインアップ画面へ
     const isNotFound = e.name === 'ValidationError' || (e.message && e.message.includes('not found'));
     if (isNotFound) {
-      return { status: 'not_registered', activeUser: null, mainAppHtml: null, error: null };
+      return { status: 'not_registered', activeUser: null, appHtml: null, error: null };
     }
-    return { status: 'unauthorized', activeUser: null, mainAppHtml: null, error: e.message };
+    return { status: 'unauthorized', activeUser: null, appHtml: null, error: e.message };
   }
 }
 
