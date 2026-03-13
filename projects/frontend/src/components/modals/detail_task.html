@@ -360,7 +360,6 @@
 
         this.loadLists(taskId);
         this.loadRelatedTasks(taskId);
-        this.loadFiles(taskId);
         this.isDirty = defaultDirty;
       },
 
@@ -697,19 +696,13 @@
           relatedChanges.childTasksToAdd.length > 0 ||
           relatedChanges.childTasksToRemove.length > 0;
 
-        // ファイルの変更をチェック
-        const fileChanges = this.getFileChanges();
-        const hasFileChanges = fileChanges.toInsert.length > 0 ||
-          fileChanges.toUpdate.length > 0 ||
-          fileChanges.toDelete.length > 0;
-
         // 親タスクの変更をupdatesに含める
         if (relatedChanges.hasParentChange) {
           updates.parent_task_id = currentItem.parent_task_id || '';
           hasChanges = true;
         }
 
-        if (!hasChanges && !hasListChanges && !hasRelatedChanges && !hasFileChanges) {
+        if (!hasChanges && !hasListChanges && !hasRelatedChanges) {
           this.close(false, true, skipClose);
           return;
         }
@@ -757,11 +750,6 @@
           // 関連タスクの変更を保存
           if (hasRelatedChanges) {
             await this.saveRelatedTaskChanges(id, relatedChanges);
-          }
-
-          // ファイルの変更を保存
-          if (hasFileChanges) {
-            await this.saveFileChanges(fileChanges);
           }
 
           console.log('[TaskDetail] Update successful');
@@ -869,12 +857,6 @@
         this.originalChildTaskIds = [];
         this.deletedChildTaskIds = [];
 
-        // ファイルのリセット
-        this.currentFiles = [];
-        this.originalFiles = [];
-        this.deletedFileIds = [];
-
-
         // 入力フィールドをクリア
         const fields = [
           'task-status-select',
@@ -911,10 +893,6 @@
         taskDetailTabBadge.forEach(badge => {
           badge.textContent = '0';
         });
-
-        // ファイルリストをクリア
-        const filesList = document.getElementById('task-files-list');
-        if (filesList) filesList.innerHTML = '';
       },
 
       /**
@@ -2079,7 +2057,6 @@
         }
       },
 
-
       /**
        * 関連タブのバッジを更新
        */
@@ -2119,257 +2096,11 @@
             addButton.querySelector('div.tooltip').style.display = 'block';
             addButton.querySelector('div.tooltip > p').innerText = '子タスクを追加します';
             break;
-          case `files`:
-            addButton.disabled = false;
-            addButton.onclick = () => {
-              // TODO: Google Driveからファイルを追加する処理をここで呼び出す
-            };
-            addButton.querySelector('div.tooltip').style.display = 'block';
-            addButton.querySelector('div.tooltip > p').innerText = 'Google Driveからファイルを追加します';
-            break;
           default:
             addButton.disabled = true;
             addButton.querySelector('div.tooltip').style.display = 'none';
             break;
         }
-      },
-
-      /**
-       * ファイルデータを読み込み
-       * @param {string} taskId - タスクID
-       */
-      loadFiles: function (taskId) {
-        const filesContainer = document.getElementById('task-files-list');
-        filesContainer.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
-
-        const query = {
-          where: {
-            task_id: ["=", taskId]
-          },
-          orderBy: {
-            index: "asc"
-          }
-        };
-
-        console.log('[TaskDetail] Loading files for task:', taskId);
-        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.FILES, 'select', query)
-          .then(results => {
-            console.log('[TaskDetail] Files query results:', results);
-            if (this.currentId !== taskId) return;
-
-            const files = results?.data || results || [];
-            console.log('[TaskDetail] Files loaded:', files);
-            this.currentFiles = files;
-            this.originalFiles = JSON.parse(JSON.stringify(files));
-            this.renderFiles(results?.isCached);
-            this.updateFilesBadge();
-
-            if (results?.isCached) {
-              console.log('[TaskDetail] Files are cached, refetching...');
-              callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.FILES, 'select', query, null, true)
-                .then(results => {
-                  const refreshedFiles = results?.data || results || [];
-                  console.log('[TaskDetail] Files refetched:', refreshedFiles);
-                  this.currentFiles = refreshedFiles;
-                  this.originalFiles = JSON.parse(JSON.stringify(refreshedFiles));
-                  this.renderFiles();
-                  this.updateFilesBadge();
-                })
-            }
-          })
-          .catch(error => {
-            console.error('[TaskDetail] Error loading files:', error);
-            if (this.currentId === taskId && filesContainer) {
-              filesContainer.innerHTML = '<p class="error-text padding">ファイルの読み込みに失敗しました</p>';
-            }
-          });
-      },
-
-      /**
-       * ファイル一覧を描画
-       * @param {boolean} disabled - 無効化フラグ
-       */
-      renderFiles: function (disabled = false) {
-        const container = document.getElementById('task-files-list');
-        if (!container) return;
-
-        if (!this.currentFiles || this.currentFiles.length === 0) {
-          container.innerHTML = '<p>ファイルはありません</p>';
-          return;
-        }
-
-        const html = this.currentFiles.map(file => {
-          const fileInfo = file._fileInfo;
-          if (!fileInfo) {
-            // _fileInfoがない場合（DBから読み込んだ場合）はプレースホルダーを表示
-            return `
-              <div class="row middle-align small-space small-padding background" data-file-id="${file.id}">
-                <i>description</i>
-                <div class="max">
-                  <p class="no-margin"><strong>読み込み中...</strong></p>
-                </div>
-                <button class="circle small transparent" 
-                  onclick="App.modals.taskDetail.deleteFile('${file.id}')"
-                  ${disabled ? 'disabled' : ''}>
-                  <i>delete</i>
-                </button>
-              </div>
-            `;
-          }
-
-          // MIMEタイプに基づいてアイコンを決定
-          let icon = 'description';
-          if (fileInfo.file_type.includes('folder')) {
-            icon = 'folder';
-          } else if (fileInfo.file_type.includes('spreadsheet')) {
-            icon = 'grid_on';
-          } else if (fileInfo.file_type.includes('document')) {
-            icon = 'article';
-          } else if (fileInfo.file_type.includes('presentation')) {
-            icon = 'slideshow';
-          } else if (fileInfo.file_type.includes('image')) {
-            icon = 'image';
-          } else if (fileInfo.file_type.includes('video')) {
-            icon = 'videocam';
-          } else if (fileInfo.file_type.includes('pdf')) {
-            icon = 'picture_as_pdf';
-          }
-
-          const updatedAt = formatDateTimeForDisplay(fileInfo.modified_time, 'MM/dd HH:mm');
-
-          return `
-            <div class="row middle-align small-space small-padding background" data-file-id="${file.id}">
-              <i>${icon}</i>
-              <div class="max">
-                <p class="no-margin"><a href="${escapeHtml(fileInfo.file_url)}" target="_blank"><strong>${escapeHtml(fileInfo.file_name)}</strong></a></p>
-                <p class="no-margin small-text secondary-text">最終更新: ${updatedAt}</p>
-              </div>
-              <button class="circle small transparent" 
-                onclick="App.modals.taskDetail.deleteFile('${file.id}')"
-                ${disabled ? 'disabled' : ''}>
-                <i>delete</i>
-              </button>
-            </div>
-          `;
-        }).join('');
-
-        container.innerHTML = html;
-
-        // _fileInfoがないファイルの情報を取得
-        this.currentFiles.forEach((file, index) => {
-          if (!file._fileInfo && file.gfile_id) {
-            callGAS('getDriveFileInfo', file.gfile_id)
-              .then(fileInfo => {
-                this.currentFiles[index]._fileInfo = fileInfo;
-                this.renderFiles(disabled);
-              })
-              .catch(error => {
-                console.error('ファイル情報の取得に失敗しました:', error);
-              });
-          }
-        });
-      },
-
-      /**
-       * ファイルを削除
-       * @param {string} fileId - ファイルID
-       */
-      deleteFile: function (fileId) {
-        const file = this.currentFiles.find(f => f.id === fileId);
-        if (!file) return;
-
-        // isDirtyフラグを立てる
-        this.isDirty = true;
-        console.log('[TaskDetail] isDirty set to true (deleteFile)');
-
-        // ローカルデータから削除
-        this.currentFiles = this.currentFiles.filter(f => f.id !== fileId);
-
-        this.renderFiles();
-        this.updateFilesBadge();
-
-        // 新規作成されたものでなければ削除リストに追加
-        if (!file._isNew) {
-          this.deletedFileIds.push(fileId);
-        }
-
-        console.log('[TaskDetail] File deleted (not saved yet)');
-      },
-
-      /**
-       * ファイルバッジを更新
-       */
-      updateFilesBadge: function () {
-        const badge = document.getElementById('task-files-badge');
-        if (!badge) return;
-
-        const count = this.currentFiles.length;
-        badge.textContent = count;
-        count > 0 ? badge.classList.remove('secondary') : badge.classList.add('secondary');
-      },
-
-      /**
-       * ファイルの変更を取得
-       * @returns {Object} 変更内容
-       */
-      getFileChanges: function () {
-        const toInsert = [];
-        const toUpdate = [];
-        const toDelete = [...this.deletedFileIds];
-
-        // 現在のファイルと元のファイルを比較
-        this.currentFiles.forEach(currentFile => {
-          if (currentFile._isNew) {
-            // 新規作成
-            const { _isNew, _fileInfo, ...fileData } = currentFile;
-            toInsert.push(fileData);
-          } else {
-            // 既存のファイルを探す
-            const originalFile = this.originalFiles.find(f => f.id === currentFile.id);
-            if (originalFile) {
-              // 変更があるかチェック（indexのみ変更可能性がある）
-              const hasChanges = currentFile.index !== originalFile.index;
-
-              if (hasChanges) {
-                const { _fileInfo, ...fileData } = currentFile;
-                toUpdate.push(fileData);
-              }
-            }
-          }
-        });
-
-        return { toInsert, toUpdate, toDelete };
-      },
-
-      /**
-       * ファイルの変更を保存
-       * @param {Object} fileChanges - 変更内容
-       */
-      saveFileChanges: async function (fileChanges) {
-        const { toInsert, toUpdate, toDelete } = fileChanges;
-
-        // 挿入
-        if (toInsert.length > 0) {
-          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.FILES, 'bulkinsert', toInsert);
-        }
-
-        // 削除
-        for (const fileId of toDelete) {
-          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.FILES, 'remove', {
-            where: { id: ["=", fileId] }
-          });
-        }
-
-        // 更新
-        for (const file of toUpdate) {
-          const { id, task_id, ...updates } = file;
-          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.FILES, 'update', {
-            where: { id: ["=", file.id] },
-            set: updates
-          });
-        }
-
-        console.log('[TaskDetail] File changes saved');
       }
     };
   })();
