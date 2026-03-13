@@ -93,6 +93,15 @@ zarms/
 └── README.md
 ```
 
+## ドキュメント
+
+本プロジェクトの詳細な仕様やガイドラインについては、以下のドキュメントを参照してください：
+
+* **[データベーススキーマ](database_schema.mmd)**: テーブル構造やリレーションの定義
+* **[APIリファレンス](docs/api_reference.md)**: Database API のリクエスト形式やセキュリティ設計、権限評価ルール
+* **[テストガイド](docs/testing-guide.md)**: ローカルでの結合テスト実行方法
+* **[AIエージェント向けガイドライン](AGENTS.md)**: AIが開発・計画を行うためのプロジェクト規約・振る舞い指示
+
 ## 開発環境とデプロイ
 
 本プロジェクトは [CLASP (Command Line Apps Script Projects)](https://github.com/google/clasp) を使用して管理されています。

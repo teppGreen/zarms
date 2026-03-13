@@ -236,6 +236,19 @@ erDiagram
         copyright_application_form5_submitted "著作物利用申請フォーム5提出"
         ai_usage "AI利用備考"
     }
+    permissions {
+        uuid id PK "権限ID"
+        varchar table_name "対象テーブル名"
+        uuid record_id "対象レコードID（NULLはテーブル全体）"
+        varchar email "許可するメールアドレス（NULLは全員）"
+        boolean can_read "閲覧権限"
+        boolean can_write "書き込み権限"
+        text remark "システム備考"
+        uuid created_by "作成者"
+        datetime created_at "作成日時"
+        uuid updated_by "最終更新者"
+        datetime updated_at "最終更新日時"
+    }
     logs }|--|| members : "created_by"
     apps }|--|| members : "created_by"
     apps }|--|| members : "updated_by"
@@ -277,3 +290,5 @@ erDiagram
     system_updates }|--|| members : "updated_by"
     questions }|--|| members : "created_by"
     questions }|--|| members : "updated_by"
+    permissions }|--|| members : "created_by"
+    permissions }|--|| members : "updated_by"
