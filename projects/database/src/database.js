@@ -154,6 +154,18 @@ function columnIndexToId(index) {
 }
 
 /**
+ * テキストを正規化します（大文字・小文字、全角・半角の曖昧排除）
+ * @param {string} text - 正規化するテキスト
+ * @returns {string} 正規化されたテキスト
+ */
+function normalizeText(text) {
+    if (text === null || text === undefined) return '';
+    return String(text)
+        .normalize('NFKC')
+        .toLowerCase();
+}
+
+/**
  * シート名からヘッダーマッピングを取得・キャッシュ
  * GViz APIでは列名ではなく列ID（A, B, C...）で指定する必要があるため
  * @param {string} sheetName - シート名

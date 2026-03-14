@@ -275,25 +275,6 @@ function getMyBoardTasks(userId, filters, forceRefresh) {
             }
         }
 
-        // タイトルフィルタ（GViz の CONTAINS / STARTS WITH / ENDS WITH / matches を使用）
-        if (filters && filters.title) {
-            const nameColId = tasksHeadersMap['name'];
-            if (nameColId) {
-                const kw = filters.title.replace(/'/g, "\\'");
-                const mode = filters.titleMatchMode || 'contains';
-                if (mode === 'starts_with') {
-                    andParts.push(`${nameColId} STARTS WITH '${kw}'`);
-                } else if (mode === 'ends_with') {
-                    andParts.push(`${nameColId} ENDS WITH '${kw}'`);
-                } else if (mode === 'not_contains') {
-                    andParts.push(`NOT ${nameColId} CONTAINS '${kw}'`);
-                } else {
-                    // contains (default)
-                    andParts.push(`${nameColId} CONTAINS '${kw}'`);
-                }
-            }
-        }
-
         // 日付範囲フィルタ
         if (filters && filters.dateRanges) {
             const dr = filters.dateRanges;
@@ -334,7 +315,53 @@ function getMyBoardTasks(userId, filters, forceRefresh) {
         }
 
         const tasksResult = select(TABLE_NAMES.TASKS, tasksQuery);
-        const filteredTasks = tasksResult || [];
+        let filteredTasks = tasksResult || [];
+
+        // ── Step 5: さらなるフィルタリングをJSで適用（真の曖昧検索、ボール保持者など） ──
+        if (filters) {
+            // ボール保持者フィルタ
+            if (filters.ballHolderOnly) {
+                filteredTasks = filteredTasks.filter(function (task) {
+                    let ballRole;
+                    const status = task.task_status_key;
+                    if (status === 'TODO' || status === 'IN_PROGRESS') {
+                        ballRole = 'processed_by';
+                    } else if (status === 'IN_REVIEW') {
+                        ballRole = 'reviewed_by';
+                    } else if (status === 'DONE') {
+                        ballRole = 'received_by';
+                    }
+
+                    if (ballRole) {
+                        const ballRoleMembers = filters.members ? (filters.members[ballRole] || []) : [];
+                        if (ballRoleMembers.length === 0) return false;
+                        return ballRoleMembers.indexOf(task[ballRole]) !== -1;
+                    }
+                    return false;
+                });
+            }
+
+            // タイトル曖昧検索
+            if (filters.title) {
+                const normalizedKeyword = normalizeText(filters.title);
+                const mode = filters.titleMatchMode || 'contains';
+
+                filteredTasks = filteredTasks.filter(function (task) {
+                    const normalizedTitle = normalizeText(task.name);
+                    if (mode === 'starts_with') {
+                        return normalizedTitle.indexOf(normalizedKeyword) === 0;
+                    } else if (mode === 'ends_with') {
+                        return normalizedTitle.length >= normalizedKeyword.length &&
+                            normalizedTitle.lastIndexOf(normalizedKeyword) === (normalizedTitle.length - normalizedKeyword.length);
+                    } else if (mode === 'not_contains') {
+                        return normalizedTitle.indexOf(normalizedKeyword) === -1;
+                    } else {
+                        // contains (default)
+                        return normalizedTitle.indexOf(normalizedKeyword) !== -1;
+                    }
+                });
+            }
+        }
 
         // キャッシュに保存
         try {

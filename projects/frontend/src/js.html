@@ -1437,6 +1437,23 @@
     }
   };
 
+  /**
+   * テキスト操作ユーティリティ
+   */
+  App.utils.text = {
+    /**
+     * テキストを正規化します（大文字・小文字、全角・半角の曖昧排除）
+     * @param {string} text - 正規化するテキスト
+     * @returns {string} 正規化されたテキスト
+     */
+    normalize: function (text) {
+      if (text === null || text === undefined) return '';
+      return String(text)
+        .normalize('NFKC')
+        .toLowerCase();
+    }
+  };
+
   // ============================================
   // Optimistic UI: データ同期ロジック
   // ============================================
