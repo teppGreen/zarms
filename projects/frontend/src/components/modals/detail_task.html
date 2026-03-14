@@ -727,7 +727,7 @@
           App.utils.url.updateParams(newParams, false);
         }
 
-        showSnackbar('変更を保存しています。画面を閉じないでください。', 'info', 'top', 0);
+        showSnackbar('変更を保存しています...', 'info', 'top', 0);
 
         try {
           // タスクの更新
@@ -753,7 +753,7 @@
           }
 
           console.log('[TaskDetail] Update successful');
-          showSnackbar('変更を保存しました。', 'success');
+          showSnackbar('変更を保存しました', 'success');
 
           // もしこのタスクのモーダルが再度開かれていたら、内部状態を更新
           if (this.currentId === id) {
@@ -1084,7 +1084,7 @@
         })];
 
         navigator.clipboard.write(data).then(() => {
-          showSnackbar('このタスクへのリンクをコピーしました。', 'success');
+          showSnackbar('このタスクへのリンクをコピーしました', 'success');
         }).catch(err => {
           console.error('Clipboard write failed', err);
           navigator.clipboard.writeText(textContent).then(() => {
@@ -1250,7 +1250,7 @@
 
         // 作成者は変更不可
         if (role === 'created_by') {
-          showSnackbar('作成者は変更できません', 'warning');
+          showSnackbar('作成者は変更できません', 'info');
           return;
         }
 

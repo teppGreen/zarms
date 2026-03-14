@@ -78,8 +78,9 @@
         <button class="circle transparent">
             <i>help</i>
             <menu id="help-menu" class="left no-wrap">
-                <li><a id="help-link" href="" rel="noopener noreferrer" target="_blank">ヘルプ</a></li>
-                <li><a id="terms-link" href="" rel="noopener noreferrer" target="_blank">利用規約</a></li>
+                <li><a id="help-link" href="" target="_blank">ヘルプ</a></li>
+                <li><a id="terms-link" href="" target="_blank">利用規約</a></li>
+                <li><a id="privacy-link" href="" target="_blank">プライバシーポリシー</a></li>
             </menu>
         </button>
 
@@ -106,8 +107,7 @@
                 </button>
             </div>
             <div class="s6">
-                <button class="primary extra responsive"
-                    onclick="App.utils.header.systemUpdates.reloadPage(this)">
+                <button class="primary extra responsive" onclick="App.utils.header.systemUpdates.reloadPage(this)">
                     <i>refresh</i>
                     <span>今すぐ更新する</span>
                 </button>
@@ -122,11 +122,15 @@
         document.addEventListener('DOMContentLoaded', function () {
             const helpLink = document.getElementById('help-link');
             if (helpLink) {
-                helpLink.href = EXTERNAL_URLS.HELP_SITE;
+                helpLink.href = `${EXTERNAL_URLS.PORTAL_SITE}/help`;
             }
             const termsLink = document.getElementById('terms-link');
             if (termsLink) {
-                termsLink.href = EXTERNAL_URLS.TERMS_SITE;
+                termsLink.href = `${EXTERNAL_URLS.PORTAL_SITE}/terms`;
+            }
+            const privacyLink = document.getElementById('privacy-link');
+            if (privacyLink) {
+                privacyLink.href = `${EXTERNAL_URLS.PORTAL_SITE}/privacy`;
             }
         });
 
@@ -583,7 +587,7 @@
                             <i class="small">info</i>
                             <span class="bold">ZARMSについて</span>
                         </div>
-                        <p class="small-text">${UI_TEXT.SYSTEM_DESCRIPTION}</p>
+                        <p class="small-text">${UI_TEXT.APP_DESCRIPTION}</p>
                     </div>
                 `;
 
