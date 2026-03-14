@@ -130,15 +130,8 @@
                     const headerHtml = `
                         <header class="small-margin no-padding">
                             <nav id="board-tab-header-${board.id}" class="no-margin no-padding row">
-                                <div class="field transparent max no-margin bold">
-                                    <input type="text" 
-                                    value="${escapeHtml(board.name)}" 
-                                    style="font-size: 1.75rem;" 
-                                    placeholder="0000_ボード名"
-                                    onfocus="if(this.value.trim() !== '') this.dataset.originalValue = this.value"
-                                    onblur="App.pages.boards.updateBoardName('${board.id}', this.value, this)">
-                                </div>
-                                <div class="medium"></div>
+                                <h3 class="bold small">${escapeHtml(board.name)}</h3>
+                                <div class="max"></div>
                                 <div class="no-margin no-padding small-round surface-container-low board-view-toggle" id="view-toggle-${board.id}" title="表示切替">
                                     <button class="square no-margin transparent view-kanban-btn" onclick="App.pages.boards.switchViewMode('${board.id}', 'kanban')" title="カンバン表示"><i>view_kanban</i></button>
                                     <button class="square no-margin transparent view-list-btn" onclick="App.pages.boards.switchViewMode('${board.id}', 'list')" title="リスト表示"><i>view_list</i></button>
@@ -1125,7 +1118,7 @@
                 const btnInfo = document.getElementById(`btn-info-${board.id}`);
                 if (btnInfo) {
                     btnInfo.addEventListener('click', () => {
-                        this.openDescriptionModal(board.id);
+                        this.openBoardSettingsModal(board.id);
                     });
                 }
 
@@ -1441,35 +1434,42 @@
             },
 
             /**
-             * ボード説明モーダルを開く
+             * ボード設定モーダル（タイトル・説明）を開く
              */
-            openDescriptionModal: function (boardId) {
+            openBoardSettingsModal: function (boardId) {
                 const board = App.state.data.boards.find(b => b.id === boardId);
                 if (!board) return;
 
                 // モーダルが既に存在する場合は削除
-                const existingModal = document.getElementById(`modal-board-description-${boardId}`);
+                const existingModal = document.getElementById(`modal-board-settings-${boardId}`);
                 if (existingModal) {
                     existingModal.remove();
                 }
 
                 // モーダルHTMLを生成
                 const modalHtml = `
-                    <dialog id="modal-board-description-${boardId}" class="modal padding no-scroll">
+                    <dialog id="modal-board-settings-${boardId}" class="modal medium-width padding">
                         <nav class="small-padding bottom-margin">
-                            <h5 class="max bold">ボードの説明</h5>
-                            <button class="circle transparent" onclick="ui('#modal-board-description-${boardId}')">
+                            <h5 class="max bold">ボードの設定</h5>
+                            <button class="circle transparent" onclick="ui('#modal-board-settings-${boardId}')">
                                 <i>close</i>
                             </button>
                         </nav>
-                        <div class="field border background scroll large-width small-padding small-round">
-                            <textarea id="textarea-board-description-${boardId}" rows="10" placeholder="ここにボードの説明を入力してください。入力した内容は全員が閲覧できます。">${escapeHtml(board.description || '')}</textarea>
+                        <div class="small-padding">
+                            <div class="field border large no-wrap label">
+                                <input type="text" id="input-board-name-${boardId}" value="${escapeHtml(board.name)}" onblur="this.placeholder=' '" onfocus="this.placeholder='0000_ボード名'" placeholder=" ">
+                                <label>ボード名</label>
+                            </div>
+                            <div class="field border large label">
+                                <textarea id="textarea-board-description-${boardId}" rows="10" onblur="this.placeholder=' '" onfocus="this.placeholder='〇〇ユニットの△△業務に関わるタスクを管理するボード。'" placeholder=" ">${escapeHtml(board.description || '')}</textarea>
+                                <label>ボードの説明</label>
+                            </div>
                         </div>
                         <nav class="right-align small-padding">
-                            <button class="border" onclick="ui('#modal-board-description-${boardId}')">
+                            <button class="border" onclick="ui('#modal-board-settings-${boardId}')">
                                 <span>キャンセル</span>
                             </button>
-                            <button onclick="App.pages.boards.saveBoardDescription('${boardId}')">
+                            <button onclick="App.pages.boards.saveBoardSettings('${boardId}')">
                                 <span>保存</span>
                             </button>
                         </nav>
@@ -1480,51 +1480,83 @@
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
 
                 // モーダルを開く
-                ui(`#modal-board-description-${boardId}`);
+                ui(`#modal-board-settings-${boardId}`);
             },
 
             /**
-             * ボード説明を保存
+             * ボード設定（タイトル・説明）を保存
              */
-            saveBoardDescription: async function (boardId) {
-                const textarea = document.getElementById(`textarea-board-description-${boardId}`);
-                if (!textarea) return;
+            saveBoardSettings: async function (boardId) {
+                const inputName = document.getElementById(`input-board-name-${boardId}`);
+                const textareaDesc = document.getElementById(`textarea-board-description-${boardId}`);
+                if (!inputName || !textareaDesc) return;
 
-                const newDescription = textarea.value;
+                const newName = inputName.value.trim();
+                const newDescription = textareaDesc.value;
+                
+                if (!newName) {
+                    alert('ボード名を入力してください');
+                    return;
+                }
+
                 const board = App.state.data.boards.find(b => b.id === boardId);
                 if (!board) return;
 
+                const oldName = board.name;
                 const oldDescription = board.description;
 
+                // 変更がない場合は閉じるだけ
+                if (oldName === newName && oldDescription === newDescription) {
+                    ui(`#modal-board-settings-${boardId}`);
+                    return;
+                }
+
                 // Optimistic UI update
+                board.name = newName;
                 board.description = newDescription;
+
+                // ヘッダーのタイトル表示を更新
+                const headerTitle = document.querySelector(`#board-tab-header-${boardId} h3`);
+                if (headerTitle) {
+                    headerTitle.textContent = newName;
+                }
 
                 // 左ナビゲーションを再描画
                 if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
                     App.utils.navigation.renderBoardsNavigation();
+                    // アクティブ状態を復元
+                    const activeLink = document.querySelector(`a[data-board-id="${boardId}"]`);
+                    if (activeLink) activeLink.classList.add('active');
                 }
 
                 // モーダルを閉じる
-                ui(`#modal-board-description-${boardId}`);
+                ui(`#modal-board-settings-${boardId}`);
 
                 try {
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'update', {
                         where: { id: ["=", boardId] },
-                        set: { description: newDescription }
-                    }, 'ボードの説明を更新');
+                        set: { 
+                            name: newName,
+                            description: newDescription 
+                        }
+                    }, 'ボードの設定を更新');
 
-                    showSnackbar('ボードの説明を更新しました', 'success');
+                    showSnackbar('ボードの設定を更新しました', 'success');
                 } catch (error) {
-                    console.error('Failed to update board description:', error);
+                    console.error('Failed to update board settings:', error);
                     // ロールバック
+                    board.name = oldName;
                     board.description = oldDescription;
-                    if (tooltipDescription) {
-                        tooltipDescription.textContent = oldDescription || 'ボードの説明を追加';
+                    
+                    // ヘッダーのタイトル表示を戻す
+                    if (headerTitle) {
+                        headerTitle.textContent = oldName;
                     }
+
                     if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
                         App.utils.navigation.renderBoardsNavigation();
                     }
-                    alert('ボードの説明の更新に失敗しました');
+                    alert('ボードの設定の更新に失敗しました');
                 }
             }
             ,
