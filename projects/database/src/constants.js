@@ -120,7 +120,7 @@ const EXTERNAL_URLS = {
  */
 const TASK_BY_QUESTION_DEFAULT_VALUES = {
   board_id: scriptProperties.getProperty('BOARDS.QUESTION'),
-  created_by: scriptProperties.getProperty('MEMBERS.SYSTEM'),
+  created_by: 'system',
   processed_by: scriptProperties.getProperty('MEMBERS.HELPDESK_UNIT_LEADER'),
   reviewed_by: scriptProperties.getProperty('MEMBERS.MANAGEMENT_GROUP_STAFF'),
   received_by: scriptProperties.getProperty('MEMBERS.MANAGEMENT_GROUP_STAFF'),

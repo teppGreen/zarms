@@ -720,8 +720,8 @@
                 setLoading(true);
 
                 try {
-                    // 全角数字を半角に変換してから数値チェック
-                    const normalizedValue = searchValue.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+                    // 全角数字を半角に変換してから数値チェック（正規化ユーティリティを使用）
+                    const normalizedValue = App.utils.text.normalize(searchValue);
                     const numericValue = Number(normalizedValue);
                     const isNumericInput = !isNaN(numericValue) && normalizedValue !== '' && Number.isInteger(numericValue);
 
