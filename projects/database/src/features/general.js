@@ -61,7 +61,7 @@ function registerUserEmail(userId) {
         }
         const result = handleDatabaseProcess(userId, TABLE_NAMES.MEMBERS, 'update', {
             set: { email: email },
-            where: { id: ["=", userId] }
+            where: { id: ["=", userId], email: ["is null"] }
         }, 'ユーザーのemailを登録');
         return !!result;
     } catch (error) {

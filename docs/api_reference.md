@@ -32,6 +32,7 @@
       "id": ["=", "task_12345"]
     }
   },
+  "forceRefresh": false,
   "signature":  "a1b2c3d4e5f6..."
 }
 ```
@@ -42,4 +43,6 @@
 * **`tableName`** (String): DB操作対象のテーブル名（例: `tasks`, `members`, `boards`）。
 * **`operation`** (String): 実行する操作名。許可されている操作リスト（`ALLOWED_OPERATIONS`）に含まれている必要があります（例: `select`, `insert`, `update`, `remove`, `bulkinsert`）。
 * **`dataObject`** (Object): クエリ条件（`where`, `set`, `orderBy`等）やデータベースへ保存するデータを含むオブジェクト。
-* **`signature`** (String): `timestamp`, `tableName`, `operation`, `dataObject`（をJSON化したもの）を決められた順序で結合し、`DB_API_SECRET` を鍵として計算したHMAC-SHA256署名（16進数文字列）。
+* **`forceRefresh`** (Boolean): `true` を指定すると、サーバー側のキャッシュを無視してスプレッドシートから最新データを取得します（主に `select` 操作で使用）。
+* **`signature`** (String): `timestamp`, `tableName`, `operation`, `dataObject`（をJSON化したもの）, `forceRefresh`（"true" または "false" の文字列）を決められた順序で結合し、`DB_API_SECRET` を鍵として計算したHMAC-SHA256署名（16進数文字列）。
+  * 結合順序: `timestamp|tableName|operation|dataObjectJson|forceRefreshString`

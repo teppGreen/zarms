@@ -21,6 +21,7 @@ const TABLE_NAMES = {
   SYSTEM_UPDATES: 'system_updates',
   QUESTIONS: 'questions',
   PLANS: 'plans',
+  PERMISSIONS: 'permissions',
 };
 
 const DIRECTORY_TYPES = {
@@ -70,6 +71,7 @@ const TABLE_HEADERS = {
   SYSTEM_UPDATES: ['id', 'version', 'title', 'description', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   QUESTIONS: ['id', 'question_number', 'created_at', 'question_category', 'question_content', 'remark', 'created_by', 'updated_by', 'updated_at'],
   PLANS: ['id', 'plan_number', 'zarms_code', 'parent_plan_id', 'plan_type_sequence_number', 'plan_status', 'plan_type', 'name', 'summary', 'description', 'plan_tags', 'plan_categories', 'selection_application_text', 'selection_presentation_url', 'first_selection_comment', 'second_selection_comment', 'estimated_staff_count', 'estimated_participant_count', 'estimated_total_cost', 'actual_staff_count', 'actual_participant_count', 'actual_total_cost', 'has_collaborators', 'has_guests', 'online_media_type', 'online_media_url', 'website_url', 'sheet_url', 'folder_url', 'document_url', 'slide_url', 'script_url', 'thumbnail_url', 'exhibitor_type', 'exhibitor_member', 'exhibitor_directory', 'manager_committee_student', 'manager_committee_staff', 'slack_channel_url', 'has_recruitments', 'has_live', 'remark', 'applied_by', 'applied_at', 'created_by', 'created_at', 'updated_by', 'updated_at', 'copyright_application_form1_submitted', 'copyright_application_form2_submitted', 'copyright_application_form3_submitted', 'copyright_application_form4_submitted', 'copyright_application_form5_submitted'],
+  PERMISSIONS: ['id', 'table_name', 'record_id', 'email', 'can_read', 'can_write', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
 };
 
 // ============================================
@@ -126,3 +128,17 @@ const TASK_BY_QUESTION_DEFAULT_VALUES = {
   remark: 'システムが自動作成',
   priority_key: 'MEDIUM',
 }
+
+// ============================================
+// API認証設定
+// ============================================
+
+/**
+ * APIメッセージ認証に使用するHMAC秘密鍵とタイムスタンプ許容幅
+ * ScriptPropertiesに 'DB_API_SECRET' を設定することで有効になる
+ */
+const API_AUTH_CONFIG = {
+  SECRET_PROPERTY_KEY: 'DB_API_SECRET',
+  TIMESTAMP_TOLERANCE_MS: 5 * 60 * 1000, // ±5分
+  ALLOWED_OPERATIONS: ['select', 'insert', 'bulkinsert', 'update', 'remove'],
+};
