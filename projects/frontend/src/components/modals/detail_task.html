@@ -163,7 +163,6 @@
             <div class="center-align row tiny-space secondary-text" title="最終更新">
               <i>update</i>
               <span class="font-number" id="task-last-updated-datetime"></span>
-              <!-- <span class="" id="task-last-updated-by"></span> -->
             </div>
           </div>
         </div>
@@ -184,17 +183,8 @@
               <span>関連</span>
               <div class="badge l font-number none primary" id="task-related-badge" style="display: none;">0</div>
             </a>
-            <!-- <a onclick="App.modals.taskDetail.switchTaskDetailTab(this,'files')">
-              <span>ファイル</span>
-              <div class="badge l secondary font-number none" id="task-files-badge">0</div>
-            </a> -->
           </nav>
-          <button disabled class="large circle primary" id="task-detail-add-button">
-            <i>add</i>
-            <div class="tooltip left round left-padding right-padding" style="display: none;">
-              <p></p>
-            </div>
-          </button>
+
         </nav>
         <div class="page medium-height active" id="task-detail-description">
           <div class="border quill-editor" id="task-description-editor"></div>
@@ -208,22 +198,27 @@
         <div class="page medium-height scroll" id="task-detail-related">
           <!-- 親タスク -->
           <fieldset class="border bottom-margin">
-            <legend class="small-text">親タスク</legend>
+            <legend class="small-text">
+              親タスク
+              <button class="circle transparent small no-margin" onclick="App.modals.taskDetail.editParentTask()" title="親タスクを設定・変更">
+                <i class="tiny">edit</i>
+              </button>
+            </legend>
             <div id="parent-task-container">
             </div>
           </fieldset>
 
           <!-- 子タスク -->
           <fieldset class="border">
-            <legend class="small-text">子タスク</legend>
+            <legend class="small-text">
+              子タスク
+              <button class="circle transparent small no-margin" onclick="App.modals.taskDetail.addChildTask()" title="子タスクを追加">
+                <i class="tiny">add</i>
+              </button>
+            </legend>
             <div id="child-tasks-container">
             </div>
           </fieldset>
-        </div>
-        <div class="page medium-height scroll" id="task-detail-files">
-          <div id="task-files-list">
-            <!-- ファイル一覧がここに動的に生成されます -->
-          </div>
         </div>
       </div>
 
@@ -261,6 +256,7 @@
       originalLists: [], // リストの元のデータ（変更検知用）
       listSortable: null, // SortableJSインスタンス
       deletedListIds: [], // 削除されたリストIDの配列
+      isListLoadingFresh: true, // リストの新鮮なデータを読み込み中か
 
       // 関連タスク管理
       currentParentTask: null, // 親タスクデータ
@@ -396,6 +392,7 @@
             if (results?.isCached) {
               callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, true)
                 .then(results => {
+                  if (this.currentId !== taskId) return;
                   const refleshedComments = results?.data || results || [];
                   this.renderComments(refleshedComments);
                 })
@@ -849,6 +846,7 @@
         this.currentLists = [];
         this.originalLists = [];
         this.deletedListIds = [];
+        this.isListLoadingFresh = true;
 
         // 関連タスクのリセット
         this.currentParentTask = null;
@@ -892,6 +890,7 @@
         const taskDetailTabBadge = document.querySelectorAll(`#task-detail-tabs > a > div.badge`);
         taskDetailTabBadge.forEach(badge => {
           badge.textContent = '0';
+          badge.style.display = 'none';
         });
       },
 
@@ -1039,9 +1038,6 @@
 
         const lastUpdatedAtEl = document.getElementById('task-last-updated-datetime');
         lastUpdatedAtEl.textContent = formatDateTimeForDisplay(updatedAt);
-
-        // const lastUpdatedByEl = document.getElementById('task-last-updated-by');
-        // lastUpdatedByEl.textContent = updatedByMemberName;
       },
 
       /**
@@ -1347,6 +1343,7 @@
        * @param {string} taskId - タスクID
        */
       loadLists: function (taskId) {
+        this.isListLoadingFresh = true;
         const listContainer = document.getElementById('task-list-items');
         listContainer.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
 
@@ -1370,17 +1367,20 @@
             this.currentLists = lists;
             // originalDataにもリストを保存（変更検知用）
             this.originalLists = JSON.parse(JSON.stringify(lists));
-            this.renderLists(results?.isCached);
+            this.isListLoadingFresh = results?.isCached || false;
+            this.renderLists(this.isListLoadingFresh);
             this.updateListBadge();
 
             if (results?.isCached) {
               console.log('[TaskDetail] Lists are cached, refetching...');
               callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LISTS, 'select', query, null, true)
                 .then(results => {
+                  if (this.currentId !== taskId) return;
                   const refleshedLists = results?.data || results || [];
                   console.log('[TaskDetail] Lists refetched:', refleshedLists);
                   this.currentLists = refleshedLists;
                   this.originalLists = JSON.parse(JSON.stringify(refleshedLists));
+                  this.isListLoadingFresh = false;
                   this.renderLists();
                   this.updateListBadge();
                 })
@@ -1406,6 +1406,7 @@
 
         if (!this.currentLists || this.currentLists.length === 0) {
           container.innerHTML = '<p>リスト項目はありません</p>';
+          this._renderListAddButton(disabled);
           return;
         }
 
@@ -1451,6 +1452,27 @@
 
         container.innerHTML = html;
         this.setupListSortable();
+        this._renderListAddButton(disabled);
+      },
+
+      /**
+       * リストページ末尾にインライン「項目を追加」ボタンを配置
+       * SortableJSの管理外（task-detail-list直下）に置くことでドラッグ対象から除外する
+       */
+      _renderListAddButton: function (disabled = false) {
+        const listPage = document.getElementById('task-detail-list');
+        if (!listPage) return;
+
+        // 既存のインラインボタンを削除（重複防止）
+        const existing = listPage.querySelector('.list-inline-add-btn');
+        if (existing) existing.remove();
+
+        const btn = document.createElement('button');
+        btn.className = 'top-margin transparent responsive list-inline-add-btn';
+        btn.disabled = disabled;
+        btn.innerHTML = '<i>add</i><span>項目を追加</span>';
+        btn.onclick = () => this.createListItem();
+        listPage.appendChild(btn);
       },
 
       /**
@@ -1783,6 +1805,7 @@
         // 親タスクを取得
         if (parentTaskId) {
           parentTask = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_parent);
+          if (this.currentId !== taskId) return;
           this.currentParentTask = parentTask ? parentTask.data[0] : null;
         } else {
           this.currentParentTask = null;
@@ -1793,6 +1816,7 @@
 
         // 子タスクを取得
         const childTasks = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_child);
+        if (this.currentId !== taskId) return;
 
         this.currentChildTasks = childTasks ? childTasks.data : [];
         this.originalChildTaskIds = (childTasks ? childTasks.data : []).map(t => t.id);
@@ -1804,6 +1828,7 @@
         if (parentTask?.isCached) {
           await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_parent, null, true)
             .then(results => {
+              if (this.currentId !== taskId) return;
               this.currentParentTask = results ? results?.data[0] : null;
               this.renderParentTask();
             })
@@ -1812,6 +1837,7 @@
         if (childTasks?.isCached) {
           await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_child, null, true)
             .then(results => {
+              if (this.currentId !== taskId) return;
               this.currentChildTasks = results ? results?.data : [];
               this.originalChildTaskIds = (results ? results?.data : []).map(t => t.id);
               this.renderChildTasks();
@@ -1847,31 +1873,12 @@
           const statusText = this.getStatusText(this.currentParentTask.task_status_key);
           const statusClass = this.currentParentTask.task_status_key === 'DONE' ? 'success' : 'secondary';
           container.innerHTML = `
-            <div class="row middle-align small-space">
-              <div class="max" id="parent-task-display">
-                <p class="no-margin">
-                  <strong style="cursor: pointer; text-decoration: underline;" onclick="App.modals.taskDetail.openRelatedTask('${this.currentParentTask.id}', '${this.currentParentTask.board_id || ''}')">${displayId}</strong> ${taskName}
-                  <span class="chip small ${statusClass}">${statusText}</span>
-                </p>
-              </div>
-              <button class="circle transparent small" onclick="App.modals.taskDetail.editParentTask()"
-                title="親タスクを編集">
-                <i>edit</i>
-              </button>
-            </div>`;
+            <p class="no-margin">
+              <strong style="cursor: pointer; text-decoration: underline;" onclick="App.modals.taskDetail.openRelatedTask('${this.currentParentTask.id}', '${this.currentParentTask.board_id || ''}')">${displayId}</strong> ${taskName}
+              <span class="chip small ${statusClass}">${statusText}</span>
+            </p>`;
         } else {
-          container.innerHTML = `
-            <div class="row middle-align small-space">
-              <div class="max" id="parent-task-display">
-                <p class="no-margin">
-                  親タスクはありません。
-                </p>
-              </div>
-              <button class="circle transparent small" onclick="App.modals.taskDetail.editParentTask()"
-                title="親タスクを追加">
-                <i>add</i>
-              </button>
-            </div>`;
+          container.innerHTML = `<p class="no-margin secondary-text">未設定</p>`;
         }
       },
 
@@ -1883,17 +1890,7 @@
         if (!container) return;
 
         if (this.currentChildTasks.length === 0) {
-          container.innerHTML = `
-          <div class="row middle-align small-space">
-                <div class="max">
-                  <p class="no-margin">
-                    子タスクはありません。
-                  </p>
-                </div>
-                <button class="circle transparent small" onclick="App.modals.taskDetail.addChildTask()" title="子タスクを追加">
-                  <i>add</i>
-                </button>
-              </div>`;
+          container.innerHTML = `<p class="no-margin secondary-text">未設定</p>`;
         } else {
           container.innerHTML = this.currentChildTasks.map(task => {
             const displayId = task.display_id ? `#${task.display_id}` : '';
@@ -1930,6 +1927,7 @@
 
         App.modals.selectTasks.open({
           multiSelect: false,
+          excludeId: this.currentId,
           preSelected: currentParentId ? [currentParentId] : [],
           callback: (selectedTasks) => {
             if (selectedTasks.length === 0) {
@@ -1960,6 +1958,7 @@
 
         App.modals.selectTasks.open({
           multiSelect: false,
+          excludeId: this.currentId,
           preSelected: [],
           callback: async (selectedTasks) => {
             if (selectedTasks.length === 0) return;
@@ -2077,30 +2076,7 @@
         });
         clickedNav.classList.add('active');
 
-        const addButton = document.getElementById(`task-detail-add-button`);
 
-        switch (tabId) {
-          case `list`:
-            addButton.disabled = false;
-            addButton.onclick = () => {
-              this.createListItem();
-            };
-            addButton.querySelector('div.tooltip').style.display = 'block';
-            addButton.querySelector('div.tooltip > p').innerText = '新しいリスト項目を作成します';
-            break;
-          case `related`:
-            addButton.disabled = false;
-            addButton.onclick = () => {
-              this.addChildTask();
-            };
-            addButton.querySelector('div.tooltip').style.display = 'block';
-            addButton.querySelector('div.tooltip > p').innerText = '子タスクを追加します';
-            break;
-          default:
-            addButton.disabled = true;
-            addButton.querySelector('div.tooltip').style.display = 'none';
-            break;
-        }
       }
     };
   })();

@@ -43,11 +43,13 @@
             selectedIds: [],
             searchResults: [],
             multiSelect: false,
+            excludeId: null,
             isLoading: false,
 
             open: async function (options = {}) {
                 this.callback = options.callback || null;
                 this.multiSelect = options.multiSelect || false;
+                this.excludeId = options.excludeId || null;
 
                 await ui('#modal-select-tasks');
                 const input = document.getElementById('task-search-input');
@@ -70,14 +72,21 @@
 
                 try {
                     // データベース検索を実行
-                    const results = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
+                    const query = {
                         where: {
                             name: ["LIKE", searchTerm]
                         },
                         orderBy: {
                             ['display_id']: 'desc'
                         }
-                    }, null, true);
+                    };
+
+                    // 除外IDがある場合は条件に追加
+                    if (this.excludeId) {
+                        query.where.id = ["!=", this.excludeId];
+                    }
+
+                    const results = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query, null, true);
 
                     this.searchResults = results?.data || [];
                     this.renderResults();
@@ -155,6 +164,7 @@
                             <span class="small-margin">
                                 <strong>${displayName}</strong>
                                 ${displayId ? `<span class="small-text" style="opacity: 0.7;"> ${displayId}</span>` : ''}
+                                ${task.parent_task_id ? '<span class="chip tiny secondary">親タスク設定済</span>' : ''}
                             </span>
                         </label></div>
                     `;
