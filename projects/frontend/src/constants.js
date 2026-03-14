@@ -14,6 +14,8 @@ const TABLE_NAMES = {
   MEMBERS: 'members',
   PLAN_ASSIGNMENTS: 'plan_assignments',
   DIRECTORY_ASSIGNMENTS: 'directory_assignments',
+  SKILLS: 'skills',
+  SKILL_ASSIGNMENTS: 'skill_assignments',
   TASKS: 'tasks',
   LISTS: 'lists',
   FILES: 'files',

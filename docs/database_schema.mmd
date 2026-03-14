@@ -70,6 +70,10 @@ erDiagram
         varchar slack_profile_url "SlackプロフィールURL"
         varchar name "氏名"
         varchar display_name "表示名"
+        varchar title "筆頭役職"
+        text description "プロフィール文"
+        varchar website_url "ウェブサイトURL"
+        varchar profile_photo_file_url "プロフィール写真GファイルURL"
         varchar profile_photo_url "プロフィール写真URL"
         boolean is_active "有効"
         text remark "システム備考"
@@ -249,6 +253,28 @@ erDiagram
         uuid updated_by "最終更新者"
         datetime updated_at "最終更新日時"
     }
+    skills {
+        uuid id PK "スキルID"
+        varchar skill_type_key "スキルタイプキー"
+        varchar title "タイトル"
+        text description "説明"
+        text remark "システム備考"
+        uuid created_by "作成者"
+        datetime created_at "作成日時"
+        uuid updated_by "最終更新者"
+        datetime updated_at "最終更新日時"
+    }
+    skill_assignments {
+        uuid id	PK "スキル割り当てID"
+        uuid member_id "メンバーID"
+        uuid skill_id "スキルID"
+        varchar skill_level_key "スキルレベルキー(BEGGINER/INTERMEDIATE/ADVANCED)"
+        text remark
+        uuid created_by	
+        datetime created_at	
+        uuid updated_by	
+        datetime updated_at
+    }
     logs }|--|| members : "created_by"
     apps }|--|| members : "created_by"
     apps }|--|| members : "updated_by"
@@ -292,3 +318,9 @@ erDiagram
     questions }|--|| members : "updated_by"
     permissions }|--|| members : "created_by"
     permissions }|--|| members : "updated_by"
+    skills }|--|| members : "created_by"
+    skills }|--|| members : "updated_by"
+    skill_assignments }|--|| members : "created_by"
+    skill_assignments }|--|| members : "updated_by"
+    skill_assignments }|--|| members : "member_id"
+    skill_assignments }|--|| skills : "skill_id"
