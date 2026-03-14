@@ -1,23 +1,21 @@
-<dialog id="modal-new-task" class="modal large-height padding">
-    <header class="fixed">
-        <nav class="small-padding top-margin">
-            <h5 class="bold">新規タスク作成</h5>
-            <div class="max"></div>
-            <label class="switch icon">
-                <input type="checkbox" id="new-task-assistant-toggle"
-                    onchange="App.modals.newTask.switchTab(this.checked ? 'assistant' : 'simple')">
-                <span>
-                    <i>auto_awesome</i>
-                </span>
-                <div class="tooltip bottom">AIアシスタント</div>
-            </label>
-            <button class="circle transparent" onclick="App.modals.newTask.close()">
-                <i>close</i>
-            </button>
-    </header>
+<dialog id="modal-new-task" class="modal large-width large-height padding">
+    <nav class="small-padding bottom-margin">
+        <h5 class="max bold">新規タスク作成</h5>
+        <label class="switch icon">
+            <input type="checkbox" id="new-task-assistant-toggle"
+                onchange="App.modals.newTask.switchTab(this.checked ? 'assistant' : 'simple')">
+            <span>
+                <i>auto_awesome</i>
+            </span>
+            <div class="tooltip bottom">AIアシスタント</div>
+        </label>
+        <button class="circle transparent" onclick="App.modals.newTask.close()">
+            <i>close</i>
+        </button>
+    </nav>
 
     <!-- ===== 通常のタスク作成 ===== -->
-    <div id="new-task-page-simple" class="page left large-width active large-padding">
+    <div id="new-task-page-simple" class="page left active small-padding">
         <!-- ボード選択 -->
         <div class="field border large suffix no-wrap label">
             <select placeholder=" " id="new-task-simple-board-select" required></select>
@@ -49,7 +47,7 @@
     </div>
 
     <!-- ===== タスク作成アシスタント ===== -->
-    <div id="new-task-page-assistant" class="page right large-width active large-padding">
+    <div id="new-task-page-assistant" class="page right active small-padding">
 
         <!-- 入力画面 -->
         <div id="new-task-assistant-input">
@@ -428,7 +426,7 @@
                     }
                 } catch (error) {
                     console.error('クリップボード読み取りエラー:', error);
-                    showSnackbar('クリップボードの読み取りに失敗しました。ブラウザの権限を確認してください。', 'error');
+                    showSnackbar('クリップボードの読み取りに失敗しました', 'error');
                 }
             },
 
@@ -510,7 +508,7 @@
 
                 } catch (error) {
                     console.error('データのパースエラー:', error);
-                    showSnackbar('データの形式が正しくありません。もう一度コピーし、再度ペーストしてください。', 'error');
+                    showSnackbar('データの形式が正しくありません', 'error');
                     this.clearPreview();
                 }
             },
@@ -634,7 +632,7 @@
                 }
 
                 try {
-                    showSnackbar('タスクを作成中です。画面を開いたままお待ちください。');
+                    showSnackbar('タスクを作成中です...');
                     const btn = document.getElementById('new-task-create-btn');
                     if (btn) {
                         const icon = btn.querySelector('i');

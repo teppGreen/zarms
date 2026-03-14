@@ -1,5 +1,5 @@
 <nav id="left-nav" class="m l left no-wrap small-padding max no-scroll">
-    <header class="no-padding no-margin">
+    <header class="no-padding center no-margin">
         <img src="https://i.gyazo.com/5c4f146e5ec5efdf571670f6b318e309.png" alt="ZARMS" class="small-width"
             onclick="App.utils.navigation.switchTab('home')">
     </header>
@@ -104,26 +104,6 @@
                                 } else {
                                     isRendered = canvas && canvas.children.length > 0;
                                 }
-
-                                // 前回レンダリングから60秒未満の場合は再ロードをスキップ
-                                const lastRender = App.pages.boards.lastRenderTimes?.[boardId] || 0;
-                                const now = Date.now();
-                                let isThrottled = false;
-                                if (now - lastRender < 60000 && !forceLoadData) {
-                                    console.log(`[switchTab] Throttling loadData for board ${boardId}. forceLoadData: ${forceLoadData}, skipLoadData: ${skipLoadData}. Last render was ${now - lastRender}ms ago.`);
-                                    App.pages.boards.currentBoardId = boardId;
-                                    isThrottled = true;
-
-                                    // スロットル時でもイベントハンドラーとSortableを再設定
-                                    if (canvas && App.pages.boards.bindCardClick) {
-                                        App.pages.boards.bindCardClick(canvas);
-                                    }
-                                    if (App.pages.boards.setupSortable) {
-                                        App.pages.boards.setupSortable(boardId);
-                                    }
-                                    return;
-                                }
-
                                 await App.pages.boards.loadData(boardId, isRendered);
                             }
                         } else {
