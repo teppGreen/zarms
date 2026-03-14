@@ -87,7 +87,8 @@ function getInitialAppData(email, urlParams, isMobile = false) {
     // 1. スプレッドシートへのアクセス権限確認（throws if no access）
     getSpreadsheet();
   } catch (e) {
-    return { status: 'unauthorized', activeUser: null, appHtml: null, error: e.message };
+    return { status: 'unauthorized', useApiMode: true, activeUser: null, appHtml: null, error: e.message };
+    // TODO: 一旦フロントエンドに返さず、そのままAPIモードを使用した接続を試みる
   }
 
   try {
@@ -104,7 +105,7 @@ function getInitialAppData(email, urlParams, isMobile = false) {
     if (isNotFound) {
       return { status: 'not_registered', activeUser: null, appHtml: null, error: null };
     }
-    return { status: 'unauthorized', activeUser: null, appHtml: null, error: e.message };
+    return { status: 'unauthorized', useApiMode: true, activeUser: null, appHtml: null, error: e.message };
   }
 }
 
@@ -247,4 +248,20 @@ function isDevelopment(urlParams) {
     console.error('[isDevelopment] Error:', error);
     return false;
   }
+}
+
+// ============================================
+// 権限チェックロジック
+// ============================================
+
+/**
+ * 現在のスコープのアクセス権限状態を確認します
+ * @returns {Object} 権限状態と認証用URL
+ */
+function checkAppAuthorization() {
+  const authInfo = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
+  return {
+    status: authInfo.getAuthorizationStatus() === ScriptApp.AuthorizationStatus.REQUIRED ? 'REQUIRED' : 'OK',
+    url: authInfo.getAuthorizationUrl()
+  };
 }
