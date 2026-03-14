@@ -676,6 +676,8 @@
                 }
 
                 try {
+                    showSnackBar('ボードを作成中です...');
+
                     const cleanItem = {
                         name: promptValue,
                         is_active: true
@@ -784,11 +786,11 @@
                         })];
 
                         navigator.clipboard.write(data).then(() => {
-                            showSnackbar('このボードへのリンクをコピーしました。', 'success');
+                            showSnackbar('このボードへのリンクをコピーしました', 'success');
                         }).catch(err => {
                             console.error('Clipboard write failed', err);
                             navigator.clipboard.writeText(textContent).then(() => {
-                                showSnackbar('何らかの理由でこのボードへのリンクをコピーできませんでした。', 'error');
+                                showSnackbar('このボードへのリンクをコピーできませんでした', 'error');
                             });
                         });
                     });
@@ -803,7 +805,7 @@
                         if (!confirm(confirmMsg)) return;
 
                         try {
-                            showSnackbar(isArchiving ? 'ボードをアーカイブしました。まもなく画面が更新されます。' : 'ボードのアーカイブを解除しました。まもなく画面が更新されます。', 'primary');
+                            showSnackbar(isArchiving ? 'ボードをアーカイブ中です...' : 'ボードのアーカイブを解除中です...', 'info');
                             const newStatus = !isArchiving;
                             const actionName = isArchiving ? 'ボードをアーカイブ' : 'ボードのアーカイブを解除';
 
@@ -1262,7 +1264,7 @@
                         set: { description: newDescription }
                     }, 'ボードの説明を更新');
 
-                    showSnackbar('ボードの説明を更新しました。', 'success');
+                    showSnackbar('ボードの説明を更新しました', 'success');
                 } catch (error) {
                     console.error('Failed to update board description:', error);
                     // ロールバック
