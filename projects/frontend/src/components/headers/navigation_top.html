@@ -8,7 +8,7 @@
         </button>
         <menu id="new-button-dropdown" class="s m right no-wrap" onclick="App.utils.header.closeNewButtonDropdown()">
             <li>
-                <a onclick="App.modals.taskDetail.create()">
+                <a onclick="App.modals.newTask.open()">
                     <i>add_task</i>
                     <span>新しいタスク</span>
                 </a>
@@ -19,25 +19,50 @@
                     <span>新しいボード</span>
                 </a>
             </li>
+            <li>
+                <a onclick="App.modals.newMember.open()">
+                    <i>person_add</i>
+                    <span>新しいメンバー</span>
+                </a>
+            </li>
+            <li>
+                <a onclick="App.modals.newDirectory.open()">
+                    <i>account_tree</i>
+                    <span>新しい組織</span>
+                </a>
+            </li>
         </menu>
 
         <!-- デスクトップ用 -->
-        <button class="l primary large round" onclick="App.modals.newTask.open()">
-            <i>add_task</i>
-            <span>タスク</span>
-            <div class="tooltip right round left-padding right-padding">
-                <p>新しいタスクを作成します</p>
-                <span><i class="tiny no-padding no-margin">keyboard_option_key</i>T</span>
-            </div>
-        </button>
-
-        <button class="l large round border" onclick="App.pages.boards.createBoard()">
-            <i>create_new_folder</i>
-            <span>ボード</span>
-            <div class="tooltip right round left-padding right-padding">
-                <p>新しいボードを作成します</p>
-                <span><i class="tiny no-padding no-margin">keyboard_option_key</i>B</span>
-            </div>
+        <button class="l large round primary">
+            <i>add</i>
+            <span>新規作成</span>
+            <menu class="min no-wrap">
+                <li>
+                    <a onclick="App.modals.newTask.open()">
+                        <i>add_task</i>
+                        <span>新しいタスク<i class="tiny no-padding no-margin">keyboard_option_key</i>T</span>
+                    </a>
+                </li>
+                <li>
+                    <a onclick="App.pages.boards.createBoard()">
+                        <i>create_new_folder</i>
+                        <span>新しいボード</span>
+                    </a>
+                </li>
+                <li>
+                    <a onclick="App.modals.newMember.open()">
+                        <i>person_add</i>
+                        <span>新しいメンバー</span>
+                    </a>
+                </li>
+                <li>
+                    <a onclick="App.modals.newDirectory.open()">
+                        <i>account_tree</i>
+                        <span>新しい組織</span>
+                    </a>
+                </li>
+            </menu>
         </button>
     </nav>
 
@@ -347,17 +372,18 @@
                         }
 
                         return `
-                            <article class="no-elevate padding top-align row small-margin small-round ${readClass}"
+                            <article class="no-elevate padding top-align small-margin small-round ${readClass}"
                                onclick="App.utils.header.comments.openComment('${comment.id}', '${comment.task_id}', '${comment.task_board_id}')">
-                                <div><i class="circle extra">${avatarHtml}</i></div>
+                                <div class="row">
+                                <div>
+                                	<i class="circle extra">${avatarHtml}</i>
+                                </div>
                                 <div class="max">
                                     <div class="row">
                                         <span class="bold small-text">${escapeHtml(comment.display_name)}</span>
                                         <span class="small-text secondary-text font-number">${updatedAt}</span>
                                     </div>
                                     <div class="small-text secondary-text">${escapeHtml(comment.task_name)} <span class="font-number secondary-text">#${comment.task_display_id}</span></div>
-                                    <div class="tiny-space"></div>
-                                    <div class="small-text">${escapeHtml(plainContent)}</div>
                                 </div>
                                 <div>
                                     <button class="transparent circle small no-margin"
@@ -366,6 +392,8 @@
                                     <i class="small">${readIcon}</i>
                                     </button>
                                 </div>
+                                <div class="tiny-space"></div>
+                                <div class="small-text">${escapeHtml(plainContent)}</div>
                             </article>
                         `;
                     }).join('');
