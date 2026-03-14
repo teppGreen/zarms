@@ -1454,6 +1454,47 @@
     }
   };
 
+  /**
+   * 検索ユーティリティ
+   */
+  App.utils.search = Object.assign(App.utils.search || {}, {
+    /**
+     * 検索の前提となる正規化と数値判定を一括して行います
+     * @param {string} searchValue - 検索文字列
+     * @returns {Object} { normalizedValue, numericValue, isNumericInput }
+     */
+    getNormalizedSearchInfo: function (searchValue) {
+      if (!searchValue) return { normalizedValue: '', numericValue: NaN, isNumericInput: false };
+      const normalizedValue = App.utils.text.normalize(searchValue);
+      const numericValue = Number(normalizedValue);
+      const isNumericInput = !isNaN(numericValue) && normalizedValue !== '' && Number.isInteger(numericValue);
+      return { normalizedValue, numericValue, isNumericInput };
+    },
+
+    /**
+     * 文字列からタスク検索用のクエリを構築します
+     * クライアント側ではカラムIDが不明なため、基本的には where 句を使用します。
+     * @param {string} searchValue - 検索文字列
+     * @returns {Object} クエリオブジェクト { where: Object }
+     */
+    buildTaskSearchQuery: function (searchValue) {
+      const { normalizedValue, numericValue, isNumericInput } = this.getNormalizedSearchInfo(searchValue);
+      if (!normalizedValue) return null;
+
+      if (isNumericInput) {
+        // 数値入力の場合: display_id が一致するものを優先
+        return {
+          where: { display_id: ['=', numericValue] }
+        };
+      } else {
+        // 通常の文字列検索
+        return {
+          where: { name: ['LIKE', `%${normalizedValue}%`] }
+        };
+      }
+    }
+  });
+
   // ============================================
   // Optimistic UI: データ同期ロジック
   // ============================================

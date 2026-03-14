@@ -55,7 +55,8 @@
         <!-- Status -->
         <div class="grid">
           <div class="s6">
-            <div class="field label border small">
+            <div class="prefix field label border small">
+              <i id="task-status-icon" class="tiny circle"></i>
               <select id="task-status-select" class="transparent">
                 <option value="TODO">未着手</option>
                 <option value="IN_PROGRESS">進行中</option>
@@ -433,6 +434,14 @@
             });
           }
         });
+
+        const statusSelect = document.getElementById('task-status-select');
+        if (statusSelect) {
+          statusSelect.addEventListener('change', () => {
+            const selectedValue = statusSelect.value;
+            this.renderStatusIcon(selectedValue);
+          });
+        }
       },
 
       /**
@@ -985,6 +994,7 @@
         // Status
         const statusSelect = document.getElementById('task-status-select');
         if (statusSelect) statusSelect.value = task.task_status_key;
+        this.renderStatusIcon(task.task_status_key);
 
         // Priority
         const prioritySelect = document.getElementById('task-priority-select');
@@ -1025,6 +1035,20 @@
         }
 
         this.renderLastUpdated();
+      },
+
+      renderStatusIcon: function (statusKey) {
+        const statusIcon = document.getElementById('task-status-icon');
+        const statusColors = {
+          'TODO': 'red',
+          'IN_PROGRESS': 'yellow',
+          'IN_REVIEW': 'purple',
+          'DONE': 'green'
+        };
+        if (statusIcon) {
+          const selectedColor = statusColors[statusKey];
+          statusIcon.className = `tiny circle ${selectedColor}`;
+        }
       },
 
       renderLastUpdated: function () {
@@ -1456,7 +1480,7 @@
       },
 
       /**
-       * リストページ末尾にインライン「項目を追加」ボタンを配置
+       * リストページ末尾にインライン「項目を作成」ボタンを配置
        * SortableJSの管理外（task-detail-list直下）に置くことでドラッグ対象から除外する
        */
       _renderListAddButton: function (disabled = false) {
@@ -1468,9 +1492,9 @@
         if (existing) existing.remove();
 
         const btn = document.createElement('button');
-        btn.className = 'top-margin transparent responsive list-inline-add-btn';
+        btn.className = 'small-margin border responsive list-inline-add-btn';
         btn.disabled = disabled;
-        btn.innerHTML = '<i>add</i><span>項目を追加</span>';
+        btn.innerHTML = '<i>add</i><span>項目を作成</span>';
         btn.onclick = () => this.createListItem();
         listPage.appendChild(btn);
       },
@@ -1878,7 +1902,7 @@
               <span class="chip small ${statusClass}">${statusText}</span>
             </p>`;
         } else {
-          container.innerHTML = `<p class="no-margin secondary-text">未設定</p>`;
+          container.innerHTML = `<p class="no-margin secondary-text">親タスクは設定されていません</p>`;
         }
       },
 
@@ -1890,7 +1914,7 @@
         if (!container) return;
 
         if (this.currentChildTasks.length === 0) {
-          container.innerHTML = `<p class="no-margin secondary-text">未設定</p>`;
+          container.innerHTML = `<p class="no-margin secondary-text">子タスクは設定されていません</p>`;
         } else {
           container.innerHTML = this.currentChildTasks.map(task => {
             const displayId = task.display_id ? `#${task.display_id}` : '';
