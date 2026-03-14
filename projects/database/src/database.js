@@ -236,6 +236,13 @@ function parseWhereClause(whereClause, headersMap) {
             continue;
         }
 
+        // IS NULL / IS NOT NULL の特別処理
+        const lowerOperator = operator.toLowerCase();
+        if (lowerOperator === 'is null' || lowerOperator === 'is not null') {
+            conditions.push(`${columnId} ${operator.toUpperCase()}`);
+            continue;
+        }
+
         // 値のエスケープ処理
         let escapedValue = value;
         if (typeof value === 'string') {

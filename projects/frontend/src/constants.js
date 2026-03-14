@@ -112,12 +112,26 @@ const AUTH_CONFIG = {
 const UI_TEXT = {
   APP_TITLE: 'ZARMS',
   APP_COPYRIGHT: '© 2026 展軸祭実行委員会',
-  APP_DESCRIPTION: '展軸祭実行委員会の業務システム「ZARMS」へようこそ！',
-  SYSTEM_DESCRIPTION: 'ZARMS（ザームス）は、展軸祭実行委員会の業務を効率化するためのタスク管理システムです。ボードごとにタスクを管理し、メンバー間での進捗共有やコメントによるコミュニケーションをサポートします。',
+  APP_DESCRIPTION: 'ZARMS(ザームス)は、展軸祭運営者向けの業務システムです。企画・人員・タスク等の円滑な管理を支援します。',
   LOADING_MESSAGE: 'お待ちください',
   ERROR_USER_NOT_FOUND: 'ユーザーが見つかりませんでした',
   ERROR_ACCESS_DENIED: 'アクセス権限がありません',
   SUCCESS_SAVED: '保存しました',
   SUCCESS_DELETED: '削除しました',
   SUCCESS_CREATED: '作成しました'
+};
+
+// ============================================
+// Database API設定（APIモード用）
+// ============================================
+
+/**
+ * unauthorizedユーザー向けDatabase API設定
+ * ScriptPropertiesに以下を設定してください:
+ *   DB_API_URL    - databaseプロジェクトのWebアプリURL
+ *   DB_API_SECRET - HMAC署名用シークレット（databaseと同じ値）
+ */
+const DB_API_CONFIG = {
+  URL: scriptProperties.getProperty('DB_API_URL'),
+  SECRET: scriptProperties.getProperty('DB_API_SECRET'),
 };

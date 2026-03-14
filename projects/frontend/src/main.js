@@ -41,7 +41,7 @@ function doGet(e) {
  * @param {boolean} isMobile - モバイル版かどうか
  * @returns {string} HTMLコンテンツ
  */
-function loadAppHtml(activeUser, urlParams, isMobile = false) {
+function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false) {
   const templatePath = isMobile ? 'mobile/index' : 'index';
   const template = HtmlService.createTemplateFromFile(templatePath);
 
@@ -52,12 +52,13 @@ function loadAppHtml(activeUser, urlParams, isMobile = false) {
     TABLE_NAMES: TABLE_NAMES,
     DIRECTORY_TYPES: DIRECTORY_TYPES,
     TASK_STATUS: TASK_STATUS,
+    useApiMode: useApiMode,
     userProperties: PropertiesService.getUserProperties().getProperties()
   };
 
   // デスクトップ版の場合のみ初期データを事前取得
   if (!isMobile) {
-    templateVariables.initialData = _prefetchInitialData(activeUser.id);
+    templateVariables.initialData = _prefetchInitialData(activeUser.id, useApiMode);
   }
 
   template.templateVariables = templateVariables;
@@ -83,29 +84,35 @@ function loadAppHtml(activeUser, urlParams, isMobile = false) {
  * }
  */
 function getInitialAppData(email, urlParams, isMobile = false) {
+  let useApiMode = false;
   try {
     // 1. スプレッドシートへのアクセス権限確認（throws if no access）
     getSpreadsheet();
   } catch (e) {
-    return { status: 'unauthorized', useApiMode: true, activeUser: null, appHtml: null, error: e.message };
-    // TODO: 一旦フロントエンドに返さず、そのままAPIモードを使用した接続を試みる
+    console.warn('Direct spreadsheet access failed, switching to API mode:', e.message);
+    useApiMode = true;
+    setApiMode(true); // db_bridge.js 内のモードを切り替え
   }
 
   try {
-    // 2. メールアドレスからメンバー情報を取得
+    // 2. メールアドレスからメンバー情報を取得（APIモードなら db_bridge が自動で API を呼ぶ）
     const activeUser = getMemberByEmail(email);
 
-    // 3. アプリのHTMLを生成
-    const appHtml = loadAppHtml(activeUser, urlParams, isMobile);
+    if (!activeUser) {
+      throw new Error('User info not found');
+    }
 
-    return { status: 'ok', activeUser: activeUser, appHtml: appHtml, error: null };
+    // 3. アプリのHTMLを生成
+    const appHtml = loadAppHtml(activeUser, urlParams, isMobile, useApiMode);
+
+    return { status: 'ok', activeUser: activeUser, appHtml: appHtml, error: null, useApiMode: useApiMode };
   } catch (e) {
     // ユーザーが見つからない場合はサインアップ画面へ
     const isNotFound = e.name === 'ValidationError' || (e.message && e.message.includes('not found'));
     if (isNotFound) {
       return { status: 'not_registered', activeUser: null, appHtml: null, error: null };
     }
-    return { status: 'unauthorized', useApiMode: true, activeUser: null, appHtml: null, error: e.message };
+    return { status: 'unauthorized', useApiMode: useApiMode, activeUser: null, appHtml: null, error: e.message };
   }
 }
 
@@ -114,7 +121,7 @@ function getInitialAppData(email, urlParams, isMobile = false) {
  * @param {string} userId - ユーザーID
  * @returns {Object} { boards, apps, members, directories, systemUpdates, isCached }
  */
-function _prefetchInitialData(userId) {
+function _prefetchInitialData(userId, useApiMode = false) {
   const queries = [
     {
       key: 'boards',
@@ -153,7 +160,9 @@ function _prefetchInitialData(userId) {
     }
   ];
 
-  const batchResult = handleBatchDatabaseProcess(userId, queries);
+  const batchResult = useApiMode
+    ? handleBatchDatabaseProcessViaApi(queries)
+    : handleBatchDatabaseProcess(userId, queries);
   const r = batchResult.results || {};
 
   return {
