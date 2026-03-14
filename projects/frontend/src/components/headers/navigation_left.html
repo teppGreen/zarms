@@ -97,7 +97,9 @@
                             targetBoardPage.style.display = 'block';
                             if (!skipLoadData && App.pages.boards && App.pages.boards.loadData) {
                                 // 既に描画済み（キャンバスにコンテンツがある）場合はtrueを渡してローディング表示をスキップ
-                                const canvas = document.getElementById('kanban-canvas-' + boardId);
+                                const viewMode = (App.pages.boards && App.pages.boards.viewMode) ? App.pages.boards.viewMode : 'kanban';
+                                const canvasId = viewMode === 'list' ? 'list-canvas-' + boardId : 'kanban-canvas-' + boardId;
+                                const canvas = document.getElementById(canvasId);
                                 let isRendered;
                                 if (forceLoadData) {
                                     isRendered = false;

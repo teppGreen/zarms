@@ -9,7 +9,7 @@
     <!-- 検索バー -->
     <div class="field small-round border prefix bottom-margin top-margin">
         <i class="front" onclick="App.modals.selectTasks.searchTasks()">search</i>
-        <input type="text" id="task-search-input" placeholder="タスク名を入力してください（部分一致）"
+        <input type="text" id="task-search-input" placeholder="タスク名またはタスク番号を入力してください"
             onkeydown="if(event.key === 'Enter' && !event.isComposing) { event.preventDefault(); App.modals.selectTasks.searchTasks(); }">
     </div>
 
@@ -64,31 +64,61 @@
 
             searchTasks: async function () {
                 const searchInput = document.getElementById('task-search-input');
-                const searchTerm = searchInput ? `%${searchInput.value.trim()}%` : '';
+                const searchValue = searchInput ? searchInput.value.trim() : '';
+
+                if (!searchValue) return;
 
                 // ローディング表示
                 this.isLoading = true;
                 this.renderLoading();
 
                 try {
-                    // データベース検索を実行
-                    const query = {
-                        where: {
-                            name: ["LIKE", searchTerm]
-                        },
-                        orderBy: {
-                            ['display_id']: 'desc'
-                        }
-                    };
+                    const { normalizedValue, numericValue, isNumericInput } = App.utils.search.getNormalizedSearchInfo(searchValue);
+                    if (!normalizedValue) return;
 
-                    // 除外IDがある場合は条件に追加
-                    if (this.excludeId) {
-                        query.where.id = ["!=", this.excludeId];
+                    const queries = [];
+                    // 1. タスク名での部分一致検索 (常に実行)
+                    const nameQuery = {
+                        where: { name: ["LIKE", `%${normalizedValue}%`] },
+                        orderBy: { ['display_id']: 'desc' }
+                    };
+                    queries.push({ key: 'byName', tableName: TABLE_NAMES.TASKS, operation: 'select', dataObject: nameQuery });
+
+                    // 2. 数値入力の場合はタスク番号での完全一致検索も追加
+                    if (isNumericInput) {
+                        const idQuery = {
+                            where: { display_id: ["=", numericValue] },
+                            orderBy: { ['display_id']: 'desc' }
+                        };
+                        queries.push({ key: 'byId', tableName: TABLE_NAMES.TASKS, operation: 'select', dataObject: idQuery });
                     }
 
-                    const results = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query, null, true);
+                    const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, queries);
+                    const resultsObj = batchResult?.results || {};
 
-                    this.searchResults = results?.data || [];
+                    // 結果をマージして重複排除
+                    const allResults = [
+                        ...(resultsObj.byName?.data || []),
+                        ...(resultsObj.byId?.data || [])
+                    ];
+
+                    // IDで重複排除
+                    const seenIds = new Set();
+                    let finalResults = allResults.filter(task => {
+                        if (seenIds.has(task.id)) return false;
+                        seenIds.add(task.id);
+                        return true;
+                    });
+
+                    // 除外IDがある場合はフィルタ
+                    if (this.excludeId) {
+                        finalResults = finalResults.filter(task => task.id !== this.excludeId);
+                    }
+
+                    // display_id 順にソート（desc）
+                    finalResults.sort((a, b) => (b.display_id || 0) - (a.display_id || 0));
+
+                    this.searchResults = finalResults;
                     this.renderResults();
                 } catch (error) {
                     console.error('タスク検索エラー:', error);
@@ -150,7 +180,9 @@
                 // 検索結果を表示
                 container.innerHTML = this.searchResults.map(task => {
                     const isSelected = this.selectedIds.includes(task.id);
-                    const displayName = escapeHtml(task.name || '無題のタスク');
+                    let name = task.name || '無題のタスク';
+                    if (name.length > 19) name = name.substring(0, 19) + '…';
+                    const displayName = escapeHtml(name);
                     const displayId = task.display_id ? `#${task.display_id}` : '';
                     const safeId = escapeHtmlAttribute(task.id);
 
@@ -161,10 +193,10 @@
                                 value="${safeId}" 
                                 ${isSelected ? 'checked' : ''}
                                 onchange="App.modals.selectTasks.toggleSelection('${safeId}', this.checked)">
-                            <span class="small-margin">
-                                <strong>${displayName}</strong>
-                                ${displayId ? `<span class="small-text" style="opacity: 0.7;"> ${displayId}</span>` : ''}
-                                ${task.parent_task_id ? '<span class="chip tiny secondary">親タスク設定済</span>' : ''}
+                            <span class="small-margin row tiny-space">
+                                <span class="font-number">${displayId}</span>
+                                <span>${displayName}</span>
+                                ${task.parent_task_id ? '<span class="secondary small-round left-padding right-padding">親タスク設定済</span>' : ''}
                             </span>
                         </label></div>
                     `;

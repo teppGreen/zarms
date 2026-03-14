@@ -18,6 +18,10 @@
             resizeRafId: null,
             // マイボードのフィルタ設定
             myBoardFilters: {},
+            // 表示モード: 'kanban' または 'list'
+            viewMode: 'kanban',
+            // ボードごとのリストソート状態 { boardId: { col: string, dir: 'asc'|'desc' } }
+            listSortState: {},
 
             // ステータスキーとカラムIDのマッピング
             statusMapping: {
@@ -135,6 +139,10 @@
                                     onblur="App.pages.boards.updateBoardName('${board.id}', this.value, this)">
                                 </div>
                                 <div class="medium"></div>
+                                <div class="no-margin no-padding small-round surface-container-low board-view-toggle" id="view-toggle-${board.id}" title="表示切替">
+                                    <button class="square no-margin transparent view-kanban-btn" onclick="App.pages.boards.switchViewMode('${board.id}', 'kanban')" title="カンバン表示"><i>view_kanban</i></button>
+                                    <button class="square no-margin transparent view-list-btn" onclick="App.pages.boards.switchViewMode('${board.id}', 'list')" title="リスト表示"><i>view_list</i></button>
+                                </div>
                                 <button class="circle transparent" id="btn-share-${board.id}">
                                     <i>share</i>
                                     <div class="tooltip bottom">共有</div>
@@ -165,6 +173,7 @@
                         pageDiv.innerHTML = `
                             ${headerHtml}
                             <div id="kanban-canvas-${board.id}" class="top-margin"></div>
+                            <div id="list-canvas-${board.id}" class="small-margin scroll surface-container-low small-round padding" style="display:none;"></div>
                         `;
 
                         container.appendChild(pageDiv);
@@ -177,6 +186,8 @@
                     }
                     // イベントを（再）登録
                     this.setupHeaderEvents(board);
+                    // 現在の表示モードをトグルに反映
+                    this.syncViewToggle(board.id);
                 });
 
                 // マイボード用のコンテナ生成
@@ -194,6 +205,10 @@
                     <nav id="board-tab-header-${boardId}" class="no-padding no-margin row">
                         <h3 class="bold small">マイボード</h3>
                         <div class="max"></div>
+                        <div class="no-margin no-padding small-round surface-container-low board-view-toggle" id="view-toggle-${boardId}" title="表示切替">
+                            <button class="square no-margin transparent view-kanban-btn" onclick="App.pages.boards.switchViewMode('${boardId}', 'kanban')" title="カンバン表示"><i>view_kanban</i></button>
+                            <button class="square no-margin transparent view-list-btn" onclick="App.pages.boards.switchViewMode('${boardId}', 'list')" title="リスト表示"><i>view_list</i></button>
+                        </div>
                         <a onclick="App.pages.boards.resetMyBoardFilters()">
                             <span>デフォルトのフィルタ</span>
                             <div class="tooltip bottom">自分が担当者のタスクのみ表示</div>
@@ -215,6 +230,7 @@
                     pageDiv.innerHTML = `
                         ${headerHtml}
                         <div id="kanban-canvas-${boardId}" class="top-margin"></div>
+                        <div id="list-canvas-${boardId}" class="small-margin scroll surface-container-low small-round padding" style="display:none;"></div>
                     `;
                     container.appendChild(pageDiv);
                 } else {
@@ -223,6 +239,7 @@
                         existingHeader.outerHTML = headerHtml;
                     }
                 }
+                this.syncViewToggle(boardId);
             },
 
             loadData: async function (boardId, isRefresh = false) {
@@ -239,9 +256,16 @@
                 const loadPromise = new Promise(resolve => resolveLoad = resolve);
                 this.loadingPromises[boardId] = loadPromise;
 
+                // キャンバスの表示状態とトグルUIを現在のviewModeに同期
+                this.syncViewToggle(boardId);
+
                 // 読み込み中アニメーションを表示
                 if (!isRefresh) {
-                    this.renderKanban(boardId, true);
+                    if (this.viewMode === 'list') {
+                        this.renderList(boardId, true);
+                    } else {
+                        this.renderKanban(boardId, true);
+                    }
                 }
 
                 try {
@@ -266,8 +290,12 @@
                     this.cachedBoardTasks[boardId] = tasks;
                     this.mergeTasksIntoGlobalCache(tasks);
 
-                    // カンバンを表示
-                    this.renderKanban(boardId, false);
+                    // 現在の表示モードで描画
+                    if (this.viewMode === 'list') {
+                        this.renderList(boardId, false);
+                    } else {
+                        this.renderKanban(boardId, false);
+                    }
 
                     // 読み込み完了としてマーク
                     if (this.loadingPromises[boardId]) {
@@ -295,8 +323,12 @@
                                 this.cachedBoardTasks[boardId] = freshTasks;
                                 this.mergeTasksIntoGlobalCache(freshTasks);
 
-                                // 最新データでカンバンを再描画
-                                this.renderKanban(boardId, false);
+                                // 最新データで再描画（表示モードに準じる）
+                                if (this.viewMode === 'list') {
+                                    this.renderList(boardId, false);
+                                } else {
+                                    this.renderKanban(boardId, false);
+                                }
                             } catch (error) {
                                 console.error(`Board ${boardId} background refresh error:`, error);
                             }
@@ -327,21 +359,25 @@
                 const columns = [
                     {
                         id: 'todo',
+                        color: 'red',
                         title: '未着手',
                         filter: (t) => t.task_status_key === 'TODO'
                     },
                     {
                         id: 'in-progress',
+                        color: 'yellow',
                         title: '進行中',
                         filter: (t) => t.task_status_key === 'IN_PROGRESS'
                     },
                     {
                         id: 'in-review',
+                        color: 'purple',
                         title: '確認中',
                         filter: (t) => t.task_status_key === 'IN_REVIEW'
                     },
                     {
                         id: 'done',
+                        color: 'green',
                         title: '完了',
                         filter: (t) => t.task_status_key === 'DONE'
                     }
@@ -430,7 +466,8 @@
                         return `
                             <div class="s12 m3 l3">
                                 <div class="grid no-space">
-                                    <div class="row s12 no-round left-margin right-margin">
+                                    <div class="row tiny-space s12 no-round left-margin right-margin">
+                                        <i class="tiny circle ${column.color}"></i>
                                         <span class="bold">${column.title}</span>
                                         <div class="max"></div>
                                         <span class="tiny">${countText}</span>
@@ -453,6 +490,309 @@
                     this.setupSortable(boardId);
                 }
             },
+            /**
+             * 表示モードを切り替える（kanban ↔ list）
+             */
+            switchViewMode: function (boardId, mode) {
+                this.viewMode = mode;
+
+                // 全てのトグルUIと対象ボードのキャンバス表示を同期
+                this.syncViewToggle(boardId);
+
+                if (mode === 'list') {
+                    this.renderList(boardId, false);
+                } else {
+                    this.renderKanban(boardId, false);
+                }
+            },
+
+            /**
+             * トグルスイッチのUI状態を viewMode に同期する
+             */
+            syncViewToggle: function (boardId) {
+                // UI上のすべてのトグルに反映（ページ全体の共有仕様）
+                document.querySelectorAll('.board-view-toggle .view-kanban-btn').forEach(btn => {
+                    const isActive = this.viewMode !== 'list';
+                    btn.classList.toggle('active', isActive);
+                    btn.classList.toggle('fill', isActive);
+                    btn.classList.toggle('transparent', !isActive);
+                });
+                document.querySelectorAll('.board-view-toggle .view-list-btn').forEach(btn => {
+                    const isActive = this.viewMode === 'list';
+                    btn.classList.toggle('active', isActive);
+                    btn.classList.toggle('fill', isActive);
+                    btn.classList.toggle('transparent', !isActive);
+                });
+
+                // 指定されたボードのキャンバス表示状態を切り替え
+                if (boardId) {
+                    const kanbanCanvas = document.getElementById(`kanban-canvas-${boardId}`);
+                    const listCanvas = document.getElementById(`list-canvas-${boardId}`);
+                    if (this.viewMode === 'list') {
+                        if (kanbanCanvas) kanbanCanvas.style.display = 'none';
+                        if (listCanvas) listCanvas.style.display = '';
+                    } else {
+                        if (listCanvas) listCanvas.style.display = 'none';
+                        if (kanbanCanvas) kanbanCanvas.style.display = '';
+                    }
+                }
+            },
+
+            /**
+             * リスト表示を描画する（BeerCSSのtableを使用）
+             */
+            renderList: function (boardId, isLoading = false) {
+                const container = document.getElementById(`list-canvas-${boardId}`);
+                if (!container) return;
+
+                // ステータスの日本語変換マップ
+                const statusColors = { 'TODO': 'red', 'IN_PROGRESS': 'yellow', 'IN_REVIEW': 'purple', 'DONE': 'green' };
+                const statusLabels = { 'TODO': '未着手', 'IN_PROGRESS': '進行中', 'IN_REVIEW': '確認中', 'DONE': '完了' };
+                // 優先度の日本語変換マップ
+                const priorityLabels = { 'HIGH': '高', 'MEDIUM': '中', 'LOW': '低' };
+
+                // カラム定義
+                const columns = [
+                    { key: 'display_id', label: 'タスク番号' },
+                    { key: 'name', label: 'タスク名' },
+                    { key: 'task_status_key', label: 'ステータス' },
+                    { key: 'priority_key', label: '優先度' },
+                    { key: 'starts_at', label: '開始日時' },
+                    { key: 'ends_at', label: '終了日時' },
+                    { key: '_members', label: '担当者', sortable: false },
+                    { key: 'board_name', label: 'ボード' },
+                    { key: 'updated_at', label: '最終更新' }
+                ];
+
+                // 現在のソート状態を取得（初期値は開始日時 asc, 終了日時 asc）
+                if (!this.listSortState[boardId]) {
+                    this.listSortState[boardId] = [
+                        { col: 'starts_at', dir: 'asc' },
+                        { col: 'ends_at', dir: 'asc' }
+                    ];
+                }
+                const sortCriteria = this.listSortState[boardId];
+
+                // タスクデータを取得・ソート
+                const rawTasks = this.cachedBoardTasks[boardId] || [];
+                const boardTasks = (boardId === 'my-board' && this.myBoardFilters)
+                    ? this.filterMyBoardTasks(rawTasks)
+                    : rawTasks;
+
+                let sortedTasks = [...boardTasks];
+                if (!isLoading && sortCriteria && sortCriteria.length > 0) {
+                    sortedTasks.sort((a, b) => {
+                        for (const crit of sortCriteria) {
+                            if (crit.col === '_members') continue;
+
+                            let va = a[crit.col];
+                            let vb = b[crit.col];
+
+                            // null/undefined を末尾に
+                            if (va == null && vb == null) continue;
+                            if (va == null) return 1;
+                            if (vb == null) return -1;
+
+                            let comparison = 0;
+                            // 数値型（display_id）
+                            if (!isNaN(va) && !isNaN(vb) && typeof va !== 'string' && typeof vb !== 'string') {
+                                comparison = Number(va) - Number(vb);
+                            } else {
+                                // 文字列または日付として比較
+                                const strA = String(va);
+                                const strB = String(vb);
+                                comparison = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
+                            }
+
+                            if (comparison !== 0) {
+                                return crit.dir === 'desc' ? -comparison : comparison;
+                            }
+                        }
+                        return 0;
+                    });
+                }
+
+                const memberMap = new Map((App.state.data.members || []).map(m => [m.id, m]));
+
+                // ヘッダー行の生成
+                const theadHtml = `<thead class="fixed"><tr>${columns.map(col => {
+                    const sortable = col.sortable !== false;
+                    // プライマリ（最初）のソート条件をアクティブとする
+                    const primaryCrit = sortCriteria[0];
+                    const isActive = primaryCrit && primaryCrit.col === col.key;
+                    const sortIconHtml = isActive
+                        ? (primaryCrit.dir === 'asc' ? 'expand_less' : 'expand_more')
+                        : '';
+                    const clickAttr = sortable
+                        ? `onclick="App.pages.boards.sortList('${boardId}', '${col.key}')" style="cursor:pointer; user-select:none; white-space:nowrap;"`
+                        : 'style="white-space:nowrap;"';
+                    return `<th ${clickAttr}><div class="row tiny-space">${col.label}<i>${sortIconHtml}</i></div></th>`;
+                }).join('')}</tr></thead>`;
+
+                // ボディ行の生成
+                let tbodyHtml;
+                if (isLoading) {
+                    // ローディング中：シマー行を表示
+                    tbodyHtml = Array(8).fill(0).map(() =>
+                        `<tr><td colspan="${columns.length}" class="shimmer-loading" style="height:1rem;"></td></tr>`
+                    ).join('');
+                } else if (sortedTasks.length === 0) {
+                    tbodyHtml = `<tr><td colspan="${columns.length}" class="center-align secondary-text">タスクがありません</td></tr>`;
+                } else {
+                    // ステータスに応じたボールホルダーの opacity
+                    const statusOpacityMap = {
+                        'TODO': [0.4, 1.0, 0.4, 0.4],
+                        'IN_PROGRESS': [0.4, 1.0, 0.4, 0.4],
+                        'IN_REVIEW': [0.4, 0.4, 1.0, 0.4],
+                        'DONE': [0.4, 0.4, 0.4, 1.0]
+                    };
+                    tbodyHtml = sortedTasks.map(task => {
+                        const createdBy = memberMap.get(task.created_by);
+                        const processedBy = memberMap.get(task.processed_by);
+                        const reviewedBy = memberMap.get(task.reviewed_by);
+                        const receivedBy = memberMap.get(task.received_by);
+
+                        // タスク名の切り詰め（20字超で21字以降カット + …）
+                        const name = task.name || '';
+                        const truncatedName = name.length > 20 ? name.substring(0, 20) + '…' : name;
+
+                        // 担当者アバターHTML（小サイズ・横並び）
+                        const memberRoles = [
+                            { member: createdBy, label: '作成者' },
+                            { member: processedBy, label: '進行者' },
+                            { member: reviewedBy, label: '確認者' },
+                            { member: receivedBy, label: '受領者' }
+                        ];
+                        const opacities = statusOpacityMap[task.task_status_key] || [0.5, 0.5, 0.5, 0.5];
+                        const membersHtml = memberRoles.map(({ member, label }, i) => {
+                            const opacity = opacities[i];
+                            const titleAttr = member ? `${escapeHtml(member.display_name)} (${label})` : label;
+                            if (member && member.profile_photo_url) {
+                                const safeUrl = sanitizeUrl(member.profile_photo_url);
+                                if (safeUrl) {
+                                    return `<i class="circle" style="opacity:${opacity};" title="${titleAttr}"><img src="${safeUrl}" class="responsive" alt="${escapeHtml(member.display_name)}"></i>`;
+                                }
+                            }
+                            return `<i class="circle tertiary" style="opacity:${opacity};" title="${titleAttr}"><i>person</i></i>`;
+                        }).join('');
+
+                        // 期限超過チェック
+                        const now = new Date();
+                        const isEndsAtOverdue = task.ends_at && new Date(task.ends_at) < now && task.task_status_key !== 'DONE';
+                        const rowClass = isEndsAtOverdue ? ' class="error-text"' : '';
+
+                        // ボード名（JOINデータ優先）
+                        const boardName = task.board_name
+                            || (App.state.data.boards || []).find(b => b.id === task.board_id)?.name
+                            || 'マイボード';
+
+                        return `<tr${rowClass} style="cursor:pointer;" data-task-id="${task.id}">` +
+                            `<td class="font-number"">
+                                <div class="row tiny-space">
+                                    <div class="list-menu-container">
+                                        <button class="transparent circle list-menu-btn" data-task-id="${task.id}"><i>menu</i></button>
+                                        <menu class="surface-container-lowest small-round no-line small-margin no-wrap min" id="context-menu-${task.id}">
+                                            <li class="row no-margin" data-action="share">
+                                                <i>share</i>
+                                                <span>共有</span>
+                                            </li>
+                                            <li class="row no-margin" data-action="duplicate">
+                                                <i>content_copy</i>
+                                                <span>複製</span>
+                                            </li>
+                                            <li class="row no-margin" data-action="delete">
+                                                <i>delete</i>
+                                                <span>削除</span>
+                                            </li>
+                                        </menu>
+                                    </div>
+                                    ${escapeHtml(String(task.display_id || ''))}
+                                </div>
+                            </td>` +
+                            `<td title="${escapeHtml(name)}">${escapeHtml(truncatedName)}</td>` +
+                            `<td><div class="row tiny-space">
+                                <i class="tiny circle ${statusColors[task.task_status_key] || ''}"></i>
+                                ${statusLabels[task.task_status_key] || ''}
+                            </div></td>` +
+                            `<td>${priorityLabels[task.priority_key] || ''}</td>` +
+                            `<td class="font-number">${formatDateTimeForDisplay(task.starts_at, 'MM/dd(E) HH:mm') || ''}</td>` +
+                            `<td class="font-number">${formatDateTimeForDisplay(task.ends_at, 'MM/dd(E) HH:mm') || ''}</td>` +
+                            `<td><div class="row tiny-space">${membersHtml}</div></td>` +
+                            `<td>${escapeHtml(boardName)}</td>` +
+                            `<td class="font-number">
+                                ${formatDateTimeForDisplay(task.updated_at, 'MM/dd(E) HH:mm') || ''}
+                            </td>` +
+                            `</tr>`;
+                    }).join('');
+                }
+
+                // テーブル全体のHTML（sticky thead + スクロールコンテナ）
+                container.innerHTML =
+                    '<div class="">' +
+                    `<table class="border">${theadHtml}<tbody>${tbodyHtml}</tbody></table>` +
+                    '</div>';
+
+                // sticky thead スタイルを適用（BeerCSSにないため最小限インラインで対応）
+                container.querySelectorAll('thead th').forEach(th => {
+                    th.style.position = 'sticky';
+                    th.style.top = '0';
+                    th.style.zIndex = '1';
+                });
+
+                this.applyListHeight(boardId);
+
+                if (!isLoading) {
+                    this.bindCardEvents(container);
+                }
+            },
+
+            /**
+             * リスト表示のヘッダーカラムをクリックしてソートを切り替える
+             */
+            sortList: function (boardId, colKey) {
+                if (!this.listSortState[boardId]) {
+                    this.listSortState[boardId] = [
+                        { col: 'starts_at', dir: 'asc' },
+                        { col: 'ends_at', dir: 'asc' }
+                    ];
+                }
+                const criteria = this.listSortState[boardId];
+                const primary = criteria[0];
+
+                if (primary && primary.col === colKey) {
+                    // 同じカラムがプライマリの場合：昇順↔降順をトグル
+                    primary.dir = primary.dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    // 別のカラム：現在のリストを先頭に追加（既存の同カラムは削除して重複を防ぐ）
+                    const filtered = criteria.filter(c => c.col !== colKey);
+                    this.listSortState[boardId] = [{ col: colKey, dir: 'asc' }, ...filtered];
+                }
+                this.renderList(boardId, false);
+            },
+
+            /**
+             * リストスクロールコンテナの高さをカンバンと同じ計算式で設定する
+             */
+            applyListHeight: function (boardId) {
+                const scrollDiv = document.querySelector(`#list-canvas-${boardId}`);
+                if (!scrollDiv) return;
+                try {
+                    const mainElement = document.querySelector('main');
+                    if (!mainElement) return;
+                    const windowHeight = window.innerHeight;
+                    const rect = scrollDiv.getBoundingClientRect();
+                    if (rect.top <= 0) return;
+                    const mainStyle = window.getComputedStyle(mainElement);
+                    const marginBottom = parseFloat(mainStyle.marginBottom) || 0;
+                    const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
+                    const offsetBottom = marginBottom + paddingBottom + 16;
+                    const newHeight = windowHeight - rect.top - offsetBottom;
+                    if (newHeight > 0) scrollDiv.style.height = `${newHeight}px`;
+                } catch (e) {
+                    console.error('List height calculation failed:', e);
+                }
+            },
+
             /**
              * SortableJSを初期化
              */
@@ -508,7 +848,7 @@
                 if (!container) return;
 
                 const containerId = container.id;
-                const boardId = containerId.replace('kanban-canvas-', '');
+                const boardId = containerId.replace(/^(kanban|list)-canvas-/, '');
 
                 // containerにIDがない場合は処理をスキップ
                 if (!containerId) {
@@ -526,15 +866,31 @@
 
                 // 新しいハンドラーを作成
                 const clickHandler = (e) => {
+                    // リスト列のメニューボタンクリック処理
+                    const listMenuBtn = e.target.closest('.list-menu-btn');
+                    if (listMenuBtn) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // どこかをクリックしたら全てのメニューを閉じる処理と共通化するためまず全部閉じる
+                        document.querySelectorAll('.kanban-card menu.active, tr[data-task-id] menu.active').forEach(m => m.classList.remove('active'));
+
+                        const taskId = listMenuBtn.dataset.taskId;
+                        const menu = document.getElementById(`context-menu-${taskId}`);
+                        if (menu) {
+                            menu.classList.add('active');
+                        }
+                        return;
+                    }
+
                     // メニュー項目のクリック処理
                     const menuItem = e.target.closest('li[data-action]');
                     if (menuItem) {
                         e.stopPropagation();
                         // 親のカードを取得
-                        const card = menuItem.closest('.kanban-card');
+                        const card = menuItem.closest('.kanban-card, tr[data-task-id]');
                         if (card) {
                             const action = menuItem.dataset.action;
-                            const taskId = card.dataset.eid;
+                            const taskId = card.dataset.eid || card.dataset.taskId;
                             this.handleCardAction(action, taskId);
 
                             // メニューを閉じる
@@ -551,12 +907,18 @@
                     }
 
                     // どこかをクリックしたら全てのメニューを閉じる
-                    document.querySelectorAll('.kanban-card menu.active').forEach(m => m.classList.remove('active'));
+                    document.querySelectorAll('.kanban-card menu.active, tr[data-task-id] menu.active').forEach(m => m.classList.remove('active'));
+
+                    // ボタンでmousedown, メニュー項目でmouseupした場合などのクリック先がコンテナ(共通祖先)になるケースではカードを開かない
+                    if (e.target.closest('.list-menu-container')) {
+                        e.stopPropagation();
+                        return;
+                    }
 
                     // カードクリック処理
-                    const card = e.target.closest('.kanban-card');
+                    const card = e.target.closest('.kanban-card, tr[data-task-id]');
                     if (card) {
-                        const taskId = card.dataset.eid;
+                        const taskId = card.dataset.eid || card.dataset.taskId;
                         if (taskId && App.modals.taskDetail) {
                             this.currentBoardId = boardId;
                             App.modals.taskDetail.open(taskId);
@@ -565,15 +927,15 @@
                 };
 
                 const contextMenuHandler = (e) => {
-                    const card = e.target.closest('.kanban-card');
+                    const card = e.target.closest('.kanban-card, tr[data-task-id]');
                     if (card) {
                         e.preventDefault();
                         e.stopPropagation(); // 他の要素のイベント発火を防ぐ
 
                         // 他のメニューを閉じる
-                        document.querySelectorAll('.kanban-card menu.active').forEach(m => m.classList.remove('active'));
+                        document.querySelectorAll('.kanban-card menu.active, tr[data-task-id] menu.active').forEach(m => m.classList.remove('active'));
 
-                        const taskId = card.dataset.eid;
+                        const taskId = card.dataset.eid || card.dataset.taskId;
                         const menu = document.getElementById(`context-menu-${taskId}`);
                         if (menu) {
                             menu.classList.add('active');
@@ -969,11 +1331,11 @@
                 // 3. 優先度アイコンの設定
                 let priorityIcon = '';
                 if (task.priority_key === 'HIGH') {
-                    priorityIcon = `<i class="circle extra transparent red-text" title="優先度: 高">sprint</i>`;
+                    priorityIcon = `<i class="circle transparent red-text" title="優先度: 高">sprint</i>`;
                 } else if (task.priority_key === 'MEDIUM') {
-                    priorityIcon = `<i class="circle extra transparent" title="優先度: 中">directions_run</i>`;
+                    priorityIcon = `<i class="circle transparent" title="優先度: 中">directions_run</i>`;
                 } else if (task.priority_key === 'LOW') {
-                    priorityIcon = `<i class="circle extra transparent" title="優先度: 低">directions_walk</i>`;
+                    priorityIcon = `<i class="circle transparent" title="優先度: 低">directions_walk</i>`;
                 }
 
                 const assigneeNames = [
@@ -990,6 +1352,8 @@
                     receivedBy ? receivedBy.profile_photo_url : null
                 ];
 
+                const assigneeLabels = ['作成者', '進行者', '確認者', '受領者'];
+
                 const assigneeIcons = assigneePhotoUrls.map((url, index) => {
                     let opacity;
                     if (index === 1 && task.task_status_key === 'TODO') {
@@ -1004,26 +1368,24 @@
                         opacity = 0.5;
                     }
 
-                    let iconSrc, buttonClass;
+                    let iconSrc;
                     if (url) {
                         // URLをサニタイズ（危険なプロトコルを除外）
                         const safeUrl = sanitizeUrl(url);
                         if (safeUrl) {
                             // URLはサニタイズ済みで安全なので、そのまま使用
-                            iconSrc = `<img src="${safeUrl}" title="${escapeHtml(assigneeNames[index])}" class="responsive">`;
+                            iconSrc = `<img src="${safeUrl}" class="responsive">`;
                         } else {
-                            iconSrc = `<i title="${escapeHtml(assigneeNames[index])}">person</i>`;
+                            iconSrc = `person`;
                         }
-                        buttonClass = 'circle transparent small';
                     } else {
-                        iconSrc = `<i title="${escapeHtml(assigneeNames[index])}">person</i>`;
-                        buttonClass = 'circle tertiary small';
+                        iconSrc = `person`;
                     }
 
                     return `
-                        <button class="${buttonClass}" style="opacity: ${opacity};">
+                        <i title="${assigneeNames[index]} (${assigneeLabels[index]})" class="circle tertiary" style="opacity: ${opacity};">
                             ${iconSrc}
-                        </button>
+                        </i>
                     `;
                 });
 
@@ -1209,7 +1571,12 @@
                     this.resizeRafId = requestAnimationFrame(() => {
                         const boardId = this.currentBoardId;
                         if (!boardId) return;
-                        this.applyColumnHeights(boardId);
+                        // 表示モードに応じて高さを再計算
+                        if (this.viewMode === 'list') {
+                            this.applyListHeight(boardId);
+                        } else {
+                            this.applyColumnHeights(boardId);
+                        }
                     });
                 });
             },

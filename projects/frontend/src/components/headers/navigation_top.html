@@ -56,7 +56,7 @@
     <div class="max"></div>
 
     <nav class="left-margin right-margin">
-        <button id="comments-button" class="circle transparent" onclick="App.utils.header.comments.toggle()">
+        <button id="comments-button" class="l circle transparent" onclick="App.utils.header.comments.toggle()">
             <i>comment</i>
             <span id="comments-badge" class="badge" style="display: none;">0</span>
             <menu id="comments-menu" class="left no-padding medium-width">
@@ -66,7 +66,7 @@
             </menu>
         </button>
 
-        <button class="circle transparent">
+        <button class="l circle transparent">
             <i>apps</i>
             <menu id="apps-menu" class="left no-padding medium-width">
                 <div id="apps-grid">
@@ -84,7 +84,7 @@
             </menu>
         </button>
 
-        <button id="system-info-button" class="circle transparent" onclick="App.utils.header.systemUpdates.toggle()">
+        <button id="system-info-button" class="l circle transparent" onclick="App.utils.header.systemUpdates.toggle()">
             <i>info</i>
             <menu id="system-info-menu" class="left no-padding medium-width">
                 <div id="system-info-list">
@@ -720,10 +720,8 @@
                 setLoading(true);
 
                 try {
-                    // 全角数字を半角に変換してから数値チェック（正規化ユーティリティを使用）
-                    const normalizedValue = App.utils.text.normalize(searchValue);
-                    const numericValue = Number(normalizedValue);
-                    const isNumericInput = !isNaN(numericValue) && normalizedValue !== '' && Number.isInteger(numericValue);
+                    // 全角数字を半角に変換してから数値チェック（共通ユーティリティを使用）
+                    const { normalizedValue, numericValue, isNumericInput } = App.utils.search.getNormalizedSearchInfo(searchValue);
 
                     // 1. マイボードタブに移動（既に移動している場合は無視）
                     if (App.utils.navigation && App.utils.navigation.switchTab) {
