@@ -63,7 +63,7 @@ const TABLE_HEADERS = {
   COMMENTS: ['id', 'display_id', 'content', 'mentioned_to', 'related_table', 'related_id', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   DIRECTORIES: ['id', 'display_id', 'parent_directory_id', 'directory_type_key', 'name', 'description', 'achievements', 'scale', 'slack_channel_url', 'website_url', 'folder_url', 'document_url', 'logo_image_url', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   APPS: ['id', 'name', 'url', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
-  MEMBERS: ['id', 'email', 'slack_profile_url', 'name', 'display_name', 'title', 'description', 'website_url', 'profile_photo_file_url', 'profile_photo_url', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
+  MEMBERS: ['id', 'email', 'slack_profile_url', 'name', 'display_name', 'title', 'description', 'website_url', 'profile_photo_file_url', 'profile_photo_url', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at', 'name_yomi', 'display_name_yomi', 'phone_number', 'birthday', 'system_role_key'],
   PLAN_ASSIGNMENTS: ['id', 'plan_id', 'member_id', 'role', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   DIRECTORY_ASSIGNMENTS: ['id', 'directory_id', 'member_id', 'role', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   SKILLS: ['id', 'skill_type_key', 'title', 'description', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
