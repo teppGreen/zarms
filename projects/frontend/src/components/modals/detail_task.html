@@ -1,5 +1,5 @@
 <!-- タスク詳細モーダル -->
-<dialog id="modal-detail-task" class="transparent bottom no-padding" style="position: absolute;">
+<dialog id="modal-detail-task" class="transparent bottom no-padding">
   <div class="bottom-padding" onclick="App.modals.taskDetail.close(false,false)" title="タスク詳細画面を閉じる">
     <i class="center extra center" title="タスク詳細画面を閉じる">keyboard_arrow_down</i>
   </div>
@@ -15,8 +15,8 @@
           <i>arrow_drop_down</i>
         </div>
       </div>
-      <div class="s6 field max no-wrap">
-        <input type="text" id="task-name-input" style="font-size: 1.25rem; font-weight: 500;" placeholder="タスク名">
+      <div class="s6 field max no-wrap bold">
+        <input type="text" id="task-name-input" placeholder="タスク名">
       </div>
 
       <div class="s3">
@@ -163,7 +163,8 @@
           <div class="s12">
             <div class="center-align row tiny-space secondary-text" title="最終更新">
               <i>update</i>
-              <span class="font-number" id="task-last-updated-datetime"></span>
+              <span id="task-last-updated-at"></span>
+              <span id="task-last-updated-by"></span>
             </div>
           </div>
         </div>
@@ -176,11 +177,11 @@
             <a class="active" onclick="App.modals.taskDetail.switchTaskDetailTab(this,'description')">
               <span>説明</span>
             </a>
-            <a class onclick="App.modals.taskDetail.switchTaskDetailTab(this,'list')">
+            <a onclick="App.modals.taskDetail.switchTaskDetailTab(this,'list')">
               <span>リスト</span>
               <div class="badge l font-number none primary" id="task-list-badge" style="display: none;">0</div>
             </a>
-            <a class onclick="App.modals.taskDetail.switchTaskDetailTab(this,'related')">
+            <a onclick="App.modals.taskDetail.switchTaskDetailTab(this,'related')">
               <span>関連</span>
               <div class="badge l font-number none primary" id="task-related-badge" style="display: none;">0</div>
             </a>
@@ -1041,7 +1042,7 @@
         const statusIcon = document.getElementById('task-status-icon');
         const statusColors = {
           'TODO': 'red',
-          'IN_PROGRESS': 'yellow',
+          'IN_PROGRESS': 'amber',
           'IN_REVIEW': 'purple',
           'DONE': 'green'
         };
@@ -1060,8 +1061,11 @@
         const updatedByMember = members.find(m => m.id === updatedBy);
         const updatedByMemberName = updatedByMember?.display_name;
 
-        const lastUpdatedAtEl = document.getElementById('task-last-updated-datetime');
-        lastUpdatedAtEl.textContent = formatDateTimeForDisplay(updatedAt);
+        const lastUpdatedAtEl = document.getElementById('task-last-updated-at');
+        lastUpdatedAtEl.textContent = formatDateTimeForDisplay(updatedAt, 'MM/dd(E) HH:mm');
+
+        const lastUpdatedByEl = document.getElementById('task-last-updated-by');
+        lastUpdatedByEl.textContent = updatedByMemberName;
       },
 
       /**
