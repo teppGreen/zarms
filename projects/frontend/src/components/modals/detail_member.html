@@ -1,0 +1,814 @@
+<!-- メンバー詳細モーダル -->
+<dialog id="modal-detail-member" class="transparent bottom no-padding">
+    <div class="bottom-padding" onclick="App.modals.memberDetail.close(false)" title="メンバー詳細画面を閉じる">
+        <i class="center extra center" title="メンバー詳細画面を閉じる">keyboard_arrow_down</i>
+    </div>
+
+    <div class="surface-container padding">
+        <div class="grid small-padding bottom-margin">
+            <div class="s12 m9">
+                <div class="row tiny-space">
+                    <div id="member-detail-avatar" class="circle medium tertiary center-align row">
+                        <i>person</i>
+                    </div>
+                    <div class="max">
+                        <div class="row tiny-space">
+                            <h5 id="member-detail-display-name" class="bold no-margin"></h5>
+                            <span id="member-detail-status-chip" class="chip small"></span>
+                        </div>
+                        <p id="member-detail-title" class="small-text secondary-text no-margin"></p>
+                        <p id="member-detail-email" class="small-text secondary-text no-margin"></p>
+                        <p id="member-detail-id" class="small-text secondary-text no-margin font-number"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="s12 m3">
+                <nav class="row right-align">
+                    <button class="circle transparent" onclick="App.modals.memberDetail.openNewComment()" title="コメントを作成">
+                        <i>add_comment</i>
+                    </button>
+                    <button class="circle transparent" onclick="App.modals.memberDetail.close(false)" title="閉じる">
+                        <i>close</i>
+                    </button>
+                </nav>
+            </div>
+        </div>
+
+        <div class="grid small-padding tiny-space no-margin">
+            <div class="s12 m3 background small-round padding">
+                <h6 class="bold small bottom-margin">基本情報</h6>
+
+                <div class="field border label bottom-margin">
+                    <input placeholder=" " type="text" id="member-detail-name-input">
+                    <label>氏名</label>
+                </div>
+
+                <div class="field border label bottom-margin">
+                    <input placeholder=" " type="text" id="member-detail-display-name-input">
+                    <label>表示名</label>
+                </div>
+
+                <div class="field border label bottom-margin">
+                    <input placeholder=" " type="email" id="member-detail-email-input">
+                    <label>メールアドレス</label>
+                </div>
+
+                <div class="field border label bottom-margin">
+                    <input placeholder=" " type="text" id="member-detail-title-input">
+                    <label>役職</label>
+                </div>
+
+                <div class="field border label bottom-margin">
+                    <input placeholder=" " type="url" id="member-detail-website-url-input">
+                    <label>ウェブサイトURL</label>
+                </div>
+
+                <div class="field border label bottom-margin">
+                    <input placeholder=" " type="url" id="member-detail-slack-url-input">
+                    <label>SlackプロフィールURL</label>
+                </div>
+
+                <div class="field border label bottom-margin">
+                    <input placeholder=" " type="url" id="member-detail-photo-url-input">
+                    <label>プロフィール写真URL</label>
+                </div>
+
+                <label class="row padding no-margin bottom-margin">
+                    <input type="checkbox" id="member-detail-is-active-input">
+                    <span>在籍中（有効）</span>
+                </label>
+
+                <div class="field border label bottom-margin">
+                    <textarea placeholder=" " id="member-detail-remark-input" rows="2"></textarea>
+                    <label>備考</label>
+                </div>
+
+                <p id="member-detail-error" class="error-text small-text" style="display: none;"></p>
+
+                <div class="center-align row tiny-space secondary-text small-text top-margin" id="member-detail-last-updated"></div>
+            </div>
+
+            <div class="s12 m6 background small-round padding">
+                <nav class="center-align max tiny-space bottom-margin">
+                    <nav class="tabbed small max" id="member-detail-tabs">
+                        <a class="active" onclick="App.modals.memberDetail.switchTab(this,'profile')">
+                            <span>プロフィール</span>
+                        </a>
+                        <a onclick="App.modals.memberDetail.switchTab(this,'directories')">
+                            <span>所属組織</span>
+                        </a>
+                        <a onclick="App.modals.memberDetail.switchTab(this,'skills')">
+                            <span>スキル</span>
+                        </a>
+                    </nav>
+                </nav>
+
+                <div id="member-detail-tab-profile" class="page medium-height active">
+                    <div class="field border label">
+                        <textarea id="member-detail-description-input" rows="13" placeholder=" "></textarea>
+                        <label>プロフィール説明</label>
+                    </div>
+                </div>
+
+                <div id="member-detail-tab-directories" class="page medium-height scroll">
+                    <div class="row tiny-space bottom-margin">
+                        <h6 class="bold small max">所属組織</h6>
+                        <button class="small round border" onclick="App.modals.memberDetail.openAddDirectory()">
+                            <i>add</i>
+                            <span>所属を追加</span>
+                        </button>
+                    </div>
+                    <div id="member-detail-directories-list"></div>
+                </div>
+
+                <div id="member-detail-tab-skills" class="page medium-height scroll">
+                    <div class="row tiny-space bottom-margin">
+                        <h6 class="bold small max">スキル</h6>
+                        <button class="small round border" onclick="App.modals.memberDetail.openAddSkill()">
+                            <i>add</i>
+                            <span>スキルを追加</span>
+                        </button>
+                    </div>
+                    <div id="member-detail-skills-list"></div>
+                </div>
+            </div>
+
+            <div class="s12 m3 background small-round padding">
+                <div class="bottom-margin">
+                    <button class="no-margin responsive large fill round max" onclick="App.modals.memberDetail.openNewComment()">
+                        <i>add_comment</i>
+                        <span>コメントを作成</span>
+                    </button>
+                </div>
+                <div class="scroll medium-height" id="member-comments-list"></div>
+            </div>
+        </div>
+
+        <nav class="small-padding no-margin">
+            <h5 id="member-detail-display-id" class="font-number"></h5>
+            <div class="max"></div>
+            <button class="border large round error-text" onclick="App.modals.memberDetail.discard()">変更を破棄</button>
+            <button class="primary large round" onclick="App.modals.memberDetail.save()">変更を保存</button>
+        </nav>
+    </div>
+</dialog>
+
+<script>
+    (function () {
+        App.modals.memberDetail = {
+            currentId: null,
+            currentItem: null,
+            originalData: null,
+            isDirty: false,
+
+            open: function (memberId) {
+                if (!memberId) return;
+
+                const member = (App.state.data.members || []).find(function (m) { return m.id === memberId; });
+                if (!member) {
+                    console.error('[MemberDetail] Member not found:', memberId);
+                    return;
+                }
+
+                this.currentId = memberId;
+                this.currentItem = Object.assign({}, member);
+                this.originalData = Object.assign({}, member);
+                this.isDirty = false;
+
+                const modal = document.getElementById('modal-detail-member');
+                const overlay = document.getElementById('overlay');
+                if (overlay) overlay.classList.add('active');
+                if (modal) modal.classList.add('active');
+
+                this._render(member);
+                this._renderDirectories(memberId);
+                this._renderSkills(memberId);
+                this.loadComments(memberId);
+                this.switchTab(document.querySelector('#member-detail-tabs > a'), 'profile');
+            },
+
+            close: function (skipDirtyCheck) {
+                if (!skipDirtyCheck && this.isDirty) {
+                    if (!confirm('変更を破棄して閉じますか？')) return;
+                }
+                closeModal('modal-detail-member');
+                this._reset();
+            },
+
+            discard: function () {
+                if (this.isDirty) {
+                    if (!confirm('変更を破棄しますか？')) return;
+                }
+                closeModal('modal-detail-member');
+                this._reset();
+            },
+
+            save: async function () {
+                const id = this.currentId;
+                if (!id) return;
+
+                const errorEl = document.getElementById('member-detail-error');
+                const newName = (document.getElementById('member-detail-name-input')?.value || '').trim();
+                const newEmail = (document.getElementById('member-detail-email-input')?.value || '').trim();
+
+                if (!newName) {
+                    if (errorEl) { errorEl.textContent = '氏名は必須です'; errorEl.style.display = ''; }
+                    return;
+                }
+                if (!newEmail) {
+                    if (errorEl) { errorEl.textContent = 'メールアドレスは必須です'; errorEl.style.display = ''; }
+                    return;
+                }
+
+                if (errorEl) errorEl.style.display = 'none';
+
+                const updates = {
+                    name: newName,
+                    display_name: (document.getElementById('member-detail-display-name-input')?.value || '').trim() || newName,
+                    email: newEmail,
+                    title: (document.getElementById('member-detail-title-input')?.value || '').trim() || null,
+                    website_url: (document.getElementById('member-detail-website-url-input')?.value || '').trim() || null,
+                    description: (document.getElementById('member-detail-description-input')?.value || '').trim() || null,
+                    slack_profile_url: (document.getElementById('member-detail-slack-url-input')?.value || '').trim() || null,
+                    profile_photo_url: (document.getElementById('member-detail-photo-url-input')?.value || '').trim() || null,
+                    is_active: document.getElementById('member-detail-is-active-input')?.checked !== false,
+                    remark: (document.getElementById('member-detail-remark-input')?.value || '').trim() || null
+                };
+
+                const orig = this.originalData || {};
+                let hasChanges = false;
+                for (const key of Object.keys(updates)) {
+                    if (String(updates[key] ?? '') !== String(orig[key] ?? '')) {
+                        hasChanges = true;
+                        break;
+                    }
+                }
+
+                if (!hasChanges) {
+                    this.isDirty = false;
+                    closeModal('modal-detail-member');
+                    this._reset();
+                    return;
+                }
+
+                Object.assign(this.currentItem, updates);
+                const memberInState = (App.state.data.members || []).find(function (m) { return m.id === id; });
+                if (memberInState) Object.assign(memberInState, updates);
+
+                this.isDirty = false;
+                closeModal('modal-detail-member');
+                showSnackbar('変更を保存しています...', 'info', 'top', 0);
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'update', {
+                        where: { id: ['=', id] },
+                        set: updates
+                    }, 'メンバーを更新');
+
+                    showSnackbar('変更を保存しました', 'success');
+                    if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+                } catch (err) {
+                    console.error('[MemberDetail] 保存エラー:', err);
+                    if (memberInState) Object.assign(memberInState, orig);
+                    showSnackbar('保存に失敗しました', 'error');
+                }
+
+                this._reset();
+            },
+
+            switchTab: function (el, tabName) {
+                const tabs = document.querySelectorAll('#member-detail-tabs > a');
+                tabs.forEach(function (a) { a.className = ''; });
+                if (el) el.className = 'active';
+
+                const profileTab = document.getElementById('member-detail-tab-profile');
+                const directoriesTab = document.getElementById('member-detail-tab-directories');
+                const skillsTab = document.getElementById('member-detail-tab-skills');
+
+                if (profileTab) profileTab.className = tabName === 'profile' ? 'page medium-height active' : 'page medium-height';
+                if (directoriesTab) directoriesTab.className = tabName === 'directories' ? 'page medium-height active scroll' : 'page medium-height scroll';
+                if (skillsTab) skillsTab.className = tabName === 'skills' ? 'page medium-height active scroll' : 'page medium-height scroll';
+            },
+
+            openNewComment: function () {
+                if (!this.currentId) return;
+                if (!App.modals.newComment) return;
+
+                if (App.modals.newComment.openFor) {
+                    App.modals.newComment.openFor('members', this.currentId);
+                    return;
+                }
+
+                App.modals.newComment.open(this.currentId);
+            },
+
+            openAddDirectory: function () {
+                if (!this.currentId) return;
+                if (!App.modals.selectDirectories || !App.modals.selectDirectories.open) return;
+
+                const memberId = this.currentId;
+                const preSelected = (App.state.data.directoryAssignments || [])
+                    .filter(function (a) { return a.member_id === memberId && a.is_active !== false; })
+                    .map(function (a) { return a.directory_id; });
+
+                App.modals.selectDirectories.open({
+                    multiSelect: true,
+                    preSelected: preSelected,
+                    callback: function (selectedIds) {
+                        App.modals.memberDetail.applyDirectorySelection(memberId, selectedIds);
+                    }
+                });
+            },
+
+            applyDirectorySelection: async function (memberId, selectedIds) {
+                if (!memberId) return;
+                if (!selectedIds || selectedIds.length === 0) return;
+
+                const assignments = App.state.data.directoryAssignments || [];
+
+                showSnackbar('所属組織を登録しています...', 'info', 'top', 0);
+
+                try {
+                    for (let i = 0; i < selectedIds.length; i++) {
+                        const directoryId = selectedIds[i];
+                        const existing = assignments.find(function (a) {
+                            return a.member_id === memberId && a.directory_id === directoryId;
+                        });
+
+                        if (existing) {
+                            if (existing.is_active === false) {
+                                await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                                    where: { id: ['=', existing.id] },
+                                    set: { is_active: true }
+                                }, '所属組織を更新');
+                                existing.is_active = true;
+                            }
+                            continue;
+                        }
+
+                        const record = {
+                            member_id: memberId,
+                            directory_id: directoryId,
+                            is_active: true
+                        };
+
+                        const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'insert', record, '所属組織を追加');
+                        if (inserted && inserted.data && inserted.data.id) {
+                            record.id = inserted.data.id;
+                        }
+                        assignments.push(record);
+                    }
+
+                    showSnackbar('所属組織を登録しました', 'success');
+                } catch (err) {
+                    console.error('[MemberDetail] 所属組織登録エラー:', err);
+                    showSnackbar('所属組織の登録に失敗しました', 'error');
+                }
+
+                this._renderDirectories(memberId);
+                if (App.pages.members && App.pages.members.loadData) {
+                    App.pages.members.loadData(true);
+                }
+            },
+
+            deactivateDirectoryAssignment: async function (assignmentId) {
+                if (!assignmentId) return;
+                if (!confirm('所属組織を解除しますか？')) return;
+
+                const assignments = App.state.data.directoryAssignments || [];
+                const target = assignments.find(function (a) { return a.id === assignmentId; });
+                if (!target) return;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', assignmentId] },
+                        set: { is_active: false }
+                    }, '所属組織を解除');
+
+                    target.is_active = false;
+                    showSnackbar('所属組織を解除しました', 'success');
+                } catch (err) {
+                    console.error('[MemberDetail] 所属組織解除エラー:', err);
+                    showSnackbar('解除に失敗しました', 'error');
+                }
+
+                this._renderDirectories(this.currentId);
+                if (App.pages.members && App.pages.members.loadData) {
+                    App.pages.members.loadData(true);
+                }
+            },
+
+            openAddSkill: function () {
+                if (!this.currentId) return;
+                if (!App.modals.selectSkills || !App.modals.selectSkills.open) return;
+
+                const memberId = this.currentId;
+                const preSelected = (App.state.data.skillAssignments || [])
+                    .filter(function (a) { return a.member_id === memberId; })
+                    .map(function (a) { return a.skill_id; });
+
+                App.modals.selectSkills.open({
+                    multiSelect: true,
+                    preSelected: preSelected,
+                    defaultLevel: 'BEGINNER',
+                    callback: function (result) {
+                        App.modals.memberDetail.applySkillSelection(memberId, result.selectedIds, result.levelKey);
+                    }
+                });
+            },
+
+            applySkillSelection: async function (memberId, selectedIds, levelKey) {
+                if (!memberId) return;
+                if (!selectedIds || selectedIds.length === 0) return;
+
+                const assignments = App.state.data.skillAssignments || [];
+                const level = levelKey || 'BEGINNER';
+
+                showSnackbar('スキルを登録しています...', 'info', 'top', 0);
+
+                try {
+                    for (let i = 0; i < selectedIds.length; i++) {
+                        const skillId = selectedIds[i];
+                        const existing = assignments.find(function (a) {
+                            return a.member_id === memberId && a.skill_id === skillId;
+                        });
+
+                        if (existing) {
+                            if (existing.skill_level_key !== level) {
+                                await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
+                                    where: { id: ['=', existing.id] },
+                                    set: { skill_level_key: level }
+                                }, 'スキルレベルを更新');
+                                existing.skill_level_key = level;
+                            }
+                            continue;
+                        }
+
+                        const record = {
+                            member_id: memberId,
+                            skill_id: skillId,
+                            skill_level_key: level
+                        };
+
+                        const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'insert', record, 'スキルを追加');
+                        if (inserted && inserted.data && inserted.data.id) {
+                            record.id = inserted.data.id;
+                        }
+                        assignments.push(record);
+                    }
+
+                    showSnackbar('スキルを登録しました', 'success');
+                } catch (err) {
+                    console.error('[MemberDetail] スキル登録エラー:', err);
+                    showSnackbar('スキルの登録に失敗しました', 'error');
+                }
+
+                this._renderSkills(memberId);
+                if (App.pages.members && App.pages.members.loadData) {
+                    App.pages.members.loadData(true);
+                }
+            },
+
+            updateSkillLevel: async function (assignmentId, levelKey) {
+                if (!assignmentId) return;
+                const assignments = App.state.data.skillAssignments || [];
+                const target = assignments.find(function (a) { return a.id === assignmentId; });
+                if (!target || target.skill_level_key === levelKey) return;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', assignmentId] },
+                        set: { skill_level_key: levelKey }
+                    }, 'スキルレベルを更新');
+                    target.skill_level_key = levelKey;
+                    showSnackbar('スキルレベルを更新しました', 'success');
+                    this._renderSkills(this.currentId);
+                } catch (err) {
+                    console.error('[MemberDetail] スキル更新エラー:', err);
+                    showSnackbar('更新に失敗しました', 'error');
+                }
+            },
+
+            removeSkillAssignment: async function (assignmentId) {
+                if (!assignmentId) return;
+                if (!confirm('スキルを解除しますか？')) return;
+
+                const assignments = App.state.data.skillAssignments || [];
+                const targetIndex = assignments.findIndex(function (a) { return a.id === assignmentId; });
+                if (targetIndex === -1) return;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'remove', {
+                        where: { id: ['=', assignmentId] }
+                    }, 'スキルを解除');
+                    assignments.splice(targetIndex, 1);
+                    showSnackbar('スキルを解除しました', 'success');
+                } catch (err) {
+                    console.error('[MemberDetail] スキル解除エラー:', err);
+                    showSnackbar('解除に失敗しました', 'error');
+                }
+
+                this._renderSkills(this.currentId);
+                if (App.pages.members && App.pages.members.loadData) {
+                    App.pages.members.loadData(true);
+                }
+            },
+
+            loadComments: function (memberId, skipLoadingCache = false) {
+                const commentsList = document.getElementById('member-comments-list');
+                if (commentsList) {
+                    commentsList.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
+                }
+
+                const query = {
+                    where: {
+                        related_table: ['=', 'members'],
+                        related_id: ['=', memberId]
+                    },
+                    orderBy: {
+                        created_at: 'desc'
+                    }
+                };
+
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, skipLoadingCache)
+                    .then(results => {
+                        if (this.currentId !== memberId) return;
+
+                        const comments = results?.data || results || [];
+                        this.renderComments(comments);
+
+                        if (results?.isCached) {
+                            callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, true)
+                                .then(refreshedResults => {
+                                    if (this.currentId !== memberId) return;
+                                    const refreshedComments = refreshedResults?.data || refreshedResults || [];
+                                    this.renderComments(refreshedComments);
+                                });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('[MemberDetail] コメント読み込みエラー:', error);
+                        if (this.currentId === memberId && commentsList) {
+                            commentsList.innerHTML = '<p class="error-text padding">コメントの読み込みに失敗しました</p>';
+                        }
+                    });
+            },
+
+            renderComments: function (comments) {
+                const container = document.getElementById('member-comments-list');
+                if (!container) return;
+
+                if (!comments || comments.length === 0) {
+                    container.innerHTML = '<p>コメントはありません</p>';
+                    return;
+                }
+
+                const members = App.state.data.members || [];
+
+                container.innerHTML = comments.map(function (comment, index) {
+                    const creator = members.find(function (m) { return m.id === comment.created_by; });
+                    const creatorName = creator ? creator.display_name : '不明';
+                    const creatorPhoto = creator ? creator.profile_photo_url : '';
+                    const creatorSlackProfileUrl = creator ? creator.slack_profile_url : '#';
+                    const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
+                    const hr = index > 0 ? '<hr class="max small-margin">' : '';
+
+                    const creatorIcon = creatorPhoto
+                        ? '<img src="' + creatorPhoto + '" alt="' + escapeHtml(creatorName) + '" class="circle tiny">'
+                        : '<i class="tiny">account_circle</i>';
+
+                    return '' +
+                        hr +
+                        '<div class="small-padding">' +
+                        '<div class="row tiny-space">' +
+                        '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '<\/a>' +
+                        '<div class="max row tiny-space">' +
+                        '<span class="bold small-text">' + escapeHtml(creatorName) + '<\/span>' +
+                        '<span class="small-text secondary-text">' + createdAt + '<\/span>' +
+                        '<\/div>' +
+                        '<\/div>' +
+                        '<div class="tiny-space"><\/div>' +
+                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '<\/p>' +
+                        '<\/div>';
+                }).join('');
+            },
+
+            _render: function (member) {
+                const avatarEl = document.getElementById('member-detail-avatar');
+                const dispNameEl = document.getElementById('member-detail-display-name');
+                const emailEl = document.getElementById('member-detail-email');
+                const idEl = document.getElementById('member-detail-id');
+                const titleEl = document.getElementById('member-detail-title');
+                const statusChip = document.getElementById('member-detail-status-chip');
+                const footerIdEl = document.getElementById('member-detail-display-id');
+
+                if (member.profile_photo_url && avatarEl) {
+                    avatarEl.innerHTML = '<img src="' + member.profile_photo_url + '" class="responsive circle" alt="">';
+                    avatarEl.className = 'circle medium transparent';
+                } else if (avatarEl) {
+                    avatarEl.innerHTML = '<i>person</i>';
+                    avatarEl.className = 'circle medium tertiary center-align row';
+                }
+                if (dispNameEl) dispNameEl.textContent = member.display_name || member.name || '';
+                if (titleEl) titleEl.textContent = member.title || '';
+                if (emailEl) emailEl.textContent = member.email || '';
+                if (idEl) idEl.textContent = member.id ? '#' + member.id : '';
+                if (footerIdEl) footerIdEl.textContent = member.id ? '#' + member.id : '';
+                if (statusChip) {
+                    if (member.is_active === false) {
+                        statusChip.textContent = '退籍';
+                        statusChip.className = 'chip small border';
+                    } else {
+                        statusChip.textContent = '在籍';
+                        statusChip.className = 'chip small primary';
+                    }
+                }
+
+                const setVal = function (id, val) {
+                    var el = document.getElementById(id);
+                    if (el) el.value = val || '';
+                };
+
+                setVal('member-detail-name-input', member.name);
+                setVal('member-detail-display-name-input', member.display_name);
+                setVal('member-detail-email-input', member.email);
+                setVal('member-detail-title-input', member.title);
+                setVal('member-detail-website-url-input', member.website_url);
+                setVal('member-detail-description-input', member.description);
+                setVal('member-detail-slack-url-input', member.slack_profile_url);
+                setVal('member-detail-photo-url-input', member.profile_photo_url);
+                setVal('member-detail-remark-input', member.remark);
+
+                var cb = document.getElementById('member-detail-is-active-input');
+                if (cb) cb.checked = member.is_active !== false;
+
+                var lastUpdatedEl = document.getElementById('member-detail-last-updated');
+                if (lastUpdatedEl) {
+                    if (member.updated_at) {
+                        var updatedByMember = (App.state.data.members || []).find(function (m) { return m.id === member.updated_by; });
+                        var updatedByName = updatedByMember ? updatedByMember.display_name : '';
+                        lastUpdatedEl.innerHTML = `<i>update</i><span>${formatDateTimeForDisplay(member.updated_at, 'MM/dd(E) HH:mm') || ''}<span>${updatedByName || ''}</span></span>`;
+                    } else {
+                        lastUpdatedEl.innerHTML = '';
+                    }
+                }
+
+                var errorEl = document.getElementById('member-detail-error');
+                if (errorEl) errorEl.style.display = 'none';
+
+                this._setupDirtyWatchers();
+                this.isDirty = false;
+            },
+
+            _setupDirtyWatchers: function () {
+                var self = this;
+                var watchIds = [
+                    'member-detail-name-input',
+                    'member-detail-display-name-input',
+                    'member-detail-email-input',
+                    'member-detail-title-input',
+                    'member-detail-website-url-input',
+                    'member-detail-description-input',
+                    'member-detail-slack-url-input',
+                    'member-detail-photo-url-input',
+                    'member-detail-remark-input',
+                    'member-detail-is-active-input'
+                ];
+
+                watchIds.forEach(function (wid) {
+                    var el = document.getElementById(wid);
+                    if (!el || el.dataset.memberDetailBound === '1') return;
+                    el.addEventListener('input', function () { self.isDirty = true; });
+                    el.addEventListener('change', function () { self.isDirty = true; });
+                    el.dataset.memberDetailBound = '1';
+                });
+            },
+
+            _renderDirectories: function (memberId) {
+                var container = document.getElementById('member-detail-directories-list');
+                if (!container) return;
+
+                var assignments = (App.state.data.directoryAssignments || []).filter(function (a) {
+                    return a.member_id === memberId;
+                });
+                var directories = App.state.data.directories || [];
+
+                if (assignments.length === 0) {
+                    container.innerHTML = '<p class="secondary-text padding">所属組織はありません</p>';
+                    return;
+                }
+
+                container.innerHTML = assignments.map(function (a) {
+                    var dir = directories.find(function (d) { return d.id === a.directory_id; });
+                    var dirName = dir ? dir.name : '（削除済み組織）';
+                    var role = a.role || '';
+                    var isActive = a.is_active !== false;
+                    var actionBtn = a.id
+                        ? '<button class="small round border" onclick="App.modals.memberDetail.deactivateDirectoryAssignment(\'' + a.id + '\')">解除<\/button>'
+                        : '';
+                    return '<div class="row padding small-space">' +
+                        '<i>account_tree</i>' +
+                        '<div class="max">' +
+                        '<p class="no-margin bold small">' + escapeHtml(dirName) + '<\/p>' +
+                        (role ? '<p class="no-margin small-text secondary-text">' + escapeHtml(role) + '<\/p>' : '') +
+                        '<\/div>' +
+                        (!isActive ? '<span class="chip small border">退任済</span>' : actionBtn) +
+                        '<\/div>';
+                }).join('<hr class="small-margin">');
+            },
+
+            _renderSkills: function (memberId) {
+                var container = document.getElementById('member-detail-skills-list');
+                if (!container) return;
+
+                var skillAssignments = (App.state.data.skillAssignments || []).filter(function (sa) {
+                    return sa.member_id === memberId;
+                });
+                var skills = App.state.data.skills || [];
+
+                if (skillAssignments.length === 0) {
+                    container.innerHTML = '<p class="secondary-text padding">スキル情報はありません</p>';
+                    return;
+                }
+
+                var levelLabels = {
+                    BEGINNER: '初級',
+                    INTERMEDIATE: '中級',
+                    ADVANCED: '上級',
+                    EXPERT: 'エキスパート'
+                };
+
+                const levelOptions = function (current) {
+                    return Object.keys(levelLabels).map(function (key) {
+                        const selected = current === key ? ' selected' : '';
+                        return '<option value="' + key + '"' + selected + '>' + levelLabels[key] + '<\/option>';
+                    }).join('');
+                };
+
+                container.innerHTML = skillAssignments.map(function (sa) {
+                    var skill = skills.find(function (s) { return s.id === sa.skill_id; });
+                    var skillName = skill ? skill.title : '（削除済みスキル）';
+                    var level = levelLabels[sa.skill_level_key] || sa.skill_level_key || '';
+                    var levelSelect = sa.id
+                        ? '<select class="small" onchange="App.modals.memberDetail.updateSkillLevel(\'' + sa.id + '\', this.value)">' + levelOptions(sa.skill_level_key) + '<\/select>'
+                        : '<span class="small-text secondary-text">-<\/span>';
+                    var removeBtn = sa.id
+                        ? '<button class="small round border" onclick="App.modals.memberDetail.removeSkillAssignment(\'' + sa.id + '\')">解除<\/button>'
+                        : '';
+                    return '<div class="row padding small-space">' +
+                        '<i>psychology</i>' +
+                        '<div class="max">' +
+                        '<p class="no-margin bold small">' + escapeHtml(skillName) + '<\/p>' +
+                        (level ? '<p class="no-margin small-text secondary-text">' + escapeHtml(level) + '<\/p>' : '') +
+                        '<\/div>' +
+                        '<div class="row tiny-space">' + levelSelect + removeBtn + '<\/div>' +
+                        '<\/div>';
+                }).join('<hr class="small-margin">');
+            },
+
+            _reset: function () {
+                this.currentId = null;
+                this.currentItem = null;
+                this.originalData = null;
+                this.isDirty = false;
+
+                var fields = [
+                    'member-detail-name-input',
+                    'member-detail-display-name-input',
+                    'member-detail-email-input',
+                    'member-detail-title-input',
+                    'member-detail-website-url-input',
+                    'member-detail-description-input',
+                    'member-detail-slack-url-input',
+                    'member-detail-photo-url-input',
+                    'member-detail-remark-input'
+                ];
+                fields.forEach(function (id) {
+                    var el = document.getElementById(id);
+                    if (el) el.value = '';
+                });
+
+                var titleEl = document.getElementById('member-detail-title');
+                if (titleEl) titleEl.textContent = '';
+                var statusChip = document.getElementById('member-detail-status-chip');
+                if (statusChip) {
+                    statusChip.textContent = '';
+                    statusChip.className = 'chip small';
+                }
+                var footerIdEl = document.getElementById('member-detail-display-id');
+                if (footerIdEl) footerIdEl.textContent = '';
+
+                var cb = document.getElementById('member-detail-is-active-input');
+                if (cb) cb.checked = true;
+
+                var comments = document.getElementById('member-comments-list');
+                if (comments) comments.innerHTML = '';
+
+                var profileTabBtn = document.querySelector('#member-detail-tabs > a');
+                this.switchTab(profileTabBtn, 'profile');
+            }
+        };
+    })();
+</script>

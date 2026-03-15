@@ -119,7 +119,7 @@ function getInitialAppData(email, urlParams, isMobile = false) {
 /**
  * アプリ起動に必要なマスタデータを一括事前取得（CacheService活用）
  * @param {string} userId - ユーザーID
- * @returns {Object} { boards, apps, members, directories, systemUpdates, isCached }
+ * @returns {Object} { boards, apps, members, directories, directoryAssignments, skills, skillAssignments, systemUpdates, isCached }
  */
 function _prefetchInitialData(userId, useApiMode = false) {
   const queries = [
@@ -152,6 +152,27 @@ function _prefetchInitialData(userId, useApiMode = false) {
       forceRefresh: false
     },
     {
+      key: 'directoryAssignments',
+      tableName: TABLE_NAMES.DIRECTORY_ASSIGNMENTS,
+      operation: 'select',
+      dataObject: {},
+      forceRefresh: false
+    },
+    {
+      key: 'skills',
+      tableName: TABLE_NAMES.SKILLS,
+      operation: 'select',
+      dataObject: {},
+      forceRefresh: false
+    },
+    {
+      key: 'skillAssignments',
+      tableName: TABLE_NAMES.SKILL_ASSIGNMENTS,
+      operation: 'select',
+      dataObject: {},
+      forceRefresh: false
+    },
+    {
       key: 'systemUpdates',
       tableName: TABLE_NAMES.SYSTEM_UPDATES,
       operation: 'select',
@@ -170,6 +191,9 @@ function _prefetchInitialData(userId, useApiMode = false) {
     apps: (r.apps?.data || r.apps || []),
     members: (r.members?.data || r.members || []),
     directories: (r.directories?.data || r.directories || []),
+    directoryAssignments: (r.directoryAssignments?.data || r.directoryAssignments || []),
+    skills: (r.skills?.data || r.skills || []),
+    skillAssignments: (r.skillAssignments?.data || r.skillAssignments || []),
     systemUpdates: (r.systemUpdates?.data || r.systemUpdates || []),
     // いずれかがキャッシュから取得された場合 true
     isCached: !batchResult.hasAnyUncached

@@ -1,28 +1,370 @@
 <div id="tab-members" style="display: none;">
-    <header class="small-margin no-padding">
-        <nav class="no-margin no-padding space">
+    <header class="small-margin">
+        <nav class="no-padding no-margin row">
             <h3 class="bold small">メンバー</h3>
-            <a id="open-member-spreadsheet" rel="noopener noreferrer" target="_blank" class="small-text secondary-text">新しいタブで開く<i class="tiny">open_in_new</i></a>
+            <div class="max"></div>
+            <nav class="tabbed background small max" id="members-tab-nav" title="表示切替">
+                <a class="active" id="members-tab-btn-member" title="メンバー" onclick="App.pages.members.switchTab('member')">
+                    <i>people</i>
+                    <span>メンバー</span>
+                </a>
+                <a id="members-tab-btn-directory" title="ディレクトリ" onclick="App.pages.members.switchTab('directory')">
+                    <i>account_tree</i>
+                    <span>ディレクトリ</span>
+                </a>
+                <a id="members-tab-btn-skills" title="スキル" onclick="App.pages.members.switchTab('skills')">
+                    <i>psychology</i>
+                    <span>スキル</span>
+                </a>
+            </div>
         </nav>
     </header>
-    <div class="small-margin large-height round border">
-        <iframe id="member-spreadsheet-link" src="" style="width: 100%; height: 100%; border: 0;"></iframe>
+
+    <!-- メンバー一覧サブタブ -->
+    <div id="members-subtab-member" class="small-margin small-round">
+        <div>
+            <div id="members-table-loading" class="row center-align padding">
+                <progress class="circle small"></progress>
+            </div>
+            <div id="members-table-container" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- 組織一覧サブタブ -->
+    <div id="members-subtab-directory" style="display: none;" class="small-margin small-round">
+        <div>
+            <div id="directories-table-loading" class="row center-align padding" style="display: none;">
+                <progress class="circle small"></progress>
+            </div>
+            <div id="directories-table-container" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div id="members-subtab-skills" style="display: none;" class="small-margin small-round">
+        <div>
+            <div id="skills-table-loading" class="row center-align padding" style="display: none;">
+                <progress class="circle small"></progress>
+            </div>
+            <div id="skills-table-container" style="display: none;"></div>
+        </div>
     </div>
 </div>
 
 <script>
     (function () {
-        // スプレッドシートURLを設定から取得
-        document.addEventListener('DOMContentLoaded', function () {
-            const link = document.getElementById('member-spreadsheet-link');
-            if (link) {
-                link.src = EXTERNAL_URLS.MEMBER_SPREADSHEET + '&rm=minimal';
-            }
+        // ページ内状態
+        let _memberTable = null;
+        let _directoryTable = null;
+        let _isLoading = false;
+        let _currentTab = 'member';
+        let _selectedMemberId = null;
+        let _skillTable = null;
 
-            const link2 = document.getElementById('open-member-spreadsheet');
-            if (link2) {
-                link2.href = EXTERNAL_URLS.MEMBER_SPREADSHEET;
+        App.pages.members = {
+
+            loadData: async function (isRefresh) {
+                // ローディング開始フラグ（AGENTS.md §6: 処理開始直後に初期化）
+                _isLoading = true;
+                this._showLoading(true, _currentTab);
+
+                try {
+                    const members = App.state.data.members || [];
+                    const directories = App.state.data.directories || [];
+                    const directoryAssignments = App.state.data.directoryAssignments || [];
+                    const skills = App.state.data.skills || [];
+                    const skillAssignments = App.state.data.skillAssignments || [];
+
+                    this._renderMembersTable(members, directories, directoryAssignments);
+                    this._renderDirectoriesTable(directories, members, directoryAssignments);
+                    this._renderSkillsTable(skills, members, skillAssignments);
+
+                } catch (err) {
+                    console.error('[Members] データ読み込みエラー:', err);
+                    showSnackbar('データの読み込みに失敗しました', 'error');
+                } finally {
+                    _isLoading = false;
+                    this._showLoading(false, _currentTab);
+                }
+            },
+
+            // サブタブ切り替え
+            switchTab: function (tabName) {
+                _currentTab = tabName;
+
+                const memberSubtab = document.getElementById('members-subtab-member');
+                const directorySubtab = document.getElementById('members-subtab-directory');
+                const memberBtn = document.getElementById('members-tab-btn-member');
+                const directoryBtn = document.getElementById('members-tab-btn-directory');
+                const skillSubtab = document.getElementById('members-subtab-skills');
+                const skillBtn = document.getElementById('members-tab-btn-skills');
+
+                if (tabName === 'member') {
+                    memberSubtab.style.display = '';
+                    directorySubtab.style.display = 'none';
+                    if (skillSubtab) skillSubtab.style.display = 'none';
+                    memberBtn.className = 'active';
+                    directoryBtn.className = '';
+                    if (skillBtn) skillBtn.className = '';
+                    if (_memberTable) setTimeout(function () { _memberTable.redraw(true); }, 50);
+                } else if (tabName === 'directory') {
+                    memberSubtab.style.display = 'none';
+                    directorySubtab.style.display = '';
+                    if (skillSubtab) skillSubtab.style.display = 'none';
+                    memberBtn.className = '';
+                    directoryBtn.className = 'active';
+                    if (skillBtn) skillBtn.className = '';
+                    if (_directoryTable) setTimeout(function () { _directoryTable.redraw(true); }, 50);
+                } else {
+                    memberSubtab.style.display = 'none';
+                    directorySubtab.style.display = 'none';
+                    if (skillSubtab) skillSubtab.style.display = '';
+                    memberBtn.className = '';
+                    directoryBtn.className = '';
+                    if (skillBtn) skillBtn.className = 'active';
+                    if (_skillTable) setTimeout(function () { _skillTable.redraw(true); }, 50);
+                }
+            },
+
+            // メンバーテーブル描画
+            _renderMembersTable: function (members, directories, assignments) {
+                const container = document.getElementById('members-table-container');
+                if (!container) return;
+
+                // 所属組織名を結合
+                const data = members.map(function (m) {
+                    const myAssignments = assignments.filter(function (a) {
+                        return a.member_id === m.id && a.is_active !== false;
+                    });
+                    const dirNames = myAssignments.map(function (a) {
+                        const d = directories.find(function (dir) { return dir.id === a.directory_id; });
+                        return d ? d.name : null;
+                    }).filter(Boolean);
+                    return Object.assign({}, m, {
+                        _directoriesText: dirNames.join(' \/ '),
+                        _statusText: m.is_active === false ? '退籍' : '在籍'
+                    });
+                });
+
+                // 既存テーブルはデータ差し替えのみ
+                if (_memberTable) {
+                    _memberTable.replaceData(data);
+                    container.style.display = '';
+                    return;
+                }
+
+                container.style.display = '';
+                _memberTable = new Tabulator(container, {
+                    data: data,
+                    layout: 'fitColumns',
+                    responsiveLayout: false,
+                    height: 'calc(100vh - 300px)',
+                    locale: 'ja',
+                    langs: {
+                        ja: {
+                            pagination: { first: '最初', prev: '前', next: '次', last: '最後', first_title: '最初のページ', prev_title: '前のページ', next_title: '次のページ', last_title: '最後のページ' }
+                        }
+                    },
+                    placeholder: 'データがありません',
+                    pagination: false,
+                    movableColumns: true,
+                    selectableRange: true,
+                    selectableRangeColumns: true,
+                    selectableRangeRows: true,
+                    selectableRangeClearCells: true,
+                    clipboard: true,
+                    clipboardCopyRowRange: 'range',
+                    clipboardCopyStyled: false,
+                    columns: [
+                        {
+                            title: '詳細',
+                            field: 'id',
+                            headerSort: false,
+                            width: 88,
+                            hozAlign: 'center',
+                            formatter: function () {
+                                return '<button type="button" class="small round border" data-action="member-detail">開く<\/button>';
+                            },
+                            cellClick: function (e, cell) {
+                                var id = cell.getRow().getData().id;
+                                if (id && App.modals.memberDetail && App.modals.memberDetail.open) {
+                                    App.modals.memberDetail.open(id);
+                                }
+                            }
+                        },
+                        { title: '表示名', field: 'display_name', headerFilter: true, widthGrow: 1.5, minWidth: 120 },
+                        { title: '氏名', field: 'name', headerFilter: true, widthGrow: 1.5, minWidth: 120 },
+                        { title: 'メールアドレス', field: 'email', headerFilter: true, widthGrow: 2, minWidth: 180 },
+                        { title: '所属組織', field: '_directoriesText', headerFilter: true, widthGrow: 2, minWidth: 160 },
+                        {
+                            title: 'ステータス',
+                            field: '_statusText',
+                            headerFilter: 'list',
+                            headerFilterParams: { values: ['', '在籍', '退籍'], clearable: true },
+                            widthGrow: 0.7,
+                            minWidth: 90,
+                            formatter: function (cell) {
+                                var val = cell.getValue();
+                                if (val === '在籍') return '<span style="color: var(--primary); font-weight: 600;">在籍<\/span>';
+                                return '<span style="opacity: 0.5;">退籍<\/span>';
+                            }
+                        },
+                    ],
+                });
+            },
+
+            // 組織テーブル描画
+            _renderDirectoriesTable: function (directories, members, assignments) {
+                const container = document.getElementById('directories-table-container');
+                if (!container) return;
+
+                const typeMap = (typeof DIRECTORY_TYPES !== 'undefined') ? DIRECTORY_TYPES : {};
+
+                const data = directories.map(function (d) {
+                    const parent = directories.find(function (p) { return p.id === d.parent_directory_id; });
+                    const memberCount = assignments.filter(function (a) {
+                        return a.directory_id === d.id && a.is_active !== false;
+                    }).length;
+                    return Object.assign({}, d, {
+                        _parentName: parent ? parent.name : '',
+                        _typeText: typeMap[d.directory_type_key] || d.directory_type_key || '',
+                        _memberCount: memberCount,
+                        _statusText: d.is_active === false ? '無効' : '有効'
+                    });
+                });
+
+                if (_directoryTable) {
+                    _directoryTable.replaceData(data);
+                    container.style.display = '';
+                    return;
+                }
+
+                container.style.display = '';
+
+                var typeValues = [''].concat(Object.values(typeMap));
+
+                _directoryTable = new Tabulator(container, {
+                    data: data,
+                    layout: 'fitColumns',
+                    responsiveLayout: false,
+                    height: 'calc(100vh - 300px)',
+                    locale: 'ja',
+                    langs: {
+                        ja: {
+                            pagination: { first: '最初', prev: '前', next: '次', last: '最後', first_title: '最初のページ', prev_title: '前のページ', next_title: '次のページ', last_title: '最後のページ' }
+                        }
+                    },
+                    placeholder: 'データがありません',
+                    pagination: false,
+                    movableColumns: true,
+                    columns: [
+                        { title: '組織名', field: 'name', headerFilter: true, widthGrow: 2, minWidth: 160 },
+                        {
+                            title: '種別',
+                            field: '_typeText',
+                            headerFilter: 'list',
+                            headerFilterParams: { values: typeValues, clearable: true },
+                            widthGrow: 1,
+                            minWidth: 100
+                        },
+                        { title: '親組織', field: '_parentName', headerFilter: true, widthGrow: 1.5, minWidth: 130 },
+                        { title: 'メンバー数', field: '_memberCount', hozAlign: 'right', widthGrow: 0.6, minWidth: 80, sorter: 'number' },
+                        {
+                            title: 'ステータス',
+                            field: '_statusText',
+                            headerFilter: 'list',
+                            headerFilterParams: { values: ['', '有効', '無効'], clearable: true },
+                            widthGrow: 0.6,
+                            minWidth: 80,
+                            formatter: function (cell) {
+                                var val = cell.getValue();
+                                if (val === '有効') return '<span style="color: var(--primary); font-weight: 600;">有効<\/span>';
+                                return '<span style="opacity: 0.5;">無効<\/span>';
+                            }
+                        },
+                    ],
+                });
+
+                _directoryTable.on('rowClick', function (e, row) {
+                    console.log('[Members] 組織クリック:', row.getData().id);
+                });
+            },
+
+            _renderSkillsTable: function (skills, members, assignments) {
+                const container = document.getElementById('skills-table-container');
+                if (!container) return;
+
+                const data = skills.map(function (s) {
+                    const assigned = assignments.filter(function (a) { return a.skill_id === s.id; });
+                    return Object.assign({}, s, {
+                        _memberCount: assigned.length
+                    });
+                });
+
+                if (_skillTable) {
+                    _skillTable.replaceData(data);
+                    container.style.display = '';
+                    return;
+                }
+
+                container.style.display = '';
+                _skillTable = new Tabulator(container, {
+                    data: data,
+                    layout: 'fitColumns',
+                    responsiveLayout: false,
+                    height: 'calc(100vh - 300px)',
+                    locale: 'ja',
+                    langs: {
+                        ja: {
+                            pagination: { first: '最初', prev: '前', next: '次', last: '最後', first_title: '最初のページ', prev_title: '前のページ', next_title: '次のページ', last_title: '最後のページ' }
+                        }
+                    },
+                    placeholder: 'データがありません',
+                    pagination: false,
+                    movableColumns: true,
+                    columns: [
+                        {
+                            title: '詳細',
+                            field: 'id',
+                            headerSort: false,
+                            width: 88,
+                            hozAlign: 'center',
+                            formatter: function () {
+                                return '<button type="button" class="small round border" data-action="skill-detail">開く<\/button>';
+                            },
+                            cellClick: function (e, cell) {
+                                var id = cell.getRow().getData().id;
+                                if (id && App.modals.skillDetail && App.modals.skillDetail.open) {
+                                    App.modals.skillDetail.open(id);
+                                }
+                            }
+                        },
+                        { title: 'タイトル', field: 'title', headerFilter: true, widthGrow: 2, minWidth: 160 },
+                        { title: '種別', field: 'skill_type_key', headerFilter: true, widthGrow: 1, minWidth: 120 },
+                        { title: '説明', field: 'description', headerFilter: true, widthGrow: 3, minWidth: 220 },
+                        { title: 'メンバー数', field: '_memberCount', hozAlign: 'right', widthGrow: 0.6, minWidth: 80, sorter: 'number' }
+                    ]
+                });
+            },
+
+            // ローディング表示
+            _showLoading: function (show, tab) {
+                var memberLoading = document.getElementById('members-table-loading');
+                var dirLoading = document.getElementById('directories-table-loading');
+                var skillLoading = document.getElementById('skills-table-loading');
+                var memberContainer = document.getElementById('members-table-container');
+                var dirContainer = document.getElementById('directories-table-container');
+                var skillContainer = document.getElementById('skills-table-container');
+                if (tab === 'member') {
+                    if (memberLoading) memberLoading.style.display = show ? '' : 'none';
+                    if (memberContainer) memberContainer.style.display = show ? 'none' : '';
+                } else if (tab === 'directory') {
+                    if (dirLoading) dirLoading.style.display = show ? '' : 'none';
+                    if (dirContainer) dirContainer.style.display = show ? 'none' : '';
+                } else {
+                    if (skillLoading) skillLoading.style.display = show ? '' : 'none';
+                    if (skillContainer) skillContainer.style.display = show ? 'none' : '';
+                }
             }
-        });
+        };
     })();
 </script>
