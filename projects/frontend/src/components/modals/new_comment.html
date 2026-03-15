@@ -21,21 +21,38 @@
 <script>
     (function () {
         App.modals.newComment = {
-            taskId: null,
+            relatedId: null,
+            relatedTable: 'tasks',
 
             /**
              * 新規コメントモーダルを開く
              * @param {string} taskId - タスクID
              */
             open: function (taskId) {
-                // フィールドをクリア
                 this.reset();
-                this.taskId = taskId;
+                this.relatedId = taskId;
+                this.relatedTable = 'tasks';
 
-                // モーダルを開く
                 ui('#modal-new-comment');
 
-                // コメント入力欄にフォーカス
+                setTimeout(() => {
+                    const contentField = document.getElementById('new-comment-content');
+                    if (contentField) contentField.focus();
+                }, 200);
+            },
+
+            /**
+             * 任意テーブル向けに新規コメントモーダルを開く
+             * @param {string} relatedTable - 関連テーブル名
+             * @param {string} relatedId - 関連ID
+             */
+            openFor: function (relatedTable, relatedId) {
+                this.reset();
+                this.relatedId = relatedId;
+                this.relatedTable = relatedTable || 'tasks';
+
+                ui('#modal-new-comment');
+
                 setTimeout(() => {
                     const contentField = document.getElementById('new-comment-content');
                     if (contentField) contentField.focus();
@@ -56,6 +73,8 @@
             reset: function () {
                 const contentField = document.getElementById('new-comment-content');
                 if (contentField) contentField.value = '';
+                this.relatedId = null;
+                this.relatedTable = 'tasks';
             },
 
             /**
@@ -70,14 +89,18 @@
                     return;
                 }
 
+                if (!this.relatedId) {
+                    alert('コメントの関連先が不正です');
+                    return;
+                }
+
                 this.close();
                 showSnackbar('コメントを作成しています...', 'info', 'top', 0);
 
-                // コメントを保存
                 callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'insert', {
                     content: content,
-                    related_table: 'tasks',
-                    related_id: this.taskId
+                    related_table: this.relatedTable,
+                    related_id: this.relatedId
                 }, 'コメントを作成')
                     .then(result => {
                         if (!result || (Array.isArray(result) && result.length === 0)) {
@@ -87,11 +110,14 @@
 
                         showSnackbar('コメントを作成しました', 'success');
 
-                        // タスク詳細モーダルが開いていて、同じタスクの場合はコメントリストを再読み込み
-                        if (App.modals.taskDetail && App.modals.taskDetail.currentId === this.taskId) {
-                            App.modals.taskDetail.loadComments(this.taskId, true);
+                        if (this.relatedTable === 'tasks' && App.modals.taskDetail && App.modals.taskDetail.currentId === this.relatedId) {
+                            App.modals.taskDetail.loadComments(this.relatedId, true);
                         }
-                        
+
+                        if (this.relatedTable === 'members' && App.modals.memberDetail && App.modals.memberDetail.currentId === this.relatedId) {
+                            App.modals.memberDetail.loadComments(this.relatedId, true);
+                        }
+
                     })
                     .catch(error => {
                         console.error('[NewComment] Save error:', error);

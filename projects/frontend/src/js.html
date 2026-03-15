@@ -22,7 +22,10 @@
         members: [],
         tasks: [],
         apps: [],
-        systemUpdates: []
+        systemUpdates: [],
+        directoryAssignments: [],
+        skills: [],
+        skillAssignments: []
       },
 
       userId: null, // 現在のユーザーのID（uuid）
@@ -373,6 +376,9 @@
       let apps = [];
       let members = [];
       let directories = [];
+      let directoryAssignments = [];
+      let skills = [];
+      let skillAssignments = [];
       let systemUpdates = [];
       let wasCached = false;
 
@@ -381,6 +387,9 @@
         apps = embedded.apps || [];
         members = embedded.members || [];
         directories = embedded.directories || [];
+        directoryAssignments = embedded.directoryAssignments || [];
+        skills = embedded.skills || [];
+        skillAssignments = embedded.skillAssignments || [];
         systemUpdates = embedded.systemUpdates || [];
         wasCached = embedded.isCached || false;
         console.log('[loadAllData] Server-embedded initialData (isCached:', wasCached, ')');
@@ -392,6 +401,9 @@
           { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh: false },
           { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: false },
           { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: false },
+          { key: 'directoryAssignments', tableName: TABLE_NAMES.DIRECTORY_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: false },
+          { key: 'skills', tableName: TABLE_NAMES.SKILLS, operation: 'select', dataObject: {}, forceRefresh: false },
+          { key: 'skillAssignments', tableName: TABLE_NAMES.SKILL_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: false },
           { key: 'systemUpdates', tableName: TABLE_NAMES.SYSTEM_UPDATES, operation: 'select', dataObject: { orderBy: { created_at: 'desc' } }, forceRefresh: true }
         ]);
         const r = batchResult?.results || {};
@@ -399,6 +411,9 @@
         apps = r.apps?.data || r.apps || [];
         members = r.members?.data || r.members || [];
         directories = r.directories?.data || r.directories || [];
+        directoryAssignments = r.directoryAssignments?.data || r.directoryAssignments || [];
+        skills = r.skills?.data || r.skills || [];
+        skillAssignments = r.skillAssignments?.data || r.skillAssignments || [];
         systemUpdates = r.systemUpdates?.data || r.systemUpdates || [];
         wasCached = !batchResult?.hasAnyUncached;
       }
@@ -408,6 +423,9 @@
       App.state.data.apps = apps;
       App.state.data.members = members;
       App.state.data.directories = directories;
+      App.state.data.directoryAssignments = directoryAssignments;
+      App.state.data.skills = skills;
+      App.state.data.skillAssignments = skillAssignments;
       App.state.data.systemUpdates = systemUpdates;
       App.state.data.tasks = [];
 
@@ -443,18 +461,27 @@
               { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: true },
               { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh: true },
               { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: true },
-              { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: true }
+              { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: true },
+              { key: 'directoryAssignments', tableName: TABLE_NAMES.DIRECTORY_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true },
+              { key: 'skills', tableName: TABLE_NAMES.SKILLS, operation: 'select', dataObject: {}, forceRefresh: true },
+              { key: 'skillAssignments', tableName: TABLE_NAMES.SKILL_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true }
             ]);
             const r = batchResult?.results || {};
             const freshBoards = r.boards?.data || r.boards || [];
             const freshApps = r.apps?.data || r.apps || [];
             const freshMembers = r.members?.data || r.members || [];
             const freshDirectories = r.directories?.data || r.directories || [];
+            const freshDirectoryAssignments = r.directoryAssignments?.data || r.directoryAssignments || [];
+            const freshSkills = r.skills?.data || r.skills || [];
+            const freshSkillAssignments = r.skillAssignments?.data || r.skillAssignments || [];
 
             App.state.data.boards = freshBoards;
             App.state.data.apps = freshApps;
             App.state.data.members = freshMembers;
             App.state.data.directories = freshDirectories;
+            App.state.data.directoryAssignments = freshDirectoryAssignments;
+            App.state.data.skills = freshSkills;
+            App.state.data.skillAssignments = freshSkillAssignments;
 
             // ナビゲーションを更新（アクティブ状態を保持）
             const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#boards-nav a.active');
@@ -588,6 +615,13 @@
           if (App.pages.boards && App.pages.boards.loadData) {
             await App.pages.boards.loadData(boardId, true); // isRefresh = true
           }
+        }
+      }
+
+      if (tabId === 'tab-members') {
+        // メンバーページ: Tabulator テーブルをキャッシュ済みデータで再描画
+        if (App.pages.members && App.pages.members.loadData) {
+          await App.pages.members.loadData(true);
         }
       }
       // homeタブなどでは何もしない（必要に応じて追加）
