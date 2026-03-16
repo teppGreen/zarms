@@ -70,16 +70,17 @@ function processQuestion_(userId, question, boardEmail) {
         ...TASK_BY_QUESTION_DEFAULT_VALUES
     };
 
-    handleDatabaseProcess(userId, TABLE_NAMES.TASKS, 'insert', taskData, '問い合わせからタスクを自動作成');
+    const insertResult = handleDatabaseProcess(userId, TABLE_NAMES.TASKS, 'insert', taskData, '問い合わせからタスクを自動作成');
+    const createdTask = insertResult?.data || taskData;
 
     // 5. 共有URLを構築
-    const shareUrl = buildTaskShareUrl_(taskId);
+    const shareUrl = buildTaskShareUrl_(createdTask.id || taskId);
 
     // 7. メールを作成・送信
-    const email = buildNotificationEmail_(taskData, question, shareUrl, boardEmail);
+    const email = buildNotificationEmail_(createdTask, question, shareUrl, boardEmail);
     MailApp.sendEmail(email);
 
-    console.log(`[syncQuestions] タスク作成・メール送信完了 (question_number: ${question.question_number}, task_id: ${taskId})`);
+    console.log(`[syncQuestions] タスク作成・メール送信完了 (question_number: ${question.question_number}, task_id: ${createdTask.id || taskId})`);
 }
 
 // ============================================
