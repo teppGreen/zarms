@@ -166,7 +166,7 @@
                         pageDiv.innerHTML = `
                             ${headerHtml}
                             <div id="kanban-canvas-${board.id}" class="top-margin"></div>
-                            <div id="list-canvas-${board.id}" class="small-margin scroll surface-container-low small-round padding" style="display:none;"></div>
+                            <div id="list-canvas-${board.id}" class="small-margin surface-container-low small-round padding" style="display:none;"></div>
                         `;
 
                         container.appendChild(pageDiv);
@@ -223,7 +223,7 @@
                     pageDiv.innerHTML = `
                         ${headerHtml}
                         <div id="kanban-canvas-${boardId}" class="top-margin"></div>
-                        <div id="list-canvas-${boardId}" class="small-margin scroll surface-container-low small-round padding" style="display:none;"></div>
+                        <div id="list-canvas-${boardId}" class="small-margin surface-container-low small-round padding" style="display:none;"></div>
                     `;
                     container.appendChild(pageDiv);
                 } else {
@@ -685,17 +685,21 @@
                                     <div class="list-menu-container">
                                         <button class="transparent circle list-menu-btn" data-task-id="${task.id}"><i>menu</i></button>
                                         <menu class="surface-container-lowest small-round no-line small-margin no-wrap min" id="context-menu-${task.id}">
+                                            <li class="row no-margin" data-action="open">
+                                                <i>open_in_new</i>
+                                                <span>詳細を開く</span>
+                                            </li>
                                             <li class="row no-margin" data-action="share">
                                                 <i>share</i>
-                                                <span>共有</span>
+                                                <span>リンクをコピーする</span>
                                             </li>
                                             <li class="row no-margin" data-action="duplicate">
                                                 <i>content_copy</i>
-                                                <span>複製</span>
+                                                <span>複製する</span>
                                             </li>
                                             <li class="row no-margin" data-action="delete">
                                                 <i>delete</i>
-                                                <span>削除</span>
+                                                <span>削除する</span>
                                             </li>
                                         </menu>
                                     </div>
@@ -721,7 +725,7 @@
 
                 // テーブル全体のHTML（sticky thead + スクロールコンテナ）
                 container.innerHTML =
-                    '<div class="">' +
+                    '<div class="scroll surface-container-low list-table-scroll">' +
                     `<table class="border">${theadHtml}<tbody>${tbodyHtml}</tbody></table>` +
                     '</div>';
 
@@ -767,7 +771,7 @@
              * リストスクロールコンテナの高さをカンバンと同じ計算式で設定する
              */
             applyListHeight: function (boardId) {
-                const scrollDiv = document.querySelector(`#list-canvas-${boardId}`);
+                const scrollDiv = document.querySelector(`#list-canvas-${boardId} .list-table-scroll`);
                 if (!scrollDiv) return;
                 try {
                     const mainElement = document.querySelector('main');
@@ -778,7 +782,7 @@
                     const mainStyle = window.getComputedStyle(mainElement);
                     const marginBottom = parseFloat(mainStyle.marginBottom) || 0;
                     const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
-                    const offsetBottom = marginBottom + paddingBottom + 16;
+                    const offsetBottom = marginBottom + paddingBottom + 32;
                     const newHeight = windowHeight - rect.top - offsetBottom;
                     if (newHeight > 0) scrollDiv.style.height = `${newHeight}px`;
                 } catch (e) {
@@ -1416,17 +1420,21 @@
                         ${priorityIcon}${assigneeIcons.join('')}
                     </div>
                     <menu class="surface-container-lowest small-round no-line small-margin no-wrap min" id="context-menu-${task.id}">
+                        <li class="row no-margin" data-action="open">
+                            <i>open_in_new</i>
+                            <span>詳細を開く</span>
+                        </li>
                         <li class="row no-margin" data-action="share">
                             <i>share</i>
-                            <span>共有</span>
+                            <span>リンクをコピーする</span>
                         </li>
                         <li class="row no-margin" data-action="duplicate">
                             <i>content_copy</i>
-                            <span>複製</span>
+                            <span>複製する</span>
                         </li>
                         <li class="row no-margin" data-action="delete">
                             <i>delete</i>
-                            <span>削除</span>
+                            <span>削除する</span>
                         </li>
                     </menu>
                 </article>
@@ -1566,7 +1574,11 @@
                 let task = this.getTaskById(taskId);
                 if (!task) return;
 
-                if (action === 'share') {
+                if (action === 'open') {
+                    if (App.modals.taskDetail && App.modals.taskDetail.open) {
+                        App.modals.taskDetail.open(taskId);
+                    }
+                } else if (action === 'share') {
                     App.modals.taskDetail.shareTask(task);
                 } else if (action === 'duplicate') {
                     App.modals.taskDetail.duplicateTask(task);

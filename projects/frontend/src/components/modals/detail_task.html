@@ -67,7 +67,8 @@
             </div>
           </div>
           <div class="s6">
-            <div class="field label border small">
+            <div class="prefix field label border small">
+              <i id="task-priority-icon"></i>
               <select id="task-priority-select">
                 <option value="LOW">低</option>
                 <option value="MEDIUM">中</option>
@@ -441,6 +442,14 @@
           statusSelect.addEventListener('change', () => {
             const selectedValue = statusSelect.value;
             this.renderStatusIcon(selectedValue);
+          });
+        }
+
+        const prioritySelect = document.getElementById('task-priority-select');
+        if (prioritySelect) {
+          prioritySelect.addEventListener('change', () => {
+            const selectedValue = prioritySelect.value;
+            this.renderPriorityIcon(selectedValue);
           });
         }
       },
@@ -1000,6 +1009,7 @@
         // Priority
         const prioritySelect = document.getElementById('task-priority-select');
         if (prioritySelect) prioritySelect.value = task.priority_key;
+        this.renderPriorityIcon(task.priority_key);
 
         // Board
         this.renderBoardOptions(task.board_id);
@@ -1049,6 +1059,19 @@
         if (statusIcon) {
           const selectedColor = statusColors[statusKey];
           statusIcon.className = `tiny circle ${selectedColor}`;
+        }
+      },
+
+      renderPriorityIcon: function (priorityKey) {
+        const priorityIcon = document.getElementById('task-priority-icon');
+        const priorityIcons = {
+          'LOW': 'directions_walk',
+          'MEDIUM': 'directions_run',
+          'HIGH': 'sprint'
+        };
+        if (priorityIcon) {
+          const selectedIcon = priorityIcons[priorityKey];
+          priorityIcon.innerHTML = `${selectedIcon}`;
         }
       },
 
@@ -1447,7 +1470,7 @@
             : '<i>person</i>';
 
           return `
-            <div class="list-item row no-margin middle-align small-space small-padding background" data-list-id="${list.id}">
+            <div class="list-item row no-margin middle-align small-space background" data-list-id="${list.id}">
               <i class="drag-handle" style="cursor: move;">drag_indicator</i>
               <label class="checkbox">
                 <input type="checkbox" 
@@ -1496,7 +1519,7 @@
         if (existing) existing.remove();
 
         const btn = document.createElement('button');
-        btn.className = 'small-margin border responsive list-inline-add-btn';
+        btn.className = 'top-margin primary center list-inline-add-btn';
         btn.disabled = disabled;
         btn.innerHTML = '<i>add</i><span>項目を作成</span>';
         btn.onclick = () => this.createListItem();
