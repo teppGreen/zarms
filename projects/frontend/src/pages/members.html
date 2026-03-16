@@ -29,7 +29,7 @@
             <div id="members-table-loading" class="row center-align padding">
                 <progress class="circle small"></progress>
             </div>
-            <div id="members-table-container" style="display: none;"></div>
+            <div id="members-table-container" class="members-tabulator-host" style="display: none;"></div>
         </div>
     </div>
 
@@ -38,7 +38,7 @@
             <div id="directories-table-loading" class="row center-align padding" style="display: none;">
                 <progress class="circle small"></progress>
             </div>
-            <div id="directories-table-container" style="display: none;"></div>
+            <div id="directories-table-container" class="members-tabulator-host" style="display: none;"></div>
         </div>
     </div>
 
@@ -47,7 +47,7 @@
             <div id="skills-table-loading" class="row center-align padding" style="display: none;">
                 <progress class="circle small"></progress>
             </div>
-            <div id="skills-table-container" style="display: none;"></div>
+            <div id="skills-table-container" class="members-tabulator-host" style="display: none;"></div>
         </div>
     </div>
 </div>
@@ -125,6 +125,24 @@
             directory: 'directories-table-loading',
             skills: 'skills-table-loading'
         };
+        const _frameIds = {
+            member: 'members-table-frame',
+            directory: 'directories-table-frame',
+            skills: 'skills-table-frame'
+        };
+        const _frameState = {
+            member: { ready: false, token: '', pendingPayload: null },
+            directory: { ready: false, token: '', pendingPayload: null },
+            skills: { ready: false, token: '', pendingPayload: null }
+        };
+        const _frameMessageType = {
+            ready: 'members-tabulator-ready',
+            rowClick: 'members-tabulator-row-click',
+            sortChange: 'members-tabulator-sort-change',
+            error: 'members-tabulator-error',
+            render: 'members-tabulator-render',
+            resize: 'members-tabulator-resize'
+        };
         const _filterFieldConfig = {
             member: [
                 { key: 'display_name', label: '表示名', type: 'text' },
@@ -197,15 +215,16 @@
                     _tableData.directory = this._buildDirectoryRows(directories, directoryAssignments);
                     _tableData.skills = this._buildSkillRows(skills, skillAssignments);
 
+                    this._ensureResizeHandler();
                     this._renderAllTables();
                     this._updateFilterBadge();
-                    this._ensureResizeHandler();
                 } catch (err) {
                     console.error('[Members] データ読み込みエラー:', err);
                     showSnackbar('データの読み込みに失敗しました', 'error');
                 } finally {
                     _isLoading = false;
                     this._showLoading(false, _currentTab);
+                    this._renderTable(_currentTab);
                 }
             },
 
@@ -244,6 +263,9 @@
 
                 this._showLoading(_isLoading, _currentTab);
                 this._updateFilterBadge();
+                if (!_isLoading) {
+                    this._renderTable(_currentTab);
+                }
                 if (App.modals.filterMembers && App.modals.filterMembers.syncUI) {
                     App.modals.filterMembers.syncUI();
                 }
@@ -378,9 +400,7 @@
             },
 
             _renderAllTables: function () {
-                this._renderTable('member');
-                this._renderTable('directory');
-                this._renderTable('skills');
+                this._renderTable(_currentTab);
             },
 
             _renderTable: function (tabName) {
@@ -389,10 +409,147 @@
                 if (!container || !config) return;
 
                 const rows = this._getVisibleRows(tabName);
-                container.innerHTML = this._buildTableHtml(tabName, rows, config);
-                container.style.display = '';
+                const frame = this._ensureTabulatorFrame(tabName, container);
+                const payload = this._buildFramePayload(tabName, rows, config);
+
+                container.style.display = _isLoading ? 'none' : '';
                 this._applyTableHeight(tabName);
-                this._bindTableEvents(tabName, container);
+
+                if (_frameState[tabName].ready && frame.contentWindow) {
+                    this._postFrameMessage(tabName, _frameMessageType.render, payload);
+                    return;
+                }
+
+                _frameState[tabName].pendingPayload = payload;
+            },
+
+            _ensureTabulatorFrame: function (tabName, container) {
+                let frame = document.getElementById(_frameIds[tabName]);
+                if (frame) return frame;
+
+                const token = this._getFrameToken(tabName);
+                frame = document.createElement('iframe');
+                frame.id = _frameIds[tabName];
+                frame.className = 'members-tabulator-frame';
+                frame.setAttribute('title', this.getCurrentTabLabel() + '一覧');
+                frame.setAttribute('sandbox', 'allow-scripts');
+                frame.setAttribute('loading', 'eager');
+                frame.setAttribute('referrerpolicy', 'no-referrer');
+                frame.srcdoc = this._buildFrameSrcdoc(tabName, token);
+                frame.style.width = '100%';
+                frame.style.border = '0';
+                frame.style.display = 'block';
+                frame.style.background = 'transparent';
+
+                container.innerHTML = '';
+                container.appendChild(frame);
+                return frame;
+            },
+
+            _getFrameToken: function (tabName) {
+                if (_frameState[tabName].token) {
+                    return _frameState[tabName].token;
+                }
+
+                let token = '';
+                try {
+                    const bytes = new Uint8Array(16);
+                    window.crypto.getRandomValues(bytes);
+                    token = Array.from(bytes).map(function (value) {
+                        return value.toString(16).padStart(2, '0');
+                    }).join('');
+                } catch (err) {
+                    token = String(Date.now()) + String(Math.random()).slice(2);
+                }
+
+                _frameState[tabName].token = token;
+                return token;
+            },
+
+            _buildFramePayload: function (tabName, rows, config) {
+                return {
+                    tabName: tabName,
+                    rows: rows,
+                    emptyText: config.emptyText,
+                    columns: this._getTabulatorColumns(config.columns),
+                    sorters: (_sortState[tabName] || []).map(function (sorter) {
+                        return { column: sorter.col, dir: sorter.dir };
+                    })
+                };
+            },
+
+            _getTabulatorColumns: function (columns) {
+                return columns.map(function (column) {
+                    return {
+                        title: column.label,
+                        field: column.key,
+                        width: App.pages.members._parseColumnWidth(column.width),
+                        headerSort: column.sortable !== false,
+                        hozAlign: column.align || 'left',
+                        formatterKey: column.key === '_statusText' ? 'status' : 'text',
+                        variableHeight: column.wrap === true,
+                        cssClass: column.wrap ? 'members-tabulator-cell-wrap' : 'members-tabulator-cell-nowrap',
+                        sorter: column.type === 'number' ? 'number' : 'string'
+                    };
+                });
+            },
+
+            _parseColumnWidth: function (width) {
+                if (!width) return null;
+                const numeric = parseInt(String(width).replace('px', ''), 10);
+                return Number.isNaN(numeric) ? null : numeric;
+            },
+
+            _buildFrameSrcdoc: function (tabName, token) {
+                return '<!doctype html>' +
+                    '<html lang="ja">' +
+                    '<head>' +
+                    '<meta charset="UTF-8">' +
+                    '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+                    '<link rel="stylesheet" href="https:\/\/unpkg.com\/tabulator-tables@6.3.0\/dist\/css\/tabulator.min.css">' +
+                    '<style>' +
+                    'html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:"Noto Sans JP",sans-serif;}' +
+                    '#members-tabulator-root{width:100%;height:100%;}' +
+                    '.tabulator{height:100%;border:0;background:var(--surface-container-lowest,#fff);font-size:14px;}' +
+                    '.tabulator .tabulator-header{background:#fff;border-bottom:1px solid #dadce0;color:#1f1f1f;font-weight:600;}' +
+                    '.tabulator .tabulator-col,.tabulator .tabulator-cell{padding:12px 14px;}' +
+                    '.tabulator .tabulator-row{background:#fff;border-bottom:1px solid #eceff1;}' +
+                    '.tabulator .tabulator-row:hover{background:#f7faff;}' +
+                    '.tabulator-row.tabulator-selected{background:#eef3ff;}' +
+                    '.members-tabulator-cell-wrap{white-space:normal;line-height:1.5;}' +
+                    '.members-tabulator-cell-nowrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+                    '.tabulator-placeholder{display:flex;align-items:center;justify-content:center;color:#5f6368;}' +
+                    '</style>' +
+                    '</head>' +
+                    '<body>' +
+                    '<div id="members-tabulator-root"></div>' +
+                    '<script src="https:\/\/unpkg.com\/tabulator-tables@6.3.0\/dist\/js\/tabulator.min.js"><\/script>' +
+                    '<script>' +
+                    'const FRAME_TOKEN=' + JSON.stringify(token) + ';' +
+                    'const TAB_NAME=' + JSON.stringify(tabName) + ';' +
+                    'let table=null;' +
+                    'function postMessageToParent(type,payload){window.parent.postMessage({source:"members-tabulator",type:type,tabName:TAB_NAME,token:FRAME_TOKEN,payload:payload||{}},"*");}' +
+                    'function createStatusNode(value){const span=document.createElement("span");span.textContent=String(value||"");if(value==="在籍"||value==="有効"){span.style.color="#2d3eff";span.style.fontWeight="600";}else{span.style.opacity="0.6";}return span;}' +
+                    'function createColumns(columns){return (columns||[]).map(function(column){const definition={title:column.title,field:column.field,headerSort:column.headerSort!==false,sorter:column.sorter||"string",hozAlign:column.hozAlign||"left",cssClass:column.cssClass||"",variableHeight:column.variableHeight===true,formatter:"plaintext"};if(column.width){definition.width=column.width;}if(column.formatterKey==="status"){definition.formatter=function(cell){return createStatusNode(cell.getValue());};}return definition;});}' +
+                    'function renderTable(payload){const root=document.getElementById("members-tabulator-root");if(table){table.destroy();table=null;}table=new Tabulator(root,{data:Array.isArray(payload.rows)?payload.rows:[],columns:createColumns(payload.columns),layout:"fitColumns",height:"100%",placeholder:payload.emptyText||"データがありません",initialSort:Array.isArray(payload.sorters)?payload.sorters:[],index:"id"});table.on("rowClick",function(event,row){postMessageToParent("' + _frameMessageType.rowClick + '",{rowId:row.getData()&&row.getData().id?String(row.getData().id):""});});table.on("dataSorted",function(sorters){postMessageToParent("' + _frameMessageType.sortChange + '",{sorters:(sorters||[]).map(function(sorter){return {column:sorter.field,dir:sorter.dir};})});});}' +
+                    'window.addEventListener("message",function(event){const data=event.data||{};if(!data||data.source!=="members-host"||data.token!==FRAME_TOKEN){return;}if(data.type==="' + _frameMessageType.render + '"){try{renderTable(data.payload||{});}catch(error){postMessageToParent("' + _frameMessageType.error + '",{message:error&&error.message?error.message:"Tabulator描画に失敗しました"});}}if(data.type==="' + _frameMessageType.resize + '"&&table){table.redraw(true);}});' +
+                    'window.addEventListener("load",function(){postMessageToParent("' + _frameMessageType.ready + '",{});});' +
+                    '<\/script>' +
+                    '</body>' +
+                    '</html>';
+            },
+
+            _postFrameMessage: function (tabName, type, payload) {
+                const frame = document.getElementById(_frameIds[tabName]);
+                const state = _frameState[tabName];
+                if (!frame || !frame.contentWindow || !state.token) return;
+
+                frame.contentWindow.postMessage({
+                    source: 'members-host',
+                    type: type,
+                    token: state.token,
+                    payload: payload || {}
+                }, '*');
             },
 
             _buildTableHtml: function (tabName, rows, config) {
@@ -583,26 +740,102 @@
             _ensureResizeHandler: function () {
                 if (_resizeHandlerBound) return;
                 _resizeHandlerBound = true;
+                window.addEventListener('message', function (event) {
+                    App.pages.members._handleFrameMessage(event);
+                });
                 window.addEventListener('resize', function () {
                     App.pages.members._applyTableHeight(_currentTab);
                 });
             },
 
+            _handleFrameMessage: function (event) {
+                const data = event.data || {};
+                if (!data || data.source !== 'members-tabulator' || !data.tabName || !_frameState[data.tabName]) {
+                    return;
+                }
+
+                const frame = document.getElementById(_frameIds[data.tabName]);
+                if (!frame || event.source !== frame.contentWindow) {
+                    return;
+                }
+
+                if (data.token !== _frameState[data.tabName].token) {
+                    return;
+                }
+
+                if (data.type === _frameMessageType.ready) {
+                    _frameState[data.tabName].ready = true;
+                    this._applyTableHeight(data.tabName);
+                    if (_frameState[data.tabName].pendingPayload) {
+                        this._postFrameMessage(data.tabName, _frameMessageType.render, _frameState[data.tabName].pendingPayload);
+                        _frameState[data.tabName].pendingPayload = null;
+                    }
+                    return;
+                }
+
+                if (data.type === _frameMessageType.rowClick) {
+                    this._handleFrameRowClick(data.tabName, data.payload || {});
+                    return;
+                }
+
+                if (data.type === _frameMessageType.sortChange) {
+                    const sorters = (data.payload && data.payload.sorters) || [];
+                    _sortState[data.tabName] = sorters.map(function (sorter) {
+                        return { col: sorter.column, dir: sorter.dir === 'desc' ? 'desc' : 'asc' };
+                    });
+                    return;
+                }
+
+                if (data.type === _frameMessageType.error) {
+                    console.error('[Members] Tabulator iframe error:', (data.payload && data.payload.message) || 'unknown error');
+                    showSnackbar('メンバー一覧の描画に失敗しました', 'error');
+                }
+            },
+
+            _handleFrameRowClick: function (tabName, payload) {
+                const rowId = payload && payload.rowId ? String(payload.rowId) : '';
+                if (!rowId) return;
+
+                if (tabName === 'member') {
+                    if (App.modals.memberDetail && App.modals.memberDetail.open) {
+                        App.modals.memberDetail.open(rowId);
+                    }
+                    return;
+                }
+
+                if (tabName === 'directory') {
+                    if (App.modals.directoryDetail && App.modals.directoryDetail.open) {
+                        App.modals.directoryDetail.open(rowId);
+                    }
+                    return;
+                }
+
+                if (App.modals.skillDetail && App.modals.skillDetail.open) {
+                    App.modals.skillDetail.open(rowId);
+                }
+            },
+
             _applyTableHeight: function (tabName) {
-                const scrollDiv = document.querySelector('#' + _containers[tabName] + ' .members-list-table-scroll');
-                if (!scrollDiv) return;
+                const container = document.getElementById(_containers[tabName]);
+                const frame = document.getElementById(_frameIds[tabName]);
+                if (!container || !frame) return;
                 try {
                     const mainElement = document.querySelector('main');
                     if (!mainElement) return;
                     const windowHeight = window.innerHeight;
-                    const rect = scrollDiv.getBoundingClientRect();
+                    const rect = container.getBoundingClientRect();
                     if (rect.top <= 0) return;
                     const mainStyle = window.getComputedStyle(mainElement);
                     const marginBottom = parseFloat(mainStyle.marginBottom) || 0;
                     const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
                     const offsetBottom = marginBottom + paddingBottom + 32;
                     const newHeight = windowHeight - rect.top - offsetBottom;
-                    if (newHeight > 0) scrollDiv.style.height = newHeight + 'px';
+                    if (newHeight > 0) {
+                        container.style.height = newHeight + 'px';
+                        container.style.minHeight = newHeight + 'px';
+                        frame.style.height = newHeight + 'px';
+                        this._postFrameMessage(tabName, _frameMessageType.resize, { height: newHeight });
+                    }
                 } catch (err) {
                     console.error('[Members] テーブル高さの計算に失敗:', err);
                 }
