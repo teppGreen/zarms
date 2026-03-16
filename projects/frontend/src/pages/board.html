@@ -671,13 +671,17 @@
 
                         // 期限超過チェック
                         const now = new Date();
-                        const isEndsAtOverdue = task.ends_at && new Date(task.ends_at) < now && task.task_status_key !== 'DONE';
-                        const rowClass = isEndsAtOverdue ? ' class="error-text"' : '';
+                        const isStartsAtOverdue = task.starts_at && new Date(task.starts_at) < now;
+                        const isEndsAtOverdue = task.ends_at && new Date(task.ends_at) < now;
+                        const rowClass = isEndsAtOverdue ? ' class="error-container"' : '';
+                        const startsAtClass = isStartsAtOverdue ? ' class="font-number error-text"' : ' class="font-number"';
+                        const endsAtClass = isEndsAtOverdue ? ' class="font-number error-text"' : ' class="font-number"';
 
                         // ボード名（JOINデータ優先）
                         const boardName = task.board_name
                             || (App.state.data.boards || []).find(b => b.id === task.board_id)?.name
                             || 'マイボード';
+                        const truncatedBoardName = boardName.length > 19 ? boardName.substring(0, 19) + '…' : boardName;
 
                         return `<tr${rowClass} style="cursor:pointer;" data-task-id="${task.id}">` +
                             `<td class="font-number"">
@@ -712,10 +716,10 @@
                                 ${statusLabels[task.task_status_key] || ''}
                             </div></td>` +
                             `<td>${priorityLabels[task.priority_key] || ''}</td>` +
-                            `<td class="font-number">${formatDateTimeForDisplay(task.starts_at, 'MM/dd(E) HH:mm') || ''}</td>` +
-                            `<td class="font-number">${formatDateTimeForDisplay(task.ends_at, 'MM/dd(E) HH:mm') || ''}</td>` +
+                            `<td${startsAtClass}>${formatDateTimeForDisplay(task.starts_at, 'MM/dd(E) HH:mm') || ''}</td>` +
+                            `<td${endsAtClass}>${formatDateTimeForDisplay(task.ends_at, 'MM/dd(E) HH:mm') || ''}</td>` +
                             `<td><div class="row tiny-space">${membersHtml}</div></td>` +
-                            `<td>${escapeHtml(boardName)}</td>` +
+                            `<td title="${escapeHtml(boardName)}">${escapeHtml(truncatedBoardName)}</td>` +
                             `<td class="font-number">
                                 ${formatDateTimeForDisplay(task.updated_at, 'MM/dd(E) HH:mm') || ''}
                             </td>` +
@@ -1408,10 +1412,13 @@
                     articleClasses += ' border error-border';
                 }
 
+                const taskName = task.name || '';
+                const truncatedTaskName = taskName.length > 19 ? taskName.substring(0, 19) + '…' : taskName;
+
                 return `
                 <article class="kanban-card elevate small-margin padding${articleClasses}" data-eid="${task.id}" role="button" style="cursor: move; position: relative;">
                     <div>
-                        <span>${displayId} <strong>${escapeHtml(task.name || '')}</strong></span>
+                        <span>${displayId} <strong title="${escapeHtml(taskName)}">${escapeHtml(truncatedTaskName)}</strong></span>
                     </div>
                     <div>
                         ${datetimeSpan}
