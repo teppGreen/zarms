@@ -6,21 +6,24 @@
             <nav class="tabbed background small max" id="members-tab-nav" title="表示切替">
                 <a class="active" id="members-tab-btn-member" title="メンバー" onclick="App.pages.members.switchTab('member')">
                     <i>people</i>
-                    <span>メンバー</span>
+                    <span class="l">メンバー</span>
                 </a>
                 <a id="members-tab-btn-directory" title="ディレクトリ" onclick="App.pages.members.switchTab('directory')">
                     <i>account_tree</i>
-                    <span>ディレクトリ</span>
+                    <span class="l">ディレクトリ</span>
                 </a>
                 <a id="members-tab-btn-skills" title="スキル" onclick="App.pages.members.switchTab('skills')">
                     <i>psychology</i>
-                    <span>スキル</span>
+                    <span class="l">スキル</span>
                 </a>
-            </div>
+            </nav>
+            <button class="circle transparent" onclick="App.modals.filterMembers.open()" title="フィルタ">
+                <i>filter_list</i>
+            </button>
+            <span id="members-filter-count" class="chip small fill" style="display: none;">0</span>
         </nav>
     </header>
 
-    <!-- メンバー一覧サブタブ -->
     <div id="members-subtab-member" class="small-margin small-round">
         <div>
             <div id="members-table-loading" class="row center-align padding">
@@ -30,7 +33,6 @@
         </div>
     </div>
 
-    <!-- 組織一覧サブタブ -->
     <div id="members-subtab-directory" style="display: none;" class="small-margin small-round">
         <div>
             <div id="directories-table-loading" class="row center-align padding" style="display: none;">
@@ -50,20 +52,137 @@
     </div>
 </div>
 
+<dialog id="modal-filter-members" class="padding no-scroll">
+    <nav class="bottom-margin small-padding">
+        <h5 id="members-filter-title" class="bold">一覧のフィルタ</h5>
+        <div class="max"></div>
+        <button class="circle transparent" onclick="ui('#modal-filter-members')">
+            <i>close</i>
+        </button>
+    </nav>
+
+    <div id="members-filter-fields" class="grid background large-width medium-height scroll padding tiny-space no-margin small-round"></div>
+
+    <nav class="right-align small-padding">
+        <a onclick="App.modals.filterMembers.resetAll()"><span>リセット</span></a>
+        <div class="max"></div>
+        <button class="border" onclick="ui('#modal-filter-members')">キャンセル</button>
+        <button onclick="App.modals.filterMembers.apply()">適用</button>
+    </nav>
+</dialog>
+
 <script>
     (function () {
-        // ページ内状態
-        let _memberTable = null;
-        let _directoryTable = null;
         let _isLoading = false;
         let _currentTab = 'member';
-        let _selectedMemberId = null;
-        let _skillTable = null;
+        let _resizeHandlerBound = false;
+        const _tableData = {
+            member: [],
+            directory: [],
+            skills: []
+        };
+        const _sortState = {
+            member: [{ col: 'display_name', dir: 'asc' }],
+            directory: [{ col: 'name', dir: 'asc' }],
+            skills: [{ col: 'title', dir: 'asc' }]
+        };
+        const _defaultFilters = {
+            member: {
+                display_name: '',
+                name: '',
+                email: '',
+                directories: '',
+                status: ''
+            },
+            directory: {
+                name: '',
+                type: '',
+                parent: '',
+                status: '',
+                memberCountMin: '',
+                memberCountMax: ''
+            },
+            skills: {
+                title: '',
+                type: '',
+                description: '',
+                memberCountMin: '',
+                memberCountMax: ''
+            }
+        };
+        const _filters = {
+            member: Object.assign({}, _defaultFilters.member),
+            directory: Object.assign({}, _defaultFilters.directory),
+            skills: Object.assign({}, _defaultFilters.skills)
+        };
+        const _containers = {
+            member: 'members-table-container',
+            directory: 'directories-table-container',
+            skills: 'skills-table-container'
+        };
+        const _loadingIds = {
+            member: 'members-table-loading',
+            directory: 'directories-table-loading',
+            skills: 'skills-table-loading'
+        };
+        const _filterFieldConfig = {
+            member: [
+                { key: 'display_name', label: '表示名', type: 'text' },
+                { key: 'name', label: '氏名', type: 'text' },
+                { key: 'email', label: 'メールアドレス', type: 'text' },
+                { key: 'directories', label: '所属組織', type: 'text' },
+                { key: 'status', label: 'ステータス', type: 'select', options: [{ value: '', label: 'すべて' }, { value: '在籍', label: '在籍' }, { value: '退籍', label: '退籍' }] }
+            ],
+            directory: [
+                { key: 'name', label: '組織名', type: 'text' },
+                { key: 'type', label: '種別', type: 'selectDynamicDirectoryTypes' },
+                { key: 'parent', label: '親組織', type: 'text' },
+                { key: 'status', label: 'ステータス', type: 'select', options: [{ value: '', label: 'すべて' }, { value: '有効', label: '有効' }, { value: '無効', label: '無効' }] },
+                { key: 'memberCountMin', label: 'メンバー数（最小）', type: 'number' },
+                { key: 'memberCountMax', label: 'メンバー数（最大）', type: 'number' }
+            ],
+            skills: [
+                { key: 'title', label: 'タイトル', type: 'text' },
+                { key: 'type', label: '種別', type: 'text' },
+                { key: 'description', label: '説明', type: 'text' },
+                { key: 'memberCountMin', label: 'メンバー数（最小）', type: 'number' },
+                { key: 'memberCountMax', label: 'メンバー数（最大）', type: 'number' }
+            ]
+        };
+        const _tableConfig = {
+            member: {
+                emptyText: 'メンバーがありません',
+                columns: [
+                    { key: 'display_name', label: '表示名', width: '160px' },
+                    { key: 'name', label: '氏名', width: '160px' },
+                    { key: 'email', label: 'メールアドレス', width: '220px' },
+                    { key: '_directoriesText', label: '所属組織', width: '220px', wrap: true },
+                    { key: '_statusText', label: 'ステータス', width: '110px', align: 'center' }
+                ]
+            },
+            directory: {
+                emptyText: 'ディレクトリがありません',
+                columns: [
+                    { key: 'name', label: '組織名', width: '180px' },
+                    { key: '_typeText', label: '種別', width: '130px' },
+                    { key: '_parentName', label: '親組織', width: '180px' },
+                    { key: '_memberCount', label: 'メンバー数', width: '110px', type: 'number', align: 'right' },
+                    { key: '_statusText', label: 'ステータス', width: '110px', align: 'center' }
+                ]
+            },
+            skills: {
+                emptyText: 'スキルがありません',
+                columns: [
+                    { key: 'title', label: 'タイトル', width: '180px' },
+                    { key: 'skill_type_key', label: '種別', width: '140px' },
+                    { key: 'description', label: '説明', width: '260px', wrap: true },
+                    { key: '_memberCount', label: 'メンバー数', width: '110px', type: 'number', align: 'right' }
+                ]
+            }
+        };
 
         App.pages.members = {
-
             loadData: async function (isRefresh) {
-                // ローディング開始フラグ（AGENTS.md §6: 処理開始直後に初期化）
                 _isLoading = true;
                 this._showLoading(true, _currentTab);
 
@@ -74,10 +193,13 @@
                     const skills = App.state.data.skills || [];
                     const skillAssignments = App.state.data.skillAssignments || [];
 
-                    this._renderMembersTable(members, directories, directoryAssignments);
-                    this._renderDirectoriesTable(directories, members, directoryAssignments);
-                    this._renderSkillsTable(skills, members, skillAssignments);
+                    _tableData.member = this._buildMemberRows(members, directories, directoryAssignments);
+                    _tableData.directory = this._buildDirectoryRows(directories, directoryAssignments);
+                    _tableData.skills = this._buildSkillRows(skills, skillAssignments);
 
+                    this._renderAllTables();
+                    this._updateFilterBadge();
+                    this._ensureResizeHandler();
                 } catch (err) {
                     console.error('[Members] データ読み込みエラー:', err);
                     showSnackbar('データの読み込みに失敗しました', 'error');
@@ -87,7 +209,6 @@
                 }
             },
 
-            // サブタブ切り替え
             switchTab: function (tabName) {
                 _currentTab = tabName;
 
@@ -105,7 +226,6 @@
                     memberBtn.className = 'active';
                     directoryBtn.className = '';
                     if (skillBtn) skillBtn.className = '';
-                    if (_memberTable) setTimeout(function () { _memberTable.redraw(true); }, 50);
                 } else if (tabName === 'directory') {
                     memberSubtab.style.display = 'none';
                     directorySubtab.style.display = '';
@@ -113,7 +233,6 @@
                     memberBtn.className = '';
                     directoryBtn.className = 'active';
                     if (skillBtn) skillBtn.className = '';
-                    if (_directoryTable) setTimeout(function () { _directoryTable.redraw(true); }, 50);
                 } else {
                     memberSubtab.style.display = 'none';
                     directorySubtab.style.display = 'none';
@@ -121,239 +240,88 @@
                     memberBtn.className = '';
                     directoryBtn.className = '';
                     if (skillBtn) skillBtn.className = 'active';
-                    if (_skillTable) setTimeout(function () { _skillTable.redraw(true); }, 50);
+                }
+
+                this._showLoading(_isLoading, _currentTab);
+                this._updateFilterBadge();
+                if (App.modals.filterMembers && App.modals.filterMembers.syncUI) {
+                    App.modals.filterMembers.syncUI();
                 }
             },
 
-            // メンバーテーブル描画
-            _renderMembersTable: function (members, directories, assignments) {
-                const container = document.getElementById('members-table-container');
-                if (!container) return;
+            sortTable: function (tabName, colKey) {
+                const config = _tableConfig[tabName];
+                if (!config) return;
 
-                // 所属組織名を結合
-                const data = members.map(function (m) {
-                    const myAssignments = assignments.filter(function (a) {
-                        return a.member_id === m.id && a.is_active !== false;
-                    });
-                    const dirNames = myAssignments.map(function (a) {
-                        const d = directories.find(function (dir) { return dir.id === a.directory_id; });
-                        return d ? d.name : null;
-                    }).filter(Boolean);
-                    return Object.assign({}, m, {
-                        _directoriesText: dirNames.join(' \/ '),
-                        _statusText: m.is_active === false ? '退籍' : '在籍'
-                    });
-                });
+                const column = config.columns.find(function (item) { return item.key === colKey; });
+                if (!column || column.sortable === false) return;
 
-                // 既存テーブルはデータ差し替えのみ
-                if (_memberTable) {
-                    _memberTable.replaceData(data);
-                    container.style.display = '';
-                    return;
+                const current = _sortState[tabName] || [];
+                const primary = current[0];
+                if (primary && primary.col === colKey) {
+                    primary.dir = primary.dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    _sortState[tabName] = [{ col: colKey, dir: 'asc' }].concat(current.filter(function (item) {
+                        return item.col !== colKey;
+                    }));
                 }
 
-                container.style.display = '';
-                _memberTable = new Tabulator(container, {
-                    data: data,
-                    layout: 'fitColumns',
-                    responsiveLayout: false,
-                    height: 'calc(100vh - 300px)',
-                    locale: 'ja',
-                    langs: {
-                        ja: {
-                            pagination: { first: '最初', prev: '前', next: '次', last: '最後', first_title: '最初のページ', prev_title: '前のページ', next_title: '次のページ', last_title: '最後のページ' }
+                this._renderTable(tabName);
+            },
+
+            resetFilters: function (tabName) {
+                _filters[tabName] = Object.assign({}, _defaultFilters[tabName]);
+                this._renderTable(tabName);
+                this._updateFilterBadge();
+            },
+
+            setFilters: function (tabName, nextFilters) {
+                _filters[tabName] = Object.assign({}, _filters[tabName], nextFilters);
+                this._renderTable(tabName);
+                this._updateFilterBadge();
+            },
+
+            getFilterFields: function (tabName) {
+                if (tabName === 'directory') {
+                    const values = Object.entries((typeof DIRECTORY_TYPES !== 'undefined') ? DIRECTORY_TYPES : {}).map(function (entry) {
+                        return { value: entry[1], label: entry[1] };
+                    });
+                    return _filterFieldConfig.directory.map(function (field) {
+                        if (field.type === 'selectDynamicDirectoryTypes') {
+                            return {
+                                key: field.key,
+                                label: field.label,
+                                type: 'select',
+                                options: [{ value: '', label: 'すべて' }].concat(values)
+                            };
                         }
-                    },
-                    placeholder: 'データがありません',
-                    pagination: false,
-                    movableColumns: true,
-                    selectableRange: true,
-                    selectableRangeColumns: true,
-                    selectableRangeRows: true,
-                    selectableRangeClearCells: true,
-                    clipboard: true,
-                    clipboardCopyRowRange: 'range',
-                    clipboardCopyStyled: false,
-                    columns: [
-                        {
-                            title: '詳細',
-                            field: 'id',
-                            headerSort: false,
-                            width: 88,
-                            hozAlign: 'center',
-                            formatter: function () {
-                                return '<button type="button" class="small round border" data-action="member-detail">開く<\/button>';
-                            },
-                            cellClick: function (e, cell) {
-                                var id = cell.getRow().getData().id;
-                                if (id && App.modals.memberDetail && App.modals.memberDetail.open) {
-                                    App.modals.memberDetail.open(id);
-                                }
-                            }
-                        },
-                        { title: '表示名', field: 'display_name', headerFilter: true, widthGrow: 1.5, minWidth: 120 },
-                        { title: '氏名', field: 'name', headerFilter: true, widthGrow: 1.5, minWidth: 120 },
-                        { title: 'メールアドレス', field: 'email', headerFilter: true, widthGrow: 2, minWidth: 180 },
-                        { title: '所属組織', field: '_directoriesText', headerFilter: true, widthGrow: 2, minWidth: 160 },
-                        {
-                            title: 'ステータス',
-                            field: '_statusText',
-                            headerFilter: 'list',
-                            headerFilterParams: { values: ['', '在籍', '退籍'], clearable: true },
-                            widthGrow: 0.7,
-                            minWidth: 90,
-                            formatter: function (cell) {
-                                var val = cell.getValue();
-                                if (val === '在籍') return '<span style="color: var(--primary); font-weight: 600;">在籍<\/span>';
-                                return '<span style="opacity: 0.5;">退籍<\/span>';
-                            }
-                        },
-                    ],
-                });
-            },
-
-            // 組織テーブル描画
-            _renderDirectoriesTable: function (directories, members, assignments) {
-                const container = document.getElementById('directories-table-container');
-                if (!container) return;
-
-                const typeMap = (typeof DIRECTORY_TYPES !== 'undefined') ? DIRECTORY_TYPES : {};
-
-                const data = directories.map(function (d) {
-                    const parent = directories.find(function (p) { return p.id === d.parent_directory_id; });
-                    const memberCount = assignments.filter(function (a) {
-                        return a.directory_id === d.id && a.is_active !== false;
-                    }).length;
-                    return Object.assign({}, d, {
-                        _parentName: parent ? parent.name : '',
-                        _typeText: typeMap[d.directory_type_key] || d.directory_type_key || '',
-                        _memberCount: memberCount,
-                        _statusText: d.is_active === false ? '無効' : '有効'
+                        return field;
                     });
-                });
-
-                if (_directoryTable) {
-                    _directoryTable.replaceData(data);
-                    container.style.display = '';
-                    return;
                 }
-
-                container.style.display = '';
-
-                var typeValues = [''].concat(Object.values(typeMap));
-
-                _directoryTable = new Tabulator(container, {
-                    data: data,
-                    layout: 'fitColumns',
-                    responsiveLayout: false,
-                    height: 'calc(100vh - 300px)',
-                    locale: 'ja',
-                    langs: {
-                        ja: {
-                            pagination: { first: '最初', prev: '前', next: '次', last: '最後', first_title: '最初のページ', prev_title: '前のページ', next_title: '次のページ', last_title: '最後のページ' }
-                        }
-                    },
-                    placeholder: 'データがありません',
-                    pagination: false,
-                    movableColumns: true,
-                    columns: [
-                        { title: '組織名', field: 'name', headerFilter: true, widthGrow: 2, minWidth: 160 },
-                        {
-                            title: '種別',
-                            field: '_typeText',
-                            headerFilter: 'list',
-                            headerFilterParams: { values: typeValues, clearable: true },
-                            widthGrow: 1,
-                            minWidth: 100
-                        },
-                        { title: '親組織', field: '_parentName', headerFilter: true, widthGrow: 1.5, minWidth: 130 },
-                        { title: 'メンバー数', field: '_memberCount', hozAlign: 'right', widthGrow: 0.6, minWidth: 80, sorter: 'number' },
-                        {
-                            title: 'ステータス',
-                            field: '_statusText',
-                            headerFilter: 'list',
-                            headerFilterParams: { values: ['', '有効', '無効'], clearable: true },
-                            widthGrow: 0.6,
-                            minWidth: 80,
-                            formatter: function (cell) {
-                                var val = cell.getValue();
-                                if (val === '有効') return '<span style="color: var(--primary); font-weight: 600;">有効<\/span>';
-                                return '<span style="opacity: 0.5;">無効<\/span>';
-                            }
-                        },
-                    ],
-                });
-
-                _directoryTable.on('rowClick', function (e, row) {
-                    console.log('[Members] 組織クリック:', row.getData().id);
-                });
+                return _filterFieldConfig[tabName] || [];
             },
 
-            _renderSkillsTable: function (skills, members, assignments) {
-                const container = document.getElementById('skills-table-container');
-                if (!container) return;
-
-                const data = skills.map(function (s) {
-                    const assigned = assignments.filter(function (a) { return a.skill_id === s.id; });
-                    return Object.assign({}, s, {
-                        _memberCount: assigned.length
-                    });
-                });
-
-                if (_skillTable) {
-                    _skillTable.replaceData(data);
-                    container.style.display = '';
-                    return;
-                }
-
-                container.style.display = '';
-                _skillTable = new Tabulator(container, {
-                    data: data,
-                    layout: 'fitColumns',
-                    responsiveLayout: false,
-                    height: 'calc(100vh - 300px)',
-                    locale: 'ja',
-                    langs: {
-                        ja: {
-                            pagination: { first: '最初', prev: '前', next: '次', last: '最後', first_title: '最初のページ', prev_title: '前のページ', next_title: '次のページ', last_title: '最後のページ' }
-                        }
-                    },
-                    placeholder: 'データがありません',
-                    pagination: false,
-                    movableColumns: true,
-                    columns: [
-                        {
-                            title: '詳細',
-                            field: 'id',
-                            headerSort: false,
-                            width: 88,
-                            hozAlign: 'center',
-                            formatter: function () {
-                                return '<button type="button" class="small round border" data-action="skill-detail">開く<\/button>';
-                            },
-                            cellClick: function (e, cell) {
-                                var id = cell.getRow().getData().id;
-                                if (id && App.modals.skillDetail && App.modals.skillDetail.open) {
-                                    App.modals.skillDetail.open(id);
-                                }
-                            }
-                        },
-                        { title: 'タイトル', field: 'title', headerFilter: true, widthGrow: 2, minWidth: 160 },
-                        { title: '種別', field: 'skill_type_key', headerFilter: true, widthGrow: 1, minWidth: 120 },
-                        { title: '説明', field: 'description', headerFilter: true, widthGrow: 3, minWidth: 220 },
-                        { title: 'メンバー数', field: '_memberCount', hozAlign: 'right', widthGrow: 0.6, minWidth: 80, sorter: 'number' }
-                    ]
-                });
+            getCurrentTab: function () {
+                return _currentTab;
             },
 
-            // ローディング表示
+            getCurrentFilters: function () {
+                return Object.assign({}, _filters[_currentTab]);
+            },
+
+            getCurrentTabLabel: function () {
+                if (_currentTab === 'member') return 'メンバー';
+                if (_currentTab === 'directory') return 'ディレクトリ';
+                return 'スキル';
+            },
+
             _showLoading: function (show, tab) {
-                var memberLoading = document.getElementById('members-table-loading');
-                var dirLoading = document.getElementById('directories-table-loading');
-                var skillLoading = document.getElementById('skills-table-loading');
-                var memberContainer = document.getElementById('members-table-container');
-                var dirContainer = document.getElementById('directories-table-container');
-                var skillContainer = document.getElementById('skills-table-container');
+                var memberLoading = document.getElementById(_loadingIds.member);
+                var dirLoading = document.getElementById(_loadingIds.directory);
+                var skillLoading = document.getElementById(_loadingIds.skills);
+                var memberContainer = document.getElementById(_containers.member);
+                var dirContainer = document.getElementById(_containers.directory);
+                var skillContainer = document.getElementById(_containers.skills);
                 if (tab === 'member') {
                     if (memberLoading) memberLoading.style.display = show ? '' : 'none';
                     if (memberContainer) memberContainer.style.display = show ? 'none' : '';
@@ -364,6 +332,351 @@
                     if (skillLoading) skillLoading.style.display = show ? '' : 'none';
                     if (skillContainer) skillContainer.style.display = show ? 'none' : '';
                 }
+            },
+
+            _buildMemberRows: function (members, directories, assignments) {
+                return members.map(function (member) {
+                    const myAssignments = assignments.filter(function (assignment) {
+                        return assignment.member_id === member.id && assignment.is_active !== false;
+                    });
+                    const names = myAssignments.map(function (assignment) {
+                        const directory = directories.find(function (item) { return item.id === assignment.directory_id; });
+                        return directory ? directory.name : null;
+                    }).filter(Boolean);
+                    return Object.assign({}, member, {
+                        _directoriesText: names.join(' / '),
+                        _statusText: member.is_active === false ? '退籍' : '在籍'
+                    });
+                });
+            },
+
+            _buildDirectoryRows: function (directories, assignments) {
+                const typeMap = (typeof DIRECTORY_TYPES !== 'undefined') ? DIRECTORY_TYPES : {};
+                return directories.map(function (directory) {
+                    const parent = directories.find(function (item) { return item.id === directory.parent_directory_id; });
+                    const memberCount = assignments.filter(function (assignment) {
+                        return assignment.directory_id === directory.id && assignment.is_active !== false;
+                    }).length;
+                    return Object.assign({}, directory, {
+                        _parentName: parent ? parent.name : '',
+                        _typeText: typeMap[directory.directory_type_key] || directory.directory_type_key || '',
+                        _memberCount: memberCount,
+                        _statusText: directory.is_active === false ? '無効' : '有効'
+                    });
+                });
+            },
+
+            _buildSkillRows: function (skills, assignments) {
+                return skills.map(function (skill) {
+                    const count = assignments.filter(function (assignment) {
+                        return assignment.skill_id === skill.id;
+                    }).length;
+                    return Object.assign({}, skill, {
+                        _memberCount: count
+                    });
+                });
+            },
+
+            _renderAllTables: function () {
+                this._renderTable('member');
+                this._renderTable('directory');
+                this._renderTable('skills');
+            },
+
+            _renderTable: function (tabName) {
+                const container = document.getElementById(_containers[tabName]);
+                const config = _tableConfig[tabName];
+                if (!container || !config) return;
+
+                const rows = this._getVisibleRows(tabName);
+                container.innerHTML = this._buildTableHtml(tabName, rows, config);
+                container.style.display = '';
+                this._applyTableHeight(tabName);
+                this._bindTableEvents(tabName, container);
+            },
+
+            _buildTableHtml: function (tabName, rows, config) {
+                const self = this;
+                const headerHtml = '<thead class="fixed"><tr>' + config.columns.map(function (column) {
+                    const icon = self._getSortIcon(tabName, column.key);
+                    const style = column.width ? ' style="width:' + column.width + ';"' : '';
+                    if (column.sortable === false) {
+                        return '<th' + style + '><div class="row tiny-space">' + self._escapeHtml(column.label) + '</div></th>';
+                    }
+                    return '<th' + style + ' class="members-sortable" onclick="App.pages.members.sortTable(\'' + tabName + '\', \'' + column.key + '\')"><div class="row tiny-space">' + self._escapeHtml(column.label) + '<i>' + icon + '</i></div></th>';
+                }).join('') + '</tr></thead>';
+
+                const bodyHtml = rows.length === 0
+                    ? '<tbody><tr><td colspan="' + config.columns.length + '" class="center-align secondary-text">' + this._escapeHtml(config.emptyText) + '</td></tr></tbody>'
+                    : '<tbody>' + rows.map(function (row) {
+                        return self._buildRowHtml(tabName, row, config.columns);
+                    }).join('') + '</tbody>';
+
+                return '<div class="scroll surface-container-low members-list-table-scroll">' +
+                    '<table class="border members-data-table">' + headerHtml + bodyHtml + '</table>' +
+                    '</div>';
+            },
+
+            _buildRowHtml: function (tabName, row, columns) {
+                const self = this;
+                return '<tr class="members-data-row" data-row-id="' + this._escapeAttr(row.id) + '">' + columns.map(function (column) {
+                    return self._buildCell(tabName, row, column);
+                }).join('') + '</tr>';
+            },
+
+            _buildCell: function (tabName, row, column) {
+                const displayHtml = this._getCellDisplayHtml(tabName, column, row);
+                const alignStyle = column.align ? 'text-align:' + column.align + ';' : '';
+                const className = column.wrap ? 'members-cell-wrap' : 'members-cell-nowrap';
+                return '<td style="' + alignStyle + '">' +
+                    '<div class="' + className + '">' + displayHtml + '</div>' +
+                    '</td>';
+            },
+
+            _getVisibleRows: function (tabName) {
+                const filteredRows = this._applyFilters(tabName, _tableData[tabName] || []);
+                return this._applySort(tabName, filteredRows);
+            },
+
+            _applyFilters: function (tabName, rows) {
+                const filters = _filters[tabName] || {};
+                return rows.filter(function (row) {
+                    if (tabName === 'member') {
+                        return App.pages.members._matchText(row.display_name, filters.display_name) &&
+                            App.pages.members._matchText(row.name, filters.name) &&
+                            App.pages.members._matchText(row.email, filters.email) &&
+                            App.pages.members._matchText(row._directoriesText, filters.directories) &&
+                            App.pages.members._matchSelect(row._statusText, filters.status);
+                    }
+                    if (tabName === 'directory') {
+                        return App.pages.members._matchText(row.name, filters.name) &&
+                            App.pages.members._matchSelect(row._typeText, filters.type) &&
+                            App.pages.members._matchText(row._parentName, filters.parent) &&
+                            App.pages.members._matchSelect(row._statusText, filters.status) &&
+                            App.pages.members._matchMinMax(row._memberCount, filters.memberCountMin, filters.memberCountMax);
+                    }
+                    return App.pages.members._matchText(row.title, filters.title) &&
+                        App.pages.members._matchText(row.skill_type_key, filters.type) &&
+                        App.pages.members._matchText(row.description, filters.description) &&
+                        App.pages.members._matchMinMax(row._memberCount, filters.memberCountMin, filters.memberCountMax);
+                });
+            },
+
+            _applySort: function (tabName, rows) {
+                const config = _tableConfig[tabName];
+                const criteria = _sortState[tabName] || [];
+                const nextRows = rows.slice();
+                nextRows.sort(function (left, right) {
+                    for (let i = 0; i < criteria.length; i += 1) {
+                        const criterion = criteria[i];
+                        const column = config.columns.find(function (item) { return item.key === criterion.col; });
+                        if (!column) continue;
+
+                        const a = App.pages.members._getSortableValue(left, column);
+                        const b = App.pages.members._getSortableValue(right, column);
+
+                        if (a === null && b === null) continue;
+                        if (a === null) return 1;
+                        if (b === null) return -1;
+
+                        let comparison = 0;
+                        if (column.type === 'number') {
+                            comparison = Number(a) - Number(b);
+                        } else {
+                            comparison = String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+                        }
+
+                        if (comparison !== 0) {
+                            return criterion.dir === 'desc' ? -comparison : comparison;
+                        }
+                    }
+                    return 0;
+                });
+                return nextRows;
+            },
+
+            _bindTableEvents: function (tabName, container) {
+                container.onclick = function (event) {
+                    const row = event.target.closest('tr[data-row-id]');
+                    if (!row) return;
+
+                    const rowId = row.dataset.rowId;
+                    if (!rowId) return;
+
+                    if (tabName === 'member') {
+                        if (App.modals.memberDetail && App.modals.memberDetail.open) {
+                            App.modals.memberDetail.open(rowId);
+                        }
+                        return;
+                    }
+
+                    if (tabName === 'directory') {
+                        if (App.modals.directoryDetail && App.modals.directoryDetail.open) {
+                            App.modals.directoryDetail.open(rowId);
+                        }
+                        return;
+                    }
+
+                    if (App.modals.skillDetail && App.modals.skillDetail.open) {
+                        App.modals.skillDetail.open(rowId);
+                    }
+                };
+            },
+
+            _getCellDisplayHtml: function (tabName, column, row) {
+                const value = this._getCellCopyValue(tabName, column, row);
+                if (column.key === '_statusText') {
+                    const style = value === '在籍' || value === '有効'
+                        ? 'color: var(--primary); font-weight: 600;'
+                        : 'opacity: 0.55;';
+                    return '<span style="' + style + '">' + this._escapeHtml(value) + '</span>';
+                }
+                return this._escapeHtml(value);
+            },
+
+            _getCellCopyValue: function (tabName, column, row) {
+                if (!row || !column) return '';
+                const value = row[column.key];
+                if (value === null || value === undefined) return '';
+                return String(value);
+            },
+
+            _getSortableValue: function (row, column) {
+                const value = row[column.key];
+                if (value === null || value === undefined || value === '') return null;
+                return value;
+            },
+
+            _getSortIcon: function (tabName, colKey) {
+                const primary = (_sortState[tabName] || [])[0];
+                if (!primary || primary.col !== colKey) return '';
+                return primary.dir === 'asc' ? 'expand_less' : 'expand_more';
+            },
+
+            _matchText: function (value, filterValue) {
+                if (!filterValue) return true;
+                return String(value || '').toLowerCase().indexOf(String(filterValue).toLowerCase()) !== -1;
+            },
+
+            _matchSelect: function (value, filterValue) {
+                if (!filterValue) return true;
+                return String(value || '') === String(filterValue);
+            },
+
+            _matchMinMax: function (value, minValue, maxValue) {
+                const numericValue = Number(value || 0);
+                if (minValue !== '' && !Number.isNaN(Number(minValue)) && numericValue < Number(minValue)) return false;
+                if (maxValue !== '' && !Number.isNaN(Number(maxValue)) && numericValue > Number(maxValue)) return false;
+                return true;
+            },
+
+            _updateFilterBadge: function () {
+                const badge = document.getElementById('members-filter-count');
+                if (!badge) return;
+                const values = Object.values(_filters[_currentTab] || {}).filter(function (value) {
+                    return value !== '' && value !== null && value !== undefined;
+                });
+                badge.textContent = String(values.length);
+                badge.style.display = values.length > 0 ? '' : 'none';
+            },
+
+            _ensureResizeHandler: function () {
+                if (_resizeHandlerBound) return;
+                _resizeHandlerBound = true;
+                window.addEventListener('resize', function () {
+                    App.pages.members._applyTableHeight(_currentTab);
+                });
+            },
+
+            _applyTableHeight: function (tabName) {
+                const scrollDiv = document.querySelector('#' + _containers[tabName] + ' .members-list-table-scroll');
+                if (!scrollDiv) return;
+                try {
+                    const mainElement = document.querySelector('main');
+                    if (!mainElement) return;
+                    const windowHeight = window.innerHeight;
+                    const rect = scrollDiv.getBoundingClientRect();
+                    if (rect.top <= 0) return;
+                    const mainStyle = window.getComputedStyle(mainElement);
+                    const marginBottom = parseFloat(mainStyle.marginBottom) || 0;
+                    const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
+                    const offsetBottom = marginBottom + paddingBottom + 32;
+                    const newHeight = windowHeight - rect.top - offsetBottom;
+                    if (newHeight > 0) scrollDiv.style.height = newHeight + 'px';
+                } catch (err) {
+                    console.error('[Members] テーブル高さの計算に失敗:', err);
+                }
+            },
+
+            _escapeHtml: function (value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            },
+
+            _escapeAttr: function (value) {
+                return this._escapeHtml(value).replace(/`/g, '&#96;');
+            }
+        };
+
+        App.modals.filterMembers = {
+            open: function () {
+                this.syncUI();
+                ui('#modal-filter-members');
+            },
+
+            syncUI: function () {
+                const title = document.getElementById('members-filter-title');
+                const container = document.getElementById('members-filter-fields');
+                const tabName = App.pages.members.getCurrentTab();
+                const fields = App.pages.members.getFilterFields(tabName);
+                const currentFilters = App.pages.members.getCurrentFilters();
+
+                if (title) {
+                    title.textContent = App.pages.members.getCurrentTabLabel() + '一覧のフィルタ';
+                }
+                if (!container) return;
+
+                container.innerHTML = fields.map(function (field) {
+                    if (field.type === 'select') {
+                        return '<div class="s12 m6 l6"><div class="field border large suffix no-wrap label">' +
+                            '<select id="members-filter-' + field.key + '">' +
+                            field.options.map(function (option) {
+                                return '<option value="' + App.pages.members._escapeAttr(option.value) + '">' + App.pages.members._escapeHtml(option.label) + '</option>';
+                            }).join('') +
+                            '</select><label>' + App.pages.members._escapeHtml(field.label) + '</label><i>arrow_drop_down</i></div></div>';
+                    }
+                    const inputType = field.type === 'number' ? 'number' : 'text';
+                    return '<div class="s12 m6 l6"><div class="field border large label">' +
+                        '<input type="' + inputType + '" id="members-filter-' + field.key + '" placeholder=" ">' +
+                        '<label>' + App.pages.members._escapeHtml(field.label) + '</label></div></div>';
+                }).join('');
+
+                fields.forEach(function (field) {
+                    const input = document.getElementById('members-filter-' + field.key);
+                    if (input) input.value = currentFilters[field.key] || '';
+                });
+            },
+
+            apply: function () {
+                const tabName = App.pages.members.getCurrentTab();
+                const fields = App.pages.members.getFilterFields(tabName);
+                const nextFilters = {};
+                fields.forEach(function (field) {
+                    const input = document.getElementById('members-filter-' + field.key);
+                    nextFilters[field.key] = input ? input.value : '';
+                });
+                App.pages.members.setFilters(tabName, nextFilters);
+                ui('#modal-filter-members');
+            },
+
+            resetAll: function () {
+                const tabName = App.pages.members.getCurrentTab();
+                App.pages.members.resetFilters(tabName);
+                this.syncUI();
             }
         };
     })();

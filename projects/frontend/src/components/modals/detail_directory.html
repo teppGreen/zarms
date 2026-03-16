@@ -1,0 +1,214 @@
+<dialog id="modal-detail-directory" class="modal medium-width padding">
+    <nav class="small-padding bottom-margin">
+        <h5 class="max bold">ディレクトリ詳細</h5>
+        <button class="circle transparent" onclick="App.modals.directoryDetail.close()">
+            <i>close</i>
+        </button>
+    </nav>
+
+    <div class="small-padding">
+        <div class="field border large label bottom-margin">
+            <input placeholder=" " type="text" id="directory-detail-name-input">
+            <label>組織名</label>
+        </div>
+
+        <div class="field border large suffix no-wrap label bottom-margin">
+            <select id="directory-detail-type-select"></select>
+            <label>種別</label>
+            <i>arrow_drop_down</i>
+        </div>
+
+        <div class="field border large suffix no-wrap label bottom-margin">
+            <select id="directory-detail-parent-select"></select>
+            <label>親組織</label>
+            <i>arrow_drop_down</i>
+        </div>
+
+        <div class="field border large label bottom-margin">
+            <input placeholder=" " type="url" id="directory-detail-slack-url-input">
+            <label>SlackチャンネルURL</label>
+        </div>
+
+        <div class="field border large label bottom-margin">
+            <input placeholder=" " type="text" id="directory-detail-gfolder-id-input">
+            <label>Google DriveフォルダID</label>
+        </div>
+
+        <label class="row padding no-margin bottom-margin">
+            <input type="checkbox" id="directory-detail-is-active-input">
+            <span>有効</span>
+        </label>
+
+        <div class="field border large label bottom-margin">
+            <textarea placeholder=" " id="directory-detail-remark-input" rows="2"></textarea>
+            <label>備考</label>
+        </div>
+
+        <div class="background small-round padding bottom-margin">
+            <p id="directory-detail-id" class="font-number small-text no-margin"></p>
+            <p id="directory-detail-member-count" class="small-text no-margin"></p>
+            <div id="directory-detail-members" class="row wrap tiny-space top-margin"></div>
+        </div>
+
+        <p id="directory-detail-error" class="error-text small-text" style="display: none;"></p>
+
+        <nav class="right-align top-margin">
+            <button class="border" onclick="App.modals.directoryDetail.close()">
+                <span>閉じる</span>
+            </button>
+            <button class="primary" onclick="App.modals.directoryDetail.save()">
+                <span>保存</span>
+            </button>
+        </nav>
+    </div>
+</dialog>
+
+<script>
+    (function () {
+        App.modals.directoryDetail = {
+            currentId: null,
+
+            open: function (directoryId) {
+                if (!directoryId) return;
+
+                const directory = (App.state.data.directories || []).find(function (item) { return item.id === directoryId; });
+                if (!directory) return;
+
+                this.currentId = directoryId;
+                this._populateSelects(directoryId);
+                this._render(directory);
+                ui('#modal-detail-directory');
+            },
+
+            close: function () {
+                ui('#modal-detail-directory');
+                this.currentId = null;
+            },
+
+            save: async function () {
+                if (!this.currentId) return;
+
+                const errorEl = document.getElementById('directory-detail-error');
+                const name = (document.getElementById('directory-detail-name-input')?.value || '').trim();
+                const typeKey = document.getElementById('directory-detail-type-select')?.value || null;
+                const parentId = document.getElementById('directory-detail-parent-select')?.value || null;
+                const slackUrl = (document.getElementById('directory-detail-slack-url-input')?.value || '').trim() || null;
+                const gfolderId = (document.getElementById('directory-detail-gfolder-id-input')?.value || '').trim() || null;
+                const isActive = document.getElementById('directory-detail-is-active-input')?.checked !== false;
+                const remark = (document.getElementById('directory-detail-remark-input')?.value || '').trim() || null;
+
+                if (!name) {
+                    if (errorEl) {
+                        errorEl.textContent = '組織名は必須です';
+                        errorEl.style.display = '';
+                    }
+                    return;
+                }
+
+                if (errorEl) errorEl.style.display = 'none';
+
+                const updateSet = {
+                    name: name,
+                    directory_type_key: typeKey || null,
+                    parent_directory_id: parentId || null,
+                    slack_channel_url: slackUrl,
+                    gfolder_id: gfolderId,
+                    is_active: isActive,
+                    remark: remark
+                };
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'update', {
+                        where: { id: ['=', this.currentId] },
+                        set: updateSet
+                    }, 'ディレクトリを更新');
+
+                    const target = (App.state.data.directories || []).find(function (item) { return item.id === App.modals.directoryDetail.currentId; });
+                    if (target) {
+                        Object.assign(target, updateSet);
+                    }
+
+                    if (App.pages.members && App.pages.members.loadData) {
+                        await App.pages.members.loadData(true);
+                    }
+
+                    showSnackbar('ディレクトリを更新しました', 'success');
+                    this.close();
+                } catch (err) {
+                    console.error('[directoryDetail] save failed', err);
+                    if (errorEl) {
+                        errorEl.textContent = '更新に失敗しました';
+                        errorEl.style.display = '';
+                    }
+                }
+            },
+
+            _populateSelects: function (currentId) {
+                const typeSelect = document.getElementById('directory-detail-type-select');
+                const parentSelect = document.getElementById('directory-detail-parent-select');
+                const directories = App.state.data.directories || [];
+
+                if (typeSelect) {
+                    typeSelect.innerHTML = '<option value="">（種別なし）</option>';
+                    Object.entries((typeof DIRECTORY_TYPES !== 'undefined') ? DIRECTORY_TYPES : {}).forEach(function (entry) {
+                        const option = document.createElement('option');
+                        option.value = entry[0];
+                        option.textContent = entry[1];
+                        typeSelect.appendChild(option);
+                    });
+                }
+
+                if (parentSelect) {
+                    parentSelect.innerHTML = '<option value="">（なし）</option>';
+                    directories.filter(function (item) {
+                        return item.id !== currentId;
+                    }).sort(function (left, right) {
+                        return (left.name || '').localeCompare(right.name || '');
+                    }).forEach(function (item) {
+                        const option = document.createElement('option');
+                        option.value = item.id;
+                        option.textContent = item.name;
+                        parentSelect.appendChild(option);
+                    });
+                }
+            },
+
+            _render: function (directory) {
+                const assignments = (App.state.data.directoryAssignments || []).filter(function (assignment) {
+                    return assignment.directory_id === directory.id && assignment.is_active !== false;
+                });
+                const members = App.state.data.members || [];
+                const chips = assignments.map(function (assignment) {
+                    const member = members.find(function (item) { return item.id === assignment.member_id; });
+                    const label = member ? (member.display_name || member.name || member.email || '不明') : '不明';
+                    return '<span class="chip small">' + escapeHtml(label) + '</span>';
+                }).join('');
+
+                const setValue = function (id, value) {
+                    const el = document.getElementById(id);
+                    if (el) el.value = value || '';
+                };
+
+                setValue('directory-detail-name-input', directory.name);
+                setValue('directory-detail-slack-url-input', directory.slack_channel_url);
+                setValue('directory-detail-gfolder-id-input', directory.gfolder_id);
+                setValue('directory-detail-remark-input', directory.remark);
+
+                const typeSelect = document.getElementById('directory-detail-type-select');
+                if (typeSelect) typeSelect.value = directory.directory_type_key || '';
+                const parentSelect = document.getElementById('directory-detail-parent-select');
+                if (parentSelect) parentSelect.value = directory.parent_directory_id || '';
+                const activeInput = document.getElementById('directory-detail-is-active-input');
+                if (activeInput) activeInput.checked = directory.is_active !== false;
+                const idEl = document.getElementById('directory-detail-id');
+                if (idEl) idEl.textContent = directory.id ? '#' + directory.id : '';
+                const memberCountEl = document.getElementById('directory-detail-member-count');
+                if (memberCountEl) memberCountEl.textContent = '所属メンバー数: ' + String(assignments.length);
+                const membersEl = document.getElementById('directory-detail-members');
+                if (membersEl) membersEl.innerHTML = chips || '<span class="small-text secondary-text">所属メンバーはありません</span>';
+                const errorEl = document.getElementById('directory-detail-error');
+                if (errorEl) errorEl.style.display = 'none';
+            }
+        };
+    })();
+</script>
