@@ -360,15 +360,15 @@
 
 
                         const contentLengthLimit = 75;
-                        // コメント内容（最初の80文字まで、改行はスペースに置き換え）
-                        let plainContent = comment.content ? comment.content : '';
+                        // コメント内容（最初の75文字まで、改行はスペースに置き換え）
+                        let commentContent = comment.content ? comment.content : '';
                         // 改行をスペースに置き換え（プレビューなので）
-                        plainContent = plainContent.replace(/\r\n/g, ' ').replace(/\n/g, ' ');
-                        // 80文字でトリミング
-                        plainContent = plainContent.substring(0, contentLengthLimit);
+                        commentContent = commentContent.replace(/\r\n/g, ' ').replace(/\n/g, ' ');
+                        // 75文字でトリミング
+                        const commentContent75 = commentContent.substring(0, contentLengthLimit);
 
-                        if (plainContent.length > contentLengthLimit) {
-                            plainContent += '…';
+                        if (commentContent.length > contentLengthLimit) {
+                            commentContent75 += '…';
                         }
 
                         return `
@@ -393,7 +393,7 @@
                                     </button>
                                 </div>
                                 <div class="tiny-space"></div>
-                                <div class="small-text">${escapeHtml(plainContent)}</div>
+                                <div class="small-text">${escapeHtml(commentContent75)}</div>
                             </article>
                         `;
                     }).join('');
