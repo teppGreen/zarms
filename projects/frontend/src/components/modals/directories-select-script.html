@@ -1,0 +1,292 @@
+<script>
+    (function () {
+        App.modals.selectDirectories = {
+            callback: null,
+            selectedIds: [],
+            allDirectories: [],
+            multiSelect: false,
+            expandedNodes: {}, // 展開状態を保持
+            searchTerm: '',
+            selectedType: '',
+            displayedIds: [], // 表示されているノードのID
+
+            open: function (options = {}) {
+                this.callback = options.callback || null;
+                this.multiSelect = options.multiSelect || false;
+                this.selectedIds = options.preSelected || [];
+                this.expandedNodes = {}; // リセット
+                this.searchTerm = '';
+                this.selectedType = '';
+                this.displayedIds = [];
+
+                // 検索入力をリセット
+                const searchInput = document.getElementById('directory-search-input');
+                if (searchInput) searchInput.value = '';
+
+                // directoriesDataをロード（毎回取得）
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {})
+                    .then(async result => {
+                        let directories = result?.data || result || [];
+
+                        // isCachedチェック: キャッシュデータ検出。即座に最新データを取得中...');
+                        if (result?.isCached === true) {
+                            console.log('Directories (modal): キャッシュデータ検出。即座に最新データを取得中...');
+                            const freshResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {}, null, true);
+                            directories = freshResult?.data || freshResult || [];
+                        }
+
+                        this.allDirectories = directories;
+                        this.render();
+                        ui('#modal-select-directories');
+
+                        // 共通処理を使用
+                        App.utils.modal.focusInput('#directory-search-input');
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        App.utils.error.handle(error);
+                    });
+            },
+
+            render: function () {
+                // タイプフィルタのオプションを生成
+                const typeFilter = document.getElementById('directory-type-filter');
+                const enumData = App.state.data.enum;
+                if (typeFilter && enumData && enumData['DIRECTORY_TYPE']) {
+                    const options = enumData['DIRECTORY_TYPE'].map(opt =>
+                        `<option value="${escapeHtml(opt.key)}">${escapeHtml(opt.value)}</option>`
+                    ).join('');
+                    typeFilter.innerHTML = '<option value="">すべて</option>' + options;
+                }
+
+                this.renderTree();
+            },
+
+            /**
+             * フラットなデータをツリー構造に変換する
+             */
+            buildTree: function (flatData) {
+                if (!flatData || flatData.length === 0) return [];
+
+                // IDをキーにしたマップを作成
+                const nodeMap = {};
+                flatData.forEach(item => {
+                    nodeMap[item.id] = {
+                        ...item,
+                        children: []
+                    };
+                });
+
+                // 親子関係を構築
+                const rootNodes = [];
+                flatData.forEach(item => {
+                    const node = nodeMap[item.id];
+                    if (item.parent_directory_id && nodeMap[item.parent_directory_id]) {
+                        // 親が存在する場合は親の children に追加
+                        nodeMap[item.parent_directory_id].children.push(node);
+                    } else {
+                        // 親がない場合はルートノード
+                        rootNodes.push(node);
+                    }
+                });
+
+                return rootNodes;
+            },
+
+            /**
+             * フィルタを適用してツリーを再描画
+             */
+            filterResults: function () {
+                const searchInput = document.getElementById('directory-search-input');
+                const typeFilter = document.getElementById('directory-type-filter');
+
+                this.searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+                this.selectedType = typeFilter ? typeFilter.value : '';
+
+                this.renderTree();
+            },
+
+            /**
+             * ツリー構造をテーブルに描画する
+             */
+            renderTree: function () {
+                const tbody = document.getElementById('directory-tree-body');
+                if (!tbody) return;
+
+                // Reset displayed IDs
+                this.displayedIds = [];
+
+                // ツリー構造を構築
+                const tree = this.buildTree(this.allDirectories);
+
+                // フィルタされているかどうか
+                const hasFilter = this.searchTerm || this.selectedType;
+
+                // HTML生成
+                let html = '';
+                const self = this;
+
+                const renderNode = (node, level) => {
+                    // フィルタチェック
+                    const matchesSearch = !self.searchTerm ||
+                        (node.display_id && String(node.display_id).toLowerCase().includes(self.searchTerm)) ||
+                        (node.name && node.name.toLowerCase().includes(self.searchTerm));
+
+                    const matchesType = !self.selectedType || node.directory_type_key === self.selectedType;
+
+                    // 子孫がフィルタにマッチするかチェック
+                    const hasMatchingDescendant = (n) => {
+                        if (n.children && n.children.length > 0) {
+                            return n.children.some(child => {
+                                const childMatchesSearch = !self.searchTerm ||
+                                    (child.display_id && String(child.display_id).toLowerCase().includes(self.searchTerm)) ||
+                                    (child.name && child.name.toLowerCase().includes(self.searchTerm));
+                                const childMatchesType = !self.selectedType || child.directory_type_key === self.selectedType;
+                                return (childMatchesSearch && childMatchesType) || hasMatchingDescendant(child);
+                            });
+                        }
+                        return false;
+                    };
+
+                    // フィルタありの場合、自身またはその子孫がマッチしない場合はスキップ
+                    if (hasFilter && !((matchesSearch && matchesType) || hasMatchingDescendant(node))) {
+                        return;
+                    }
+
+                    // このノードは表示される
+                    self.displayedIds.push(node.id);
+
+                    const hasChildren = node.children && node.children.length > 0;
+                    // フィルタありの場合はデフォルト展開
+                    const isExpanded = hasFilter ? true : (self.expandedNodes[node.id] !== false);
+                    const indent = level * 24;
+
+                    // トグルアイコンを決定
+                    let toggleIcon = '';
+                    if (hasChildren) {
+                        toggleIcon = isExpanded ? 'expand_more' : 'chevron_right';
+                    } else {
+                        toggleIcon = 'remove';
+                    }
+
+                    // 選択状態を確認
+                    const isSelected = self.selectedIds.includes(node.id);
+                    const inputType = self.multiSelect ? 'checkbox' : 'radio';
+
+                    html += `
+                    <tr data-id="${escapeHtml(node.id)}" data-level="${level}">
+                        <td>
+                            <div class="row tiny-space" style="padding-left: ${indent}px;">
+                                <button class="circle transparent small" 
+                                        onclick="App.modals.selectDirectories.toggleNode('${node.id}')"
+                                        ${hasChildren ? '' : 'disabled'}>
+                                    <i>${toggleIcon}</i>
+                                </button>
+                                <label class="checkbox">
+                                    <input type="${inputType}" 
+                                           name="directory-select" 
+                                           value="${escapeHtml(node.id)}" 
+                                           ${isSelected ? 'checked' : ''}
+                                           onchange="App.modals.selectDirectories.toggleSelection('${node.id}', this.checked)">
+                                     <span style="font-family: 'Roboto Mono', monospace; font-weight: 500;">
+                                        <strong>${escapeHtml(node.display_id)}</strong>
+                                        ${escapeHtml(node.name || '')}
+                                    </span>
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+
+                    // 子ノードを再帰的に描画（展開状態の場合のみ）
+                    if (hasChildren && isExpanded) {
+                        node.children.forEach(child => {
+                            renderNode(child, level + 1);
+                        });
+                    }
+                };
+
+                // ルートノードから描画開始
+                tree.forEach(rootNode => {
+                    renderNode(rootNode, 0);
+                });
+
+                if (!html) {
+                    tbody.innerHTML = '<tr><td class="padding">該当する組織が見つかりません</td></tr>';
+                } else {
+                    tbody.innerHTML = html;
+                }
+
+                self.updateSelectAllCheckbox();
+            },
+
+            updateSelectAllCheckbox: function () {
+                const container = document.getElementById('directory-select-all-container');
+                const checkbox = document.getElementById('directory-select-all-checkbox');
+
+                if (this.multiSelect && container) {
+                    container.style.display = '';
+
+                    if (this.displayedIds.length > 0 && checkbox) {
+                        const allSelected = this.displayedIds.every(id => this.selectedIds.includes(id));
+                        checkbox.checked = allSelected;
+                        checkbox.disabled = false;
+                    } else if (checkbox) {
+                        checkbox.checked = false;
+                        checkbox.disabled = true;
+                    }
+                } else if (container) {
+                    container.style.display = 'none';
+                }
+            },
+
+            /**
+             * ノードの展開/折りたたみを切り替える
+             */
+            toggleNode: function (nodeId) {
+                const currentState = this.expandedNodes[nodeId];
+                this.expandedNodes[nodeId] = currentState === false ? true : false;
+                this.renderTree();
+            },
+
+            toggleSelectAll: function (checked) {
+                if (!this.multiSelect) return;
+
+                if (checked) {
+                    // 表示されているものをすべて選択
+                    this.displayedIds.forEach(id => {
+                        if (!this.selectedIds.includes(id)) {
+                            this.selectedIds.push(id);
+                        }
+                    });
+                } else {
+                    // 表示されているものの選択を解除
+                    this.selectedIds = this.selectedIds.filter(id => !this.displayedIds.includes(id));
+                }
+                this.renderTree();
+            },
+
+            toggleSelection: function (id, checked) {
+                if (this.multiSelect) {
+                    if (checked && !this.selectedIds.includes(id)) {
+                        this.selectedIds.push(id);
+                    } else if (!checked) {
+                        this.selectedIds = this.selectedIds.filter(sid => sid !== id);
+                    }
+                } else {
+                    this.selectedIds = checked ? [id] : [];
+                }
+                // Update checkbox state (re-render or just call update)
+                // Re-rendering is safest for consistency
+                this.renderTree();
+            },
+
+            confirm: function () {
+                if (this.callback) {
+                    this.callback(this.selectedIds);
+                }
+                ui('#modal-select-directories');
+            }
+        };
+    })();
+</script>

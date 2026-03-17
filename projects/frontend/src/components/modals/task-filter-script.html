@@ -1,0 +1,336 @@
+<script>
+    (function () {
+        App.modals.filterTask = {
+            currentRole: null, // 現在選択中のロール
+
+            /**
+             * メンバー選択モーダルを開く
+             */
+            selectMembers: function (role) {
+                this.currentRole = role;
+                const currentFilters = App.pages.boards?.myBoardFilters;
+                const currentMembers = currentFilters?.members?.[role] || [];
+                const allRoles = ['created_by', 'processed_by', 'reviewed_by', 'received_by'];
+
+                App.modals.selectMembers.open({
+                    multiSelect: true,
+                    preSelected: [], // 追加モードのため既存選択は表示しない
+                    showApplyAll: true,
+                    callback: (selectedIds) => {
+                        // 既存メンバーと新規選択メンバーを結合
+                        const mergedIds = Array.from(new Set([...currentMembers, ...selectedIds]));
+                        this.updateMemberSelection(role, mergedIds);
+                    },
+                    applyAllCallback: (selectedIds) => {
+                        // 全ロールに対して選択メンバーを追加
+                        allRoles.forEach(r => {
+                            const existingMembers = App.pages.boards?.myBoardFilters?.members?.[r] || [];
+                            const mergedIds = Array.from(new Set([...existingMembers, ...selectedIds]));
+                            this.updateMemberSelection(r, mergedIds);
+                        });
+                    }
+                });
+            },
+
+            /**
+             * ボード選択モーダルを開く
+             */
+            selectBoards: function () {
+                const currentFilters = App.pages.boards?.myBoardFilters;
+                const currentBoards = currentFilters?.boards || [];
+
+                App.modals.selectBoards.open({
+                    multiSelect: true,
+                    preSelected: [], // 追加モードのため既存選択は表示しない
+                    callback: (selectedIds) => {
+                        // 既存ボードと新規選択ボードを結合
+                        const mergedIds = Array.from(new Set([...currentBoards, ...selectedIds]));
+                        this.updateBoardSelection(mergedIds);
+                    }
+                });
+            },
+
+            /**
+             * 選択されたボードを更新
+             */
+            updateBoardSelection: function (boardIds) {
+                if (!App.pages.boards?.myBoardFilters) return;
+
+                App.pages.boards.myBoardFilters.boards = boardIds;
+                this.renderBoardChips();
+            },
+
+            /**
+             * ボードチップを描画
+             */
+            renderBoardChips: function () {
+                const filters = App.pages.boards?.myBoardFilters;
+                if (!filters) return;
+
+                const boardIds = filters.boards || [];
+                const allBoards = App.state.data.boards || [];
+                const selectedBoards = allBoards.filter(b => boardIds.includes(b.id));
+
+                // 共通処理を使用
+                const containerSelector = '#filter-boards';
+                const container = document.querySelector(containerSelector);
+                if (!container) return;
+
+                if (selectedBoards.length === 0) {
+                    container.innerHTML = '<span class="small-text" style="opacity: 0.6;">未選択（すべてのボード）<\/span>';
+                    return;
+                }
+
+                App.utils.modal.renderSelectedChips(
+                    containerSelector,
+                    selectedBoards,
+                    (boardId) => this.removeBoard(boardId),
+                    (board) => board.name || 'Unknown'
+                );
+            },
+
+            /**
+             * ボードを削除
+             */
+            removeBoard: function (boardId) {
+                if (!App.pages.boards?.myBoardFilters) return;
+
+                const filters = App.pages.boards.myBoardFilters;
+                if (!filters.boards) filters.boards = [];
+                filters.boards = filters.boards.filter(id => id !== boardId);
+
+                // チップを再描画
+                this.renderBoardChips();
+            },
+
+            /**
+             * 選択されたメンバーを更新
+             */
+            updateMemberSelection: function (role, memberIds) {
+                if (!App.pages.boards?.myBoardFilters) return;
+
+                App.pages.boards.myBoardFilters.members[role] = memberIds;
+                this.renderMemberChips(role);
+            },
+
+            /**
+             * メンバーチップを再描画します
+             * @param {string} role - ロール（'created_by', 'processed_by'など）
+             */
+            renderMemberChips: function (role) {
+                const filters = App.pages.boards?.myBoardFilters;
+                if (!filters || !filters.members || !filters.members[role]) {
+                    return;
+                }
+
+                const memberIds = filters.members[role];
+                const allMembers = App.state.data.members || [];
+                const selectedMembers = allMembers.filter(m => memberIds.includes(m.id));
+
+                // 共通処理を使用
+                App.utils.modal.renderSelectedChips(
+                    `#filter-members-${role.replace(/_/g, '-')}`,
+                    selectedMembers,
+                    (memberId) => this.removeMember(role, memberId),
+                    (member) => member.display_name || member.email || 'Unknown'
+                );
+            },
+
+            /**
+             * メンバーを削除します
+             * @param {string} role - ロール
+             * @param {string} memberId - メンバーID
+             */
+            removeMember: function (role, memberId) {
+                if (!App.pages.boards?.myBoardFilters) return;
+
+                const filters = App.pages.boards.myBoardFilters;
+                filters.members[role] = filters.members[role].filter(id => id !== memberId);
+
+                // チップを再描画
+                this.renderMemberChips(role);
+            },
+
+            /**
+             * フィルタ設定を適用
+             */
+            apply: function () {
+                const titleInput = document.getElementById('filter-title-input');
+                const titleMatchSelect = document.getElementById('filter-title-match-select');
+                const startsAtFrom = document.getElementById('filter-starts-at-from');
+                const startsAtTo = document.getElementById('filter-starts-at-to');
+                const endsAtFrom = document.getElementById('filter-ends-at-from');
+                const endsAtTo = document.getElementById('filter-ends-at-to');
+                const overdue = document.getElementById('filter-is-overdue');
+                const includeListMembers = document.getElementById('filter-processed-by-include-list-members');
+                const ballHolderOnly = document.getElementById('filter-ball-holder-only');
+
+                const filters = {
+                    title: titleInput ? titleInput.value : '',
+                    titleMatchMode: titleMatchSelect ? titleMatchSelect.value : 'contains',
+                    members: App.pages.boards?.myBoardFilters?.members || {
+                        created_by: [App.state.userId],
+                        processed_by: [App.state.userId],
+                        reviewed_by: [App.state.userId],
+                        received_by: [App.state.userId]
+                    },
+                    dateRanges: {
+                        starts_at: {
+                            from: startsAtFrom?.value ? new Date(startsAtFrom.value).toISOString() : null,
+                            to: startsAtTo?.value ? new Date(startsAtTo.value).toISOString() : null
+                        },
+                        ends_at: {
+                            from: endsAtFrom?.value ? new Date(endsAtFrom.value).toISOString() : null,
+                            to: endsAtTo?.value ? new Date(endsAtTo.value).toISOString() : null
+                        }
+                    },
+                    boards: App.pages.boards?.myBoardFilters?.boards || [],
+                    isOverdue: overdue ? overdue.checked : false,
+                    includeListMembers: includeListMembers ? includeListMembers.checked : false,
+                    ballHolderOnly: ballHolderOnly ? ballHolderOnly.checked : false
+                };
+
+                // ボードページにフィルタ設定を保存
+                if (App.pages.boards) {
+                    App.pages.boards.myBoardFilters = filters;
+                    // 再読み込み
+                    App.pages.boards.loadData('my-board');
+                }
+
+                // モーダルを閉じる
+                ui('#modal-filter-task');
+            },
+
+            /**
+             * 全フィルタをリセット（何も選択されていない状態にする）
+             */
+            resetAll: function () {
+                const titleInput = document.getElementById('filter-title-input');
+                const titleMatchSelect = document.getElementById('filter-title-match-select');
+                const startsAtFrom = document.getElementById('filter-starts-at-from');
+                const startsAtTo = document.getElementById('filter-starts-at-to');
+                const endsAtFrom = document.getElementById('filter-ends-at-from');
+                const endsAtTo = document.getElementById('filter-ends-at-to');
+                const overdue = document.getElementById('filter-is-overdue');
+                const includeListMembers = document.getElementById('filter-processed-by-include-list-members');
+                const ballHolderOnly = document.getElementById('filter-ball-holder-only');
+
+                if (titleInput) titleInput.value = '';
+                if (titleMatchSelect) titleMatchSelect.value = 'contains';
+                if (startsAtFrom) startsAtFrom.value = '';
+                if (startsAtTo) startsAtTo.value = '';
+                if (endsAtFrom) endsAtFrom.value = '';
+                if (endsAtTo) endsAtTo.value = '';
+                if (overdue) overdue.checked = false;
+                if (includeListMembers) includeListMembers.checked = false;
+                if (ballHolderOnly) ballHolderOnly.checked = false;
+
+                // メンバーフィルタ・ボードフィルタを空にする
+                if (App.pages.boards) {
+                    App.pages.boards.myBoardFilters.members = {
+                        created_by: [],
+                        processed_by: [],
+                        reviewed_by: [],
+                        received_by: []
+                    };
+                    App.pages.boards.myBoardFilters.boards = [];
+
+                    // チップを再描画
+                    ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
+                        this.renderMemberChips(role);
+                    });
+                    this.renderBoardChips();
+                }
+            },
+
+            /**
+             * デフォルトに戻す
+             */
+            resetDefaults: function () {
+                const titleInput = document.getElementById('filter-title-input');
+                const titleMatchSelect = document.getElementById('filter-title-match-select');
+                const startsAtFrom = document.getElementById('filter-starts-at-from');
+                const startsAtTo = document.getElementById('filter-starts-at-to');
+                const endsAtFrom = document.getElementById('filter-ends-at-from');
+                const endsAtTo = document.getElementById('filter-ends-at-to');
+                const overdue = document.getElementById('filter-is-overdue');
+                const includeListMembers = document.getElementById('filter-processed-by-include-list-members');
+                const ballHolderOnly = document.getElementById('filter-ball-holder-only');
+
+                if (titleInput) titleInput.value = '';
+                if (titleMatchSelect) titleMatchSelect.value = 'contains';
+                if (startsAtFrom) startsAtFrom.value = '';
+                if (startsAtTo) startsAtTo.value = '';
+                if (endsAtFrom) endsAtFrom.value = '';
+                if (endsAtTo) endsAtTo.value = '';
+                if (overdue) overdue.checked = false;
+                if (includeListMembers) includeListMembers.checked = true;
+                if (ballHolderOnly) ballHolderOnly.checked = false;
+
+                // メンバーフィルタをデフォルトに戻す
+                if (App.pages.boards) {
+                    const userId = App.state.userId;
+                    App.pages.boards.myBoardFilters.members = {
+                        created_by: [userId],
+                        processed_by: [userId],
+                        reviewed_by: [userId],
+                        received_by: [userId]
+                    };
+                    App.pages.boards.myBoardFilters.boards = [];
+
+                    // チップを再描画
+                    ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
+                        this.renderMemberChips(role);
+                    });
+                    this.renderBoardChips();
+                }
+            },
+
+            /**
+             * 現在の設定をUIに反映
+             */
+            syncUI: function () {
+                if (!App.pages.boards || !App.pages.boards.myBoardFilters) return;
+
+                const filters = App.pages.boards.myBoardFilters;
+                const titleInput = document.getElementById('filter-title-input');
+                const titleMatchSelect = document.getElementById('filter-title-match-select');
+                const startsAtFrom = document.getElementById('filter-starts-at-from');
+                const startsAtTo = document.getElementById('filter-starts-at-to');
+                const endsAtFrom = document.getElementById('filter-ends-at-from');
+                const endsAtTo = document.getElementById('filter-ends-at-to');
+                const overdue = document.getElementById('filter-is-overdue');
+                const includeListMembers = document.getElementById('filter-processed-by-include-list-members');
+                const ballHolderOnly = document.getElementById('filter-ball-holder-only');
+
+                if (titleInput) titleInput.value = filters.title || '';
+                if (titleMatchSelect) titleMatchSelect.value = filters.titleMatchMode || 'contains';
+
+                if (startsAtFrom && filters.dateRanges?.starts_at?.from) {
+                    startsAtFrom.value = formatDateTimeForInput(filters.dateRanges.starts_at.from);
+                }
+                if (startsAtTo && filters.dateRanges?.starts_at?.to) {
+                    startsAtTo.value = formatDateTimeForInput(filters.dateRanges.starts_at.to);
+                }
+                if (endsAtFrom && filters.dateRanges?.ends_at?.from) {
+                    endsAtFrom.value = formatDateTimeForInput(filters.dateRanges.ends_at.from);
+                }
+                if (endsAtTo && filters.dateRanges?.ends_at?.to) {
+                    endsAtTo.value = formatDateTimeForInput(filters.dateRanges.ends_at.to);
+                }
+
+                if (overdue) overdue.checked = filters.isOverdue;
+                if (includeListMembers) includeListMembers.checked = filters.includeListMembers || false;
+                if (ballHolderOnly) ballHolderOnly.checked = filters.ballHolderOnly || false;
+
+                // メンバーチップを描画
+                ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
+                    this.renderMemberChips(role);
+                });
+
+                // ボードチップを描画
+                this.renderBoardChips();
+            },
+        }
+    })();
+</script>

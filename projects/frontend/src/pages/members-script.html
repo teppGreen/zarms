@@ -1,0 +1,843 @@
+<script>
+    (function () {
+        let _isLoading = false;
+        let _currentTab = 'member';
+        let _resizeHandlerBound = false;
+        const _tableData = {
+            member: [],
+            directory: [],
+            skills: []
+        };
+        const _sortState = {
+            member: [{ col: 'display_name', dir: 'asc' }],
+            directory: [{ col: 'name', dir: 'asc' }],
+            skills: [{ col: 'title', dir: 'asc' }]
+        };
+        const _defaultFilters = {
+            member: {
+                display_name: '',
+                name: '',
+                email: '',
+                directories: '',
+                status: ''
+            },
+            directory: {
+                name: '',
+                type: '',
+                parent: '',
+                status: '',
+                memberCountMin: '',
+                memberCountMax: ''
+            },
+            skills: {
+                title: '',
+                type: '',
+                description: '',
+                memberCountMin: '',
+                memberCountMax: ''
+            }
+        };
+        const _filters = {
+            member: Object.assign({}, _defaultFilters.member),
+            directory: Object.assign({}, _defaultFilters.directory),
+            skills: Object.assign({}, _defaultFilters.skills)
+        };
+        const _containers = {
+            member: 'members-table-container',
+            directory: 'directories-table-container',
+            skills: 'skills-table-container'
+        };
+        const _loadingIds = {
+            member: 'members-table-loading',
+            directory: 'directories-table-loading',
+            skills: 'skills-table-loading'
+        };
+        const _frameIds = {
+            member: 'members-table-frame',
+            directory: 'directories-table-frame',
+            skills: 'skills-table-frame'
+        };
+        const _frameState = {
+            member: { ready: false, token: '', pendingPayload: null },
+            directory: { ready: false, token: '', pendingPayload: null },
+            skills: { ready: false, token: '', pendingPayload: null }
+        };
+        const _frameMessageType = {
+            ready: 'members-tabulator-ready',
+            rowClick: 'members-tabulator-row-click',
+            sortChange: 'members-tabulator-sort-change',
+            error: 'members-tabulator-error',
+            render: 'members-tabulator-render',
+            resize: 'members-tabulator-resize'
+        };
+        const _filterFieldConfig = {
+            member: [
+                { key: 'display_name', label: '表示名', type: 'text' },
+                { key: 'name', label: '氏名', type: 'text' },
+                { key: 'email', label: 'メールアドレス', type: 'text' },
+                { key: 'directories', label: '所属組織', type: 'text' },
+                { key: 'status', label: 'ステータス', type: 'select', options: [{ value: '', label: 'すべて' }, { value: '在籍', label: '在籍' }, { value: '退籍', label: '退籍' }] }
+            ],
+            directory: [
+                { key: 'name', label: '組織名', type: 'text' },
+                { key: 'type', label: '種別', type: 'selectDynamicDirectoryTypes' },
+                { key: 'parent', label: '親組織', type: 'text' },
+                { key: 'status', label: 'ステータス', type: 'select', options: [{ value: '', label: 'すべて' }, { value: '有効', label: '有効' }, { value: '無効', label: '無効' }] },
+                { key: 'memberCountMin', label: 'メンバー数（最小）', type: 'number' },
+                { key: 'memberCountMax', label: 'メンバー数（最大）', type: 'number' }
+            ],
+            skills: [
+                { key: 'title', label: 'タイトル', type: 'text' },
+                { key: 'type', label: '種別', type: 'text' },
+                { key: 'description', label: '説明', type: 'text' },
+                { key: 'memberCountMin', label: 'メンバー数（最小）', type: 'number' },
+                { key: 'memberCountMax', label: 'メンバー数（最大）', type: 'number' }
+            ]
+        };
+        const _tableConfig = {
+            member: {
+                emptyText: 'メンバーがありません',
+                columns: [
+                    { key: 'display_name', label: '表示名', width: '160px' },
+                    { key: 'name', label: '氏名', width: '160px' },
+                    { key: 'email', label: 'メールアドレス', width: '220px' },
+                    { key: '_directoriesText', label: '所属組織', width: '220px', wrap: true },
+                    { key: '_statusText', label: 'ステータス', width: '110px', align: 'center' }
+                ]
+            },
+            directory: {
+                emptyText: 'ディレクトリがありません',
+                columns: [
+                    { key: 'name', label: '組織名', width: '180px' },
+                    { key: '_typeText', label: '種別', width: '130px' },
+                    { key: '_parentName', label: '親組織', width: '180px' },
+                    { key: '_memberCount', label: 'メンバー数', width: '110px', type: 'number', align: 'right' },
+                    { key: '_statusText', label: 'ステータス', width: '110px', align: 'center' }
+                ]
+            },
+            skills: {
+                emptyText: 'スキルがありません',
+                columns: [
+                    { key: 'title', label: 'タイトル', width: '180px' },
+                    { key: 'skill_type_key', label: '種別', width: '140px' },
+                    { key: 'description', label: '説明', width: '260px', wrap: true },
+                    { key: '_memberCount', label: 'メンバー数', width: '110px', type: 'number', align: 'right' }
+                ]
+            }
+        };
+
+        App.pages.members = {
+            loadData: async function (isRefresh) {
+                _isLoading = true;
+                this._showLoading(true, _currentTab);
+
+                try {
+                    const members = App.state.data.members || [];
+                    const directories = App.state.data.directories || [];
+                    const directoryAssignments = App.state.data.directoryAssignments || [];
+                    const skills = App.state.data.skills || [];
+                    const skillAssignments = App.state.data.skillAssignments || [];
+
+                    _tableData.member = this._buildMemberRows(members, directories, directoryAssignments);
+                    _tableData.directory = this._buildDirectoryRows(directories, directoryAssignments);
+                    _tableData.skills = this._buildSkillRows(skills, skillAssignments);
+
+                    this._ensureResizeHandler();
+                    this._renderAllTables();
+                    this._updateFilterBadge();
+                } catch (err) {
+                    console.error('[Members] データ読み込みエラー:', err);
+                    showSnackbar('データの読み込みに失敗しました', 'error');
+                } finally {
+                    _isLoading = false;
+                    this._showLoading(false, _currentTab);
+                    this._renderTable(_currentTab);
+                }
+            },
+
+            switchTab: function (tabName) {
+                _currentTab = tabName;
+
+                const memberSubtab = document.getElementById('members-subtab-member');
+                const directorySubtab = document.getElementById('members-subtab-directory');
+                const memberBtn = document.getElementById('members-tab-btn-member');
+                const directoryBtn = document.getElementById('members-tab-btn-directory');
+                const skillSubtab = document.getElementById('members-subtab-skills');
+                const skillBtn = document.getElementById('members-tab-btn-skills');
+
+                if (tabName === 'member') {
+                    memberSubtab.style.display = '';
+                    directorySubtab.style.display = 'none';
+                    if (skillSubtab) skillSubtab.style.display = 'none';
+                    memberBtn.className = 'active';
+                    directoryBtn.className = '';
+                    if (skillBtn) skillBtn.className = '';
+                } else if (tabName === 'directory') {
+                    memberSubtab.style.display = 'none';
+                    directorySubtab.style.display = '';
+                    if (skillSubtab) skillSubtab.style.display = 'none';
+                    memberBtn.className = '';
+                    directoryBtn.className = 'active';
+                    if (skillBtn) skillBtn.className = '';
+                } else {
+                    memberSubtab.style.display = 'none';
+                    directorySubtab.style.display = 'none';
+                    if (skillSubtab) skillSubtab.style.display = '';
+                    memberBtn.className = '';
+                    directoryBtn.className = '';
+                    if (skillBtn) skillBtn.className = 'active';
+                }
+
+                this._showLoading(_isLoading, _currentTab);
+                this._updateFilterBadge();
+                if (!_isLoading) {
+                    this._renderTable(_currentTab);
+                }
+                if (App.modals.filterMembers && App.modals.filterMembers.syncUI) {
+                    App.modals.filterMembers.syncUI();
+                }
+            },
+
+            sortTable: function (tabName, colKey) {
+                const config = _tableConfig[tabName];
+                if (!config) return;
+
+                const column = config.columns.find(function (item) { return item.key === colKey; });
+                if (!column || column.sortable === false) return;
+
+                const current = _sortState[tabName] || [];
+                const primary = current[0];
+                if (primary && primary.col === colKey) {
+                    primary.dir = primary.dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    _sortState[tabName] = [{ col: colKey, dir: 'asc' }].concat(current.filter(function (item) {
+                        return item.col !== colKey;
+                    }));
+                }
+
+                this._renderTable(tabName);
+            },
+
+            resetFilters: function (tabName) {
+                _filters[tabName] = Object.assign({}, _defaultFilters[tabName]);
+                this._renderTable(tabName);
+                this._updateFilterBadge();
+            },
+
+            setFilters: function (tabName, nextFilters) {
+                _filters[tabName] = Object.assign({}, _filters[tabName], nextFilters);
+                this._renderTable(tabName);
+                this._updateFilterBadge();
+            },
+
+            getFilterFields: function (tabName) {
+                if (tabName === 'directory') {
+                    const values = Object.entries((typeof DIRECTORY_TYPES !== 'undefined') ? DIRECTORY_TYPES : {}).map(function (entry) {
+                        return { value: entry[1], label: entry[1] };
+                    });
+                    return _filterFieldConfig.directory.map(function (field) {
+                        if (field.type === 'selectDynamicDirectoryTypes') {
+                            return {
+                                key: field.key,
+                                label: field.label,
+                                type: 'select',
+                                options: [{ value: '', label: 'すべて' }].concat(values)
+                            };
+                        }
+                        return field;
+                    });
+                }
+                return _filterFieldConfig[tabName] || [];
+            },
+
+            getCurrentTab: function () {
+                return _currentTab;
+            },
+
+            getCurrentFilters: function () {
+                return Object.assign({}, _filters[_currentTab]);
+            },
+
+            getCurrentTabLabel: function () {
+                if (_currentTab === 'member') return 'メンバー';
+                if (_currentTab === 'directory') return 'ディレクトリ';
+                return 'スキル';
+            },
+
+            _showLoading: function (show, tab) {
+                var memberLoading = document.getElementById(_loadingIds.member);
+                var dirLoading = document.getElementById(_loadingIds.directory);
+                var skillLoading = document.getElementById(_loadingIds.skills);
+                var memberContainer = document.getElementById(_containers.member);
+                var dirContainer = document.getElementById(_containers.directory);
+                var skillContainer = document.getElementById(_containers.skills);
+                if (tab === 'member') {
+                    if (memberLoading) memberLoading.style.display = show ? '' : 'none';
+                    if (memberContainer) memberContainer.style.display = show ? 'none' : '';
+                } else if (tab === 'directory') {
+                    if (dirLoading) dirLoading.style.display = show ? '' : 'none';
+                    if (dirContainer) dirContainer.style.display = show ? 'none' : '';
+                } else {
+                    if (skillLoading) skillLoading.style.display = show ? '' : 'none';
+                    if (skillContainer) skillContainer.style.display = show ? 'none' : '';
+                }
+            },
+
+            _buildMemberRows: function (members, directories, assignments) {
+                return members.map(function (member) {
+                    const myAssignments = assignments.filter(function (assignment) {
+                        return assignment.member_id === member.id && assignment.is_active !== false;
+                    });
+                    const names = myAssignments.map(function (assignment) {
+                        const directory = directories.find(function (item) { return item.id === assignment.directory_id; });
+                        return directory ? directory.name : null;
+                    }).filter(Boolean);
+                    return Object.assign({}, member, {
+                        _directoriesText: names.join(' / '),
+                        _statusText: member.is_active === false ? '退籍' : '在籍'
+                    });
+                });
+            },
+
+            _buildDirectoryRows: function (directories, assignments) {
+                const typeMap = (typeof DIRECTORY_TYPES !== 'undefined') ? DIRECTORY_TYPES : {};
+                return directories.map(function (directory) {
+                    const parent = directories.find(function (item) { return item.id === directory.parent_directory_id; });
+                    const memberCount = assignments.filter(function (assignment) {
+                        return assignment.directory_id === directory.id && assignment.is_active !== false;
+                    }).length;
+                    return Object.assign({}, directory, {
+                        _parentName: parent ? parent.name : '',
+                        _typeText: typeMap[directory.directory_type_key] || directory.directory_type_key || '',
+                        _memberCount: memberCount,
+                        _statusText: directory.is_active === false ? '無効' : '有効'
+                    });
+                });
+            },
+
+            _buildSkillRows: function (skills, assignments) {
+                return skills.map(function (skill) {
+                    const count = assignments.filter(function (assignment) {
+                        return assignment.skill_id === skill.id;
+                    }).length;
+                    return Object.assign({}, skill, {
+                        _memberCount: count
+                    });
+                });
+            },
+
+            _renderAllTables: function () {
+                this._renderTable(_currentTab);
+            },
+
+            _renderTable: function (tabName) {
+                const container = document.getElementById(_containers[tabName]);
+                const config = _tableConfig[tabName];
+                if (!container || !config) return;
+
+                const rows = this._getVisibleRows(tabName);
+                const frame = this._ensureTabulatorFrame(tabName, container);
+                const payload = this._buildFramePayload(tabName, rows, config);
+
+                container.style.display = _isLoading ? 'none' : '';
+                this._applyTableHeight(tabName);
+
+                if (_frameState[tabName].ready && frame.contentWindow) {
+                    this._postFrameMessage(tabName, _frameMessageType.render, payload);
+                    return;
+                }
+
+                _frameState[tabName].pendingPayload = payload;
+            },
+
+            _ensureTabulatorFrame: function (tabName, container) {
+                let frame = document.getElementById(_frameIds[tabName]);
+                if (frame) return frame;
+
+                const token = this._getFrameToken(tabName);
+                frame = document.createElement('iframe');
+                frame.id = _frameIds[tabName];
+                frame.className = 'members-tabulator-frame';
+                frame.setAttribute('title', this.getCurrentTabLabel() + '一覧');
+                frame.setAttribute('sandbox', 'allow-scripts');
+                frame.setAttribute('loading', 'eager');
+                frame.setAttribute('referrerpolicy', 'no-referrer');
+                frame.srcdoc = this._buildFrameSrcdoc(tabName, token);
+                frame.style.width = '100%';
+                frame.style.border = '0';
+                frame.style.display = 'block';
+                frame.style.background = 'transparent';
+
+                container.innerHTML = '';
+                container.appendChild(frame);
+                return frame;
+            },
+
+            _getFrameToken: function (tabName) {
+                if (_frameState[tabName].token) {
+                    return _frameState[tabName].token;
+                }
+
+                let token = '';
+                try {
+                    const bytes = new Uint8Array(16);
+                    window.crypto.getRandomValues(bytes);
+                    token = Array.from(bytes).map(function (value) {
+                        return value.toString(16).padStart(2, '0');
+                    }).join('');
+                } catch (err) {
+                    token = String(Date.now()) + String(Math.random()).slice(2);
+                }
+
+                _frameState[tabName].token = token;
+                return token;
+            },
+
+            _buildFramePayload: function (tabName, rows, config) {
+                return {
+                    tabName: tabName,
+                    rows: rows,
+                    emptyText: config.emptyText,
+                    columns: this._getTabulatorColumns(config.columns),
+                    sorters: (_sortState[tabName] || []).map(function (sorter) {
+                        return { column: sorter.col, dir: sorter.dir };
+                    })
+                };
+            },
+
+            _getTabulatorColumns: function (columns) {
+                return columns.map(function (column) {
+                    return {
+                        title: column.label,
+                        field: column.key,
+                        width: App.pages.members._parseColumnWidth(column.width),
+                        headerSort: column.sortable !== false,
+                        hozAlign: column.align || 'left',
+                        formatterKey: column.key === '_statusText' ? 'status' : 'text',
+                        variableHeight: column.wrap === true,
+                        cssClass: column.wrap ? 'members-tabulator-cell-wrap' : 'members-tabulator-cell-nowrap',
+                        sorter: column.type === 'number' ? 'number' : 'string'
+                    };
+                });
+            },
+
+            _parseColumnWidth: function (width) {
+                if (!width) return null;
+                const numeric = parseInt(String(width).replace('px', ''), 10);
+                return Number.isNaN(numeric) ? null : numeric;
+            },
+
+            _buildFrameSrcdoc: function (tabName, token) {
+                return '<!doctype html>' +
+                    '<html lang="ja">' +
+                    '<head>' +
+                    '<meta charset="UTF-8">' +
+                    '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+                    '<link rel="stylesheet" href="https:\/\/unpkg.com\/tabulator-tables@6.3.0\/dist\/css\/tabulator.min.css">' +
+                    '<style>' +
+                    'html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:"Noto Sans JP",sans-serif;}' +
+                    '#members-tabulator-root{width:100%;height:100%;}' +
+                    '.tabulator{height:100%;border:0;background:var(--surface-container-low);font-size:14px;}' +
+                    '.tabulator .tabulator-header{background:#fff;border-bottom:1px solid #dadce0;color:#1f1f1f;font-weight:600;}' +
+                    '.tabulator .tabulator-col,.tabulator .tabulator-cell{padding:12px 14px;}' +
+                    '.tabulator .tabulator-row{background:#fff;border-bottom:1px solid #eceff1;}' +
+                    '.tabulator .tabulator-row:hover{background:#f7faff;}' +
+                    '.tabulator-row.tabulator-selected{background:#eef3ff;}' +
+                    '.members-tabulator-cell-wrap{white-space:normal;line-height:1.5;}' +
+                    '.members-tabulator-cell-nowrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+                    '.tabulator-placeholder{display:flex;align-items:center;justify-content:center;color:#5f6368;}' +
+                    '</style>' +
+                    '</head>' +
+                    '<body>' +
+                    '<div id="members-tabulator-root"></div>' +
+                    '<script src="https:\/\/unpkg.com\/tabulator-tables@6.3.0\/dist\/js\/tabulator.min.js"><\/script>' +
+                    '<script>' +
+                    'const FRAME_TOKEN=' + JSON.stringify(token) + ';' +
+                    'const TAB_NAME=' + JSON.stringify(tabName) + ';' +
+                    'let table=null;' +
+                    'function postMessageToParent(type,payload){window.parent.postMessage({source:"members-tabulator",type:type,tabName:TAB_NAME,token:FRAME_TOKEN,payload:payload||{}},"*");}' +
+                    'function createStatusNode(value){const span=document.createElement("span");span.textContent=String(value||"");if(value==="在籍"||value==="有効"){span.style.color="#2d3eff";span.style.fontWeight="600";}else{span.style.opacity="0.6";}return span;}' +
+                    'function createColumns(columns){return (columns||[]).map(function(column){const definition={title:column.title,field:column.field,headerSort:column.headerSort!==false,sorter:column.sorter||"string",hozAlign:column.hozAlign||"left",cssClass:column.cssClass||"",variableHeight:column.variableHeight===true,formatter:"plaintext"};if(column.width){definition.width=column.width;}if(column.formatterKey==="status"){definition.formatter=function(cell){return createStatusNode(cell.getValue());};}return definition;});}' +
+                    'function renderTable(payload){const root=document.getElementById("members-tabulator-root");if(table){table.destroy();table=null;}table=new Tabulator(root,{data:Array.isArray(payload.rows)?payload.rows:[],columns:createColumns(payload.columns),layout:"fitColumns",height:"100%",placeholder:payload.emptyText||"データがありません",initialSort:Array.isArray(payload.sorters)?payload.sorters:[],index:"id"});table.on("rowClick",function(event,row){postMessageToParent("' + _frameMessageType.rowClick + '",{rowId:row.getData()&&row.getData().id?String(row.getData().id):""});});table.on("dataSorted",function(sorters){postMessageToParent("' + _frameMessageType.sortChange + '",{sorters:(sorters||[]).map(function(sorter){return {column:sorter.field,dir:sorter.dir};})});});}' +
+                    'window.addEventListener("message",function(event){const data=event.data||{};if(!data||data.source!=="members-host"||data.token!==FRAME_TOKEN){return;}if(data.type==="' + _frameMessageType.render + '"){try{renderTable(data.payload||{});}catch(error){postMessageToParent("' + _frameMessageType.error + '",{message:error&&error.message?error.message:"Tabulator描画に失敗しました"});}}if(data.type==="' + _frameMessageType.resize + '"&&table){table.redraw(true);}});' +
+                    'window.addEventListener("load",function(){postMessageToParent("' + _frameMessageType.ready + '",{});});' +
+                    '<\/script>' +
+                    '</body>' +
+                    '</html>';
+            },
+
+            _postFrameMessage: function (tabName, type, payload) {
+                const frame = document.getElementById(_frameIds[tabName]);
+                const state = _frameState[tabName];
+                if (!frame || !frame.contentWindow || !state.token) return;
+
+                frame.contentWindow.postMessage({
+                    source: 'members-host',
+                    type: type,
+                    token: state.token,
+                    payload: payload || {}
+                }, '*');
+            },
+
+            _buildTableHtml: function (tabName, rows, config) {
+                const self = this;
+                const headerHtml = '<thead class="fixed"><tr>' + config.columns.map(function (column) {
+                    const icon = self._getSortIcon(tabName, column.key);
+                    const style = column.width ? ' style="width:' + column.width + ';"' : '';
+                    if (column.sortable === false) {
+                        return '<th' + style + '><div class="row tiny-space">' + self._escapeHtml(column.label) + '</div></th>';
+                    }
+                    return '<th' + style + ' class="members-sortable" onclick="App.pages.members.sortTable(\'' + tabName + '\', \'' + column.key + '\')"><div class="row tiny-space">' + self._escapeHtml(column.label) + '<i>' + icon + '</i></div></th>';
+                }).join('') + '</tr></thead>';
+
+                const bodyHtml = rows.length === 0
+                    ? '<tbody><tr><td colspan="' + config.columns.length + '" class="center-align secondary-text">' + this._escapeHtml(config.emptyText) + '</td></tr></tbody>'
+                    : '<tbody>' + rows.map(function (row) {
+                        return self._buildRowHtml(tabName, row, config.columns);
+                    }).join('') + '</tbody>';
+
+                return '<div class="scroll surface-container-low members-list-table-scroll">' +
+                    '<table class="border members-data-table">' + headerHtml + bodyHtml + '</table>' +
+                    '</div>';
+            },
+
+            _buildRowHtml: function (tabName, row, columns) {
+                const self = this;
+                return '<tr class="members-data-row" data-row-id="' + this._escapeAttr(row.id) + '">' + columns.map(function (column) {
+                    return self._buildCell(tabName, row, column);
+                }).join('') + '</tr>';
+            },
+
+            _buildCell: function (tabName, row, column) {
+                const displayHtml = this._getCellDisplayHtml(tabName, column, row);
+                const alignStyle = column.align ? 'text-align:' + column.align + ';' : '';
+                const className = column.wrap ? 'members-cell-wrap' : 'members-cell-nowrap';
+                return '<td style="' + alignStyle + '">' +
+                    '<div class="' + className + '">' + displayHtml + '</div>' +
+                    '</td>';
+            },
+
+            _getVisibleRows: function (tabName) {
+                const filteredRows = this._applyFilters(tabName, _tableData[tabName] || []);
+                return this._applySort(tabName, filteredRows);
+            },
+
+            _applyFilters: function (tabName, rows) {
+                const filters = _filters[tabName] || {};
+                return rows.filter(function (row) {
+                    if (tabName === 'member') {
+                        return App.pages.members._matchText(row.display_name, filters.display_name) &&
+                            App.pages.members._matchText(row.name, filters.name) &&
+                            App.pages.members._matchText(row.email, filters.email) &&
+                            App.pages.members._matchText(row._directoriesText, filters.directories) &&
+                            App.pages.members._matchSelect(row._statusText, filters.status);
+                    }
+                    if (tabName === 'directory') {
+                        return App.pages.members._matchText(row.name, filters.name) &&
+                            App.pages.members._matchSelect(row._typeText, filters.type) &&
+                            App.pages.members._matchText(row._parentName, filters.parent) &&
+                            App.pages.members._matchSelect(row._statusText, filters.status) &&
+                            App.pages.members._matchMinMax(row._memberCount, filters.memberCountMin, filters.memberCountMax);
+                    }
+                    return App.pages.members._matchText(row.title, filters.title) &&
+                        App.pages.members._matchText(row.skill_type_key, filters.type) &&
+                        App.pages.members._matchText(row.description, filters.description) &&
+                        App.pages.members._matchMinMax(row._memberCount, filters.memberCountMin, filters.memberCountMax);
+                });
+            },
+
+            _applySort: function (tabName, rows) {
+                const config = _tableConfig[tabName];
+                const criteria = _sortState[tabName] || [];
+                const nextRows = rows.slice();
+                nextRows.sort(function (left, right) {
+                    for (let i = 0; i < criteria.length; i += 1) {
+                        const criterion = criteria[i];
+                        const column = config.columns.find(function (item) { return item.key === criterion.col; });
+                        if (!column) continue;
+
+                        const a = App.pages.members._getSortableValue(left, column);
+                        const b = App.pages.members._getSortableValue(right, column);
+
+                        if (a === null && b === null) continue;
+                        if (a === null) return 1;
+                        if (b === null) return -1;
+
+                        let comparison = 0;
+                        if (column.type === 'number') {
+                            comparison = Number(a) - Number(b);
+                        } else {
+                            comparison = String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+                        }
+
+                        if (comparison !== 0) {
+                            return criterion.dir === 'desc' ? -comparison : comparison;
+                        }
+                    }
+                    return 0;
+                });
+                return nextRows;
+            },
+
+            _bindTableEvents: function (tabName, container) {
+                container.onclick = function (event) {
+                    const row = event.target.closest('tr[data-row-id]');
+                    if (!row) return;
+
+                    const rowId = row.dataset.rowId;
+                    if (!rowId) return;
+
+                    if (tabName === 'member') {
+                        if (App.modals.memberDetail && App.modals.memberDetail.open) {
+                            App.modals.memberDetail.open(rowId);
+                        }
+                        return;
+                    }
+
+                    if (tabName === 'directory') {
+                        if (App.modals.directoryDetail && App.modals.directoryDetail.open) {
+                            App.modals.directoryDetail.open(rowId);
+                        }
+                        return;
+                    }
+
+                    if (App.modals.skillDetail && App.modals.skillDetail.open) {
+                        App.modals.skillDetail.open(rowId);
+                    }
+                };
+            },
+
+            _getCellDisplayHtml: function (tabName, column, row) {
+                const value = this._getCellCopyValue(tabName, column, row);
+                if (column.key === '_statusText') {
+                    const style = value === '在籍' || value === '有効'
+                        ? 'color: var(--primary); font-weight: 600;'
+                        : 'opacity: 0.55;';
+                    return '<span style="' + style + '">' + this._escapeHtml(value) + '</span>';
+                }
+                return this._escapeHtml(value);
+            },
+
+            _getCellCopyValue: function (tabName, column, row) {
+                if (!row || !column) return '';
+                const value = row[column.key];
+                if (value === null || value === undefined) return '';
+                return String(value);
+            },
+
+            _getSortableValue: function (row, column) {
+                const value = row[column.key];
+                if (value === null || value === undefined || value === '') return null;
+                return value;
+            },
+
+            _getSortIcon: function (tabName, colKey) {
+                const primary = (_sortState[tabName] || [])[0];
+                if (!primary || primary.col !== colKey) return '';
+                return primary.dir === 'asc' ? 'expand_less' : 'expand_more';
+            },
+
+            _matchText: function (value, filterValue) {
+                if (!filterValue) return true;
+                return String(value || '').toLowerCase().indexOf(String(filterValue).toLowerCase()) !== -1;
+            },
+
+            _matchSelect: function (value, filterValue) {
+                if (!filterValue) return true;
+                return String(value || '') === String(filterValue);
+            },
+
+            _matchMinMax: function (value, minValue, maxValue) {
+                const numericValue = Number(value || 0);
+                if (minValue !== '' && !Number.isNaN(Number(minValue)) && numericValue < Number(minValue)) return false;
+                if (maxValue !== '' && !Number.isNaN(Number(maxValue)) && numericValue > Number(maxValue)) return false;
+                return true;
+            },
+
+            _updateFilterBadge: function () {
+                const badge = document.getElementById('members-filter-count');
+                if (!badge) return;
+                const values = Object.values(_filters[_currentTab] || {}).filter(function (value) {
+                    return value !== '' && value !== null && value !== undefined;
+                });
+                badge.textContent = String(values.length);
+                badge.style.display = values.length > 0 ? '' : 'none';
+            },
+
+            _ensureResizeHandler: function () {
+                if (_resizeHandlerBound) return;
+                _resizeHandlerBound = true;
+                window.addEventListener('message', function (event) {
+                    App.pages.members._handleFrameMessage(event);
+                });
+                window.addEventListener('resize', function () {
+                    App.pages.members._applyTableHeight(_currentTab);
+                });
+            },
+
+            _handleFrameMessage: function (event) {
+                const data = event.data || {};
+                if (!data || data.source !== 'members-tabulator' || !data.tabName || !_frameState[data.tabName]) {
+                    return;
+                }
+
+                const frame = document.getElementById(_frameIds[data.tabName]);
+                if (!frame || event.source !== frame.contentWindow) {
+                    return;
+                }
+
+                if (data.token !== _frameState[data.tabName].token) {
+                    return;
+                }
+
+                if (data.type === _frameMessageType.ready) {
+                    _frameState[data.tabName].ready = true;
+                    this._applyTableHeight(data.tabName);
+                    if (_frameState[data.tabName].pendingPayload) {
+                        this._postFrameMessage(data.tabName, _frameMessageType.render, _frameState[data.tabName].pendingPayload);
+                        _frameState[data.tabName].pendingPayload = null;
+                    }
+                    return;
+                }
+
+                if (data.type === _frameMessageType.rowClick) {
+                    this._handleFrameRowClick(data.tabName, data.payload || {});
+                    return;
+                }
+
+                if (data.type === _frameMessageType.sortChange) {
+                    const sorters = (data.payload && data.payload.sorters) || [];
+                    _sortState[data.tabName] = sorters.map(function (sorter) {
+                        return { col: sorter.column, dir: sorter.dir === 'desc' ? 'desc' : 'asc' };
+                    });
+                    return;
+                }
+
+                if (data.type === _frameMessageType.error) {
+                    console.error('[Members] Tabulator iframe error:', (data.payload && data.payload.message) || 'unknown error');
+                    showSnackbar('メンバー一覧の描画に失敗しました', 'error');
+                }
+            },
+
+            _handleFrameRowClick: function (tabName, payload) {
+                const rowId = payload && payload.rowId ? String(payload.rowId) : '';
+                if (!rowId) return;
+
+                if (tabName === 'member') {
+                    if (App.modals.memberDetail && App.modals.memberDetail.open) {
+                        App.modals.memberDetail.open(rowId);
+                    }
+                    return;
+                }
+
+                if (tabName === 'directory') {
+                    if (App.modals.directoryDetail && App.modals.directoryDetail.open) {
+                        App.modals.directoryDetail.open(rowId);
+                    }
+                    return;
+                }
+
+                if (App.modals.skillDetail && App.modals.skillDetail.open) {
+                    App.modals.skillDetail.open(rowId);
+                }
+            },
+
+            _applyTableHeight: function (tabName) {
+                const container = document.getElementById(_containers[tabName]);
+                const frame = document.getElementById(_frameIds[tabName]);
+                if (!container || !frame) return;
+                try {
+                    const mainElement = document.querySelector('main');
+                    if (!mainElement) return;
+                    const windowHeight = window.innerHeight;
+                    const rect = container.getBoundingClientRect();
+                    if (rect.top <= 0) return;
+                    const mainStyle = window.getComputedStyle(mainElement);
+                    const marginBottom = parseFloat(mainStyle.marginBottom) || 0;
+                    const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
+                    const offsetBottom = marginBottom + paddingBottom + 32;
+                    const newHeight = windowHeight - rect.top - offsetBottom;
+                    if (newHeight > 0) {
+                        container.style.height = newHeight + 'px';
+                        container.style.minHeight = newHeight + 'px';
+                        frame.style.height = newHeight + 'px';
+                        this._postFrameMessage(tabName, _frameMessageType.resize, { height: newHeight });
+                    }
+                } catch (err) {
+                    console.error('[Members] テーブル高さの計算に失敗:', err);
+                }
+            },
+
+            _escapeHtml: function (value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            },
+
+            _escapeAttr: function (value) {
+                return this._escapeHtml(value).replace(/`/g, '&#96;');
+            }
+        };
+
+        App.modals.filterMembers = {
+            open: function () {
+                this.syncUI();
+                ui('#modal-filter-members');
+            },
+
+            syncUI: function () {
+                const title = document.getElementById('members-filter-title');
+                const container = document.getElementById('members-filter-fields');
+                const tabName = App.pages.members.getCurrentTab();
+                const fields = App.pages.members.getFilterFields(tabName);
+                const currentFilters = App.pages.members.getCurrentFilters();
+
+                if (title) {
+                    title.textContent = App.pages.members.getCurrentTabLabel() + '一覧のフィルタ';
+                }
+                if (!container) return;
+
+                container.innerHTML = fields.map(function (field) {
+                    if (field.type === 'select') {
+                        return '<div class="s12 m6 l6"><div class="field border large suffix no-wrap label">' +
+                            '<select id="members-filter-' + field.key + '">' +
+                            field.options.map(function (option) {
+                                return '<option value="' + App.pages.members._escapeAttr(option.value) + '">' + App.pages.members._escapeHtml(option.label) + '</option>';
+                            }).join('') +
+                            '</select><label>' + App.pages.members._escapeHtml(field.label) + '</label><i>arrow_drop_down</i></div></div>';
+                    }
+                    const inputType = field.type === 'number' ? 'number' : 'text';
+                    return '<div class="s12 m6 l6"><div class="field border large label">' +
+                        '<input type="' + inputType + '" id="members-filter-' + field.key + '" placeholder=" ">' +
+                        '<label>' + App.pages.members._escapeHtml(field.label) + '</label></div></div>';
+                }).join('');
+
+                fields.forEach(function (field) {
+                    const input = document.getElementById('members-filter-' + field.key);
+                    if (input) input.value = currentFilters[field.key] || '';
+                });
+            },
+
+            apply: function () {
+                const tabName = App.pages.members.getCurrentTab();
+                const fields = App.pages.members.getFilterFields(tabName);
+                const nextFilters = {};
+                fields.forEach(function (field) {
+                    const input = document.getElementById('members-filter-' + field.key);
+                    nextFilters[field.key] = input ? input.value : '';
+                });
+                App.pages.members.setFilters(tabName, nextFilters);
+                ui('#modal-filter-members');
+            },
+
+            resetAll: function () {
+                const tabName = App.pages.members.getCurrentTab();
+                App.pages.members.resetFilters(tabName);
+                this.syncUI();
+            }
+        };
+    })();
+</script>
