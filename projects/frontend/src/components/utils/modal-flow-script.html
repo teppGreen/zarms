@@ -1,0 +1,47 @@
+<script>
+    (function () {
+        App.utils.modalFlow = {
+            /**
+             * membersページを強制再同期します
+             * @param {boolean} forceRefresh
+             * @returns {Promise<void>}
+             */
+            reloadMembersData: async function (forceRefresh) {
+                if (!App.pages.members || !App.pages.members.loadData) return;
+                await App.pages.members.loadData(forceRefresh === true);
+            },
+
+            /**
+             * membersページの再同期をバックグラウンドで実行します
+             * @param {boolean} forceRefresh
+             */
+            refreshMembersDataInBackground: function (forceRefresh) {
+                if (!App.pages.members || !App.pages.members.loadData) return;
+                Promise.resolve().then(function () {
+                    return App.pages.members.loadData(forceRefresh === true);
+                }).catch(function (error) {
+                    console.error('[modalFlow] background reload failed', error);
+                });
+            },
+
+            /**
+             * 共通エラー処理
+             * @param {string} snackbarMessage
+             * @param {any} error
+             * @param {boolean} shouldReload
+             * @returns {Promise<void>}
+             */
+            handleOperationError: async function (snackbarMessage, error, shouldReload) {
+                if (error) {
+                    console.error('[modalFlow] operation failed', error);
+                }
+                if (snackbarMessage) {
+                    showSnackbar(snackbarMessage, 'error');
+                }
+                if (shouldReload) {
+                    this.refreshMembersDataInBackground(true);
+                }
+            }
+        };
+    })();
+</script>
