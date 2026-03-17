@@ -20,9 +20,11 @@
       deletedChildTaskIds: [], // 削除された子タスクIDの配列
 
       // ファイル管理
+      currentLinks: [], // 現在のリンクデータ
+      originalLinks: [], // 元のリンクデータ（変更検知用）
       currentFiles: [], // 現在のファイルデータ
       originalFiles: [], // 元のファイルデータ（変更検知用）
-      deletedFileIds: [], // 削除されたファイルIDの配列
+      deletedFileIds: [], // 削除されたファイルIDの配列（現状は未使用）
 
       open: async function (taskId, skipUrlUpdate = false, defaultDirty = false) {
         console.log('[TaskDetail] open called with id:', taskId);
@@ -110,6 +112,7 @@
 
         this.loadLists(taskId);
         this.loadRelatedTasks(taskId);
+        this.loadAssets(taskId);
         this.isDirty = defaultDirty;
       },
 
@@ -463,13 +466,21 @@
           relatedChanges.childTasksToAdd.length > 0 ||
           relatedChanges.childTasksToRemove.length > 0;
 
+        // リンク/ファイルの変更をチェック
+        const assetChanges = this.getAssetChanges();
+        const hasAssetChanges =
+          assetChanges.links.toInsert.length > 0 ||
+          assetChanges.links.toUpdate.length > 0 ||
+          assetChanges.files.toInsert.length > 0 ||
+          assetChanges.files.toUpdate.length > 0;
+
         // 親タスクの変更をupdatesに含める
         if (relatedChanges.hasParentChange) {
           updates.parent_task_id = currentItem.parent_task_id || '';
           hasChanges = true;
         }
 
-        if (!hasChanges && !hasListChanges && !hasRelatedChanges) {
+        if (!hasChanges && !hasListChanges && !hasRelatedChanges && !hasAssetChanges) {
           this.close(false, true, skipClose);
           return;
         }
@@ -519,6 +530,11 @@
             await this.saveRelatedTaskChanges(id, relatedChanges);
           }
 
+          // リンク/ファイルの変更を保存
+          if (hasAssetChanges) {
+            await this.saveAssetChanges(assetChanges);
+          }
+
           console.log('[TaskDetail] Update successful');
           showSnackbar('変更を保存しました', 'success');
 
@@ -526,6 +542,8 @@
           if (this.currentId === id) {
             this.originalData = { ...currentItem };
             this.originalLists = JSON.parse(JSON.stringify(this.currentLists));
+            this.originalLinks = JSON.parse(JSON.stringify(this.currentLinks));
+            this.originalFiles = JSON.parse(JSON.stringify(this.currentFiles));
             this.deletedListIds = [];
             this.isDirty = false;
           }
@@ -617,6 +635,11 @@
         this.originalLists = [];
         this.deletedListIds = [];
         this.isListLoadingFresh = true;
+        this.currentLinks = [];
+        this.originalLinks = [];
+        this.currentFiles = [];
+        this.originalFiles = [];
+        this.deletedFileIds = [];
 
         // 関連タスクのリセット
         this.currentParentTask = null;
@@ -652,6 +675,10 @@
 
         const listsContainer = document.getElementById('task-list-items');
         if (listsContainer) listsContainer.innerHTML = '';
+        const linkContainer = document.getElementById('task-link-items');
+        if (linkContainer) linkContainer.innerHTML = '';
+        const fileContainer = document.getElementById('task-file-items');
+        if (fileContainer) fileContainer.innerHTML = '';
 
         // コメントリストをクリア
         const commentsList = document.getElementById('task-comments-list');
@@ -1647,6 +1674,224 @@
         }
 
         this.updateRelatedBadge();
+      },
+
+      loadAssets: function (taskId) {
+        if (!taskId) return;
+
+        const linkContainer = document.getElementById('task-link-items');
+        const fileContainer = document.getElementById('task-file-items');
+        if (linkContainer) {
+          linkContainer.innerHTML = '<p class="small-text secondary-text">読み込み中</p>';
+        }
+        if (fileContainer) {
+          fileContainer.innerHTML = '<p class="small-text secondary-text">読み込み中</p>';
+        }
+
+        const linkQuery = {
+          where: { task_id: ['=', taskId] },
+          orderBy: { index: 'asc' }
+        };
+        const fileQuery = {
+          where: { task_id: ['=', taskId] },
+          orderBy: { index: 'asc' }
+        };
+
+        Promise.all([
+          callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LINKS, 'select', linkQuery),
+          callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.FILES, 'select', fileQuery)
+        ]).then(results => {
+          if (this.currentId !== taskId) return;
+
+          const links = results[0]?.data || results[0] || [];
+          const files = results[1]?.data || results[1] || [];
+
+          this.currentLinks = Array.isArray(links) ? links : [];
+          this.originalLinks = JSON.parse(JSON.stringify(this.currentLinks));
+          this.currentFiles = Array.isArray(files) ? files : [];
+          this.originalFiles = JSON.parse(JSON.stringify(this.currentFiles));
+
+          this.renderAssets();
+          this.updateAssetsBadge();
+        }).catch(error => {
+          console.error('[TaskDetail] Error loading assets:', error);
+          if (linkContainer) {
+            linkContainer.innerHTML = '<p class="error-text small-text">リンクの読み込みに失敗しました</p>';
+          }
+          if (fileContainer) {
+            fileContainer.innerHTML = '<p class="error-text small-text">ファイルの読み込みに失敗しました</p>';
+          }
+        });
+      },
+
+      renderAssets: function () {
+        const linkContainer = document.getElementById('task-link-items');
+        const fileContainer = document.getElementById('task-file-items');
+        if (!linkContainer || !fileContainer) return;
+
+        if (!this.currentLinks || this.currentLinks.length === 0) {
+          linkContainer.innerHTML = '<p class="secondary-text small-text">リンクはありません</p>';
+        } else {
+          linkContainer.innerHTML = this.currentLinks.map((link, index) => {
+            const safeId = escapeHtmlAttribute(link.id || ('new-link-' + index));
+            return '' +
+              '<div class="row tiny-space top-margin">' +
+              '<div class="field border label small max">' +
+              '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(link.label || '') + '" onchange="App.modals.taskDetail.updateLinkField(\'' + safeId + '\', \'label\', this.value)">' +
+              '<label>ラベル</label>' +
+              '</div>' +
+              '<div class="field border label small max">' +
+              '<input type="url" placeholder=" " value="' + escapeHtmlAttribute(link.url || '') + '" onchange="App.modals.taskDetail.updateLinkField(\'' + safeId + '\', \'url\', this.value)">' +
+              '<label>URL</label>' +
+              '</div>' +
+              '</div>';
+          }).join('');
+        }
+
+        if (!this.currentFiles || this.currentFiles.length === 0) {
+          fileContainer.innerHTML = '<p class="secondary-text small-text">ファイルはありません</p>';
+        } else {
+          fileContainer.innerHTML = this.currentFiles.map((file, index) => {
+            const safeId = escapeHtmlAttribute(file.id || ('new-file-' + index));
+            return '' +
+              '<div class="row tiny-space top-margin">' +
+              '<div class="field border label small max">' +
+              '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(file.gfile_id || '') + '" onchange="App.modals.taskDetail.updateFileField(\'' + safeId + '\', this.value)">' +
+              '<label>Google DriveファイルID</label>' +
+              '</div>' +
+              '</div>';
+          }).join('');
+        }
+      },
+
+      createLinkItem: function () {
+        if (!this.currentId) return;
+        this.isDirty = true;
+        this.currentLinks.push({
+          id: 'new-link-' + String(Date.now()) + String(Math.random()).slice(2),
+          task_id: this.currentId,
+          index: this.currentLinks.length,
+          label: '',
+          url: '',
+          _isNew: true
+        });
+        this.renderAssets();
+        this.updateAssetsBadge();
+      },
+
+      createFileItem: function () {
+        if (!this.currentId) return;
+        this.isDirty = true;
+        this.currentFiles.push({
+          id: 'new-file-' + String(Date.now()) + String(Math.random()).slice(2),
+          task_id: this.currentId,
+          index: this.currentFiles.length,
+          gfile_id: '',
+          _isNew: true
+        });
+        this.renderAssets();
+        this.updateAssetsBadge();
+      },
+
+      updateLinkField: function (linkId, field, value) {
+        const target = this.currentLinks.find(function (item) { return String(item.id) === String(linkId); });
+        if (!target) return;
+        target[field] = value;
+        this.isDirty = true;
+      },
+
+      updateFileField: function (fileId, value) {
+        const target = this.currentFiles.find(function (item) { return String(item.id) === String(fileId); });
+        if (!target) return;
+        target.gfile_id = value;
+        this.isDirty = true;
+      },
+
+      getAssetChanges: function () {
+        const linkInsert = [];
+        const linkUpdate = [];
+        const fileInsert = [];
+        const fileUpdate = [];
+
+        this.currentLinks.forEach(current => {
+          const isNew = current._isNew === true;
+          if (isNew) {
+            linkInsert.push({
+              task_id: this.currentId,
+              index: Number(current.index || 0),
+              label: current.label || null,
+              url: current.url || null
+            });
+            return;
+          }
+          const original = this.originalLinks.find(function (item) { return item.id === current.id; });
+          if (!original) return;
+          if ((current.label || '') !== (original.label || '') || (current.url || '') !== (original.url || '') || Number(current.index || 0) !== Number(original.index || 0)) {
+            linkUpdate.push(current);
+          }
+        });
+
+        this.currentFiles.forEach(current => {
+          const isNew = current._isNew === true;
+          if (isNew) {
+            fileInsert.push({
+              task_id: this.currentId,
+              index: Number(current.index || 0),
+              gfile_id: current.gfile_id || null
+            });
+            return;
+          }
+          const original = this.originalFiles.find(function (item) { return item.id === current.id; });
+          if (!original) return;
+          if ((current.gfile_id || '') !== (original.gfile_id || '') || Number(current.index || 0) !== Number(original.index || 0)) {
+            fileUpdate.push(current);
+          }
+        });
+
+        return {
+          links: { toInsert: linkInsert, toUpdate: linkUpdate },
+          files: { toInsert: fileInsert, toUpdate: fileUpdate }
+        };
+      },
+
+      saveAssetChanges: async function (changes) {
+        const links = changes.links || { toInsert: [], toUpdate: [] };
+        const files = changes.files || { toInsert: [], toUpdate: [] };
+
+        if (links.toInsert.length > 0) {
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LINKS, 'bulkinsert', links.toInsert);
+        }
+        for (const link of links.toUpdate) {
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LINKS, 'update', {
+            where: { id: ['=', link.id] },
+            set: {
+              index: Number(link.index || 0),
+              label: link.label || null,
+              url: link.url || null
+            }
+          });
+        }
+
+        if (files.toInsert.length > 0) {
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.FILES, 'bulkinsert', files.toInsert);
+        }
+        for (const file of files.toUpdate) {
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.FILES, 'update', {
+            where: { id: ['=', file.id] },
+            set: {
+              index: Number(file.index || 0),
+              gfile_id: file.gfile_id || null
+            }
+          });
+        }
+      },
+
+      updateAssetsBadge: function () {
+        const badge = document.getElementById('task-assets-badge');
+        if (!badge) return;
+        const count = (this.currentLinks || []).length + (this.currentFiles || []).length;
+        badge.textContent = String(count);
+        badge.style.display = count > 0 ? '' : 'none';
       },
 
       /**
