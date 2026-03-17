@@ -3,6 +3,7 @@
         App.modals.skillDetail = {
             currentId: null,
             currentItem: null,
+            originalData: null,
 
             open: function (skillId) {
                 if (!skillId) return;
@@ -15,6 +16,7 @@
 
                 this.currentId = skillId;
                 this.currentItem = Object.assign({}, skill);
+                this.originalData = Object.assign({}, skill);
 
                 const modal = document.getElementById('modal-detail-skill');
                 const overlay = document.getElementById('overlay');
@@ -30,6 +32,86 @@
                 this._reset();
             },
 
+            save: async function () {
+                if (!this.currentId) return;
+
+                const title = (document.getElementById('skill-detail-title-input')?.value || '').trim();
+                const typeKey = (document.getElementById('skill-detail-type-input')?.value || '').trim() || null;
+                const description = (document.getElementById('skill-detail-description-input')?.value || '').trim() || null;
+                const remark = (document.getElementById('skill-detail-remark-input')?.value || '').trim() || null;
+                const errorEl = document.getElementById('skill-detail-error');
+
+                if (!title) {
+                    if (errorEl) {
+                        errorEl.textContent = 'タイトルは必須です';
+                        errorEl.style.display = '';
+                    }
+                    return;
+                }
+                if (errorEl) errorEl.style.display = 'none';
+
+                const updates = {
+                    title: title,
+                    skill_type_key: typeKey,
+                    description: description,
+                    remark: remark
+                };
+
+                const orig = this.originalData || {};
+                let hasChanges = false;
+                Object.keys(updates).forEach(function (key) {
+                    if (String(updates[key] || '') !== String(orig[key] || '')) {
+                        hasChanges = true;
+                    }
+                });
+                if (!hasChanges) {
+                    this.close();
+                    return;
+                }
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILLS, 'update', {
+                        where: { id: ['=', this.currentId] },
+                        set: updates
+                    }, 'スキルを更新');
+
+                    const target = (App.state.data.skills || []).find(function (item) {
+                        return item.id === App.modals.skillDetail.currentId;
+                    });
+                    if (target) {
+                        Object.assign(target, updates);
+                    }
+
+                    showSnackbar('スキルを更新しました', 'success');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+
+                    const latest = (App.state.data.skills || []).find(function (item) {
+                        return item.id === App.modals.skillDetail.currentId;
+                    });
+                    if (latest) {
+                        this.currentItem = Object.assign({}, latest);
+                        this.originalData = Object.assign({}, latest);
+                        this._render(latest);
+                    }
+                } catch (err) {
+                    console.error('[SkillDetail] save failed:', err);
+                    showSnackbar('スキルの更新に失敗しました', 'error');
+                    if (errorEl) {
+                        errorEl.textContent = '更新に失敗しました';
+                        errorEl.style.display = '';
+                    }
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+                }
+            },
+
             _render: function (skill) {
                 const titleEl = document.getElementById('skill-detail-title');
                 const typeEl = document.getElementById('skill-detail-type');
@@ -41,6 +123,33 @@
                 if (typeEl) typeEl.textContent = skill.skill_type_key || '';
                 if (descEl) descEl.textContent = skill.description || '';
                 if (idEl) idEl.textContent = skill.id ? '#' + skill.id : '';
+
+                const titleInput = document.getElementById('skill-detail-title-input');
+                if (titleInput) titleInput.value = skill.title || '';
+                const typeInput = document.getElementById('skill-detail-type-input');
+                if (typeInput) {
+                    const knownTypes = (App.state.data.skills || []).reduce(function (result, item) {
+                        const key = (item.skill_type_key || '').trim();
+                        if (key && result.indexOf(key) === -1) {
+                            result.push(key);
+                        }
+                        return result;
+                    }, []).sort(function (left, right) {
+                        return left.localeCompare(right);
+                    });
+
+                    typeInput.innerHTML = '<option value="">（未設定）</option>' + knownTypes.map(function (key) {
+                        const escaped = escapeHtmlAttribute(key);
+                        return '<option value="' + escaped + '">' + escapeHtml(key) + '<\/option>';
+                    }).join('');
+                    typeInput.value = skill.skill_type_key || '';
+                }
+                const descInput = document.getElementById('skill-detail-description-input');
+                if (descInput) descInput.value = skill.description || '';
+                const remarkInput = document.getElementById('skill-detail-remark-input');
+                if (remarkInput) remarkInput.value = skill.remark || '';
+                const errorEl = document.getElementById('skill-detail-error');
+                if (errorEl) errorEl.style.display = 'none';
 
                 if (lastUpdatedEl) {
                     if (skill.updated_at) {
@@ -168,11 +277,18 @@
                 } catch (err) {
                     console.error('[SkillDetail] 追加エラー:', err);
                     showSnackbar('スキルの登録に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
                 }
 
                 this._renderMembers(skillId);
-                if (App.pages.members && App.pages.members.loadData) {
-                    App.pages.members.loadData(true);
+                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                    App.utils.modalFlow.refreshMembersDataInBackground(false);
+                } else if (App.pages.members && App.pages.members.loadData) {
+                    App.pages.members.loadData(false);
                 }
             },
 
@@ -194,6 +310,11 @@
                 } catch (err) {
                     console.error('[SkillDetail] 更新エラー:', err);
                     showSnackbar('更新に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
                 }
             },
 
@@ -215,11 +336,18 @@
                 } catch (err) {
                     console.error('[SkillDetail] 解除エラー:', err);
                     showSnackbar('解除に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
                 }
 
                 this._renderMembers(this.currentId);
-                if (App.pages.members && App.pages.members.loadData) {
-                    App.pages.members.loadData(true);
+                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                    App.utils.modalFlow.refreshMembersDataInBackground(false);
+                } else if (App.pages.members && App.pages.members.loadData) {
+                    App.pages.members.loadData(false);
                 }
             },
 
@@ -233,6 +361,7 @@
             _reset: function () {
                 this.currentId = null;
                 this.currentItem = null;
+                this.originalData = null;
 
                 const container = document.getElementById('skill-detail-members-list');
                 if (container) container.innerHTML = '';
@@ -248,6 +377,18 @@
                 if (descEl) descEl.textContent = '';
                 if (idEl) idEl.textContent = '';
                 if (lastUpdatedEl) lastUpdatedEl.innerHTML = '';
+
+                const titleInput = document.getElementById('skill-detail-title-input');
+                const typeInput = document.getElementById('skill-detail-type-input');
+                const descInput = document.getElementById('skill-detail-description-input');
+                const remarkInput = document.getElementById('skill-detail-remark-input');
+                const errorEl = document.getElementById('skill-detail-error');
+
+                if (titleInput) titleInput.value = '';
+                if (typeInput) typeInput.value = '';
+                if (descInput) descInput.value = '';
+                if (remarkInput) remarkInput.value = '';
+                if (errorEl) errorEl.style.display = 'none';
             }
         };
     })();

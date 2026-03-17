@@ -210,11 +210,14 @@
                 } catch (err) {
                     console.error('[MemberDetail] 所属組織登録エラー:', err);
                     showSnackbar('所属組織の登録に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    }
                 }
 
                 this._renderDirectories(memberId);
-                if (App.pages.members && App.pages.members.loadData) {
-                    App.pages.members.loadData(true);
+                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                    App.utils.modalFlow.refreshMembersDataInBackground(false);
                 }
             },
 
@@ -237,11 +240,14 @@
                 } catch (err) {
                     console.error('[MemberDetail] 所属組織解除エラー:', err);
                     showSnackbar('解除に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    }
                 }
 
                 this._renderDirectories(this.currentId);
-                if (App.pages.members && App.pages.members.loadData) {
-                    App.pages.members.loadData(true);
+                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                    App.utils.modalFlow.refreshMembersDataInBackground(false);
                 }
             },
 
@@ -308,11 +314,14 @@
                 } catch (err) {
                     console.error('[MemberDetail] スキル登録エラー:', err);
                     showSnackbar('スキルの登録に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    }
                 }
 
                 this._renderSkills(memberId);
-                if (App.pages.members && App.pages.members.loadData) {
-                    App.pages.members.loadData(true);
+                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                    App.utils.modalFlow.refreshMembersDataInBackground(false);
                 }
             },
 
@@ -333,6 +342,9 @@
                 } catch (err) {
                     console.error('[MemberDetail] スキル更新エラー:', err);
                     showSnackbar('更新に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    }
                 }
             },
 
@@ -353,11 +365,14 @@
                 } catch (err) {
                     console.error('[MemberDetail] スキル解除エラー:', err);
                     showSnackbar('解除に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    }
                 }
 
                 this._renderSkills(this.currentId);
-                if (App.pages.members && App.pages.members.loadData) {
-                    App.pages.members.loadData(true);
+                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                    App.utils.modalFlow.refreshMembersDataInBackground(false);
                 }
             },
 

@@ -40,6 +40,14 @@
                     return;
                 }
 
+                if (parentId && this._hasParentCycle(parentId, this.currentId)) {
+                    if (errorEl) {
+                        errorEl.textContent = '親組織に自身または子孫組織は設定できません';
+                        errorEl.style.display = '';
+                    }
+                    return;
+                }
+
                 if (errorEl) errorEl.style.display = 'none';
 
                 const updateSet = {
@@ -63,8 +71,10 @@
                         Object.assign(target, updateSet);
                     }
 
-                    if (App.pages.members && App.pages.members.loadData) {
-                        await App.pages.members.loadData(true);
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
                     }
 
                     showSnackbar('ディレクトリを更新しました', 'success');
@@ -75,6 +85,127 @@
                         errorEl.textContent = '更新に失敗しました';
                         errorEl.style.display = '';
                     }
+                }
+            },
+
+            openAddMembers: function () {
+                if (!this.currentId) return;
+                if (!App.modals.selectMembers || !App.modals.selectMembers.open) return;
+
+                const directoryId = this.currentId;
+                const preSelected = (App.state.data.directoryAssignments || [])
+                    .filter(function (a) { return a.directory_id === directoryId && a.is_active !== false; })
+                    .map(function (a) { return a.member_id; });
+
+                App.modals.selectMembers.open({
+                    multiSelect: true,
+                    preSelected: preSelected,
+                    callback: function (selectedIds) {
+                        App.modals.directoryDetail.applyMembersSelection(directoryId, selectedIds);
+                    }
+                });
+            },
+
+            applyMembersSelection: async function (directoryId, selectedIds) {
+                if (!directoryId) return;
+                if (!selectedIds || selectedIds.length === 0) return;
+
+                const assignments = App.state.data.directoryAssignments || [];
+                showSnackbar('所属メンバーを更新しています...', 'info', 'top', 0);
+
+                try {
+                    for (let i = 0; i < selectedIds.length; i++) {
+                        const memberId = selectedIds[i];
+                        const existing = assignments.find(function (a) {
+                            return a.directory_id === directoryId && a.member_id === memberId;
+                        });
+
+                        if (existing) {
+                            if (existing.is_active === false) {
+                                await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                                    where: { id: ['=', existing.id] },
+                                    set: { is_active: true }
+                                }, '所属メンバーを更新');
+                                existing.is_active = true;
+                            }
+                            continue;
+                        }
+
+                        const record = {
+                            directory_id: directoryId,
+                            member_id: memberId,
+                            is_active: true
+                        };
+
+                        const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'insert', record, '所属メンバーを追加');
+                        if (inserted && inserted.data && inserted.data.id) {
+                            record.id = inserted.data.id;
+                        }
+                        assignments.push(record);
+                    }
+
+                    showSnackbar('所属メンバーを更新しました', 'success');
+                } catch (err) {
+                    console.error('[directoryDetail] applyMembersSelection failed', err);
+                    showSnackbar('所属メンバーの更新に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+                }
+
+                const directory = (App.state.data.directories || []).find(function (item) { return item.id === directoryId; });
+                if (directory) {
+                    this._render(directory);
+                }
+                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                    App.utils.modalFlow.refreshMembersDataInBackground(false);
+                } else if (App.pages.members && App.pages.members.loadData) {
+                    App.pages.members.loadData(false);
+                }
+            },
+
+            deactivateMemberAssignment: async function (assignmentId) {
+                if (!assignmentId) return;
+                if (!confirm('所属メンバーを解除しますか？')) return;
+
+                const assignments = App.state.data.directoryAssignments || [];
+                const target = assignments.find(function (a) { return a.id === assignmentId; });
+                if (!target) return;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', assignmentId] },
+                        set: { is_active: false }
+                    }, '所属メンバーを解除');
+                    target.is_active = false;
+                    showSnackbar('所属メンバーを解除しました', 'success');
+                } catch (err) {
+                    console.error('[directoryDetail] deactivateMemberAssignment failed', err);
+                    showSnackbar('所属メンバーの解除に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+                }
+
+                const directory = (App.state.data.directories || []).find(function (item) { return item.id === this.currentId; }, this);
+                if (directory) {
+                    this._render(directory);
+                }
+                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                    App.utils.modalFlow.refreshMembersDataInBackground(false);
+                } else if (App.pages.members && App.pages.members.loadData) {
+                    App.pages.members.loadData(false);
+                }
+            },
+
+            openMemberDetail: function (memberId) {
+                if (!memberId) return;
+                if (App.modals.memberDetail && App.modals.memberDetail.open) {
+                    App.modals.memberDetail.open(memberId);
                 }
             },
 
@@ -116,7 +247,18 @@
                 const chips = assignments.map(function (assignment) {
                     const member = members.find(function (item) { return item.id === assignment.member_id; });
                     const label = member ? (member.display_name || member.name || member.email || '不明') : '不明';
-                    return '<span class="chip small">' + escapeHtml(label) + '</span>';
+                    const openButton = member && member.id
+                        ? '<button class="small border round" onclick="App.modals.directoryDetail.openMemberDetail(\'' + escapeHtmlAttribute(member.id) + '\')">詳細<\/button>'
+                        : '';
+                    const removeButton = assignment.id
+                        ? '<button class="small border round" onclick="App.modals.directoryDetail.deactivateMemberAssignment(\'' + escapeHtmlAttribute(assignment.id) + '\')">解除<\/button>'
+                        : '';
+
+                    return '<div class="row middle-align tiny-space padding">' +
+                        '<i>person<\/i>' +
+                        '<div class="max"><p class="no-margin small">' + escapeHtml(label) + '<\/p><\/div>' +
+                        '<div class="row tiny-space">' + openButton + removeButton + '<\/div>' +
+                        '<\/div>';
                 }).join('');
 
                 const setValue = function (id, value) {
@@ -140,9 +282,25 @@
                 const memberCountEl = document.getElementById('directory-detail-member-count');
                 if (memberCountEl) memberCountEl.textContent = '所属メンバー数: ' + String(assignments.length);
                 const membersEl = document.getElementById('directory-detail-members');
-                if (membersEl) membersEl.innerHTML = chips || '<span class="small-text secondary-text">所属メンバーはありません</span>';
+                if (membersEl) membersEl.innerHTML = chips || '<p class="small-text secondary-text">所属メンバーはありません</p>';
                 const errorEl = document.getElementById('directory-detail-error');
                 if (errorEl) errorEl.style.display = 'none';
+            },
+
+            _hasParentCycle: function (parentId, currentId) {
+                const directories = App.state.data.directories || [];
+                const visited = {};
+                let cursor = parentId;
+
+                while (cursor) {
+                    if (cursor === currentId) return true;
+                    if (visited[cursor]) return true;
+                    visited[cursor] = true;
+                    const node = directories.find(function (item) { return item.id === cursor; });
+                    cursor = node ? (node.parent_directory_id || null) : null;
+                }
+
+                return false;
             }
         };
     })();
