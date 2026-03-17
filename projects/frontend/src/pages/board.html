@@ -132,10 +132,13 @@
                             <nav id="board-tab-header-${board.id}" class="no-margin no-padding row">
                                 <h3 class="bold small">${escapeHtml(board.name)}</h3>
                                 <div class="max"></div>
-                                <div class="no-margin no-padding small-round surface-container-low board-view-toggle" id="view-toggle-${board.id}" title="表示切替">
-                                    <button class="square no-margin transparent view-kanban-btn" onclick="App.pages.boards.switchViewMode('${board.id}', 'kanban')" title="カンバン表示"><i>view_kanban</i></button>
-                                    <button class="square no-margin transparent view-list-btn" onclick="App.pages.boards.switchViewMode('${board.id}', 'list')" title="リスト表示"><i>view_list</i></button>
-                                </div>
+                                <label class="switch icon board-view-toggle" id="view-toggle-${board.id}">
+                                    <input type="checkbox" onchange="App.pages.boards.onViewToggleChange('${board.id}')">
+                                    <span>
+                                        <i>table</i>
+                                    </span>
+                                    <div class="tooltip bottom">テーブルビュー</div>
+                                </label>
                                 <button class="circle transparent" id="btn-share-${board.id}">
                                     <i>share</i>
                                     <div class="tooltip bottom">共有</div>
@@ -198,10 +201,13 @@
                     <nav id="board-tab-header-${boardId}" class="no-padding no-margin row">
                         <h3 class="bold small">マイボード</h3>
                         <div class="max"></div>
-                        <div class="no-margin no-padding small-round surface-container-low board-view-toggle" id="view-toggle-${boardId}" title="表示切替">
-                            <button class="square no-margin transparent view-kanban-btn" onclick="App.pages.boards.switchViewMode('${boardId}', 'kanban')" title="カンバン表示"><i>view_kanban</i></button>
-                            <button class="square no-margin transparent view-list-btn" onclick="App.pages.boards.switchViewMode('${boardId}', 'list')" title="リスト表示"><i>view_list</i></button>
-                        </div>
+                        <label class="switch icon board-view-toggle" id="view-toggle-${boardId}">
+                            <input type="checkbox" onchange="App.pages.boards.onViewToggleChange('${boardId}')">
+                            <span>
+                                <i>table</i>
+                            </span>
+                            <div class="tooltip bottom">テーブルビュー</div>
+                        </label>
                         <a onclick="App.pages.boards.resetMyBoardFilters()">
                             <span>デフォルトのフィルタ</span>
                             <div class="tooltip bottom">自分が担当者のタスクのみ表示</div>
@@ -504,24 +510,17 @@
              */
             syncViewToggle: function (boardId) {
                 // UI上のすべてのトグルに反映（ページ全体の共有仕様）
-                document.querySelectorAll('.board-view-toggle .view-kanban-btn').forEach(btn => {
-                    const isActive = this.viewMode !== 'list';
-                    btn.classList.toggle('active', isActive);
-                    btn.classList.toggle('fill', isActive);
-                    btn.classList.toggle('transparent', !isActive);
-                });
-                document.querySelectorAll('.board-view-toggle .view-list-btn').forEach(btn => {
-                    const isActive = this.viewMode === 'list';
-                    btn.classList.toggle('active', isActive);
-                    btn.classList.toggle('fill', isActive);
-                    btn.classList.toggle('transparent', !isActive);
+                // checked = list表示、unchecked = kanban表示
+                const isListMode = this.viewMode === 'list';
+                document.querySelectorAll('.board-view-toggle input[type="checkbox"]').forEach(checkbox => {
+                    checkbox.checked = isListMode;
                 });
 
                 // 指定されたボードのキャンバス表示状態を切り替え
                 if (boardId) {
                     const kanbanCanvas = document.getElementById(`kanban-canvas-${boardId}`);
                     const listCanvas = document.getElementById(`list-canvas-${boardId}`);
-                    if (this.viewMode === 'list') {
+                    if (isListMode) {
                         if (kanbanCanvas) kanbanCanvas.style.display = 'none';
                         if (listCanvas) listCanvas.style.display = '';
                     } else {
@@ -529,6 +528,17 @@
                         if (kanbanCanvas) kanbanCanvas.style.display = '';
                     }
                 }
+            },
+
+            /**
+             * checkboxの変更イベントハンドラ
+             */
+            onViewToggleChange: function (boardId) {
+                const checkbox = document.querySelector(`#view-toggle-${boardId} input[type="checkbox"]`);
+                if (!checkbox) return;
+                // checked = list表示、unchecked = kanban表示
+                const mode = checkbox.checked ? 'list' : 'kanban';
+                this.switchViewMode(boardId, mode);
             },
 
             /**
@@ -1465,7 +1475,7 @@
                 const modalHtml = `
                     <dialog id="modal-board-settings-${boardId}" class="modal medium-width padding">
                         <nav class="small-padding bottom-margin">
-                            <h5 class="max bold">ボードの設定</h5>
+                            <h5 class="max bold">ボード設定</h5>
                             <button class="circle transparent" onclick="ui('#modal-board-settings-${boardId}')">
                                 <i>close</i>
                             </button>
@@ -1477,7 +1487,7 @@
                             </div>
                             <div class="field border large label">
                                 <textarea id="textarea-board-description-${boardId}" rows="10" onblur="this.placeholder=' '" onfocus="this.placeholder='〇〇ユニットの△△業務に関わるタスクを管理するボード。'" placeholder=" ">${escapeHtml(board.description || '')}</textarea>
-                                <label>ボードの説明</label>
+                                <label>ボード設定</label>
                             </div>
                         </div>
                         <nav class="right-align small-padding">
@@ -1554,7 +1564,7 @@
                             name: newName,
                             description: newDescription 
                         }
-                    }, 'ボードの設定を更新');
+                    }, 'ボード設定を更新');
 
                     showSnackbar('ボードの設定を更新しました', 'success');
                 } catch (error) {
@@ -1571,7 +1581,7 @@
                     if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
                         App.utils.navigation.renderBoardsNavigation();
                     }
-                    alert('ボードの設定の更新に失敗しました');
+                    alert('ボード設定の更新に失敗しました');
                 }
             }
             ,
