@@ -1,0 +1,142 @@
+<script>
+    (function () {
+        App.modals.selectSkills = {
+            callback: null,
+            selectedIds: [],
+            allSkills: [],
+            filteredSkills: [],
+            multiSelect: false,
+            selectedLevel: 'BEGINNER',
+
+            open: async function (options = {}) {
+                this.callback = options.callback || null;
+                this.multiSelect = options.multiSelect || false;
+                this.selectedIds = options.preSelected || [];
+                this.selectedLevel = options.defaultLevel || 'BEGINNER';
+
+                const levelSelect = document.getElementById('skill-level-select');
+                if (levelSelect) levelSelect.value = this.selectedLevel;
+
+                this.allSkills = App.state.data.skills || [];
+                this.filteredSkills = [];
+                this.render();
+                await ui('#modal-select-skills');
+
+                App.utils.modal.focusInput('#skill-search-input');
+            },
+
+            updateLevel: function () {
+                const levelSelect = document.getElementById('skill-level-select');
+                if (levelSelect) this.selectedLevel = levelSelect.value;
+            },
+
+            render: function () {
+                this.filterResults();
+            },
+
+            filterResults: function () {
+                const searchInput = document.getElementById('skill-search-input');
+                const container = document.getElementById('skill-results-container');
+                const selectAllContainer = document.getElementById('skill-select-all-container');
+                const selectAllCheckbox = document.getElementById('skill-select-all-checkbox');
+
+                if (!container) return;
+
+                const searchTerm = searchInput ? searchInput.value : '';
+
+                this.filteredSkills = App.utils.modal.filterData(
+                    this.allSkills,
+                    searchTerm,
+                    ['title'],
+                    false
+                );
+
+                if (this.multiSelect && selectAllContainer) {
+                    selectAllContainer.style.display = '';
+                    if (this.filteredSkills.length > 0 && selectAllCheckbox) {
+                        const allSelected = this.filteredSkills.every(s => this.selectedIds.includes(s.id));
+                        selectAllCheckbox.checked = allSelected;
+                        selectAllCheckbox.disabled = false;
+                    } else if (selectAllCheckbox) {
+                        selectAllCheckbox.checked = false;
+                        selectAllCheckbox.disabled = true;
+                    }
+                } else if (selectAllContainer) {
+                    selectAllContainer.style.display = 'none';
+                }
+
+                if (this.filteredSkills.length === 0) {
+                    container.innerHTML = '<p class="padding">該当するスキルが見つかりません</p>';
+                    return;
+                }
+
+                container.innerHTML = this.filteredSkills.map(skill => {
+                    const isSelected = this.selectedIds.includes(skill.id);
+                    const safeTitle = escapeHtml(skill.title || '無題');
+                    const safeType = escapeHtml(skill.skill_type_key || '');
+                    const safeId = escapeHtmlAttribute(skill.id);
+
+                    return `
+                        <div><label class="${this.multiSelect ? 'checkbox' : 'radio'} left-align small-space">
+                            <input type="${this.multiSelect ? 'checkbox' : 'radio'}"
+                                name="skill-select"
+                                value="${safeId}"
+                                ${isSelected ? 'checked' : ''}
+                                onchange="App.modals.selectSkills.toggleSelection('${safeId}', this.checked)">
+                            <span class="small-margin">
+                                <strong>${safeTitle}</strong>
+                                <span class="secondary-text small-text">${safeType}</span>
+                            </span>
+                        </label></div>
+                    `;
+                }).join('');
+            },
+
+            toggleSelectAll: function (checked) {
+                if (!this.multiSelect) return;
+
+                if (checked) {
+                    this.filteredSkills.forEach(skill => {
+                        if (!this.selectedIds.includes(skill.id)) {
+                            this.selectedIds.push(skill.id);
+                        }
+                    });
+                } else {
+                    const filteredIds = this.filteredSkills.map(s => s.id);
+                    this.selectedIds = this.selectedIds.filter(id => !filteredIds.includes(id));
+                }
+                this.render();
+            },
+
+            toggleSelection: function (id, checked) {
+                if (this.multiSelect) {
+                    if (checked && !this.selectedIds.includes(id)) {
+                        this.selectedIds.push(id);
+                    } else if (!checked) {
+                        this.selectedIds = this.selectedIds.filter(sid => sid !== id);
+                    }
+                    this.render();
+                } else {
+                    this.selectedIds = checked ? [id] : [];
+                }
+            },
+
+            confirm: function () {
+                this.selectedIds = App.utils.modal.getSelectedIds(
+                    '#skill-results-container',
+                    'skill-select',
+                    this.multiSelect
+                );
+
+                if (this.callback && typeof this.callback === 'function') {
+                    this.callback({
+                        selectedIds: this.selectedIds,
+                        levelKey: this.selectedLevel
+                    });
+                }
+
+                ui('#modal-select-skills');
+            }
+        };
+    })();
+</script>

@@ -1,0 +1,653 @@
+<script>
+    (function () {
+        document.addEventListener('DOMContentLoaded', function () {
+            const helpLink = document.getElementById('help-link');
+            if (helpLink) {
+                helpLink.href = `${EXTERNAL_URLS.PORTAL_SITE}/help`;
+            }
+            const termsLink = document.getElementById('terms-link');
+            if (termsLink) {
+                termsLink.href = `${EXTERNAL_URLS.PORTAL_SITE}/terms`;
+            }
+            const privacyLink = document.getElementById('privacy-link');
+            if (privacyLink) {
+                privacyLink.href = `${EXTERNAL_URLS.PORTAL_SITE}/privacy`;
+            }
+        });
+
+        App.utils.header = {
+            /**
+             * appsテーブルのデータからアプリリンクを動的に生成します
+             */
+            renderApps: function () {
+                const appsGrid = document.getElementById('apps-grid');
+                if (!appsGrid) {
+                    console.warn('apps-grid element not found');
+                    return;
+                }
+
+                // App.state.data.appsからデータを取得
+                const apps = App.state.data.apps || [];
+
+                if (apps.length === 0) {
+                    appsGrid.innerHTML = '<div class="padding center-align row tiny-space secondary-text"><i>info</i><span>リンクがありません</span></div>';
+                    return;
+                }
+
+                // リンクボタンを生成
+                const appsHtml = apps.map(app => {
+
+                    return `
+                        <article class="background no-elevate small-round small-margin row" onclick="window.open('${app.url}', '_blank', 'noopener noreferrer')">
+                            <img class="square tiny small-round" src="https:\/\/t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${app.url}&size=128"
+                                alt="${app.name}">
+                            <span class="no-wrap">${app.name}</span>
+                        </article>
+                    `;
+                }).join('');
+
+                appsGrid.innerHTML = appsHtml;
+            },
+
+            // ============================================
+            // コメント通知機能
+            // ============================================
+            comments: {
+                /** キャッシュされたコメントデータ */
+                cachedComments: null,
+                /** 最終更新日時 */
+                lastUpdatedAt: null,
+                /** 初回ロード済みフラグ */
+                isLoaded: false,
+                /** ロード中フラグ（重複呼び出し防止） */
+                isLoading: false,
+
+                /**
+                 * コメントメニューの表示切替とデータロード
+                 */
+                toggle: function () {
+                    const container = document.getElementById('comments-list');
+                    if (!container) return;
+
+                    if (this.isLoaded && this.cachedComments) {
+                        // ロード済み: キャッシュデータを即時描画し、バックグラウンドで最新データを取得
+                        this.render(this.cachedComments);
+                        this.loadData(true);
+                    } else {
+                        // 未ロード: シマーを表示してデータ取得
+                        this.showShimmer(container);
+                        this.loadData(false);
+                    }
+                },
+
+                /**
+                 * シマーエフェクトを表示
+                 */
+                showShimmer: function (container) {
+                    container.innerHTML = `
+                        <div class="center padding center-align row small-space">
+                            <progress class="circle indeterminate small"></progress>
+                            <span>読み込み中...</span>
+                        </div>
+                    `
+                },
+
+                /**
+                 * データを取得して描画
+                 * @param {boolean} forceRefresh - キャッシュを無視して強制再取得するか
+                 * @returns {Promise}
+                 */
+                loadData: async function (forceRefresh = false) {
+                    if (this.isLoading && !forceRefresh) return;
+                    this.isLoading = true;
+
+                    try {
+                        console.log('[Comments] Loading data... forceRefresh:', forceRefresh);
+                        const result = await callGAS('getCommentNavData', App.state.userId, forceRefresh);
+
+                        const comments = result?.comments || [];
+                        this.cachedComments = comments;
+                        this.isLoaded = true;
+                        this.lastUpdatedAt = new Date();
+
+                        // 描画
+                        this.render(comments);
+
+                        // キャッシュデータだった場合、バックグラウンドで最新データを取得して再描画
+                        if (!forceRefresh && result?.isCached === true) {
+                            console.log('[Comments] Cache detected. Fetching fresh data in background...');
+                            setTimeout(() => this.loadData(true), 100);
+                        }
+                    } catch (error) {
+                        console.error('[Comments] Error loading data:', error);
+                        const container = document.getElementById('comments-list');
+                        if (container && !this.cachedComments) {
+                            container.innerHTML = '<div class="padding center-align error-text"><i>error_outline</i><span>コメントの読み込みに失敗しました</span></div>';
+                        }
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                /**
+                 * 未読チェックとボタンバッジの更新
+                 * @param {Array} comments - コメントデータ
+                 */
+                checkAndUpdateBadge: function (comments, statusOverride = null) {
+                    // 現在の既読状態を取得
+                    const oldStatus = statusOverride || App.state.getUserProperty('comment_read_status', {});
+                    // 1. 保存前に一旦プロパティ内を空にする（新しいオブジェクトとして作成）
+                    const newStatus = {};
+
+                    // 2. 描画しているコメントを改めて取得して、格納する
+                    // 引数のcomments、またはキャッシュされているコメントを使用
+                    const targetComments = comments || this.cachedComments || [];
+                    targetComments.forEach(comment => {
+                        // 以前の状態があれば引き継ぎ、なければ未読(false)
+                        newStatus[comment.id] = (comment.id in oldStatus) ? oldStatus[comment.id] : false;
+                    });
+
+                    // 3. 格納（保存）
+                    App.state.saveUserProperty('comment_read_status', newStatus);
+
+                    // 未読数（badge用）の計算
+                    const totalUnreadCount = Object.values(newStatus).filter(v => v === false).length;
+
+                    const badge = document.getElementById('comments-badge');
+                    if (badge) {
+                        badge.textContent = totalUnreadCount;
+                        badge.style.display = totalUnreadCount > 0 ? '' : 'none';
+                    }
+                },
+
+                /**
+                 * コメント一覧を描画
+                 * @param {Array} comments - コメントデータ
+                 */
+                render: function (comments) {
+                    const container = document.getElementById('comments-list');
+                    if (!container) return;
+
+                    // バッジ更新とデータのクリーンアップを先に実行
+                    this.checkAndUpdateBadge(comments);
+
+                    if (!comments || comments.length === 0) {
+                        container.innerHTML = '<div class="padding center-align row tiny-space secondary-text"><i>info</i><span>コメントはありません</span></div>';
+                        return;
+                    }
+
+                    const savedData = App.state.getUserProperty('comment_read_status', {});
+                    let html = '<div class="padding center-align secondary-text small-text"><span>あなたが担当者 かつ ステータスが「完了」以外のタスクに作成されたコメント（新着順）</span></div>';
+                    html += comments.map(comment => {
+                        const isRead = savedData[comment.id] === true;
+                        const readClass = isRead ? 'background' : 'error-container';
+                        const readIcon = isRead ? 'mark_email_read' : 'mark_email_unread';
+
+                        // プロフィール写真
+                        const avatarHtml = comment.profile_photo_url
+                            ? `<img class="responsive" src="${comment.profile_photo_url}" alt="${escapeHtml(comment.display_name)}">`
+                            : `account_circle`;
+
+                        // 更新日時のフォーマット
+                        const updatedAt = comment.updated_at
+                            ? formatDateTimeForDisplay(comment.updated_at, 'MM/dd HH:mm')
+                            : '';
+
+
+                        const contentLengthLimit = 75;
+                        // コメント内容（最初の75文字まで、改行はスペースに置き換え）
+                        let commentContent = comment.content ? comment.content : '';
+                        // 改行をスペースに置き換え（プレビューなので）
+                        commentContent = commentContent.replace(/\r\n/g, ' ').replace(/\n/g, ' ');
+                        // 75文字でトリミング
+                        const commentContent75 = commentContent.substring(0, contentLengthLimit);
+
+                        if (commentContent.length > contentLengthLimit) {
+                            commentContent75 += '…';
+                        }
+
+                        return `
+                            <article class="no-elevate padding top-align small-margin small-round ${readClass}"
+                               onclick="App.utils.header.comments.openComment('${comment.id}', '${comment.task_id}', '${comment.task_board_id}')">
+                                <div class="row">
+                                <div>
+                                	<i class="circle extra">${avatarHtml}</i>
+                                </div>
+                                <div class="max">
+                                    <div class="row">
+                                        <span class="bold small-text">${escapeHtml(comment.display_name)}</span>
+                                        <span class="small-text secondary-text font-number">${updatedAt}</span>
+                                    </div>
+                                    <div class="small-text secondary-text">${escapeHtml(comment.task_name)} <span class="font-number secondary-text">#${comment.task_display_id}</span></div>
+                                </div>
+                                <div>
+                                    <button class="transparent circle small no-margin"
+                                        onclick="event.stopPropagation(); App.utils.header.comments.toggleReadStatus('${comment.id}')"
+                                        title="${isRead ? '未読にする' : '既読にする'}">
+                                    <i class="small">${readIcon}</i>
+                                    </button>
+                                </div>
+                                <div class="tiny-space"></div>
+                                <div class="small-text">${escapeHtml(commentContent75)}</div>
+                            </article>
+                        `;
+                    }).join('');
+
+                    // 最終更新日時の追加
+                    if (this.lastUpdatedAt) {
+                        const timeStr = formatDateTimeForDisplay(this.lastUpdatedAt, 'yyyy/MM/dd(E) HH:mm');
+                        html += `<div class="row padding no-margin center-align secondary-text small-text tiny-space"><span>最終更新: ${timeStr}</span></div>`;
+                    }
+
+                    container.innerHTML = html;
+                },
+
+                /**
+                 * コメントをクリックしてタスクを開く
+                 * @param {string} commentId - コメントID
+                 * @param {string} taskId - タスクID
+                 * @param {string} boardId - ボードID
+                 */
+                openComment: function (commentId, taskId, boardId) {
+                    ui('#comments-menu');
+
+                    // 既読にマーク
+                    this.markAsRead(commentId);
+
+                    // タスクを開く（home.htmlのopenTaskFromHomeを再利用）
+                    if (App.pages.home && App.pages.home.openTaskFromHome) {
+                        App.pages.home.openTaskFromHome(taskId, boardId);
+                    }
+                },
+
+                /**
+                 * コメントの既読/未読状態をトグル
+                 * @param {string} commentId - コメントID
+                 */
+                toggleReadStatus: function (commentId) {
+                    const savedData = App.state.getUserProperty('comment_read_status', {});
+                    savedData[commentId] = !savedData[commentId]; // true ↔ false をトグル
+
+                    // 更新後の状態を渡してクリーンアップと保存を実行
+                    this.checkAndUpdateBadge(this.cachedComments, savedData);
+
+                    // 描画を更新
+                    if (this.cachedComments) {
+                        this.render(this.cachedComments);
+                    }
+                },
+
+                /**
+                 * コメントを既読にマーク（openComment用）
+                 * @param {string} commentId - コメントID
+                 */
+                markAsRead: function (commentId) {
+                    const savedData = App.state.getUserProperty('comment_read_status', {});
+                    savedData[commentId] = true;
+
+                    // 更新後の状態を渡してクリーンアップと保存を実行
+                    this.checkAndUpdateBadge(this.cachedComments, savedData);
+                },
+
+                /**
+                 * 指定したタスクに関連する未読コメントをすべて既読にする
+                 * @param {string} taskId - タスクID
+                 */
+                markCommentsAsReadByTaskId: function (taskId) {
+                    // キャッシュが無い場合は何もしない（「表示されていない」とみなす）
+                    if (!this.cachedComments || this.cachedComments.length === 0) {
+                        return;
+                    }
+
+                    const savedData = App.state.getUserProperty('comment_read_status', {});
+                    let hasChanges = false;
+
+                    this.cachedComments.forEach(comment => {
+                        // タスクIDが一致 かつ 未読の場合
+                        if (comment.task_id === taskId && savedData[comment.id] !== true) {
+                            savedData[comment.id] = true;
+                            hasChanges = true;
+                        }
+                    });
+
+                    if (hasChanges) {
+                        console.log(`[Comments] Marked comments for task ${taskId} as read.`);
+                        // 更新後の状態を渡してクリーンアップと保存を実行
+                        this.checkAndUpdateBadge(this.cachedComments, savedData);
+                        // 描画を更新（メニューが開いている可能性があるため）
+                        this.render(this.cachedComments);
+                    }
+                }
+            }
+        };
+
+        // ============================================
+        // システムアップデート通知機能
+        // ============================================
+        App.utils.header.systemUpdates = {
+            /** キャッシュされたアップデートデータ */
+            cachedUpdates: null,
+            /** 最終更新日時 */
+            lastUpdatedAt: null,
+            /** 初回ロード済みフラグ */
+            isLoaded: false,
+            /** 1時間更新用のインターバルID */
+            autoRefreshInterval: null,
+
+            /**
+             * メニューの表示切替（キャッシュデータの即時描画のみ）
+             */
+            toggle: function () {
+                const container = document.getElementById('system-info-list');
+                if (!container) return;
+
+                if (this.isLoaded && this.cachedUpdates) {
+                    // ロード済み: キャッシュデータを即時描画（都度更新はしない）
+                    this.render(this.cachedUpdates);
+                } else {
+                    // 未ロード: シマーを表示してデータ取得
+                    this.showShimmer(container);
+                    this.loadData();
+                }
+            },
+
+            /**
+             * シマーエフェクトを表示
+             */
+            showShimmer: function (container) {
+                container.innerHTML = `
+                    <div class="center padding center-align row small-space">
+                        <progress class="circle indeterminate small"></progress>
+                        <span>読み込み中...</span>
+                    </div>
+                `;
+            },
+
+            /**
+             * データを取得して描画（常にキャッシュを無視して最新データを取得）
+             * @returns {Promise}
+             */
+            loadData: async function () {
+                try {
+                    console.log('[SystemUpdates] Loading data...');
+                    const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SYSTEM_UPDATES, 'select', {
+                        orderBy: { created_at: 'desc' }
+                    }, null, true);
+
+                    const updates = result?.data || result || [];
+
+                    if (this.cachedUpdates && this.isLoaded) {
+                        if (this.hasDataChanged(this.cachedUpdates, updates)) {
+                            console.log('[SystemUpdates] データ変更を検出。更新モーダルを表示します。');
+                            this.showUpdateModal();
+                            return; // モーダル表示後はデータ更新・描画をスキップ
+                        }
+                    }
+
+                    this.cachedUpdates = updates;
+                    this.isLoaded = true;
+                    this.lastUpdatedAt = new Date();
+
+                    // 描画
+                    this.render(updates);
+                } catch (error) {
+                    console.error('[SystemUpdates] Error loading data:', error);
+                    const container = document.getElementById('system-info-list');
+                    if (container && !this.cachedUpdates) {
+                        container.innerHTML = '<div class="padding center-align error-text"><i>error_outline</i><span>アップデート情報の読み込みに失敗しました</span></div>';
+                    }
+                }
+            },
+
+            /**
+             * 前回と今回のデータを比較して変更があるかどうかを判定
+             * @param {Array} oldData - 前回取得したデータ
+             * @param {Array} newData - 今回取得したデータ
+             * @returns {boolean} 変更がある場合true
+             */
+            hasDataChanged: function (oldData, newData) {
+                if (!oldData || !newData) return false;
+                return oldData.length !== newData.length;
+            },
+
+            /**
+             * システムアップデートモーダルを表示
+             */
+            showUpdateModal: function () {
+                const modal = document.getElementById('modal-system-update');
+                if (modal) {
+                    ui('#modal-system-update');
+                }
+            },
+
+            /**
+             * ページをリロード（register.htmlのreloadPageと同じ処理）
+             * @param {HTMLElement} btn - クリックされたボタン要素
+             */
+            reloadPage: function (btn) {
+                if (btn) {
+                    const icon = btn.querySelector('i');
+                    if (icon) {
+                        icon.outerHTML = '<progress class="circle indeterminate small"></progress>';
+                    }
+                    btn.disabled = true;
+                }
+                window.open(scriptUrl, '_top');
+            },
+
+            /**
+             * アップデート一覧を描画
+             * @param {Array} updates - アップデートデータ
+             */
+            render: function (updates) {
+                const container = document.getElementById('system-info-list');
+                if (!container) return;
+
+                // ZARMSの基本説明をトップに表示
+                let html = `
+                    <div class="padding">
+                        <div class="row tiny-space">
+                            <i class="small">info</i>
+                            <span class="bold">ZARMSについて</span>
+                        </div>
+                        <p class="small-text">${UI_TEXT.APP_DESCRIPTION}</p>
+                    </div>
+                `;
+
+                if (!updates || updates.length === 0) {
+                    html += '<div class="padding center-align row tiny-space secondary-text"><i>info</i><span>アップデート情報はありません</span></div>';
+                } else {
+                    html += updates.map(update => {
+                        // アップデート日時のフォーマット
+                        const createdAt = update.created_at
+                            ? formatDateTimeForDisplay(update.created_at, 'yyyy/MM/dd(E)')
+                            : '';
+
+                        // 説明文の改行を反映
+                        const description = update.description
+                            ? escapeHtml(update.description).replace(/\n/g, '<br>')
+                            : '';
+
+                        return `
+                            <article class="no-elevate padding top-align small-margin small-round background">
+                                <div>
+                                    <div class="row no-margin tiny-space">
+                                        <span class="small-text secondary-text">${createdAt}</span>
+                                    </div>
+                                    <div class="row bold no-margin tiny-space small-text">
+                                        <span class="font-number">${escapeHtml(update.version || '')}</span>
+                                        <span>${escapeHtml(update.title || '')}</span>
+                                    </div>
+                                    <div class="tiny-space"></div>
+                                    <div class="small-text">${description}</div>
+                                </div>
+                            </article>
+                        `;
+                    }).join('');
+                }
+
+                // 最終更新日時の追加
+                if (this.lastUpdatedAt) {
+                    const timeStr = formatDateTimeForDisplay(this.lastUpdatedAt, 'yyyy/MM/dd(E) HH:mm');
+                    html += `<div class="row padding no-margin center-align secondary-text small-text tiny-space"><span>最終更新: ${timeStr}</span></div>`;
+                }
+
+                container.innerHTML = html;
+            },
+
+            /**
+             * 1時間ごとの自動更新を開始
+             */
+            startAutoRefresh: function () {
+                if (this.autoRefreshInterval) {
+                    clearInterval(this.autoRefreshInterval);
+                }
+                // 1時間 = 3600000ms
+                this.autoRefreshInterval = setInterval(() => {
+                    console.log('[SystemUpdates] Auto-refreshing...');
+                    this.loadData();
+                }, 3600000);
+            },
+
+            // ============================================
+            // テスト用: コンソールから実行可能
+            // App.utils.header.systemUpdates.simulateUpdate()
+            // ============================================
+            /**
+             * [テスト用] キャッシュデータを改変してloadDataを呼び出し、
+             * 変更検出→モーダル表示の挙動をテストします。
+             * ブラウザの開発者コンソールから以下のコマンドで実行:
+             *   App.utils.header.systemUpdates.simulateUpdate()
+             */
+            simulateUpdate: function () {
+                if (!this.cachedUpdates || !this.isLoaded) {
+                    console.warn('[SystemUpdates:TEST] まだデータがロードされていません。先にinfoボタンをクリックしてデータをロードしてください。');
+                    return;
+                }
+                console.log('[SystemUpdates:TEST] キャッシュデータを改変してloadDataを呼び出します...');
+                // キャッシュに存在しないダミーレコードを追加して、loadDataで差分を検出させる
+                this.cachedUpdates = [...this.cachedUpdates, { id: 'test-dummy', title: 'テスト用更新', version: '0.0.0', created_at: new Date().toISOString() }];
+                this.loadData();
+            }
+        };
+    })();
+
+    (function () {
+        // 検索機能用の名前空間を初期化
+        if (!App.utils) App.utils = {};
+
+        App.utils.search = {
+            /**
+             * キーダウンハンドラー（Enter検索）
+             */
+            handleSearchKeydown: function (event) {
+                if (event.key === 'Enter' && !event.isComposing) {
+                    event.preventDefault();
+                    App.utils.search.handleSearchClick();
+                }
+            },
+
+            /**
+             * ブラーハンドラー（少し遅延してメニューを閉じる）
+             */
+            handleSearchBlur: function (event) {
+                setTimeout(() => {
+                    const resultsMenu = document.getElementById('search-results-menu');
+                    if (resultsMenu) {
+                        resultsMenu.style.display = 'none';
+                    }
+                }, 200);
+            },
+
+            /**
+             * 検索ボタンクリック / Enterキー押下時の検索実行
+             */
+            handleSearchClick: async function () {
+                const input = document.getElementById('search-input');
+                const searchValue = input.value.trim();
+                input.blur();
+
+                if (!searchValue) return;
+
+                // 検索中はアイコンをスピナーに切り替え
+                const searchIcon = document.getElementById('search-icon');
+                const setLoading = (loading) => {
+                    if (!searchIcon) return;
+                    if (loading) {
+                        searchIcon.outerHTML = '<progress id="search-icon" class="circle indeterminate small"></progress>';
+                    } else {
+                        const el = document.getElementById('search-icon');
+                        if (el) el.outerHTML = '<i id="search-icon" class="front" style="cursor: pointer;" onclick="App.utils.search.handleSearchClick()">search</i>';
+                    }
+                };
+                setLoading(true);
+
+                try {
+                    // 全角数字を半角に変換してから数値チェック（共通ユーティリティを使用）
+                    const { normalizedValue, numericValue, isNumericInput } = App.utils.search.getNormalizedSearchInfo(searchValue);
+
+                    // 1. マイボードタブに移動（既に移動している場合は無視）
+                    if (App.utils.navigation && App.utils.navigation.switchTab) {
+                        await App.utils.navigation.switchTab('board-my-board', false, false, true);
+                    }
+
+                    if (isNumericInput) {
+                        // 数値入力の場合: display_id でタスクを特定する
+                        let foundTask = null;
+                        try {
+                            const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
+                                where: { display_id: ['=', numericValue] }
+                            }, null, true);
+                            const tasks = result?.data || result || [];
+                            if (tasks.length > 0) {
+                                foundTask = tasks[0];
+                            }
+                        } catch (e) {
+                            console.error('[Search] display_id 検索エラー:', e);
+                        }
+
+                        if (foundTask && App.pages.boards) {
+                            // 2. 特定したタスク名でマイボードフィルタを適用
+                            App.pages.boards.initializeMyBoardFilters(false);
+                            App.pages.boards.myBoardFilters.title = foundTask.name;
+                            App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
+
+                            // 3. 検索（データ再読み込み）
+                            await App.pages.boards.loadData('my-board', false);
+
+                            // 4. 特定したタスクの詳細画面を開く
+                            if (App.modals.taskDetail) {
+                                App.modals.taskDetail.open(foundTask.id);
+                                return;
+                            }
+                        } else if (App.pages.boards) {
+                            // タスクが見つからなかった場合は数値をそのままタイトル検索にフォールバック
+                            App.pages.boards.initializeMyBoardFilters(false);
+                            App.pages.boards.myBoardFilters.title = searchValue;
+                            App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
+                            await App.pages.boards.loadData('my-board', false);
+                        }
+                    } else {
+                        // 通常の文字列検索
+                        if (App.pages.boards) {
+                            App.pages.boards.initializeMyBoardFilters(false);
+                            App.pages.boards.myBoardFilters.title = searchValue;
+                            App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
+
+                            // 検索（データ再読み込み）
+                            await App.pages.boards.loadData('my-board', false);
+                        }
+                    }
+                    // ヒットが1件のみの場合はタスク詳細を自動で開く
+                    const resultTasks = App.pages.boards.cachedBoardTasks['my-board'] || [];
+                    if (resultTasks.length === 1 && App.modals.taskDetail) {
+                        App.modals.taskDetail.open(resultTasks[0].id);
+                    }
+                } finally {
+                    // 検索完了後（エラー時も含む）アイコンを戻す
+                    setLoading(false);
+                }
+            }
+        };
+    })();
+</script>

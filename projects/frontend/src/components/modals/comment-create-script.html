@@ -1,0 +1,109 @@
+<script>
+    (function () {
+        App.modals.newComment = {
+            relatedId: null,
+            relatedTable: 'tasks',
+
+            /**
+             * 新規コメントモーダルを開く
+             * @param {string} taskId - タスクID
+             */
+            open: function (taskId) {
+                this.reset();
+                this.relatedId = taskId;
+                this.relatedTable = 'tasks';
+
+                ui('#modal-new-comment');
+
+                setTimeout(() => {
+                    const contentField = document.getElementById('new-comment-content');
+                    if (contentField) contentField.focus();
+                }, 200);
+            },
+
+            /**
+             * 任意テーブル向けに新規コメントモーダルを開く
+             * @param {string} relatedTable - 関連テーブル名
+             * @param {string} relatedId - 関連ID
+             */
+            openFor: function (relatedTable, relatedId) {
+                this.reset();
+                this.relatedId = relatedId;
+                this.relatedTable = relatedTable || 'tasks';
+
+                ui('#modal-new-comment');
+
+                setTimeout(() => {
+                    const contentField = document.getElementById('new-comment-content');
+                    if (contentField) contentField.focus();
+                }, 200);
+            },
+
+            /**
+             * モーダルを閉じる
+             */
+            close: function () {
+                ui('#modal-new-comment');
+                this.reset();
+            },
+
+            /**
+             * モーダルをリセット
+             */
+            reset: function () {
+                const contentField = document.getElementById('new-comment-content');
+                if (contentField) contentField.value = '';
+                this.relatedId = null;
+                this.relatedTable = 'tasks';
+            },
+
+            /**
+             * コメントを保存
+             */
+            save: function () {
+                const contentField = document.getElementById('new-comment-content');
+                const content = contentField ? contentField.value.trim() : '';
+
+                if (!content) {
+                    alert('コメントの内容を入力してください');
+                    return;
+                }
+
+                if (!this.relatedId) {
+                    alert('コメントの関連先が不正です');
+                    return;
+                }
+
+                this.close();
+                showSnackbar('コメントを作成しています...', 'info', 'top', 0);
+
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'insert', {
+                    content: content,
+                    related_table: this.relatedTable,
+                    related_id: this.relatedId
+                }, 'コメントを作成')
+                    .then(result => {
+                        if (!result || (Array.isArray(result) && result.length === 0)) {
+                            showSnackbar('コメントの作成に失敗しました', 'error');
+                            return;
+                        }
+
+                        showSnackbar('コメントを作成しました', 'success');
+
+                        if (this.relatedTable === 'tasks' && App.modals.taskDetail && App.modals.taskDetail.currentId === this.relatedId) {
+                            App.modals.taskDetail.loadComments(this.relatedId, true);
+                        }
+
+                        if (this.relatedTable === 'members' && App.modals.memberDetail && App.modals.memberDetail.currentId === this.relatedId) {
+                            App.modals.memberDetail.loadComments(this.relatedId, true);
+                        }
+
+                    })
+                    .catch(error => {
+                        console.error('[NewComment] Save error:', error);
+                        App.utils.error.handle(error);
+                    });
+            }
+        };
+    })();
+</script>

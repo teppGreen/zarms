@@ -1,0 +1,532 @@
+<script>
+    // App.modals.newTask の定義
+    (function () {
+        document.addEventListener('DOMContentLoaded', function () {
+            const geminiGemsTaskAddLink = document.getElementById('gemini-gems-task-add-link');
+            if (geminiGemsTaskAddLink) {
+                geminiGemsTaskAddLink.href = EXTERNAL_URLS.GEMINI_GEMS_TASK_ADD;
+            }
+        });
+
+        App.modals.newTask = {
+            parsedTasks: [], // パースされたタスクデータを保持
+            currentTab: 'simple', // 現在のタブ（'simple' or 'assistant'）
+
+            /**
+             * モーダルを開く
+             * @param {string} tab - 開くタブ（'simple' or 'assistant'）
+             */
+            open: async function (tab = 'simple') {
+                // ボード選択肢を更新（両方のセレクトボックス）
+                this.updateBoardOptions();
+
+                // プレビューをクリア
+                this.clearPreview();
+
+                // データをクリア
+                this.clearData();
+
+                // タブ切り替え
+                this.switchTab(tab);
+
+                // 通常作成のinputをクリア
+                const nameInput = document.getElementById('new-task-simple-name-input');
+                if (nameInput) nameInput.value = '';
+
+                // モーダルを表示
+                ui('#modal-new-task');
+
+                // 通常タブの場合、inputにフォーカス
+                if (tab === 'simple') {
+                    setTimeout(() => {
+                        if (nameInput) nameInput.focus();
+                    }, 100);
+                }
+            },
+
+            /**
+             * モーダルを閉じる
+             */
+            close: function () {
+                // プレビューモーダルが開いている場合は先に閉じる
+                const previewModal = document.getElementById('modal-new-task-preview');
+                if (previewModal && previewModal.classList.contains('active')) {
+                    previewModal.classList.remove('active');
+                }
+                ui('#modal-new-task');
+            },
+
+            /**
+             * プレビューモーダルを閉じる（modal-new-taskは開いたまま）
+             */
+            closePreview: function () {
+                document.getElementById('modal-new-task-preview').classList.remove('active');
+            },
+
+            /**
+             * タブを切り替える
+             * @param {string} tab - 'simple' or 'assistant'
+             */
+            switchTab: function (tab) {
+                this.currentTab = tab;
+
+                const toggle = document.getElementById('new-task-assistant-toggle');
+                const simplePage = document.getElementById('new-task-page-simple');
+                const assistantPage = document.getElementById('new-task-page-assistant');
+
+                if (tab === 'simple') {
+                    if (toggle) toggle.checked = false;
+                    if (simplePage) simplePage.classList.add('active');
+                    if (assistantPage) assistantPage.classList.remove('active');
+                } else {
+                    if (toggle) toggle.checked = true;
+                    if (simplePage) simplePage.classList.remove('active');
+                    if (assistantPage) assistantPage.classList.add('active');
+                }
+            },
+
+            /**
+             * 通常タスク作成のEnterキーハンドラ
+             */
+            handleSimpleKeydown: function (event) {
+                if (event.key === 'Enter' && !event.isComposing) {
+                    event.preventDefault();
+                    this.createSimpleTask();
+                }
+            },
+
+            /**
+             * 通常のタスク作成（単一タスク）
+             */
+            createSimpleTask: async function () {
+                const nameInput = document.getElementById('new-task-simple-name-input');
+                const taskName = nameInput ? nameInput.value.trim() : '';
+
+                if (!taskName) {
+                    showSnackbar('タスク名を入力してください', 'error');
+                    if (nameInput) nameInput.focus();
+                    return;
+                }
+
+                // モーダルを閉じる
+                this.close();
+                const userId = App.state.userId;
+                const taskId = crypto.randomUUID();
+
+                // ボード選択から取得
+                const boardSelect = document.getElementById('new-task-simple-board-select');
+                let boardId = boardSelect ? boardSelect.value : 'my-board';
+
+                // もしボード選択が「auto」（現在のボード）の場合
+                if (boardId === 'current-board') {
+                    const currentTab = document.querySelector('main > div[style*="display: block"]');
+                    const tabId = currentTab ? currentTab.id : '';
+                    if (tabId === 'tab-board') {
+                        const activeBoardDiv = document.querySelector('#tab-board > div[style*="display: block"]');
+                        if (activeBoardDiv && activeBoardDiv.id) {
+                            boardId = activeBoardDiv.id.replace('tab-board-', '');
+                        }
+                    }
+                }
+
+                const defaultTask = {
+                    id: taskId,
+                    display_id: '#',
+                    name: taskName,
+                    description: '',
+                    task_status_key: 'TODO',
+                    priority_key: 'MEDIUM',
+                    board_id: boardId,
+                    starts_at: formatDateTimeForInput(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 1, 10, 0)),
+                    ends_at: formatDateTimeForInput(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 2, 18, 0)),
+                    created_by: activeUser.id,
+                    processed_by: activeUser.id,
+                    reviewed_by: activeUser.id,
+                    received_by: activeUser.id,
+                    created_by_display_name: activeUser.display_name,
+                    created_by_profile_photo_url: activeUser.profile_photo_url,
+                    reviewed_by_display_name: activeUser.display_name,
+                    reviewed_by_profile_photo_url: activeUser.profile_photo_url,
+                    received_by_display_name: activeUser.display_name,
+                    received_by_profile_photo_url: activeUser.profile_photo_url,
+                    processed_by_display_name: null,
+                    processed_by_profile_photo_url: null
+                };
+
+                // ローカルデータに追加
+                if (!App.state.data.tasks) {
+                    App.state.data.tasks = [];
+                }
+                App.state.data.tasks.push(defaultTask);
+
+                // カレントボードタスクにも追加
+                if (App.pages.boards && App.pages.boards.currentBoardId && App.pages.boards.cachedBoardTasks) {
+                    const currentBoardId = App.pages.boards.currentBoardId;
+                    const cache = App.pages.boards.cachedBoardTasks[currentBoardId];
+                    if (Array.isArray(cache)) {
+                        cache.push(defaultTask);
+                    }
+                }
+
+                // タスク詳細モーダルを開く
+                App.modals.taskDetail.open(taskId, false, true);
+
+                // サーバーに保存
+                callGAS('handleDatabaseProcess', userId, TABLE_NAMES.TASKS, 'insert', defaultTask)
+                    .then(result => {
+                        if (result && result.data && result.data.display_id) {
+                            defaultTask.display_id = result.data.display_id;
+
+                            if (App.modals.taskDetail.currentId === taskId) {
+                                const displayIdEl = document.getElementById('task-display-id');
+                                if (displayIdEl) displayIdEl.textContent = `#${defaultTask.display_id}`;
+                                App.modals.taskDetail.setupLinkCopyButton(defaultTask);
+                                if (App.modals.taskDetail.originalData) {
+                                    App.modals.taskDetail.originalData.display_id = result.data.display_id;
+                                }
+                            }
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Failed to create task on server:', err);
+                        showSnackbar('タスクの作成に失敗しました', 'error');
+                    });
+            },
+
+            /**
+             * ボード選択肢を更新（通常タスク作成用・アシスタント用の両方）
+             */
+            updateBoardOptions: function () {
+                const selects = [
+                    document.getElementById('new-task-simple-board-select'),
+                    document.getElementById('new-task-board-select')
+                ];
+
+                // 現在のボードIDを取得
+                let currentBoardId = 'my-board';
+                const currentTab = document.querySelector('main > div[style*="display: block"]');
+                const tabId = currentTab ? currentTab.id : '';
+                if (tabId === 'tab-board') {
+                    const activeBoardDiv = document.querySelector('#tab-board > div[style*="display: block"]');
+                    if (activeBoardDiv && activeBoardDiv.id) {
+                        currentBoardId = activeBoardDiv.id.replace('tab-board-', '');
+                    }
+                }
+
+                selects.forEach(select => {
+                    if (!select) return;
+
+                    // 既存のオプションをクリア
+                    select.innerHTML = '<option value="my-board">マイボード</option>';
+
+                    // ボード一覧を取得
+                    const boards = App.state.get('boards') || [];
+
+                    // アクティブなボードのみをフィルタリングして追加
+                    boards
+                        .filter(board => board.is_active)
+                        .forEach(board => {
+                            const option = document.createElement('option');
+                            option.value = board.id;
+                            option.textContent = board.name;
+                            select.appendChild(option);
+                        });
+
+                    // 現在のボードを選択状態にする
+                    if (currentBoardId && select.querySelector(`option[value="${currentBoardId}"]`)) {
+                        select.value = currentBoardId;
+                    }
+                });
+            },
+
+            /**
+             * プレビューをクリア
+             */
+            clearPreview: function () {
+                this.parsedTasks = [];
+                const previewTableBody = document.querySelector('#new-task-preview-table tbody');
+                const createBtn = document.getElementById('new-task-create-btn');
+
+                if (previewTableBody) previewTableBody.innerHTML = '';
+                if (createBtn) createBtn.disabled = true;
+                if (createBtn) createBtn.innerHTML = '<i>add_task</i><span>タスクを作成する</span>';
+            },
+
+            /**
+             * アシスタントのプレビューモーダルを開く
+             */
+            showAssistantPreview: function () {
+                document.getElementById('modal-new-task-preview').classList.add('active');
+            },
+
+            /**
+             * クリップボードからデータを読み取る
+             */
+            readFromClipboard: async function () {
+                try {
+                    // クリップボードの読み取り権限をリクエスト
+                    const clipboardItems = await navigator.clipboard.read();
+
+                    let htmlContent = null;
+
+                    for (const clipboardItem of clipboardItems) {
+                        // HTML形式のデータを探す
+                        if (clipboardItem.types.includes('text/html')) {
+                            const blob = await clipboardItem.getType('text/html');
+                            htmlContent = await blob.text();
+                            break;
+                        }
+                    }
+
+                    // HTML形式が見つからない場合はプレーンテキストを試す
+                    if (!htmlContent) {
+                        htmlContent = await navigator.clipboard.readText();
+                    }
+
+                    if (htmlContent) {
+                        // パースとプレビュー表示
+                        this.parseAndPreview(htmlContent);
+                    } else {
+                        showSnackbar('クリップボードにデータが見つかりません', 'error');
+                    }
+                } catch (error) {
+                    console.error('クリップボード読み取りエラー:', error);
+                    showSnackbar('クリップボードの読み取りに失敗しました', 'error');
+                }
+            },
+
+            /**
+             * データをクリア
+             */
+            clearData: function () {
+                this.clearPreview();
+            },
+
+            /**
+             * データをパースしてプレビュー表示
+             * @param {string} htmlContent - パースするHTML文字列
+             */
+            parseAndPreview: function (htmlContent) {
+                if (!htmlContent || !htmlContent.trim()) {
+                    this.clearPreview();
+                    return;
+                }
+
+                try {
+                    // HTMLをパースしてテーブルを取得
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(htmlContent, 'text/html');
+                    const table = doc.querySelector('table');
+
+                    if (!table) {
+                        throw new Error('テーブルが見つかりません');
+                    }
+
+                    // ヘッダー行を取得（最初の行をヘッダーとして扱う）
+                    const allRows = Array.from(table.querySelectorAll('tr'));
+
+                    if (allRows.length < 2) {
+                        throw new Error('データ行が見つかりません（ヘッダー行のみ）');
+                    }
+
+                    // 最初の行をヘッダーとして取得
+                    const headerRow = allRows[0];
+                    const headers = Array.from(headerRow.querySelectorAll('th, td')).map(cell => {
+                        return cell.textContent.trim();
+                    });
+
+                    // 2行目以降をデータ行として取得（最初の行は常にスキップ）
+                    const dataRows = allRows.slice(1);
+
+                    if (dataRows.length === 0) {
+                        throw new Error('データ行が見つかりません');
+                    }
+
+                    // タスクデータを抽出
+                    this.parsedTasks = dataRows.map(row => {
+                        const cells = Array.from(row.querySelectorAll('td, th'));
+                        const taskData = {};
+
+                        cells.forEach((cell, index) => {
+                            const header = headers[index];
+                            const content = cell.textContent.trim();
+
+                            if (header === 'タスク名') {
+                                // 改行を除去
+                                taskData.name = content.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                            } else if (header === 'タスク説明') {
+                                taskData.description = content;
+                            } else if (header === '開始日時') {
+                                taskData.starts_at = this.parseDateTime(content);
+                            } else if (header === '終了日時') {
+                                taskData.ends_at = this.parseDateTime(content);
+                            } else if (header === '優先度') {
+                                taskData.priority_key = this.parsePriority(content);
+                            }
+                        });
+
+                        return taskData;
+                    });
+
+                    // プレビューを表示
+                    this.renderPreview();
+
+                } catch (error) {
+                    console.error('データのパースエラー:', error);
+                    showSnackbar('データの形式が正しくありません', 'error');
+                    this.clearPreview();
+                }
+            },
+
+            /**
+             * 日時文字列をパース
+             * @param {string} dateStr - 日時文字列（例: "2026/02/02(月) 10:00"）
+             * @returns {string|null} ISO 8601形式の日時文字列
+             */
+            parseDateTime: function (dateStr) {
+                if (!dateStr) return null;
+
+                try {
+                    // "2026/02/02(月) 10:00" のような形式をパース
+                    const match = dateStr.match(/(\d{4})\/(\d{1,2})\/(\d{1,2}).*?(\d{1,2}):(\d{1,2})/);
+                    if (match) {
+                        const [, year, month, day, hour, minute] = match;
+                        const date = new Date(
+                            parseInt(year),
+                            parseInt(month) - 1,
+                            parseInt(day),
+                            parseInt(hour),
+                            parseInt(minute)
+                        );
+                        return formatDateTimeForInput(date.toISOString());
+                    }
+                    return null;
+                } catch (error) {
+                    console.error('日時のパースエラー:', error);
+                    return null;
+                }
+            },
+
+            /**
+             * 優先度文字列を変換
+             * @param {string} priorityStr - 優先度文字列（低/中/高）
+             * @returns {string} 優先度キー（LOW/MEDIUM/HIGH）
+             */
+            parsePriority: function (priorityStr) {
+                const priorityMap = {
+                    '低': 'LOW',
+                    '中': 'MEDIUM',
+                    '高': 'HIGH'
+                };
+                return priorityMap[priorityStr] || 'MEDIUM';
+            },
+
+            /**
+             * プレビューテーブルを描画
+             */
+            renderPreview: function () {
+                const previewTableBody = document.querySelector('#new-task-preview-table tbody');
+                const createBtn = document.getElementById('new-task-create-btn');
+
+                if (!previewTableBody) return;
+
+                // テーブルをクリア
+                previewTableBody.innerHTML = '';
+
+                // データ行を追加
+                this.parsedTasks.forEach(task => {
+                    const row = document.createElement('tr');
+
+                    // タスク名
+                    const nameCell = document.createElement('td');
+                    nameCell.textContent = task.name || '';
+                    row.appendChild(nameCell);
+
+                    // タスク説明
+                    const descCell = document.createElement('td');
+                    descCell.textContent = task.description || '';
+                    row.appendChild(descCell);
+
+                    // 開始日時
+                    const startsCell = document.createElement('td');
+                    startsCell.textContent = task.starts_at ? formatDateTimeForDisplay(task.starts_at) : '';
+                    row.appendChild(startsCell);
+
+                    // 終了日時
+                    const endsCell = document.createElement('td');
+                    endsCell.textContent = task.ends_at ? formatDateTimeForDisplay(task.ends_at) : '';
+                    row.appendChild(endsCell);
+
+                    // 優先度
+                    const priorityCell = document.createElement('td');
+                    const priorityDisplay = {
+                        'LOW': '低',
+                        'MEDIUM': '中',
+                        'HIGH': '高'
+                    };
+                    priorityCell.textContent = priorityDisplay[task.priority_key] || '';
+                    row.appendChild(priorityCell);
+
+                    previewTableBody.appendChild(row);
+                });
+
+                // 一括作成ボタンを有効化
+                if (createBtn) {
+                    createBtn.disabled = this.parsedTasks.length === 0;
+                }
+
+                // プレビュー画面に切り替え
+                this.showAssistantPreview();
+            },
+
+            /**
+             * タスクを一括作成
+             */
+            createTasks: async function () {
+                const boardSelect = document.getElementById('new-task-board-select');
+                const boardId = boardSelect.value;
+
+                if (!boardId) {
+                    showSnackbar('ボードを選択してください', 'error');
+                    return;
+                }
+
+                if (this.parsedTasks.length === 0) {
+                    showSnackbar('作成するタスクがありません', 'error');
+                    return;
+                }
+
+                try {
+                    showSnackbar('タスクを作成中です...');
+                    const btn = document.getElementById('new-task-create-btn');
+                    if (btn) {
+                        const icon = btn.querySelector('i');
+                        if (icon) {
+                            icon.outerHTML = '<progress class="circle indeterminate small"></progress>';
+                        }
+                        btn.disabled = true;
+                    }
+
+                    // タスクデータを準備（board_idを追加）
+                    const tasksToCreate = this.parsedTasks.map(task => ({
+                        ...task,
+                        board_id: boardId,
+                        task_status_key: 'TODO', // デフォルトステータス
+                        processed_by: App.state.userId,
+                        reviewed_by: App.state.userId,
+                        received_by: App.state.userId
+                    }));
+
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'bulkinsert', tasksToCreate);
+
+                    App.modals.newTask.close();
+                    showSnackbar(`${tasksToCreate.length}件のタスクを作成しました`, 'success');
+                    await App.utils.navigation.switchTab('board-' + boardId, false, true);
+                } catch (error) {
+                    console.error('タスク一括作成エラー:', error);
+                    showSnackbar('タスクの作成に失敗しました: ' + error.message, 'error');
+                }
+            }
+        };
+    })();
+</script>
