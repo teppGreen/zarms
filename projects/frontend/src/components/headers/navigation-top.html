@@ -1,12 +1,9 @@
 <nav class="top right-margin surface">
 
-    <nav class="min">
-        <!-- モバイル用 -->
-        <button id="new-button" class="s m large circle primary"
-            onclick="App.utils.header.toggleNewButtonDropdown(event)">
-            <i>add</i>
-        </button>
-        <menu id="new-button-dropdown" class="s m right no-wrap" onclick="App.utils.header.closeNewButtonDropdown()">
+    <button id="new-button" class="large round primary">
+        <i><img src="https://i.gyazo.com/57e5513686f69b7aa4210c4dd8558c15.png" class="responsive"></i>
+        <span class="l">新規作成</span>
+        <menu id="new-button-dropdown" class="min no-wrap">
             <li>
                 <a onclick="App.modals.newTask.open()">
                     <i>add_task</i>
@@ -32,39 +29,7 @@
                 </a>
             </li>
         </menu>
-
-        <!-- デスクトップ用 -->
-        <button class="l large round primary">
-            <i>add</i>
-            <span>新規作成</span>
-            <menu class="min no-wrap">
-                <li>
-                    <a onclick="App.modals.newTask.open()">
-                        <i>add_task</i>
-                        <span>新しいタスク<i class="tiny no-padding no-margin">keyboard_option_key</i>T</span>
-                    </a>
-                </li>
-                <li>
-                    <a onclick="App.pages.boards.createBoard()">
-                        <i>create_new_folder</i>
-                        <span>新しいボード</span>
-                    </a>
-                </li>
-                <li>
-                    <a onclick="App.modals.newMember.open()">
-                        <i>person_add</i>
-                        <span>新しいメンバー</span>
-                    </a>
-                </li>
-                <li>
-                    <a onclick="App.modals.newDirectory.open()">
-                        <i>account_tree</i>
-                        <span>新しい組織</span>
-                    </a>
-                </li>
-            </menu>
-        </button>
-    </nav>
+    </button>
 
     <!-- 検索バー -->
     <div class="field round prefix border" id="search-container">
@@ -81,7 +46,7 @@
     <div class="max"></div>
 
     <nav class="left-margin right-margin">
-        <button id="comments-button" class="l circle transparent" onclick="App.utils.header.comments.toggle()">
+        <button id="comments-button" class="l circle transparent" onclick="App.utils.header.comments.toggle()" title="コメント">
             <i>comment</i>
             <span id="comments-badge" class="badge" style="display: none;">0</span>
             <menu id="comments-menu" class="left no-padding medium-width">
@@ -91,7 +56,7 @@
             </menu>
         </button>
 
-        <button class="l circle transparent">
+        <button class="l circle transparent" title="リンク">
             <i>apps</i>
             <menu id="apps-menu" class="left no-padding medium-width">
                 <div id="apps-grid">
@@ -100,7 +65,7 @@
             </menu>
         </button>
 
-        <button class="circle transparent">
+        <button class="circle transparent" title="ヘルプ">
             <i>help</i>
             <menu id="help-menu" class="left no-wrap">
                 <li><a id="help-link" href="" target="_blank">ヘルプ</a></li>
@@ -109,7 +74,7 @@
             </menu>
         </button>
 
-        <button id="system-info-button" class="l circle transparent" onclick="App.utils.header.systemUpdates.toggle()">
+        <button id="system-info-button" class="l circle transparent" title="ZARMSについて" onclick="App.utils.header.systemUpdates.toggle()">
             <i>info</i>
             <menu id="system-info-menu" class="left no-padding medium-width">
                 <div id="system-info-list">
@@ -191,27 +156,6 @@
                 }).join('');
 
                 appsGrid.innerHTML = appsHtml;
-            },
-
-            /**
-             * 「+ 新規作成」ボタンのドロップダウンの表示/非表示を切り替えます。
-             */
-            toggleNewButtonDropdown: function (event) {
-                event.stopPropagation(); // bodyのクリックイベントへの伝播を防ぐ
-                const dropdown = document.getElementById('new-button-dropdown');
-                if (dropdown) {
-                    dropdown.classList.toggle('show');
-                }
-            },
-
-            /**
-             * 新規作成ボタンのドロップダウンを閉じます
-             */
-            closeNewButtonDropdown: function () {
-                const dropdown = document.getElementById('new-button-dropdown');
-                if (dropdown) {
-                    dropdown.classList.remove('show');
-                }
             },
 
             // ============================================

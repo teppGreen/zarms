@@ -1,31 +1,39 @@
-<nav id="left-nav" class="m l left no-wrap small-padding max no-scroll">
-    <header class="no-padding center no-margin">
-        <img src="https://i.gyazo.com/5c4f146e5ec5efdf571670f6b318e309.png" alt="ZARMS" class="small-width"
-            onclick="App.utils.navigation.switchTab('home')">
+<nav id="left-nav" class="m l left no-wrap max">
+    <header class="no-margin">
+        <div class="row">
+            <button class="extra circle transparent" title="ナビゲーションを開閉"
+                onclick="App.utils.navigation.toggleLeftNavSize(event)">
+                <i>dock_to_right</i>
+            </button>
+            <div id="h1-content">
+                <h1 class="font-title underline" style="font-size: 1.75rem;">ZARMS</h1>
+            </div>
+        </div>
     </header>
 
     <a id="home-nav" onclick="App.utils.navigation.switchTab('home')">
         <i>home</i>
         <span>ホーム</span>
+        <div class="tooltip right" style="display: none;">ホーム</div>
     </a>
     <a id="members-nav" onclick="App.utils.navigation.switchTab('members')">
         <i>groups</i>
         <span>メンバー</span>
+        <div class="tooltip right" style="display: none;">メンバー</div>
     </a>
     <a id="calendar-nav" onclick="App.utils.navigation.switchTab('calendar')">
         <i>calendar_month</i>
         <span>カレンダー</span>
+        <div class="tooltip right" style="display: none;">カレンダー</div>
     </a>
     <a id="my-board-nav" onclick="App.utils.navigation.switchTab('board-my-board')">
         <i>assignment</i>
         <span>マイボード</span>
+        <div class="tooltip right" style="display: none;">マイボード</div>
     </a>
 
-    <nav class="no-padding">
-        <hr class="small-margin">
-    </nav>
-
-    <!-- 動的ボードリスト -->
+    <div id="boards-hover-anchor"></div>
+    <hr class="small-margin">
     <nav id="boards-nav" class="scroll bottom-margin no-padding left max">
     </nav>
 </nav>
@@ -33,6 +41,87 @@
 <script>
     (function () {
         App.utils.navigation = {
+            leftNavPreferredSize: 'max',
+            leftNavIsHovering: false,
+
+            applyLeftNavSize: function (size) {
+                const leftNav = document.getElementById('left-nav');
+                if (!leftNav) return;
+
+                const targetSize = size === 'min' ? 'min' : 'max';
+                leftNav.classList.remove('max', 'min');
+                leftNav.classList.add(targetSize);
+
+                // min/max に応じて要素の表示/非表示を制御
+                const boardsNav = document.getElementById('boards-nav');
+                const hrNav = boardsNav ? boardsNav.previousElementSibling : null;
+                const h1Content = document.getElementById('h1-content');
+                const spans = Array.from(leftNav.querySelectorAll('a > span'));
+                const tooltips = Array.from(leftNav.querySelectorAll('a > div.tooltip'));
+
+                if (targetSize === 'min') {
+                    // min の場合: ボードリストと区切り線を非表示、スパンも非表示
+                    if (boardsNav) boardsNav.style.display = 'none';
+                    if (hrNav) hrNav.style.display = 'none';
+                    if (h1Content) h1Content.style.display = 'none';
+                    spans.forEach(span => span.style.display = 'none');
+                    tooltips.forEach(tooltip => tooltip.style.display = '');
+                } else {
+                    // max の場合: 表示
+                    if (boardsNav) boardsNav.style.display = '';
+                    if (hrNav) hrNav.style.display = '';
+                    if (h1Content) h1Content.style.display = '';
+                    spans.forEach(span => span.style.display = '');
+                    tooltips.forEach(tooltip => tooltip.style.display = 'none');
+                }
+            },
+
+            initializeLeftNavToggle: function () {
+                const leftNav = document.getElementById('left-nav');
+                const hoverAnchor = document.getElementById('boards-hover-anchor');
+                if (!leftNav || !hoverAnchor) return;
+
+                this.leftNavPreferredSize = leftNav.classList.contains('min') ? 'min' : 'max';
+
+                leftNav.addEventListener('mousemove', (event) => {
+                    const anchorTop = hoverAnchor.getBoundingClientRect().top;
+                    const isInBoardsHoverArea = event.clientY >= anchorTop;
+
+                    if (isInBoardsHoverArea) {
+                        if (!this.leftNavIsHovering) {
+                            this.leftNavIsHovering = true;
+                            this.applyLeftNavSize('max');
+                        }
+                        return;
+                    }
+
+                    if (this.leftNavIsHovering) {
+                        this.leftNavIsHovering = false;
+                        this.applyLeftNavSize(this.leftNavPreferredSize);
+                    }
+                });
+
+                leftNav.addEventListener('mouseleave', () => {
+                    this.leftNavIsHovering = false;
+                    this.applyLeftNavSize(this.leftNavPreferredSize);
+                });
+            },
+
+            toggleLeftNavSize: function (event) {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+
+                this.leftNavPreferredSize = this.leftNavPreferredSize === 'min' ? 'max' : 'min';
+
+                if (this.leftNavIsHovering) {
+                    this.applyLeftNavSize('max');
+                } else {
+                    this.applyLeftNavSize(this.leftNavPreferredSize);
+                }
+            },
+
             /**
              * タブを切り替える
              * @param {string} tabName - タブID（例: 'home', 'members', 'board-UUID'）
@@ -358,14 +447,13 @@
                 nav.innerHTML = html;
             },
 
-            // 開発モードの時にh1を変更
             changeH1: function () {
-                if (!App.state.isDevelopment) return;
-
-                const h1 = document.querySelector('#left-nav header');
-                if (h1) {
-                    console.log('[changeH1] h1 found:', h1);
-                    h1.innerHTML = '<h1 class="font-title error margin" style="font-size: 1.75rem;">DEV-MODE</h1>';
+                if (App.state.isDevelopment) {
+                    const h1 = document.querySelector('#h1-content h1');
+                    if (h1) {
+                        h1.textContent = 'DEV';
+                        h1.classList.add('error');
+                    }
                 }
             },
 
@@ -474,6 +562,7 @@
                 }
             }
         };
+        App.utils.navigation.initializeLeftNavToggle();
         App.utils.navigation.renderLoadingPlaceholders();
     })();
 </script>
