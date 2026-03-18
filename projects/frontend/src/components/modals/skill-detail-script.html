@@ -200,6 +200,7 @@
                     const name = member ? member.display_name || member.name || member.email || '不明' : '不明';
                     const memberId = member ? member.id : '';
                     const assignmentId = sa.id || '';
+                    const remark = sa.remark || '';
 
                     const levelSelect = assignmentId
                         ? '<select class="small" onchange="App.modals.skillDetail.updateMemberLevel(\'' + assignmentId + '\', this.value)">' + levelOptions(sa.skill_level_key) + '<\/select>'
@@ -219,6 +220,10 @@
                         '<div class="max">' +
                         '<p class="no-margin bold small">' + escapeHtml(name) + '<\/p>' +
                         '<div class="row tiny-space">' + levelSelect + '<\/div>' +
+                        '<div class="field border label small top-margin no-margin">' +
+                        '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(remark) + '" onchange="App.modals.skillDetail.updateMemberRemark(\'' + escapeHtmlAttribute(assignmentId) + '\', this.value)">' +
+                        '<label>備考</label>' +
+                        '<\/div>' +
                         '<\/div>' +
                         '<div class="row tiny-space">' + openBtn + removeBtn + '<\/div>' +
                         '<\/div>';
@@ -321,6 +326,39 @@
                         App.pages.members.loadData(true);
                     }
                 }
+            },
+
+            updateMemberRemark: async function (assignmentId, remarkValue) {
+                if (!assignmentId) return;
+
+                const assignments = App.state.data.skillAssignments || [];
+                const target = assignments.find(function (sa) { return sa.id === assignmentId; });
+                if (!target) return;
+
+                const normalizedRemark = (remarkValue || '').trim() || null;
+                const prevRemark = target.remark || null;
+                if (normalizedRemark === prevRemark) return;
+
+                target.remark = normalizedRemark;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', assignmentId] },
+                        set: { remark: normalizedRemark }
+                    }, 'メンバースキル備考を更新');
+                    showSnackbar('備考を更新しました', 'success');
+                } catch (err) {
+                    console.error('[SkillDetail] 備考更新エラー:', err);
+                    target.remark = prevRemark;
+                    showSnackbar('備考の更新に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+                }
+
+                this._renderMembers(this.currentId);
             },
 
             removeAssignment: async function (assignmentId) {

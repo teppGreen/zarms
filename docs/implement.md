@@ -19,6 +19,7 @@
 2. `directory-detail` 保存時に「保存中」表示と二重送信防止を追加。
 3. `skill-detail` 保存時に「保存中」表示と二重送信防止を追加。
 4. `directory_assignments.role` の編集導線を `member-detail` / `directory-detail` の両方に追加。
+5. `skill_assignments.remark` の編集導線を `member-detail` / `skill-detail` の両方に追加。
 
 ### Next
 1. membersページのタブ切り替え時レンダリングをさらに分割し、初回表示までの体感遅延を最小化。

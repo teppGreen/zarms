@@ -380,6 +380,37 @@
                 }
             },
 
+            updateSkillRemark: async function (assignmentId, remarkValue) {
+                if (!assignmentId) return;
+
+                const assignments = App.state.data.skillAssignments || [];
+                const target = assignments.find(function (a) { return a.id === assignmentId; });
+                if (!target) return;
+
+                const normalizedRemark = (remarkValue || '').trim() || null;
+                const prevRemark = target.remark || null;
+                if (normalizedRemark === prevRemark) return;
+
+                target.remark = normalizedRemark;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', assignmentId] },
+                        set: { remark: normalizedRemark }
+                    }, 'スキル備考を更新');
+                    showSnackbar('スキル備考を更新しました', 'success');
+                } catch (err) {
+                    console.error('[MemberDetail] スキル備考更新エラー:', err);
+                    target.remark = prevRemark;
+                    showSnackbar('スキル備考の更新に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    }
+                }
+
+                this._renderSkills(this.currentId);
+            },
+
             removeSkillAssignment: async function (assignmentId) {
                 if (!assignmentId) return;
                 if (!confirm('スキルを解除しますか？')) return;
@@ -646,6 +677,7 @@
                     var skill = skills.find(function (s) { return s.id === sa.skill_id; });
                     var skillName = skill ? skill.title : '（削除済みスキル）';
                     var level = levelLabels[sa.skill_level_key] || sa.skill_level_key || '';
+                    var remark = sa.remark || '';
                     var levelSelect = sa.id
                         ? '<select class="small" onchange="App.modals.memberDetail.updateSkillLevel(\'' + sa.id + '\', this.value)">' + levelOptions(sa.skill_level_key) + '<\/select>'
                         : '<span class="small-text secondary-text">-<\/span>';
@@ -657,6 +689,10 @@
                         '<div class="max">' +
                         '<p class="no-margin bold small">' + escapeHtml(skillName) + '<\/p>' +
                         (level ? '<p class="no-margin small-text secondary-text">' + escapeHtml(level) + '<\/p>' : '') +
+                        '<div class="field border label small top-margin no-margin">' +
+                        '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(remark) + '" onchange="App.modals.memberDetail.updateSkillRemark(\'' + escapeHtmlAttribute(sa.id || '') + '\', this.value)">' +
+                        '<label>備考</label>' +
+                        '<\/div>' +
                         '<\/div>' +
                         '<div class="row tiny-space">' + levelSelect + removeBtn + '<\/div>' +
                         '<\/div>';
