@@ -1,0 +1,137 @@
+<script>
+    (function () {
+        App.modals.newPlan = {
+            open: function () {
+                this._resetForm();
+                this._populateStatusOptions();
+                const dialog = document.getElementById('modal-new-plan');
+                if (!dialog) return;
+                ui(dialog, true);
+                setTimeout(function () {
+                    const input = document.getElementById('new-plan-name-input');
+                    if (input) input.focus();
+                }, 80);
+            },
+
+            close: function () {
+                const dialog = document.getElementById('modal-new-plan');
+                if (dialog) ui(dialog, false);
+            },
+
+            create: async function () {
+                const name = (document.getElementById('new-plan-name-input')?.value || '').trim();
+                const planNumber = (document.getElementById('new-plan-plan-number-input')?.value || '').trim();
+                const status = (document.getElementById('new-plan-status-input')?.value || '').trim() || 'SUBMITTED';
+                const planType = (document.getElementById('new-plan-type-input')?.value || '').trim();
+                const summary = (document.getElementById('new-plan-summary-input')?.value || '').trim();
+
+                const errorEl = document.getElementById('new-plan-error');
+                const createBtn = document.getElementById('new-plan-create-btn');
+
+                if (!name) {
+                    if (errorEl) {
+                        errorEl.textContent = '企画名は必須です';
+                        errorEl.style.display = '';
+                    }
+                    return;
+                }
+
+                if (errorEl) errorEl.style.display = 'none';
+                if (createBtn) createBtn.disabled = true;
+
+                const tempId = 'tmp-plan-' + Date.now();
+                const optimisticPlan = {
+                    id: tempId,
+                    plan_number: planNumber || null,
+                    name: name,
+                    plan_status: status,
+                    plan_type: planType || null,
+                    summary: summary || null,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+
+                App.state.data.plans = [optimisticPlan].concat(App.state.data.plans || []);
+                this.close();
+                if (App.pages.members && App.pages.members.loadData) {
+                    App.pages.members.loadData(false);
+                }
+                showSnackbar('企画を作成しています...', 'info');
+
+                try {
+                    const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLANS, 'insert', {
+                        plan_number: planNumber || null,
+                        name: name,
+                        plan_status: status,
+                        plan_type: planType || null,
+                        summary: summary || null
+                    }, '企画を作成');
+
+                    const insertedId = inserted?.data?.id;
+                    if (insertedId) {
+                        const target = (App.state.data.plans || []).find(function (plan) {
+                            return plan.id === tempId;
+                        });
+                        if (target) target.id = insertedId;
+                    }
+
+                    const plansResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLANS, 'select', {}, null, true);
+                    const assignmentsResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLAN_ASSIGNMENTS, 'select', {}, null, true);
+                    App.state.data.plans = plansResult?.data || [];
+                    App.state.data.planAssignments = assignmentsResult?.data || [];
+
+                    if (App.pages.members && App.pages.members.loadData) {
+                        await App.pages.members.loadData(true);
+                    }
+
+                    showSnackbar('企画を作成しました', 'success');
+                } catch (error) {
+                    console.error('[newPlan] 作成エラー:', error);
+                    App.state.data.plans = (App.state.data.plans || []).filter(function (plan) {
+                        return plan.id !== tempId;
+                    });
+                    if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(false);
+                    }
+                    if (errorEl) {
+                        errorEl.textContent = '企画の作成に失敗しました';
+                        errorEl.style.display = '';
+                    }
+                    showSnackbar('企画の作成に失敗しました', 'error');
+                } finally {
+                    if (createBtn) createBtn.disabled = false;
+                }
+            },
+
+            _resetForm: function () {
+                const inputIds = [
+                    'new-plan-plan-number-input',
+                    'new-plan-name-input',
+                    'new-plan-type-input',
+                    'new-plan-summary-input'
+                ];
+
+                inputIds.forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (el) el.value = '';
+                });
+
+                const statusEl = document.getElementById('new-plan-status-input');
+                if (statusEl) statusEl.value = 'SUBMITTED';
+
+                const errorEl = document.getElementById('new-plan-error');
+                if (errorEl) errorEl.style.display = 'none';
+            },
+
+            _populateStatusOptions: function () {
+                const statusEl = document.getElementById('new-plan-status-input');
+                if (!statusEl || !KEY_LABELS || !KEY_LABELS.PLAN_STATUS) return;
+
+                statusEl.innerHTML = Object.entries(KEY_LABELS.PLAN_STATUS).map(function (entry) {
+                    return '<option value="' + escapeHtmlAttribute(entry[0]) + '">' + escapeHtml(entry[1]) + '<\/option>';
+                }).join('');
+                statusEl.value = 'SUBMITTED';
+            }
+        };
+    })();
+</script>

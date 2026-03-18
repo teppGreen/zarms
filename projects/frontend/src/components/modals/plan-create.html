@@ -1,0 +1,67 @@
+<!-- 新規企画作成モーダル -->
+<dialog id="modal-new-plan" class="modal medium-width padding">
+    <nav class="small-padding bottom-margin">
+        <h5 class="max bold">新規企画作成</h5>
+        <button class="circle transparent" onclick="App.modals.newPlan.close()">
+            <i>close</i>
+        </button>
+    </nav>
+
+    <div class="small-padding">
+        <div class="field border large label bottom-margin">
+            <input placeholder=" " type="text" id="new-plan-plan-number-input">
+            <label>企画番号</label>
+        </div>
+
+        <div class="field border large label bottom-margin">
+            <input placeholder=" " type="text" id="new-plan-name-input">
+            <label>企画名 <span class="error-text">*</span></label>
+        </div>
+
+        <div class="grid no-margin tiny-space">
+            <div class="s12 m6">
+                <div class="field border large label bottom-margin suffix no-wrap">
+                    <select id="new-plan-status-input">
+                        <option value="SUBMITTED">応募済み</option>
+                        <option value="IN_REVIEW1">一次審査中</option>
+                        <option value="IN_REVIEW2">二次審査中（最終）</option>
+                        <option value="APPROVED">審査通過</option>
+                        <option value="RETURNED">審査差戻</option>
+                        <option value="REJECTED">審査落選</option>
+                        <option value="IN_PREPARATION">準備中</option>
+                        <option value="READY">準備完了</option>
+                        <option value="PUBLISHED">公開中</option>
+                        <option value="CLOSED">公開終了</option>
+                        <option value="MERGED">統合済み</option>
+                        <option value="DISCARDED">取り下げ</option>
+                    </select>
+                    <label>状態</label>
+                    <i>arrow_drop_down</i>
+                </div>
+            </div>
+            <div class="s12 m6">
+                <div class="field border large label bottom-margin">
+                    <input placeholder=" " type="text" id="new-plan-type-input">
+                    <label>企画種別</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="field border large label bottom-margin">
+            <input placeholder=" " type="text" id="new-plan-summary-input">
+            <label>企画概要</label>
+        </div>
+
+        <p id="new-plan-error" class="error-text small-text" style="display: none;"></p>
+
+        <nav class="right-align top-margin">
+            <button class="border" onclick="App.modals.newPlan.close()">
+                <span>キャンセル</span>
+            </button>
+            <button id="new-plan-create-btn" class="primary" onclick="App.modals.newPlan.create()">
+                <i>store</i>
+                <span>作成する</span>
+            </button>
+        </nav>
+    </div>
+</dialog>

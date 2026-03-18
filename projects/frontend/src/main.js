@@ -50,8 +50,7 @@ function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false
     activeUser: activeUser,
     isDevelopment: isDevelopment(urlParams),
     TABLE_NAMES: TABLE_NAMES,
-    DIRECTORY_TYPES: DIRECTORY_TYPES,
-    TASK_STATUS: TASK_STATUS,
+    KEY_LABELS: KEY_LABELS,
     useApiMode: useApiMode,
     userProperties: PropertiesService.getUserProperties().getProperties()
   };

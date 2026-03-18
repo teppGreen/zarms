@@ -17,6 +17,23 @@
       originalChildTaskIds: [], // 元の子タスクIDの配列（変更検知用）
       deletedChildTaskIds: [], // 削除された子タスクIDの配列
 
+      applyAssigneeLabels: function () {
+        const roleLabels = {
+          'task-detail-label-assignee-section': KEY_LABELS.ASIGNEE_TYPE.PROCESSED_BY,
+          'task-detail-role-created-by': KEY_LABELS.ASIGNEE_TYPE.CREATED_BY,
+          'task-detail-role-processed-by': KEY_LABELS.ASIGNEE_TYPE.PROCESSED_BY,
+          'task-detail-role-reviewed-by': KEY_LABELS.ASIGNEE_TYPE.REVIEWED_BY,
+          'task-detail-role-received-by': KEY_LABELS.ASIGNEE_TYPE.RECEIVED_BY
+        };
+
+        Object.keys(roleLabels).forEach(id => {
+          const element = document.getElementById(id);
+          if (element) {
+            element.textContent = roleLabels[id];
+          }
+        });
+      },
+
       open: async function (taskId, skipUrlUpdate = false, defaultDirty = false) {
         console.log('[TaskDetail] open called with id:', taskId);
 
@@ -53,6 +70,7 @@
 
         this.currentItem = task;
         this.originalData = { ...task }; // 元のデータを保存
+        this.applyAssigneeLabels();
 
         // モーダルを先に開く（BeerCSSのlabelスタイルが正しく適用されるように）
         ui('#modal-detail-task', true);
@@ -60,7 +78,7 @@
         // Quillの初期化（初回のみ）
         if (!this.quill) {
           this.quill = App.utils.quill.init('#task-description-editor', {
-            placeholder: '進行者の人の目線に立って、タスクの説明を書きましょう。\nShift+Enterで改行、Enterで段落区切り'
+            placeholder: `${KEY_LABELS.ASIGNEE_TYPE.PROCESSED_BY}の人の目線に立って、タスクの説明を書きましょう。\nShift+Enterで改行、Enterで段落区切り`
           });
         }
 
@@ -1048,9 +1066,9 @@
           return;
         }
 
-        // 作成者は変更不可
+        // CREATED_BYの担当者は変更不可
         if (role === 'created_by') {
-          showSnackbar('作成者は変更できません', 'info');
+          showSnackbar(`${KEY_LABELS.ASIGNEE_TYPE.CREATED_BY}は変更できません`, 'info');
           return;
         }
 
@@ -1652,19 +1670,6 @@
       },
 
       /**
-       * タスクステータスキーをテキストに変換
-       */
-      getStatusText: function (statusKey) {
-        const statusMap = {
-          'TODO': '未着手',
-          'IN_PROGRESS': '進行中',
-          'IN_REVIEW': '確認中',
-          'DONE': '完了'
-        };
-        return statusMap[statusKey] || statusKey;
-      },
-
-      /**
        * 親タスクフィールドを描画
        */
       renderParentTask: function () {
@@ -1674,7 +1679,7 @@
         if (this.currentParentTask) {
           const displayId = this.currentParentTask.display_id ? `#${this.currentParentTask.display_id}` : '';
           const taskName = escapeHtml(this.currentParentTask.name || '無題のタスク');
-          const statusText = this.getStatusText(this.currentParentTask.task_status_key);
+          const statusText = KEY_LABELS.TASK_STATUS[this.currentParentTask.task_status_key] || '';
           const statusClass = this.currentParentTask.task_status_key === 'DONE' ? 'success' : 'secondary';
           container.innerHTML = `
             <p class="no-margin">
@@ -1699,7 +1704,7 @@
           container.innerHTML = this.currentChildTasks.map(task => {
             const displayId = task.display_id ? `#${task.display_id}` : '';
             const taskName = escapeHtml(task.name || '無題のタスク');
-            const statusText = this.getStatusText(task.task_status_key);
+            const statusText = KEY_LABELS.TASK_STATUS[task.task_status_key] || '';
             const statusClass = task.task_status_key === 'DONE' ? 'success' : 'secondary';
             return `
               <div class="row middle-align small-space">

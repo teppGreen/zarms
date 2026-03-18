@@ -1,17 +1,15 @@
-<dialog id="modal-detail-skill" class="transparent bottom no-padding">
-    <div class="bottom-padding" onclick="App.modals.skillDetail.close(false)" title="スキル詳細画面を閉じる">
-        <i class="center extra center" title="スキル詳細画面を閉じる">keyboard_arrow_down</i>
-    </div>
+<dialog id="modal-detail-skill" class="transparent max no-padding">
 
     <div class="surface-container padding">
         <div class="grid small-padding bottom-margin">
             <div class="s12 m9">
-                <h5 id="skill-detail-title" class="bold no-margin"></h5>
-                <p id="skill-detail-type" class="small-text secondary-text no-margin"></p>
-                <p id="skill-detail-description" class="small-text secondary-text top-margin"></p>
+                <h5 class="bold no-margin">スキル詳細</h5>
             </div>
             <div class="s12 m3">
                 <nav class="row right-align">
+                    <button class="circle transparent" onclick="App.modals.skillDetail.openNewComment()" title="コメントを作成">
+                        <i>add_comment</i>
+                    </button>
                     <button class="circle transparent" onclick="App.modals.skillDetail.close(false)" title="閉じる">
                         <i>close</i>
                     </button>
@@ -20,7 +18,62 @@
         </div>
 
         <div class="grid small-padding tiny-space no-margin">
-            <div class="s12 m8 background small-round padding">
+            <div class="s12 m3 background small-round padding">
+                <h6 class="bold small bottom-margin">基本情報</h6>
+
+                <div class="field border label small bottom-margin">
+                    <input type="text" id="skill-detail-id-input" placeholder=" " readonly>
+                    <label>ID</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input type="text" id="skill-detail-title-input" placeholder=" ">
+                    <label>タイトル</label>
+                </div>
+
+                <div class="field border label small suffix no-wrap bottom-margin">
+                    <select id="skill-detail-type-input">
+                        <option value="">（未設定）</option>
+                    </select>
+                    <label>種別</label>
+                    <i>arrow_drop_down</i>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <div id="skill-description-editor" class="quill-editor"></div>
+                    <label>説明</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <textarea id="skill-detail-remark-input" rows="2" placeholder=" "></textarea>
+                    <label>備考</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input type="text" id="skill-detail-created-by-input" placeholder=" " readonly>
+                    <label>作成者</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input type="text" id="skill-detail-created-at-input" placeholder=" " readonly>
+                    <label>作成日時</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input type="text" id="skill-detail-updated-by-input" placeholder=" " readonly>
+                    <label>最終更新者</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input type="text" id="skill-detail-updated-at-input" placeholder=" " readonly>
+                    <label>最終更新日時</label>
+                </div>
+
+                <p id="skill-detail-error" class="error-text small-text" style="display: none;"></p>
+                <div class="center-align row tiny-space secondary-text small-text top-margin" id="skill-detail-last-updated"></div>
+            </div>
+
+            <div class="s12 m6 background small-round padding">
                 <div class="row tiny-space bottom-margin">
                     <h6 class="bold small max">保有メンバー</h6>
                     <div class="field label border small">
@@ -40,37 +93,22 @@
                 <div id="skill-detail-members-list"></div>
             </div>
 
-            <div class="s12 m4 background small-round padding">
-                <h6 class="bold small bottom-margin">基本情報</h6>
-                <div class="field border label small bottom-margin">
-                    <input type="text" id="skill-detail-title-input" placeholder=" ">
-                    <label>タイトル</label>
+            <div class="s12 m3 background small-round padding">
+                <div class="bottom-margin">
+                    <button class="no-margin responsive large fill round max" onclick="App.modals.skillDetail.openNewComment()">
+                        <i>add_comment</i>
+                        <span>コメントを作成</span>
+                    </button>
                 </div>
-                <div class="field border label small suffix no-wrap bottom-margin">
-                    <select id="skill-detail-type-input">
-                        <option value="">（未設定）</option>
-                    </select>
-                    <label>種別</label>
-                    <i>arrow_drop_down</i>
-                </div>
-                <div class="field border label small bottom-margin">
-                    <textarea id="skill-detail-description-input" rows="3" placeholder=" "></textarea>
-                    <label>説明</label>
-                </div>
-                <div class="field border label small bottom-margin">
-                    <textarea id="skill-detail-remark-input" rows="2" placeholder=" "></textarea>
-                    <label>備考</label>
-                </div>
-                <p id="skill-detail-error" class="error-text small-text" style="display: none;"></p>
-                <div class="center-align row tiny-space secondary-text small-text top-margin" id="skill-detail-last-updated"></div>
+                <div class="scroll medium-height" id="skill-comments-list"></div>
             </div>
         </div>
 
         <nav class="small-padding no-margin">
             <h5 id="skill-detail-display-id" class="font-number"></h5>
             <div class="max"></div>
-            <button id="skill-detail-save-btn" class="border large round" onclick="App.modals.skillDetail.save()">保存</button>
-            <button class="primary large round" onclick="App.modals.skillDetail.close(false)">閉じる</button>
+            <button class="border large round" onclick="App.modals.skillDetail.close(false)">閉じる</button>
+            <button id="skill-detail-save-btn" class="primary large round" onclick="App.modals.skillDetail.save()">保存</button>
         </nav>
     </div>
 </dialog>

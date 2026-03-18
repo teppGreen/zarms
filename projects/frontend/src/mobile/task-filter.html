@@ -57,19 +57,19 @@
         <legend>担当者</legend>
         <label class="checkbox">
           <input type="checkbox" id="filter-assignee-created-by">
-          <span>作成者</span>
+          <span id="mobile-filter-label-created-by"></span>
         </label>
         <label class="checkbox">
           <input type="checkbox" id="filter-assignee-processed-by">
-          <span>進行者</span>
+          <span id="mobile-filter-label-processed-by"></span>
         </label>
         <label class="checkbox">
           <input type="checkbox" id="filter-assignee-reviewed-by">
-          <span>確認者</span>
+          <span id="mobile-filter-label-reviewed-by"></span>
         </label>
         <label class="checkbox">
           <input type="checkbox" id="filter-assignee-received-by">
-          <span>受領者</span>
+          <span id="mobile-filter-label-received-by"></span>
         </label>
         <label class="checkbox">
           <input type="checkbox" id="filter-ball-holder-only">
@@ -91,6 +91,22 @@
 <script>
   (function () {
     App.modals.mobileFilter = {
+      applyAssigneeLabels: function () {
+        const roleLabels = {
+          'mobile-filter-label-created-by': KEY_LABELS.ASIGNEE_TYPE.CREATED_BY,
+          'mobile-filter-label-processed-by': KEY_LABELS.ASIGNEE_TYPE.PROCESSED_BY,
+          'mobile-filter-label-reviewed-by': KEY_LABELS.ASIGNEE_TYPE.REVIEWED_BY,
+          'mobile-filter-label-received-by': KEY_LABELS.ASIGNEE_TYPE.RECEIVED_BY
+        };
+
+        Object.keys(roleLabels).forEach(id => {
+          const element = document.getElementById(id);
+          if (element) {
+            element.textContent = roleLabels[id];
+          }
+        });
+      },
+
       /**
        * フィルタモーダルを開く
        */
@@ -102,6 +118,8 @@
           console.error('[MobileFilter] Dialog not found');
           return;
         }
+
+        this.applyAssigneeLabels();
 
         // 現在のフィルタ設定を反映
         this.loadCurrentFilters();

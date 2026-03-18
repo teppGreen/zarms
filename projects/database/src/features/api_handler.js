@@ -314,6 +314,10 @@ function _handleApiSelect(email, tableName, dataObject, forceRefresh) {
  * @returns {TextOutput}
  */
 function _handleApiWrite(memberId, email, tableName, operation, dataObject) {
+  if (operation === 'remove') {
+    return buildErrorResponse('APIモードでは削除操作は許可されていません', 403);
+  }
+
   const { allowAll, recordIds } = getAllowedRecordIds(email, tableName, 'can_write');
 
   if (operation === 'insert' || operation === 'bulkinsert') {
@@ -325,8 +329,8 @@ function _handleApiWrite(memberId, email, tableName, operation, dataObject) {
     return buildOkResponse(result);
   }
 
-  if (operation === 'update' || operation === 'remove') {
-    // UPDATE / REMOVE: WHERE条件で対象レコードを事前確認し権限チェック
+  if (operation === 'update') {
+    // UPDATE: WHERE条件で対象レコードを事前確認し権限チェック
     const targetResult = handleDatabaseProcess(null, tableName, 'select', { where: dataObject.where }, null, true);
     const targets = targetResult?.data || targetResult || [];
 

@@ -24,26 +24,79 @@ const TABLE_NAMES = {
   PLANS: 'plans',
 };
 
-const DIRECTORY_TYPES = {
-  COMPANY: '法人・学校・団体',
-  FACULTY: '学部・学科・専攻',
-  COMMITTEE: '委員会',
-  TEMPORARY: '企画出展専用',
-  PROJECT: 'プロジェクト',
-  GROUP: 'グループ',
-  UNIT: 'ユニット',
-  SECTION: 'セクション',
-  TEAM: 'チーム',
-  CIRCLE: 'サークル',
-  CLUB: 'クラブ',
-  OTHER: 'その他'
-};
-
-const TASK_STATUS = {
-  TODO: '未着手',
-  IN_PROGRESS: '進行中',
-  IN_REVIEW: '確認中',
-  DONE: '完了'
+const KEY_LABELS = {
+  TASK_STATUS: {
+    TODO: '未着手',
+    IN_PROGRESS: '進行中',
+    IN_REVIEW: '確認中',
+    DONE: '完了'
+  },
+  PLAN_TYPE: {
+    STAGE: 'ステージ',
+    BOOTH: 'ブース',
+    NET: 'オンライン',
+    RECEPTION: '懇親会',
+    OTHER: 'その他'
+  },
+  ASIGNEE_TYPE: {
+    CREATED_BY: '作成者',
+    PROCESSED_BY: '進行者',
+    REVIEWED_BY: '確認者',
+    RECEIVED_BY: '受領者'
+  },
+  DIRECTORY_TYPE: {
+    COMPANY: '法人・学校・団体',
+    FACULTY: '学部・学科・専攻',
+    COMMITTEE: '委員会',
+    TEMPORARY: '企画出展専用',
+    PROJECT: 'プロジェクト',
+    GROUP: 'グループ',
+    UNIT: 'ユニット',
+    SECTION: 'セクション',
+    TEAM: 'チーム',
+    CIRCLE: 'サークル',
+    CLUB: 'クラブ',
+    OTHER: 'その他'
+  },
+  PRIORITY: {
+    LOW: '低',
+    MEDIUM: '中',
+    HIGH: '高'
+  },
+  SKILL_LEVEL: {
+    BEGINNER: '初級',
+    INTERMEDIATE: '中級',
+    ADVANCED: '上級'
+  },
+  ATTENDANCE_TYPE: {
+    PRESENT: '出席',
+    ABSENT: '欠席',
+    LEAVE: '中抜',
+    LATE: '遅刻',
+    EARLY: '早退',
+    LATE_EARLY: '遅刻・早退'
+  },
+  KNOWLEDGE_TYPE: {
+    TIP: '豆知識',
+    IDEA: 'アイデア',
+    ISSUE: '課題・問題',
+    REFERENCE: '参考資料',
+    OTHER: 'その他'
+  },
+  PLAN_STATUS: {
+    SUBMITTED: '応募済み', //応募フォームからデータが送信された直後の状態。「受付」は完了しているが、審査は始まっていない。
+    IN_REVIEW1: '一次審査中',
+    IN_REVIEW2: '二次審査中（最終）',
+    APPROVED: '審査通過', //企画が承認され、開催に向けて動き出す状態。
+    RETURNED: '審査差戻', //審査の結果、修正が必要と判断された状態。応募者にボールがある状態。
+    REJECTED: '審査落選', //残念ながら不採択となった状態。ここでフローは終了。
+    IN_PREPARATION: '準備中', //通過後、Web掲載用の画像や紹介文を作成・準備している段階。
+    READY: '準備完了', //全ての素材が揃い、Web公開待ちの状態。（または承認待ち）
+    PUBLISHED: '公開中', //Webサイト上に情報が表示されている状態。
+    CLOSED: '公開終了', //大学祭が終了そ非公開になった状態。
+    MERGED: '統合済み', //複数の企画が統合され、個別の企画としては存在しない状態。
+    DISCARDED: '取り下げ' //応募者が自ら企画を取り下げた状態。
+  }
 };
 
 // ============================================

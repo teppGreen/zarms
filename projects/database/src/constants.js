@@ -26,28 +26,6 @@ const TABLE_NAMES = {
   PERMISSIONS: 'permissions',
 };
 
-const DIRECTORY_TYPES = {
-  COMPANY: '法人・学校・団体',
-  FACULTY: '学部・学科・専攻',
-  COMMITTEE: '委員会',
-  TEMPORARY: '企画出展専用',
-  PROJECT: 'プロジェクト',
-  GROUP: 'グループ',
-  UNIT: 'ユニット',
-  SECTION: 'セクション',
-  TEAM: 'チーム',
-  CIRCLE: 'サークル',
-  CLUB: 'クラブ',
-  OTHER: 'その他'
-};
-
-const TASK_STATUS = {
-  TODO: '未着手',
-  IN_PROGRESS: '進行中',
-  IN_REVIEW: '確認中',
-  DONE: '完了'
-};
-
 // ============================================
 // Database Schema Headers
 // ============================================

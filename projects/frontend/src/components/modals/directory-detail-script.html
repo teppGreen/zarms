@@ -12,6 +12,7 @@
                 this.currentId = directoryId;
                 this._populateSelects(directoryId);
                 this._render(directory);
+                this.loadComments(directoryId);
                 ui('#modal-detail-directory');
             },
 
@@ -92,6 +93,97 @@
                 } finally {
                     if (saveBtn) saveBtn.disabled = false;
                 }
+            },
+
+            openNewComment: function () {
+                if (!this.currentId) return;
+                if (!App.modals.newComment) return;
+
+                if (App.modals.newComment.openFor) {
+                    App.modals.newComment.openFor('directories', this.currentId);
+                    return;
+                }
+
+                App.modals.newComment.open(this.currentId);
+            },
+
+            loadComments: function (directoryId, skipLoadingCache = false) {
+                const commentsList = document.getElementById('directory-comments-list');
+                if (commentsList) {
+                    commentsList.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
+                }
+
+                const query = {
+                    where: {
+                        related_table: ['=', 'directories'],
+                        related_id: ['=', directoryId]
+                    },
+                    orderBy: {
+                        created_at: 'desc'
+                    }
+                };
+
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, skipLoadingCache)
+                    .then(results => {
+                        if (this.currentId !== directoryId) return;
+
+                        const comments = results?.data || results || [];
+                        this.renderComments(comments);
+
+                        if (results?.isCached) {
+                            callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, true)
+                                .then(refreshedResults => {
+                                    if (this.currentId !== directoryId) return;
+                                    const refreshedComments = refreshedResults?.data || refreshedResults || [];
+                                    this.renderComments(refreshedComments);
+                                });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('[DirectoryDetail] コメント読み込みエラー:', error);
+                        if (this.currentId === directoryId && commentsList) {
+                            commentsList.innerHTML = '<p class="error-text padding">コメントの読み込みに失敗しました</p>';
+                        }
+                    });
+            },
+
+            renderComments: function (comments) {
+                const container = document.getElementById('directory-comments-list');
+                if (!container) return;
+
+                if (!comments || comments.length === 0) {
+                    container.innerHTML = '<p>コメントはありません</p>';
+                    return;
+                }
+
+                const members = App.state.data.members || [];
+
+                container.innerHTML = comments.map(function (comment, index) {
+                    const creator = members.find(function (m) { return m.id === comment.created_by; });
+                    const creatorName = creator ? creator.display_name : '不明';
+                    const creatorPhoto = creator ? creator.profile_photo_url : '';
+                    const creatorSlackProfileUrl = creator ? creator.slack_profile_url : '#';
+                    const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
+                    const hr = index > 0 ? '<hr class="max small-margin">' : '';
+
+                    const creatorIcon = creatorPhoto
+                        ? '<img src="' + creatorPhoto + '" alt="' + escapeHtml(creatorName) + '" class="circle tiny">'
+                        : '<i class="tiny">account_circle</i>';
+
+                    return '' +
+                        hr +
+                        '<div class="small-padding">' +
+                        '<div class="row tiny-space">' +
+                        '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '<\/a>' +
+                        '<div class="max row tiny-space">' +
+                        '<span class="bold small-text">' + escapeHtml(creatorName) + '<\/span>' +
+                        '<span class="small-text secondary-text">' + createdAt + '<\/span>' +
+                        '<\/div>' +
+                        '<\/div>' +
+                        '<div class="tiny-space"><\/div>' +
+                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '<\/p>' +
+                        '<\/div>';
+                }).join('');
             },
 
             openAddMembers: function () {
@@ -256,7 +348,7 @@
 
                 if (typeSelect) {
                     typeSelect.innerHTML = '<option value="">（種別なし）</option>';
-                    Object.entries((typeof DIRECTORY_TYPES !== 'undefined') ? DIRECTORY_TYPES : {}).forEach(function (entry) {
+                    Object.entries((KEY_LABELS && KEY_LABELS.DIRECTORY_TYPE) ? KEY_LABELS.DIRECTORY_TYPE : {}).forEach(function (entry) {
                         const option = document.createElement('option');
                         option.value = entry[0];
                         option.textContent = entry[1];
@@ -314,9 +406,20 @@
                 };
 
                 setValue('directory-detail-name-input', directory.name);
+                setValue('directory-detail-id-input', directory.id ? '#' + directory.id : '');
                 setValue('directory-detail-slack-url-input', directory.slack_channel_url);
                 setValue('directory-detail-gfolder-id-input', directory.gfolder_id);
                 setValue('directory-detail-remark-input', directory.remark);
+
+                const findDisplayName = function (memberId) {
+                    if (!memberId) return '';
+                    const member = members.find(function (item) { return item.id === memberId; });
+                    return member ? (member.display_name || member.name || member.email || '') : memberId;
+                };
+                setValue('directory-detail-created-by-input', findDisplayName(directory.created_by));
+                setValue('directory-detail-created-at-input', directory.created_at ? formatDateTimeForDisplay(directory.created_at) : '');
+                setValue('directory-detail-updated-by-input', findDisplayName(directory.updated_by));
+                setValue('directory-detail-updated-at-input', directory.updated_at ? formatDateTimeForDisplay(directory.updated_at) : '');
 
                 const typeSelect = document.getElementById('directory-detail-type-select');
                 if (typeSelect) typeSelect.value = directory.directory_type_key || '';
@@ -327,7 +430,7 @@
                 const idEl = document.getElementById('directory-detail-id');
                 if (idEl) idEl.textContent = directory.id ? '#' + directory.id : '';
                 const memberCountEl = document.getElementById('directory-detail-member-count');
-                if (memberCountEl) memberCountEl.textContent = '所属メンバー数: ' + String(assignments.length);
+                if (memberCountEl) memberCountEl.textContent = '所属メンバー数 ' + String(assignments.length);
                 const membersEl = document.getElementById('directory-detail-members');
                 if (membersEl) membersEl.innerHTML = chips || '<p class="small-text secondary-text">所属メンバーはありません</p>';
                 const errorEl = document.getElementById('directory-detail-error');
