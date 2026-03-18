@@ -18,11 +18,13 @@
 1. `task-detail` の `isDirty` 初期値を明示的に false に統一。
 2. `directory-detail` 保存時に「保存中」表示と二重送信防止を追加。
 3. `skill-detail` 保存時に「保存中」表示と二重送信防止を追加。
+4. `directory_assignments.role` の編集導線を `member-detail` / `directory-detail` の両方に追加。
 
 ### Next
 1. membersページのタブ切り替え時レンダリングをさらに分割し、初回表示までの体感遅延を最小化。
 2. `task-detail` の links/files エリアを board/task-detail 既存UIトーンに合わせて再調整。
 3. `directory_assignments.role` と `skill_assignments.remark` など未露出カラムの編集導線を追加。
+4. members系モーダルのレイアウトを board/task-detail の操作密度に合わせて統一。
 
 ### Notes
 - 削除導線は追加しない方針を維持。

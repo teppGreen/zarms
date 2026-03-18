@@ -251,6 +251,38 @@
                 }
             },
 
+            updateDirectoryRole: async function (assignmentId, roleValue) {
+                if (!assignmentId) return;
+
+                const assignments = App.state.data.directoryAssignments || [];
+                const target = assignments.find(function (a) { return a.id === assignmentId; });
+                if (!target) return;
+
+                const normalizedRole = (roleValue || '').trim() || null;
+                const prevRole = target.role || null;
+                if (normalizedRole === prevRole) return;
+
+                target.role = normalizedRole;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', assignmentId] },
+                        set: { role: normalizedRole }
+                    }, '組織での役割を更新');
+
+                    showSnackbar('役割を更新しました', 'success');
+                } catch (err) {
+                    console.error('[MemberDetail] 役割更新エラー:', err);
+                    target.role = prevRole;
+                    showSnackbar('役割の更新に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    }
+                }
+
+                this._renderDirectories(this.currentId);
+            },
+
             openAddSkill: function () {
                 if (!this.currentId) return;
                 if (!App.modals.selectSkills || !App.modals.selectSkills.open) return;
@@ -572,7 +604,10 @@
                         '<i>account_tree</i>' +
                         '<div class="max">' +
                         '<p class="no-margin bold small">' + escapeHtml(dirName) + '<\/p>' +
-                        (role ? '<p class="no-margin small-text secondary-text">' + escapeHtml(role) + '<\/p>' : '') +
+                        '<div class="field border label small top-margin no-margin">' +
+                        '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(role) + '" onchange="App.modals.memberDetail.updateDirectoryRole(\'' + escapeHtmlAttribute(a.id || '') + '\', this.value)">' +
+                        '<label>役割</label>' +
+                        '<\/div>' +
                         '<\/div>' +
                         (!isActive ? '<span class="chip small border">退任済</span>' : actionBtn) +
                         '<\/div>';
