@@ -113,7 +113,9 @@
                 sidebarLinks.forEach(item => item.classList.remove('active'));
 
                 let activeLink;
-                if (tabName === 'board-my-board') {
+                if (tabName === 'boards') {
+                    activeLink = document.getElementById('boards-list-nav');
+                } else if (tabName === 'board-my-board') {
                     activeLink = document.getElementById('my-board-nav');
                 } else if (isBoardTab) {
                     const boardId = tabName.replace('board-', '');
@@ -207,6 +209,12 @@
              */
             loadTabData: async function (tabName, isBackground = false) {
                 console.log(`loadTabData called for: ${tabName}, isBackground: ${isBackground}`);
+                if (tabName === 'boards' && App.pages.boardsList && App.pages.boardsList.loadData) {
+                    const listCanvas = document.getElementById('boards-list-canvas');
+                    const isRendered = !!(listCanvas && listCanvas.children.length > 0);
+                    await App.pages.boardsList.loadData(isBackground || isRendered);
+                    return;
+                }
                 if (App.pages[tabName] && App.pages[tabName].loadData) {
                     await App.pages[tabName].loadData(isBackground);
                 }
@@ -372,8 +380,8 @@
                 const boardTabName = 'board-' + board.id;
                 // アイコン: Inactiveならfolder_off, Activeならstarred状態に合わせて変更
                 const icon = !board.is_active ? 'folder_off' : (isStarred ? 'folder_special' : 'folder');
-                // text class: Inactiveなら薄くするなどのスタイルがあれば適用(ここではopacity-textを使用してみる)
-                const textClass = !board.is_active ? 'secondary-text' : 'left-align';
+                // text class: Inactiveなら薄くするなどのスタイルがあれば適用
+                const textClass = !board.is_active ? 'secondary-text' : '';
 
                 // descriptionをtitle属性用に変換（改行を&#13;&#10;に変換）
                 const titleAttr = board.description ? ` title="${escapeHtml(board.description).replace(/\n/g, '&#13;&#10;')}"` : '';

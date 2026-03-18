@@ -652,7 +652,7 @@
 
                         // タスク名の切り詰め（20字超で21字以降カット + …）
                         const name = task.name || '';
-                        const truncatedName = name.length > 20 ? name.substring(0, 20) + '…' : name;
+                        const truncatedName = name.length > 19 ? name.substring(0, 19) + '…' : name;
 
                         // 担当者アバターHTML（小サイズ・横並び）
                         const memberRoles = [
@@ -1168,25 +1168,7 @@
                 const btnArchive = document.getElementById(`btn-archive-${board.id}`);
                 if (btnArchive) {
                     btnArchive.addEventListener('click', async () => {
-                        const isArchiving = board.is_active;
-                        const confirmMsg = isArchiving ? 'このボードをアーカイブしますか？\n他の人の画面でも、アーカイブ済のボードとして表示されるようになります。ボードには引き続きアクセスできます。' : 'このボードのアーカイブを解除しますか？';
-                        if (!confirm(confirmMsg)) return;
-
-                        try {
-                            showSnackbar(isArchiving ? 'ボードをアーカイブ中です...' : 'ボードのアーカイブを解除中です...', 'info');
-                            const newStatus = !isArchiving;
-                            const actionName = isArchiving ? 'ボードをアーカイブ' : 'ボードのアーカイブを解除';
-
-                            await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'update', {
-                                where: { id: ["=", board.id] },
-                                set: { is_active: newStatus }
-                            }, actionName);
-
-                            refreshData();
-                        } catch (e) {
-                            console.error(e);
-                            alert('処理に失敗しました。時間をおいて再度お試しください。');
-                        }
+                        await this.toggleBoardArchive(board.id);
                     });
                 }
 
@@ -1260,6 +1242,39 @@
                             console.warn('[btnStar] App.utils.navigation.renderBoardsNavigation is not available');
                         }
                     });
+                }
+            },
+
+            toggleBoardArchive: async function (boardId) {
+                if (!boardId) return;
+
+                const board = (App.state.data.boards || []).find(b => b.id === boardId);
+                if (!board) {
+                    alert('対象のボードが見つかりませんでした');
+                    return;
+                }
+
+                const isArchiving = board.is_active;
+                const confirmMsg = isArchiving
+                    ? 'このボードをアーカイブしますか？\n他の人の画面でも、アーカイブ済のボードとして表示されるようになります。ボードには引き続きアクセスできます。'
+                    : 'このボードのアーカイブを解除しますか？';
+
+                if (!confirm(confirmMsg)) return;
+
+                try {
+                    showSnackbar(isArchiving ? 'ボードをアーカイブ中です...' : 'ボードのアーカイブを解除中です...', 'info');
+                    const newStatus = !isArchiving;
+                    const actionName = isArchiving ? 'ボードをアーカイブ' : 'ボードのアーカイブを解除';
+
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'update', {
+                        where: { id: ["=", board.id] },
+                        set: { is_active: newStatus }
+                    }, actionName);
+
+                    refreshData();
+                } catch (e) {
+                    console.error(e);
+                    alert('処理に失敗しました。時間をおいて再度お試しください。');
                 }
             },
 
