@@ -4,6 +4,7 @@
             currentId: null,
             currentItem: null,
             originalData: null,
+            quill: null,
 
             open: function (skillId) {
                 if (!skillId) return;
@@ -18,10 +19,17 @@
                 this.currentItem = Object.assign({}, skill);
                 this.originalData = Object.assign({}, skill);
 
+                if (!this.quill) {
+                    this.quill = App.utils.quill.init('#skill-description-editor', {
+                        placeholder: 'スキルの説明を入力...'
+                    });
+                }
+
                 ui('#modal-detail-skill', true);
 
                 this._render(skill);
                 this._renderMembers(skillId);
+                this.loadComments(skillId);
             },
 
             close: function () {
@@ -35,7 +43,7 @@
                 const saveBtn = document.getElementById('skill-detail-save-btn');
                 const title = (document.getElementById('skill-detail-title-input')?.value || '').trim();
                 const typeKey = (document.getElementById('skill-detail-type-input')?.value || '').trim() || null;
-                const description = (document.getElementById('skill-detail-description-input')?.value || '').trim() || null;
+                const description = App.utils.quill.getContent(this.quill) || null;
                 const remark = (document.getElementById('skill-detail-remark-input')?.value || '').trim() || null;
                 const errorEl = document.getElementById('skill-detail-error');
 
@@ -114,16 +122,101 @@
                 }
             },
 
+            openNewComment: function () {
+                if (!this.currentId) return;
+                if (!App.modals.newComment) return;
+
+                if (App.modals.newComment.openFor) {
+                    App.modals.newComment.openFor('skills', this.currentId);
+                    return;
+                }
+
+                App.modals.newComment.open(this.currentId);
+            },
+
+            loadComments: function (skillId, skipLoadingCache = false) {
+                const commentsList = document.getElementById('skill-comments-list');
+                if (commentsList) {
+                    commentsList.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
+                }
+
+                const query = {
+                    where: {
+                        related_table: ['=', 'skills'],
+                        related_id: ['=', skillId]
+                    },
+                    orderBy: {
+                        created_at: 'desc'
+                    }
+                };
+
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, skipLoadingCache)
+                    .then(results => {
+                        if (this.currentId !== skillId) return;
+
+                        const comments = results?.data || results || [];
+                        this.renderComments(comments);
+
+                        if (results?.isCached) {
+                            callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, true)
+                                .then(refreshedResults => {
+                                    if (this.currentId !== skillId) return;
+                                    const refreshedComments = refreshedResults?.data || refreshedResults || [];
+                                    this.renderComments(refreshedComments);
+                                });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('[SkillDetail] コメント読み込みエラー:', error);
+                        if (this.currentId === skillId && commentsList) {
+                            commentsList.innerHTML = '<p class="error-text padding">コメントの読み込みに失敗しました</p>';
+                        }
+                    });
+            },
+
+            renderComments: function (comments) {
+                const container = document.getElementById('skill-comments-list');
+                if (!container) return;
+
+                if (!comments || comments.length === 0) {
+                    container.innerHTML = '<p>コメントはありません</p>';
+                    return;
+                }
+
+                const members = App.state.data.members || [];
+
+                container.innerHTML = comments.map(function (comment, index) {
+                    const creator = members.find(function (m) { return m.id === comment.created_by; });
+                    const creatorName = creator ? creator.display_name : '不明';
+                    const creatorPhoto = creator ? creator.profile_photo_url : '';
+                    const creatorSlackProfileUrl = creator ? creator.slack_profile_url : '#';
+                    const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
+                    const hr = index > 0 ? '<hr class="max small-margin">' : '';
+
+                    const creatorIcon = creatorPhoto
+                        ? '<img src="' + creatorPhoto + '" alt="' + escapeHtml(creatorName) + '" class="circle tiny">'
+                        : '<i class="tiny">account_circle</i>';
+
+                    return '' +
+                        hr +
+                        '<div class="small-padding">' +
+                        '<div class="row tiny-space">' +
+                        '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '<\/a>' +
+                        '<div class="max row tiny-space">' +
+                        '<span class="bold small-text">' + escapeHtml(creatorName) + '<\/span>' +
+                        '<span class="small-text secondary-text">' + createdAt + '<\/span>' +
+                        '<\/div>' +
+                        '<\/div>' +
+                        '<div class="tiny-space"><\/div>' +
+                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '<\/p>' +
+                        '<\/div>';
+                }).join('');
+            },
+
             _render: function (skill) {
-                const titleEl = document.getElementById('skill-detail-title');
-                const typeEl = document.getElementById('skill-detail-type');
-                const descEl = document.getElementById('skill-detail-description');
                 const idEl = document.getElementById('skill-detail-display-id');
                 const lastUpdatedEl = document.getElementById('skill-detail-last-updated');
 
-                if (titleEl) titleEl.textContent = skill.title || '';
-                if (typeEl) typeEl.textContent = skill.skill_type_key || '';
-                if (descEl) descEl.textContent = skill.description || '';
                 if (idEl) idEl.textContent = skill.id ? '#' + skill.id : '';
 
                 const titleInput = document.getElementById('skill-detail-title-input');
@@ -146,10 +239,28 @@
                     }).join('');
                     typeInput.value = skill.skill_type_key || '';
                 }
-                const descInput = document.getElementById('skill-detail-description-input');
-                if (descInput) descInput.value = skill.description || '';
+                if (this.quill) {
+                    App.utils.quill.setContent(this.quill, skill.description || '');
+                }
                 const remarkInput = document.getElementById('skill-detail-remark-input');
                 if (remarkInput) remarkInput.value = skill.remark || '';
+                const idInput = document.getElementById('skill-detail-id-input');
+                if (idInput) idInput.value = skill.id ? '#' + skill.id : '';
+
+                const members = App.state.data.members || [];
+                const findDisplayName = function (memberId) {
+                    if (!memberId) return '';
+                    const member = members.find(function (item) { return item.id === memberId; });
+                    return member ? (member.display_name || member.name || member.email || '') : memberId;
+                };
+                const createdByInput = document.getElementById('skill-detail-created-by-input');
+                if (createdByInput) createdByInput.value = findDisplayName(skill.created_by);
+                const createdAtInput = document.getElementById('skill-detail-created-at-input');
+                if (createdAtInput) createdAtInput.value = skill.created_at ? formatDateTimeForDisplay(skill.created_at) : '';
+                const updatedByInput = document.getElementById('skill-detail-updated-by-input');
+                if (updatedByInput) updatedByInput.value = findDisplayName(skill.updated_by);
+                const updatedAtInput = document.getElementById('skill-detail-updated-at-input');
+                if (updatedAtInput) updatedAtInput.value = skill.updated_at ? formatDateTimeForDisplay(skill.updated_at) : '';
                 const errorEl = document.getElementById('skill-detail-error');
                 if (errorEl) errorEl.style.display = 'none';
 
@@ -405,29 +516,33 @@
 
                 const container = document.getElementById('skill-detail-members-list');
                 if (container) container.innerHTML = '';
-
-                const titleEl = document.getElementById('skill-detail-title');
-                const typeEl = document.getElementById('skill-detail-type');
-                const descEl = document.getElementById('skill-detail-description');
                 const idEl = document.getElementById('skill-detail-display-id');
                 const lastUpdatedEl = document.getElementById('skill-detail-last-updated');
 
-                if (titleEl) titleEl.textContent = '';
-                if (typeEl) typeEl.textContent = '';
-                if (descEl) descEl.textContent = '';
                 if (idEl) idEl.textContent = '';
                 if (lastUpdatedEl) lastUpdatedEl.innerHTML = '';
 
                 const titleInput = document.getElementById('skill-detail-title-input');
                 const typeInput = document.getElementById('skill-detail-type-input');
-                const descInput = document.getElementById('skill-detail-description-input');
                 const remarkInput = document.getElementById('skill-detail-remark-input');
                 const errorEl = document.getElementById('skill-detail-error');
+                const idInput = document.getElementById('skill-detail-id-input');
+                const createdByInput = document.getElementById('skill-detail-created-by-input');
+                const createdAtInput = document.getElementById('skill-detail-created-at-input');
+                const updatedByInput = document.getElementById('skill-detail-updated-by-input');
+                const updatedAtInput = document.getElementById('skill-detail-updated-at-input');
+                const comments = document.getElementById('skill-comments-list');
 
                 if (titleInput) titleInput.value = '';
                 if (typeInput) typeInput.value = '';
-                if (descInput) descInput.value = '';
                 if (remarkInput) remarkInput.value = '';
+                if (idInput) idInput.value = '';
+                if (createdByInput) createdByInput.value = '';
+                if (createdAtInput) createdAtInput.value = '';
+                if (updatedByInput) updatedByInput.value = '';
+                if (updatedAtInput) updatedAtInput.value = '';
+                if (comments) comments.innerHTML = '';
+                if (this.quill) App.utils.quill.clear(this.quill);
                 if (errorEl) errorEl.style.display = 'none';
             }
         };

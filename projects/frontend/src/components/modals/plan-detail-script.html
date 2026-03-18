@@ -1,0 +1,705 @@
+<script>
+    (function () {
+        App.modals.planDetail = {
+            currentId: null,
+            currentItem: null,
+            originalData: null,
+            currentAssignments: [],
+            originalAssignments: [],
+            isDeleteRequested: false,
+            isDirty: false,
+            quill: null,
+
+            open: function (planId) {
+                if (!planId) return;
+
+                const plan = (App.state.data.plans || []).find(function (item) {
+                    return item.id === planId;
+                });
+                if (!plan) {
+                    showSnackbar('企画が見つかりませんでした', 'error');
+                    return;
+                }
+
+                this.currentId = planId;
+                this.currentItem = Object.assign({}, plan);
+                this.originalData = Object.assign({}, plan);
+
+                const assignments = (App.state.data.planAssignments || []).filter(function (assignment) {
+                    return assignment.plan_id === planId;
+                }).map(function (assignment) {
+                    return Object.assign({}, assignment);
+                });
+                this.currentAssignments = assignments;
+                this.originalAssignments = assignments.map(function (assignment) {
+                    return Object.assign({}, assignment);
+                });
+                this.isDeleteRequested = false;
+                this.isDirty = false;
+
+                if (!this.quill) {
+                    this.quill = App.utils.quill.init('#plan-description-editor', {
+                        placeholder: '企画説明を入力...'
+                    });
+                }
+
+                ui('#modal-detail-plan', true);
+                this._render();
+                this._bindChangeListeners();
+                this.loadComments(planId);
+                this.switchTab(document.querySelector('#plan-detail-tabs > a'), 'description');
+
+                this._syncLatest(planId);
+            },
+
+            close: function (skipDirtyCheck) {
+                if (!skipDirtyCheck && this.isDirty) {
+                    if (!confirm('変更を破棄して閉じますか？')) return;
+                }
+                closeModal('modal-detail-plan');
+                this._reset();
+            },
+
+            discard: function () {
+                if (this.isDirty && !confirm('変更を破棄しますか？')) return;
+                closeModal('modal-detail-plan');
+                this._reset();
+            },
+
+            toggleDirty: function (nextValue) {
+                this.isDirty = nextValue === undefined ? true : nextValue === true;
+            },
+
+            openAddMembers: function () {
+                if (!this.currentId || !App.modals.selectMembers || !App.modals.selectMembers.open) return;
+                const preSelected = this.currentAssignments
+                    .filter(function (assignment) { return assignment.is_active !== false; })
+                    .map(function (assignment) { return assignment.member_id; });
+
+                App.modals.selectMembers.open({
+                    multiSelect: true,
+                    preSelected: preSelected,
+                    callback: function (selectedIds) {
+                        App.modals.planDetail.applyMemberSelection(selectedIds);
+                    }
+                });
+            },
+
+            applyMemberSelection: function (selectedIds) {
+                const before = this.currentAssignments.slice();
+                const existingByMemberId = before.reduce(function (acc, assignment) {
+                    acc[assignment.member_id] = assignment;
+                    return acc;
+                }, {});
+
+                const nextAssignments = (selectedIds || []).map(function (memberId) {
+                    const existing = existingByMemberId[memberId];
+                    if (existing) {
+                        const next = Object.assign({}, existing);
+                        next.is_active = true;
+                        return next;
+                    }
+                    return {
+                        id: null,
+                        plan_id: App.modals.planDetail.currentId,
+                        member_id: memberId,
+                        role: null,
+                        is_active: true
+                    };
+                });
+
+                this.currentAssignments = nextAssignments;
+                this.toggleDirty(true);
+                this._renderAssignments();
+            },
+
+            updateAssignmentRole: function (index, roleValue) {
+                const target = this.currentAssignments[index];
+                if (!target) return;
+                target.role = (roleValue || '').trim() || null;
+                this.toggleDirty(true);
+            },
+
+            updateAssignmentActive: function (index, isActive) {
+                const target = this.currentAssignments[index];
+                if (!target) return;
+                target.is_active = isActive === true;
+                this.toggleDirty(true);
+            },
+
+            removeAssignmentAt: function (index) {
+                if (index < 0 || index >= this.currentAssignments.length) return;
+                this.currentAssignments.splice(index, 1);
+                this.toggleDirty(true);
+                this._renderAssignments();
+            },
+
+            save: async function () {
+                if (!this.currentId) return;
+
+                const errorEl = document.getElementById('plan-detail-error');
+                const name = (document.getElementById('plan-detail-name-input')?.value || '').trim();
+                if (!name) {
+                    if (errorEl) {
+                        errorEl.textContent = '企画名は必須です';
+                        errorEl.style.display = '';
+                    }
+                    return;
+                }
+                if (errorEl) errorEl.style.display = 'none';
+
+                const updates = {
+                    plan_number: (document.getElementById('plan-detail-plan-number-input')?.value || '').trim() || null,
+                    zarms_code: (document.getElementById('plan-detail-zarms-code-input')?.value || '').trim() || null,
+                    parent_plan_number: (document.getElementById('plan-detail-parent-plan-number-input')?.value || '').trim() || null,
+                    plan_type_sequence_number: (document.getElementById('plan-detail-plan-type-sequence-number-input')?.value || '').trim() || null,
+                    name: name,
+                    plan_status: (document.getElementById('plan-detail-status-input')?.value || '').trim() || null,
+                    plan_type: (document.getElementById('plan-detail-type-input')?.value || '').trim() || null,
+                    summary: (document.getElementById('plan-detail-summary-input')?.value || '').trim() || null,
+                    description: App.utils.quill.getContent(this.quill) || null,
+                    plan_tags: (document.getElementById('plan-detail-plan-tags-input')?.value || '').trim() || null,
+                    plan_categories: (document.getElementById('plan-detail-plan-categories-input')?.value || '').trim() || null,
+                    selection_application_text: (document.getElementById('plan-detail-selection-application-text-input')?.value || '').trim() || null,
+                    selection_presentation_url: (document.getElementById('plan-detail-selection-presentation-url-input')?.value || '').trim() || null,
+                    first_selection_comment: (document.getElementById('plan-detail-first-selection-comment-input')?.value || '').trim() || null,
+                    second_selection_comment: (document.getElementById('plan-detail-second-selection-comment-input')?.value || '').trim() || null,
+                    estimated_staff_count: (document.getElementById('plan-detail-estimated-staff-count-input')?.value || '').trim() || null,
+                    estimated_participant_count: (document.getElementById('plan-detail-estimated-participant-count-input')?.value || '').trim() || null,
+                    estimated_total_cost: (document.getElementById('plan-detail-estimated-total-cost-input')?.value || '').trim() || null,
+                    actual_staff_count: (document.getElementById('plan-detail-actual-staff-count-input')?.value || '').trim() || null,
+                    actual_participant_count: (document.getElementById('plan-detail-actual-participant-count-input')?.value || '').trim() || null,
+                    actual_total_cost: (document.getElementById('plan-detail-actual-total-cost-input')?.value || '').trim() || null,
+                    has_collaborators: document.getElementById('plan-detail-has-collaborators-input')?.checked === true,
+                    has_guests: document.getElementById('plan-detail-has-guests-input')?.checked === true,
+                    online_media_type: (document.getElementById('plan-detail-online-media-type-input')?.value || '').trim() || null,
+                    online_media_url: (document.getElementById('plan-detail-online-media-url-input')?.value || '').trim() || null,
+                    website_url: (document.getElementById('plan-detail-website-url-input')?.value || '').trim() || null,
+                    sheet_url: (document.getElementById('plan-detail-sheet-url-input')?.value || '').trim() || null,
+                    folder_url: (document.getElementById('plan-detail-folder-url-input')?.value || '').trim() || null,
+                    document_url: (document.getElementById('plan-detail-document-url-input')?.value || '').trim() || null,
+                    slide_url: (document.getElementById('plan-detail-slide-url-input')?.value || '').trim() || null,
+                    script_url: (document.getElementById('plan-detail-script-url-input')?.value || '').trim() || null,
+                    thumbnail_url: (document.getElementById('plan-detail-thumbnail-url-input')?.value || '').trim() || null,
+                    exhibitor_type: (document.getElementById('plan-detail-exhibitor-type-input')?.value || '').trim() || null,
+                    exhibitor_member: (document.getElementById('plan-detail-exhibitor-member-input')?.value || '').trim() || null,
+                    exhibitor_directory: (document.getElementById('plan-detail-exhibitor-directory-input')?.value || '').trim() || null,
+                    manager_committee_student: (document.getElementById('plan-detail-manager-committee-student-input')?.value || '').trim() || null,
+                    manager_committee_staff: (document.getElementById('plan-detail-manager-committee-staff-input')?.value || '').trim() || null,
+                    slack_channel_url: (document.getElementById('plan-detail-slack-channel-url-input')?.value || '').trim() || null,
+                    has_recruitment: document.getElementById('plan-detail-has-recruitment-input')?.checked === true,
+                    has_live: document.getElementById('plan-detail-has-live-input')?.checked === true,
+                    remark: (document.getElementById('plan-detail-remark-input')?.value || '').trim() || null
+                };
+
+                const changedPlanFields = {};
+                Object.keys(updates).forEach(function (key) {
+                    if (String(updates[key] ?? '') !== String((App.modals.planDetail.originalData || {})[key] ?? '')) {
+                        changedPlanFields[key] = updates[key];
+                    }
+                });
+
+                if (this.isDeleteRequested === true) {
+                    showSnackbar('企画を削除しています...', 'info', 'top', 0);
+                    try {
+                        await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLANS, 'remove', {
+                            where: { id: ['=', this.currentId] }
+                        }, '企画を削除');
+
+                        await this._refreshPlansData(true);
+                        closeModal('modal-detail-plan');
+                        this._reset();
+                        showSnackbar('企画を削除しました', 'success');
+                    } catch (error) {
+                        console.error('[PlanDetail] 削除エラー:', error);
+                        showSnackbar('企画の削除に失敗しました', 'error');
+                    }
+                    return;
+                }
+
+                showSnackbar('企画を保存しています...', 'info', 'top', 0);
+
+                try {
+                    if (Object.keys(changedPlanFields).length > 0) {
+                        await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLANS, 'update', {
+                            where: { id: ['=', this.currentId] },
+                            set: changedPlanFields
+                        }, '企画を更新');
+                    }
+
+                    await this._saveAssignments();
+                    await this._refreshPlansData(true);
+
+                    const refreshed = (App.state.data.plans || []).find(function (item) {
+                        return item.id === App.modals.planDetail.currentId;
+                    });
+                    if (refreshed) {
+                        this.currentItem = Object.assign({}, refreshed);
+                        this.originalData = Object.assign({}, refreshed);
+                    }
+                    this.originalAssignments = this.currentAssignments.map(function (assignment) {
+                        return Object.assign({}, assignment);
+                    });
+                    this.toggleDirty(false);
+                    this._render();
+
+                    showSnackbar('企画を保存しました', 'success');
+                } catch (error) {
+                    console.error('[PlanDetail] 保存エラー:', error);
+                    showSnackbar('企画の保存に失敗しました', 'error');
+                }
+            },
+
+            requestDelete: function () {
+                if (!this.currentId) return;
+                if (!confirm('この企画を削除対象として保存しますか？\n「変更を保存」で確定します。')) return;
+                this.isDeleteRequested = true;
+                this.toggleDirty(true);
+                const errorEl = document.getElementById('plan-detail-error');
+                if (errorEl) {
+                    errorEl.textContent = 'この企画は削除予定です。「変更を保存」で確定します。';
+                    errorEl.style.display = '';
+                }
+            },
+
+            switchTab: function (el, tabName) {
+                const tabs = document.querySelectorAll('#plan-detail-tabs > a');
+                tabs.forEach(function (a) { a.className = ''; });
+                if (el) el.className = 'active';
+
+                const descriptionTab = document.getElementById('plan-detail-tab-description');
+                const metaTab = document.getElementById('plan-detail-tab-meta');
+                const membersTab = document.getElementById('plan-detail-tab-members');
+
+                if (descriptionTab) descriptionTab.className = tabName === 'description' ? 'page medium-height active' : 'page medium-height';
+                if (metaTab) metaTab.className = tabName === 'meta' ? 'page medium-height active scroll' : 'page medium-height scroll';
+                if (membersTab) membersTab.className = tabName === 'members' ? 'page medium-height active scroll' : 'page medium-height scroll';
+            },
+
+            openNewComment: function () {
+                if (!this.currentId) return;
+                if (!App.modals.newComment) return;
+
+                if (App.modals.newComment.openFor) {
+                    App.modals.newComment.openFor('plans', this.currentId);
+                    return;
+                }
+
+                App.modals.newComment.open(this.currentId);
+            },
+
+            loadComments: function (planId, skipLoadingCache = false) {
+                const commentsList = document.getElementById('plan-comments-list');
+                if (commentsList) {
+                    commentsList.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
+                }
+
+                const query = {
+                    where: {
+                        related_table: ['=', 'plans'],
+                        related_id: ['=', planId]
+                    },
+                    orderBy: {
+                        created_at: 'desc'
+                    }
+                };
+
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, skipLoadingCache)
+                    .then(results => {
+                        if (this.currentId !== planId) return;
+
+                        const comments = results?.data || results || [];
+                        this.renderComments(comments);
+
+                        if (results?.isCached) {
+                            callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, true)
+                                .then(refreshedResults => {
+                                    if (this.currentId !== planId) return;
+                                    const refreshedComments = refreshedResults?.data || refreshedResults || [];
+                                    this.renderComments(refreshedComments);
+                                });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('[PlanDetail] コメント読み込みエラー:', error);
+                        if (this.currentId === planId && commentsList) {
+                            commentsList.innerHTML = '<p class="error-text padding">コメントの読み込みに失敗しました</p>';
+                        }
+                    });
+            },
+
+            renderComments: function (comments) {
+                const container = document.getElementById('plan-comments-list');
+                if (!container) return;
+
+                if (!comments || comments.length === 0) {
+                    container.innerHTML = '<p>コメントはありません</p>';
+                    return;
+                }
+
+                const members = App.state.data.members || [];
+
+                container.innerHTML = comments.map(function (comment, index) {
+                    const creator = members.find(function (m) { return m.id === comment.created_by; });
+                    const creatorName = creator ? creator.display_name : '不明';
+                    const creatorPhoto = creator ? creator.profile_photo_url : '';
+                    const creatorSlackProfileUrl = creator ? creator.slack_profile_url : '#';
+                    const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
+                    const hr = index > 0 ? '<hr class="max small-margin">' : '';
+
+                    const creatorIcon = creatorPhoto
+                        ? '<img src="' + creatorPhoto + '" alt="' + App.modals.planDetail._escapeHtml(creatorName) + '" class="circle tiny">'
+                        : '<i class="tiny">account_circle</i>';
+
+                    return '' +
+                        hr +
+                        '<div class="small-padding">' +
+                        '<div class="row tiny-space">' +
+                        '<a href="' + App.modals.planDetail._escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '<\/a>' +
+                        '<div class="max row tiny-space">' +
+                        '<span class="bold small-text">' + App.modals.planDetail._escapeHtml(creatorName) + '<\/span>' +
+                        '<span class="small-text secondary-text">' + createdAt + '<\/span>' +
+                        '<\/div>' +
+                        '<\/div>' +
+                        '<div class="tiny-space"><\/div>' +
+                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '<\/p>' +
+                        '<\/div>';
+                }).join('');
+            },
+
+            _saveAssignments: async function () {
+                const originalById = (this.originalAssignments || []).reduce(function (acc, assignment) {
+                    if (assignment.id) {
+                        acc[assignment.id] = assignment;
+                    }
+                    return acc;
+                }, {});
+
+                for (let i = 0; i < this.currentAssignments.length; i += 1) {
+                    const assignment = this.currentAssignments[i];
+                    const payload = {
+                        plan_id: this.currentId,
+                        member_id: assignment.member_id,
+                        role: (assignment.role || '').trim() || null,
+                        is_active: assignment.is_active !== false
+                    };
+
+                    if (assignment.id) {
+                        const original = originalById[assignment.id] || {};
+                        const changed =
+                            String(payload.member_id ?? '') !== String(original.member_id ?? '') ||
+                            String(payload.role ?? '') !== String(original.role ?? '') ||
+                            Boolean(payload.is_active) !== Boolean(original.is_active !== false);
+
+                        if (!changed) continue;
+
+                        await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLAN_ASSIGNMENTS, 'update', {
+                            where: { id: ['=', assignment.id] },
+                            set: payload
+                        }, '企画関係者を更新');
+                        continue;
+                    }
+
+                    const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLAN_ASSIGNMENTS, 'insert', payload, '企画関係者を追加');
+                    if (inserted && inserted.data && inserted.data.id) {
+                        assignment.id = inserted.data.id;
+                    }
+                }
+
+                const currentIdSet = this.currentAssignments
+                    .filter(function (assignment) { return !!assignment.id; })
+                    .map(function (assignment) { return assignment.id; });
+
+                for (let i = 0; i < this.originalAssignments.length; i += 1) {
+                    const original = this.originalAssignments[i];
+                    if (!original.id) continue;
+                    if (currentIdSet.indexOf(original.id) !== -1) continue;
+
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLAN_ASSIGNMENTS, 'remove', {
+                        where: { id: ['=', original.id] }
+                    }, '企画関係者を削除');
+                }
+            },
+
+            _syncLatest: function (planId) {
+                const self = this;
+                Promise.resolve().then(async function () {
+                    try {
+                        await self._refreshPlansData(true);
+                        if (self.currentId !== planId) return;
+
+                        const refreshed = (App.state.data.plans || []).find(function (item) {
+                            return item.id === planId;
+                        });
+                        if (!refreshed || self.isDirty) return;
+
+                        self.currentItem = Object.assign({}, refreshed);
+                        self.originalData = Object.assign({}, refreshed);
+                        self.currentAssignments = (App.state.data.planAssignments || []).filter(function (assignment) {
+                            return assignment.plan_id === planId;
+                        }).map(function (assignment) {
+                            return Object.assign({}, assignment);
+                        });
+                        self.originalAssignments = self.currentAssignments.map(function (assignment) {
+                            return Object.assign({}, assignment);
+                        });
+                        self._render();
+                    } catch (error) {
+                        console.error('[PlanDetail] 背景同期エラー:', error);
+                    }
+                });
+            },
+
+            _refreshPlansData: async function (forceRefresh) {
+                const plansResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLANS, 'select', {}, null, forceRefresh === true);
+                const assignmentsResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLAN_ASSIGNMENTS, 'select', {}, null, forceRefresh === true);
+
+                App.state.data.plans = plansResult?.data || [];
+                App.state.data.planAssignments = assignmentsResult?.data || [];
+
+                if (App.pages.members && App.pages.members.loadData) {
+                    await App.pages.members.loadData(true);
+                }
+            },
+
+            _render: function () {
+                const plan = this.currentItem || {};
+                const status = plan.plan_status || 'SUBMITTED';
+                const statusLabel = (KEY_LABELS && KEY_LABELS.PLAN_STATUS && KEY_LABELS.PLAN_STATUS[status]) ? KEY_LABELS.PLAN_STATUS[status] : status;
+
+                const chipEl = document.getElementById('plan-detail-status-chip');
+                const displayIdEl = document.getElementById('plan-detail-display-id');
+                const updatedEl = document.getElementById('plan-detail-last-updated');
+
+                if (chipEl) chipEl.textContent = statusLabel;
+                if (displayIdEl) displayIdEl.textContent = plan.plan_number || (plan.zarms_code || '');
+                if (updatedEl) {
+                    const parts = [];
+                    if (plan.updated_at) parts.push(formatDateTimeForDisplay(plan.updated_at, 'yyyy/MM/dd HH:mm'));
+                    if (plan.updated_by) {
+                        const updater = (App.state.data.members || []).find(function (member) {
+                            return member.id === plan.updated_by;
+                        });
+                        if (updater) parts.push((updater.display_name || updater.name || '') + ' 更新');
+                    }
+                    updatedEl.textContent = parts.join(' / ');
+                }
+
+                const mappings = [
+                    ['plan-detail-id-input', plan.id ? '#' + plan.id : ''],
+                    ['plan-detail-plan-number-input', plan.plan_number || ''],
+                    ['plan-detail-zarms-code-input', plan.zarms_code || ''],
+                    ['plan-detail-parent-plan-number-input', plan.parent_plan_number || ''],
+                    ['plan-detail-plan-type-sequence-number-input', plan.plan_type_sequence_number || ''],
+                    ['plan-detail-name-input', plan.name || ''],
+                    ['plan-detail-status-input', plan.plan_status || 'SUBMITTED'],
+                    ['plan-detail-type-input', plan.plan_type || ''],
+                    ['plan-detail-summary-input', plan.summary || ''],
+                    ['plan-detail-plan-tags-input', plan.plan_tags || ''],
+                    ['plan-detail-plan-categories-input', plan.plan_categories || ''],
+                    ['plan-detail-selection-application-text-input', plan.selection_application_text || ''],
+                    ['plan-detail-selection-presentation-url-input', plan.selection_presentation_url || ''],
+                    ['plan-detail-first-selection-comment-input', plan.first_selection_comment || ''],
+                    ['plan-detail-second-selection-comment-input', plan.second_selection_comment || ''],
+                    ['plan-detail-estimated-staff-count-input', plan.estimated_staff_count || ''],
+                    ['plan-detail-estimated-participant-count-input', plan.estimated_participant_count || ''],
+                    ['plan-detail-estimated-total-cost-input', plan.estimated_total_cost || ''],
+                    ['plan-detail-actual-staff-count-input', plan.actual_staff_count || ''],
+                    ['plan-detail-actual-participant-count-input', plan.actual_participant_count || ''],
+                    ['plan-detail-actual-total-cost-input', plan.actual_total_cost || ''],
+                    ['plan-detail-online-media-type-input', plan.online_media_type || ''],
+                    ['plan-detail-online-media-url-input', plan.online_media_url || ''],
+                    ['plan-detail-website-url-input', plan.website_url || ''],
+                    ['plan-detail-sheet-url-input', plan.sheet_url || ''],
+                    ['plan-detail-folder-url-input', plan.folder_url || ''],
+                    ['plan-detail-document-url-input', plan.document_url || ''],
+                    ['plan-detail-slide-url-input', plan.slide_url || ''],
+                    ['plan-detail-script-url-input', plan.script_url || ''],
+                    ['plan-detail-thumbnail-url-input', plan.thumbnail_url || ''],
+                    ['plan-detail-exhibitor-type-input', plan.exhibitor_type || ''],
+                    ['plan-detail-exhibitor-member-input', plan.exhibitor_member || ''],
+                    ['plan-detail-exhibitor-directory-input', plan.exhibitor_directory || ''],
+                    ['plan-detail-manager-committee-student-input', plan.manager_committee_student || ''],
+                    ['plan-detail-manager-committee-staff-input', plan.manager_committee_staff || ''],
+                    ['plan-detail-slack-channel-url-input', plan.slack_channel_url || ''],
+                    ['plan-detail-remark-input', plan.remark || '']
+                ];
+
+                mappings.forEach(function (entry) {
+                    const el = document.getElementById(entry[0]);
+                    if (el) el.value = entry[1];
+                });
+
+                const statusInput = document.getElementById('plan-detail-status-input');
+                if (statusInput && KEY_LABELS && KEY_LABELS.PLAN_STATUS) {
+                    const options = Object.entries(KEY_LABELS.PLAN_STATUS).map(function (entry) {
+                        return '<option value="' + App.modals.planDetail._escapeAttr(entry[0]) + '">' + App.modals.planDetail._escapeHtml(entry[1]) + '<\/option>';
+                    }).join('');
+                    statusInput.innerHTML = options;
+                    statusInput.value = plan.plan_status || 'SUBMITTED';
+                }
+
+                if (this.quill) {
+                    App.utils.quill.setContent(this.quill, plan.description || '');
+                }
+
+                const setChecked = function (id, value) {
+                    const el = document.getElementById(id);
+                    if (el) el.checked = value === true;
+                };
+                setChecked('plan-detail-has-collaborators-input', plan.has_collaborators === true);
+                setChecked('plan-detail-has-guests-input', plan.has_guests === true);
+                setChecked('plan-detail-has-recruitment-input', plan.has_recruitment === true);
+                setChecked('plan-detail-has-live-input', plan.has_live === true);
+
+                const members = App.state.data.members || [];
+                const findDisplayName = function (memberId) {
+                    if (!memberId) return '';
+                    const member = members.find(function (item) { return item.id === memberId; });
+                    return member ? (member.display_name || member.name || member.email || '') : memberId;
+                };
+                const setText = function (id, value) {
+                    const el = document.getElementById(id);
+                    if (el) el.value = value || '';
+                };
+                setText('plan-detail-applied-by-input', findDisplayName(plan.applied_by));
+                setText('plan-detail-applied-at-input', plan.applied_at ? formatDateTimeForDisplay(plan.applied_at) : '');
+                setText('plan-detail-created-by-input', findDisplayName(plan.created_by));
+                setText('plan-detail-created-at-input', plan.created_at ? formatDateTimeForDisplay(plan.created_at) : '');
+                setText('plan-detail-updated-by-input', findDisplayName(plan.updated_by));
+                setText('plan-detail-updated-at-input', plan.updated_at ? formatDateTimeForDisplay(plan.updated_at) : '');
+
+                this._renderAssignments();
+            },
+
+            _renderAssignments: function () {
+                const container = document.getElementById('plan-detail-assignments-list');
+                if (!container) return;
+
+                if (!this.currentAssignments || this.currentAssignments.length === 0) {
+                    container.innerHTML = '<p class="secondary-text small-text padding">関係者は登録されていません</p>';
+                    return;
+                }
+
+                container.innerHTML = this.currentAssignments.map(function (assignment, index) {
+                    const member = (App.state.data.members || []).find(function (item) {
+                        return item.id === assignment.member_id;
+                    });
+                    const memberName = member ? (member.display_name || member.name || '名称未設定') : '不明なメンバー';
+                    const memberEmail = member ? (member.email || '') : '';
+                    const role = App.modals.planDetail._escapeAttr(assignment.role || '');
+                    const checked = assignment.is_active === false ? '' : 'checked';
+
+                    return '<article class="border small-round padding bottom-margin">' +
+                        '<div class="row tiny-space middle-align">' +
+                        '<div class="max">' +
+                        '<div class="bold">' + App.modals.planDetail._escapeHtml(memberName) + '</div>' +
+                        '<div class="small-text secondary-text">' + App.modals.planDetail._escapeHtml(memberEmail) + '</div>' +
+                        '</div>' +
+                        '<button class="circle transparent" onclick="App.modals.planDetail.removeAssignmentAt(' + index + ')" title="この関係者を削除">' +
+                        '<i>remove_circle</i>' +
+                        '</button>' +
+                        '</div>' +
+                        '<div class="field border label small top-margin">' +
+                        '<input placeholder=" " type="text" value="' + role + '" oninput="App.modals.planDetail.updateAssignmentRole(' + index + ', this.value)">' +
+                        '<label>役割</label>' +
+                        '</div>' +
+                        '<label class="row tiny-space top-margin">' +
+                        '<input type="checkbox" ' + checked + ' onchange="App.modals.planDetail.updateAssignmentActive(' + index + ', this.checked)">' +
+                        '<span>有効</span>' +
+                        '</label>' +
+                        '</article>';
+                }).join('');
+            },
+
+            _bindChangeListeners: function () {
+                const ids = [
+                    'plan-detail-plan-number-input',
+                    'plan-detail-zarms-code-input',
+                    'plan-detail-parent-plan-number-input',
+                    'plan-detail-plan-type-sequence-number-input',
+                    'plan-detail-name-input',
+                    'plan-detail-status-input',
+                    'plan-detail-type-input',
+                    'plan-detail-summary-input',
+                    'plan-detail-plan-tags-input',
+                    'plan-detail-plan-categories-input',
+                    'plan-detail-selection-application-text-input',
+                    'plan-detail-selection-presentation-url-input',
+                    'plan-detail-first-selection-comment-input',
+                    'plan-detail-second-selection-comment-input',
+                    'plan-detail-estimated-staff-count-input',
+                    'plan-detail-estimated-participant-count-input',
+                    'plan-detail-estimated-total-cost-input',
+                    'plan-detail-actual-staff-count-input',
+                    'plan-detail-actual-participant-count-input',
+                    'plan-detail-actual-total-cost-input',
+                    'plan-detail-online-media-type-input',
+                    'plan-detail-online-media-url-input',
+                    'plan-detail-website-url-input',
+                    'plan-detail-sheet-url-input',
+                    'plan-detail-folder-url-input',
+                    'plan-detail-document-url-input',
+                    'plan-detail-slide-url-input',
+                    'plan-detail-script-url-input',
+                    'plan-detail-thumbnail-url-input',
+                    'plan-detail-exhibitor-type-input',
+                    'plan-detail-exhibitor-member-input',
+                    'plan-detail-exhibitor-directory-input',
+                    'plan-detail-manager-committee-student-input',
+                    'plan-detail-manager-committee-staff-input',
+                    'plan-detail-slack-channel-url-input',
+                    'plan-detail-has-collaborators-input',
+                    'plan-detail-has-guests-input',
+                    'plan-detail-has-recruitment-input',
+                    'plan-detail-has-live-input',
+                    'plan-detail-remark-input'
+                ];
+
+                ids.forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    el.oninput = function () { App.modals.planDetail.toggleDirty(true); };
+                    el.onchange = function () { App.modals.planDetail.toggleDirty(true); };
+                });
+
+                if (this.quill && this.quill.__planDetailDirtyBound !== true) {
+                    this.quill.on('text-change', function () {
+                        App.modals.planDetail.toggleDirty(true);
+                    });
+                    this.quill.__planDetailDirtyBound = true;
+                }
+            },
+
+            _reset: function () {
+                this.currentId = null;
+                this.currentItem = null;
+                this.originalData = null;
+                this.currentAssignments = [];
+                this.originalAssignments = [];
+                this.isDeleteRequested = false;
+                this.isDirty = false;
+
+                if (this.quill) {
+                    App.utils.quill.clear(this.quill);
+                }
+
+                const comments = document.getElementById('plan-comments-list');
+                if (comments) comments.innerHTML = '';
+            },
+
+            _escapeHtml: function (value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            },
+
+            _escapeAttr: function (value) {
+                return this._escapeHtml(value).replace(/`/g, '&#96;');
+            }
+        };
+    })();
+</script>

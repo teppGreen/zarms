@@ -3,6 +3,24 @@
         App.modals.filterTask = {
             currentRole: null, // 現在選択中のロール
 
+            applyAssigneeLabels: function () {
+                const roleLabels = {
+                    'filter-label-assignee-section': KEY_LABELS.ASIGNEE_TYPE.PROCESSED_BY,
+                    'filter-label-created-by': KEY_LABELS.ASIGNEE_TYPE.CREATED_BY,
+                    'filter-label-processed-by': KEY_LABELS.ASIGNEE_TYPE.PROCESSED_BY,
+                    'filter-label-reviewed-by': KEY_LABELS.ASIGNEE_TYPE.REVIEWED_BY,
+                    'filter-label-received-by': KEY_LABELS.ASIGNEE_TYPE.RECEIVED_BY,
+                    'filter-label-processed-by-include-list-members': `｢${KEY_LABELS.ASIGNEE_TYPE.PROCESSED_BY}｣に設定した人をリストの担当者からも検索`
+                };
+
+                Object.keys(roleLabels).forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.textContent = roleLabels[id];
+                    }
+                });
+            },
+
             /**
              * メンバー選択モーダルを開く
              */
@@ -290,6 +308,7 @@
              * 現在の設定をUIに反映
              */
             syncUI: function () {
+                this.applyAssigneeLabels();
                 if (!App.pages.boards || !App.pages.boards.myBoardFilters) return;
 
                 const filters = App.pages.boards.myBoardFilters;
@@ -332,5 +351,7 @@
                 this.renderBoardChips();
             },
         }
+
+        App.modals.filterTask.applyAssigneeLabels();
     })();
 </script>

@@ -1,25 +1,12 @@
 <!-- メンバー詳細モーダル -->
-<dialog id="modal-detail-member" class="transparent bottom no-padding">
-    <div class="bottom-padding" onclick="App.modals.memberDetail.close(false)" title="メンバー詳細画面を閉じる">
-        <i class="center extra center" title="メンバー詳細画面を閉じる">keyboard_arrow_down</i>
-    </div>
+<dialog id="modal-detail-member" class="transparent max no-padding">
 
     <div class="surface-container padding">
         <div class="grid small-padding bottom-margin">
             <div class="s12 m9">
-                <div class="row tiny-space">
-                    <div id="member-detail-avatar" class="circle medium tertiary center-align row">
-                        <i>person</i>
-                    </div>
-                    <div class="max">
-                        <div class="row tiny-space">
-                            <h5 id="member-detail-display-name" class="bold no-margin"></h5>
-                            <span id="member-detail-status-chip" class="chip small"></span>
-                        </div>
-                        <p id="member-detail-title" class="small-text secondary-text no-margin"></p>
-                        <p id="member-detail-email" class="small-text secondary-text no-margin"></p>
-                        <p id="member-detail-id" class="small-text secondary-text no-margin font-number"></p>
-                    </div>
+                <div class="row tiny-space middle-align">
+                    <h5 class="bold no-margin">メンバー詳細</h5>
+                    <span id="member-detail-status-chip" class="chip small"></span>
                 </div>
             </div>
             <div class="s12 m3">
@@ -38,37 +25,72 @@
             <div class="s12 m3 background small-round padding">
                 <h6 class="bold small bottom-margin">基本情報</h6>
 
-                <div class="field border label bottom-margin">
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="member-detail-id-input" readonly>
+                    <label>ID</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
                     <input placeholder=" " type="text" id="member-detail-name-input">
                     <label>氏名</label>
                 </div>
 
-                <div class="field border label bottom-margin">
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="member-detail-name-yomi-input">
+                    <label>氏名ヨミ</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
                     <input placeholder=" " type="text" id="member-detail-display-name-input">
                     <label>表示名</label>
                 </div>
 
-                <div class="field border label bottom-margin">
-                    <input placeholder=" " type="email" id="member-detail-email-input">
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="member-detail-display-name-yomi-input">
+                    <label>表示名ヨミ</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="email" id="member-detail-email-input" readonly>
                     <label>メールアドレス</label>
                 </div>
 
-                <div class="field border label bottom-margin">
-                    <input placeholder=" " type="text" id="member-detail-title-input">
-                    <label>役職</label>
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="member-detail-system-role-key-input">
+                    <label>システム権限</label>
                 </div>
 
-                <div class="field border label bottom-margin">
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="tel" id="member-detail-phone-number-input">
+                    <label>電話番号</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="date" id="member-detail-birthday-input">
+                    <label>生年月日</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="member-detail-title-input">
+                    <label>筆頭役職</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
                     <input placeholder=" " type="url" id="member-detail-website-url-input">
                     <label>ウェブサイトURL</label>
                 </div>
 
-                <div class="field border label bottom-margin">
+                <div class="field border label small bottom-margin">
                     <input placeholder=" " type="url" id="member-detail-slack-url-input">
                     <label>SlackプロフィールURL</label>
                 </div>
 
-                <div class="field border label bottom-margin">
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="url" id="member-detail-photo-file-url-input">
+                    <label>プロフィール写真GファイルURL</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
                     <input placeholder=" " type="url" id="member-detail-photo-url-input">
                     <label>プロフィール写真URL</label>
                 </div>
@@ -78,9 +100,29 @@
                     <span>在籍中（有効）</span>
                 </label>
 
-                <div class="field border label bottom-margin">
+                <div class="field border label small bottom-margin">
                     <textarea placeholder=" " id="member-detail-remark-input" rows="2"></textarea>
                     <label>備考</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="member-detail-created-by-input" readonly>
+                    <label>作成者</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="member-detail-created-at-input" readonly>
+                    <label>作成日時</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="member-detail-updated-by-input" readonly>
+                    <label>最終更新者</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="member-detail-updated-at-input" readonly>
+                    <label>最終更新日時</label>
                 </div>
 
                 <p id="member-detail-error" class="error-text small-text" style="display: none;"></p>
@@ -104,8 +146,8 @@
                 </nav>
 
                 <div id="member-detail-tab-profile" class="page medium-height active">
-                    <div class="field border label">
-                        <textarea id="member-detail-description-input" rows="13" placeholder=" "></textarea>
+                    <div class="field border label small bottom-margin">
+                        <div id="member-description-editor" class="quill-editor"></div>
                         <label>プロフィール説明</label>
                     </div>
                 </div>

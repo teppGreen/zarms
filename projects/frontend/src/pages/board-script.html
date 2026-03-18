@@ -354,25 +354,25 @@
                     {
                         id: 'todo',
                         color: 'red',
-                        title: '未着手',
+                        title: KEY_LABELS.TASK_STATUS['TODO'],
                         filter: (t) => t.task_status_key === 'TODO'
                     },
                     {
                         id: 'in-progress',
                         color: 'amber',
-                        title: '進行中',
+                        title: KEY_LABELS.TASK_STATUS['IN_PROGRESS'],
                         filter: (t) => t.task_status_key === 'IN_PROGRESS'
                     },
                     {
                         id: 'in-review',
                         color: 'purple',
-                        title: '確認中',
+                        title: KEY_LABELS.TASK_STATUS['IN_REVIEW'],
                         filter: (t) => t.task_status_key === 'IN_REVIEW'
                     },
                     {
                         id: 'done',
                         color: 'green',
-                        title: '完了',
+                        title: KEY_LABELS.TASK_STATUS['DONE'],
                         filter: (t) => t.task_status_key === 'DONE'
                     }
                 ];
@@ -545,9 +545,6 @@
 
                 // ステータスの日本語変換マップ
                 const statusColors = { 'TODO': 'red', 'IN_PROGRESS': 'amber', 'IN_REVIEW': 'purple', 'DONE': 'green' };
-                const statusLabels = { 'TODO': '未着手', 'IN_PROGRESS': '進行中', 'IN_REVIEW': '確認中', 'DONE': '完了' };
-                // 優先度の日本語変換マップ
-                const priorityLabels = { 'HIGH': '高', 'MEDIUM': '中', 'LOW': '低' };
 
                 // カラム定義
                 const columns = [
@@ -656,10 +653,10 @@
 
                         // 担当者アバターHTML（小サイズ・横並び）
                         const memberRoles = [
-                            { member: createdBy, label: '作成者' },
-                            { member: processedBy, label: '進行者' },
-                            { member: reviewedBy, label: '確認者' },
-                            { member: receivedBy, label: '受領者' }
+                            { member: createdBy, label: KEY_LABELS.ASIGNEE_TYPE.CREATED_BY },
+                            { member: processedBy, label: KEY_LABELS.ASIGNEE_TYPE.PROCESSED_BY },
+                            { member: reviewedBy, label: KEY_LABELS.ASIGNEE_TYPE.REVIEWED_BY },
+                            { member: receivedBy, label: KEY_LABELS.ASIGNEE_TYPE.RECEIVED_BY }
                         ];
                         const opacities = statusOpacityMap[task.task_status_key] || [0.5, 0.5, 0.5, 0.5];
                         const membersHtml = memberRoles.map(({ member, label }, i) => {
@@ -718,9 +715,9 @@
                             `<td title="${escapeHtml(name)}">${escapeHtml(truncatedName)}</td>` +
                             `<td><div class="row tiny-space">
                                 <i class="tiny circle ${statusColors[task.task_status_key] || ''}"></i>
-                                ${statusLabels[task.task_status_key] || ''}
+                                ${KEY_LABELS.TASK_STATUS[task.task_status_key] || ''}
                             </div></td>` +
-                            `<td>${priorityLabels[task.priority_key] || ''}</td>` +
+                            `<td>${KEY_LABELS.PRIORITY[task.priority_key] || ''}</td>` +
                             `<td${startsAtClass}>${formatDateTimeForDisplay(task.starts_at, 'MM/dd(E) HH:mm') || ''}</td>` +
                             `<td${endsAtClass}>${formatDateTimeForDisplay(task.ends_at, 'MM/dd(E) HH:mm') || ''}</td>` +
                             `<td><div class="row tiny-space">${membersHtml}</div></td>` +
@@ -1044,7 +1041,7 @@
                 }
 
                 try {
-                    showSnackBar('ボードを作成中です...');
+                    showSnackbar('ボードを作成中です...');
 
                     const cleanItem = {
                         name: promptValue,
@@ -1373,7 +1370,12 @@
                     receivedBy ? receivedBy.profile_photo_url : null
                 ];
 
-                const assigneeLabels = ['作成者', '進行者', '確認者', '受領者'];
+                const assigneeLabels = [
+                    KEY_LABELS.ASIGNEE_TYPE.CREATED_BY,
+                    KEY_LABELS.ASIGNEE_TYPE.PROCESSED_BY,
+                    KEY_LABELS.ASIGNEE_TYPE.REVIEWED_BY,
+                    KEY_LABELS.ASIGNEE_TYPE.RECEIVED_BY
+                ];
 
                 const assigneeIcons = assigneePhotoUrls.map((url, index) => {
                     let opacity;

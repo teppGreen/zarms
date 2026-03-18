@@ -5,6 +5,7 @@
             currentItem: null,
             originalData: null,
             isDirty: false,
+            quill: null,
 
             open: function (memberId) {
                 if (!memberId) return;
@@ -19,6 +20,12 @@
                 this.currentItem = Object.assign({}, member);
                 this.originalData = Object.assign({}, member);
                 this.isDirty = false;
+
+                if (!this.quill) {
+                    this.quill = App.utils.quill.init('#member-description-editor', {
+                        placeholder: 'プロフィール説明を入力...'
+                    });
+                }
 
                 ui('#modal-detail-member', true);
 
@@ -51,13 +58,13 @@
 
                 const errorEl = document.getElementById('member-detail-error');
                 const newName = (document.getElementById('member-detail-name-input')?.value || '').trim();
-                const newEmail = (document.getElementById('member-detail-email-input')?.value || '').trim();
+                const currentEmail = (document.getElementById('member-detail-email-input')?.value || '').trim();
 
                 if (!newName) {
                     if (errorEl) { errorEl.textContent = '氏名は必須です'; errorEl.style.display = ''; }
                     return;
                 }
-                if (!newEmail) {
+                if (!currentEmail) {
                     if (errorEl) { errorEl.textContent = 'メールアドレスは必須です'; errorEl.style.display = ''; }
                     return;
                 }
@@ -67,12 +74,18 @@
                 const updates = {
                     name: newName,
                     display_name: (document.getElementById('member-detail-display-name-input')?.value || '').trim() || newName,
-                    email: newEmail,
+                    email: currentEmail,
+                    name_yomi: (document.getElementById('member-detail-name-yomi-input')?.value || '').trim() || null,
+                    display_name_yomi: (document.getElementById('member-detail-display-name-yomi-input')?.value || '').trim() || null,
+                    phone_number: (document.getElementById('member-detail-phone-number-input')?.value || '').trim() || null,
+                    birthday: (document.getElementById('member-detail-birthday-input')?.value || '').trim() || null,
                     title: (document.getElementById('member-detail-title-input')?.value || '').trim() || null,
                     website_url: (document.getElementById('member-detail-website-url-input')?.value || '').trim() || null,
-                    description: (document.getElementById('member-detail-description-input')?.value || '').trim() || null,
+                    description: App.utils.quill.getContent(this.quill) || null,
                     slack_profile_url: (document.getElementById('member-detail-slack-url-input')?.value || '').trim() || null,
+                    profile_photo_file_url: (document.getElementById('member-detail-photo-file-url-input')?.value || '').trim() || null,
                     profile_photo_url: (document.getElementById('member-detail-photo-url-input')?.value || '').trim() || null,
+                    system_role_key: (document.getElementById('member-detail-system-role-key-input')?.value || '').trim() || null,
                     is_active: document.getElementById('member-detail-is-active-input')?.checked !== false,
                     remark: (document.getElementById('member-detail-remark-input')?.value || '').trim() || null
                 };
@@ -516,25 +529,8 @@
             },
 
             _render: function (member) {
-                const avatarEl = document.getElementById('member-detail-avatar');
-                const dispNameEl = document.getElementById('member-detail-display-name');
-                const emailEl = document.getElementById('member-detail-email');
-                const idEl = document.getElementById('member-detail-id');
-                const titleEl = document.getElementById('member-detail-title');
                 const statusChip = document.getElementById('member-detail-status-chip');
                 const footerIdEl = document.getElementById('member-detail-display-id');
-
-                if (member.profile_photo_url && avatarEl) {
-                    avatarEl.innerHTML = '<img src="' + member.profile_photo_url + '" class="responsive circle" alt="">';
-                    avatarEl.className = 'circle medium transparent';
-                } else if (avatarEl) {
-                    avatarEl.innerHTML = '<i>person</i>';
-                    avatarEl.className = 'circle medium tertiary center-align row';
-                }
-                if (dispNameEl) dispNameEl.textContent = member.display_name || member.name || '';
-                if (titleEl) titleEl.textContent = member.title || '';
-                if (emailEl) emailEl.textContent = member.email || '';
-                if (idEl) idEl.textContent = member.id ? '#' + member.id : '';
                 if (footerIdEl) footerIdEl.textContent = member.id ? '#' + member.id : '';
                 if (statusChip) {
                     if (member.is_active === false) {
@@ -551,15 +547,36 @@
                     if (el) el.value = val || '';
                 };
 
+                var members = App.state.data.members || [];
+                var findDisplayName = function (memberId) {
+                    if (!memberId) return '';
+                    var found = members.find(function (item) { return item.id === memberId; });
+                    return found ? (found.display_name || found.name || found.email || '') : memberId;
+                };
+
                 setVal('member-detail-name-input', member.name);
                 setVal('member-detail-display-name-input', member.display_name);
+                setVal('member-detail-id-input', member.id ? '#' + member.id : '');
                 setVal('member-detail-email-input', member.email);
+                setVal('member-detail-name-yomi-input', member.name_yomi);
+                setVal('member-detail-display-name-yomi-input', member.display_name_yomi);
+                setVal('member-detail-phone-number-input', member.phone_number);
+                setVal('member-detail-birthday-input', member.birthday);
                 setVal('member-detail-title-input', member.title);
                 setVal('member-detail-website-url-input', member.website_url);
-                setVal('member-detail-description-input', member.description);
                 setVal('member-detail-slack-url-input', member.slack_profile_url);
+                setVal('member-detail-photo-file-url-input', member.profile_photo_file_url);
                 setVal('member-detail-photo-url-input', member.profile_photo_url);
+                setVal('member-detail-system-role-key-input', member.system_role_key);
                 setVal('member-detail-remark-input', member.remark);
+                setVal('member-detail-created-by-input', findDisplayName(member.created_by));
+                setVal('member-detail-created-at-input', member.created_at ? formatDateTimeForDisplay(member.created_at) : '');
+                setVal('member-detail-updated-by-input', findDisplayName(member.updated_by));
+                setVal('member-detail-updated-at-input', member.updated_at ? formatDateTimeForDisplay(member.updated_at) : '');
+
+                if (this.quill) {
+                    App.utils.quill.setContent(this.quill, member.description || '');
+                }
 
                 var cb = document.getElementById('member-detail-is-active-input');
                 if (cb) cb.checked = member.is_active !== false;
@@ -587,12 +604,17 @@
                 var watchIds = [
                     'member-detail-name-input',
                     'member-detail-display-name-input',
+                    'member-detail-name-yomi-input',
+                    'member-detail-display-name-yomi-input',
                     'member-detail-email-input',
+                    'member-detail-phone-number-input',
+                    'member-detail-birthday-input',
                     'member-detail-title-input',
                     'member-detail-website-url-input',
-                    'member-detail-description-input',
                     'member-detail-slack-url-input',
+                    'member-detail-photo-file-url-input',
                     'member-detail-photo-url-input',
+                    'member-detail-system-role-key-input',
                     'member-detail-remark-input',
                     'member-detail-is-active-input'
                 ];
@@ -604,6 +626,13 @@
                     el.addEventListener('change', function () { self.isDirty = true; });
                     el.dataset.memberDetailBound = '1';
                 });
+
+                if (this.quill && this.quill.__memberDetailDirtyBound !== true) {
+                    this.quill.on('text-change', function () {
+                        self.isDirty = true;
+                    });
+                    this.quill.__memberDetailDirtyBound = true;
+                }
             },
 
             _renderDirectories: function (memberId) {
@@ -705,21 +734,29 @@
                 var fields = [
                     'member-detail-name-input',
                     'member-detail-display-name-input',
+                    'member-detail-id-input',
                     'member-detail-email-input',
+                    'member-detail-name-yomi-input',
+                    'member-detail-display-name-yomi-input',
+                    'member-detail-phone-number-input',
+                    'member-detail-birthday-input',
                     'member-detail-title-input',
                     'member-detail-website-url-input',
-                    'member-detail-description-input',
                     'member-detail-slack-url-input',
+                    'member-detail-photo-file-url-input',
                     'member-detail-photo-url-input',
-                    'member-detail-remark-input'
+                    'member-detail-system-role-key-input',
+                    'member-detail-remark-input',
+                    'member-detail-created-by-input',
+                    'member-detail-created-at-input',
+                    'member-detail-updated-by-input',
+                    'member-detail-updated-at-input'
                 ];
                 fields.forEach(function (id) {
                     var el = document.getElementById(id);
                     if (el) el.value = '';
                 });
 
-                var titleEl = document.getElementById('member-detail-title');
-                if (titleEl) titleEl.textContent = '';
                 var statusChip = document.getElementById('member-detail-status-chip');
                 if (statusChip) {
                     statusChip.textContent = '';
@@ -733,6 +770,10 @@
 
                 var comments = document.getElementById('member-comments-list');
                 if (comments) comments.innerHTML = '';
+
+                if (this.quill) {
+                    App.utils.quill.clear(this.quill);
+                }
 
                 var profileTabBtn = document.querySelector('#member-detail-tabs > a');
                 this.switchTab(profileTabBtn, 'profile');

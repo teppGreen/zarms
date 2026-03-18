@@ -123,8 +123,8 @@
        * タスクカードを描画
        */
       renderTaskCard: function (task) {
-        const statusText = TASK_STATUS[task.task_status_key] || task.task_status_key;
-        const priorityText = { LOW: '低', MEDIUM: '中', HIGH: '高' }[task.priority_key] || '-';
+        const statusText = (KEY_LABELS && KEY_LABELS.TASK_STATUS && KEY_LABELS.TASK_STATUS[task.task_status_key]) || task.task_status_key;
+        const priorityText = (KEY_LABELS && KEY_LABELS.PRIORITY && KEY_LABELS.PRIORITY[task.priority_key]) || '-';
 
         // 期限情報の計算
         const deadlineInfo = this.getDeadlineInfo(task);
