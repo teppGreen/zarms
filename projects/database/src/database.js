@@ -1201,9 +1201,11 @@ function prepareNewData(userId, sheetName, dataObject, skipSerial = false) {
     const newData = { ...dataObject };
 
     const now = new Date().toISOString();
-    if (headers.includes(`created_by`)) newData[`created_by`] = userId;
+    const effectiveUserId = userId || newData[`created_by`] || `system`;
+
+    if (headers.includes(`created_by`)) newData[`created_by`] = effectiveUserId;
     if (headers.includes(`created_at`)) newData[`created_at`] = now;
-    if (headers.includes(`updated_by`)) newData[`updated_by`] = userId;
+    if (headers.includes(`updated_by`)) newData[`updated_by`] = effectiveUserId;
     if (headers.includes(`updated_at`)) newData[`updated_at`] = now;
     if (headers.includes(`id`) && !dataObject.id) newData[`id`] = generateUuid();
 
