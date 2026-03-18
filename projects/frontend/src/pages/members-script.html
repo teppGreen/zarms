@@ -7,13 +7,13 @@
             member: [],
             directory: [],
             skills: [],
-            projects: []
+            plans: []
         };
         const _sortState = {
             member: [{ col: 'display_name', dir: 'asc' }],
             directory: [{ col: 'name', dir: 'asc' }],
             skills: [{ col: 'title', dir: 'asc' }],
-            projects: [{ col: 'plan_number', dir: 'asc' }]
+            plans: [{ col: 'plan_number', dir: 'asc' }]
         };
         const _defaultFilters = {
             member: {
@@ -38,7 +38,7 @@
                 memberCountMin: '',
                 memberCountMax: ''
             },
-            projects: {
+            plans: {
                 planNumber: '',
                 name: '',
                 status: '',
@@ -51,36 +51,43 @@
             member: Object.assign({}, _defaultFilters.member),
             directory: Object.assign({}, _defaultFilters.directory),
             skills: Object.assign({}, _defaultFilters.skills),
-            projects: Object.assign({}, _defaultFilters.projects)
+            plans: Object.assign({}, _defaultFilters.plans)
+        };
+        const _headerFilters = {
+            member: [],
+            directory: [],
+            skills: [],
+            plans: []
         };
         const _containers = {
             member: 'members-table-container',
             directory: 'directories-table-container',
             skills: 'skills-table-container',
-            projects: 'projects-table-container'
+            plans: 'plans-table-container'
         };
         const _loadingIds = {
             member: 'members-table-loading',
             directory: 'directories-table-loading',
             skills: 'skills-table-loading',
-            projects: 'projects-table-loading'
+            plans: 'plans-table-loading'
         };
         const _frameIds = {
             member: 'members-table-frame',
             directory: 'directories-table-frame',
             skills: 'skills-table-frame',
-            projects: 'projects-table-frame'
+            plans: 'plans-table-frame'
         };
         const _frameState = {
             member: { ready: false, token: '', pendingPayload: null },
             directory: { ready: false, token: '', pendingPayload: null },
             skills: { ready: false, token: '', pendingPayload: null },
-            projects: { ready: false, token: '', pendingPayload: null }
+            plans: { ready: false, token: '', pendingPayload: null }
         };
         const _frameMessageType = {
             ready: 'members-tabulator-ready',
             rowClick: 'members-tabulator-row-click',
             sortChange: 'members-tabulator-sort-change',
+            filterChange: 'members-tabulator-filter-change',
             error: 'members-tabulator-error',
             render: 'members-tabulator-render',
             resize: 'members-tabulator-resize'
@@ -108,7 +115,7 @@
                 { key: 'memberCountMin', label: 'メンバー数（最小）', type: 'number' },
                 { key: 'memberCountMax', label: 'メンバー数（最大）', type: 'number' }
             ],
-            projects: [
+            plans: [
                 { key: 'planNumber', label: '企画番号', type: 'text' },
                 { key: 'name', label: '企画名', type: 'text' },
                 { key: 'status', label: '状態', type: 'text' },
@@ -147,7 +154,7 @@
                     { key: '_memberCount', label: 'メンバー数', width: '110px', type: 'number', align: 'right' }
                 ]
             },
-            projects: {
+            plans: {
                 emptyText: '企画がありません',
                 columns: [
                     { key: 'plan_number', label: '企画番号', width: '140px' },
@@ -177,7 +184,7 @@
                     _tableData.member = this._buildMemberRows(members, directories, directoryAssignments);
                     _tableData.directory = this._buildDirectoryRows(directories, directoryAssignments);
                     _tableData.skills = this._buildSkillRows(skills, skillAssignments);
-                    _tableData.projects = this._buildProjectRows(plans, planAssignments, members);
+                    _tableData.plans = this._buildPlanRows(plans, planAssignments, members);
 
                     this._ensureResizeHandler();
                     this._renderAllTables();
@@ -192,7 +199,7 @@
             },
 
             switchTab: function (tabName) {
-                if (tabName !== 'member' && tabName !== 'directory' && tabName !== 'skills' && tabName !== 'projects') {
+                if (tabName !== 'member' && tabName !== 'directory' && tabName !== 'skills' && tabName !== 'plans') {
                     tabName = 'member';
                 }
                 _currentTab = tabName;
@@ -203,45 +210,45 @@
                 const directoryBtn = document.getElementById('members-tab-btn-directory');
                 const skillSubtab = document.getElementById('members-subtab-skills');
                 const skillBtn = document.getElementById('members-tab-btn-skills');
-                const projectsSubtab = document.getElementById('members-subtab-projects');
-                const projectsBtn = document.getElementById('members-tab-btn-projects');
+                const plansSubtab = document.getElementById('members-subtab-plans');
+                const plansBtn = document.getElementById('members-tab-btn-plans');
 
                 if (tabName === 'member') {
                     memberSubtab.style.display = '';
                     directorySubtab.style.display = 'none';
                     if (skillSubtab) skillSubtab.style.display = 'none';
-                    if (projectsSubtab) projectsSubtab.style.display = 'none';
+                    if (plansSubtab) plansSubtab.style.display = 'none';
                     memberBtn.className = 'active';
                     directoryBtn.className = '';
                     if (skillBtn) skillBtn.className = '';
-                    if (projectsBtn) projectsBtn.className = '';
+                    if (plansBtn) plansBtn.className = '';
                 } else if (tabName === 'directory') {
                     memberSubtab.style.display = 'none';
                     directorySubtab.style.display = '';
                     if (skillSubtab) skillSubtab.style.display = 'none';
-                    if (projectsSubtab) projectsSubtab.style.display = 'none';
+                    if (plansSubtab) plansSubtab.style.display = 'none';
                     memberBtn.className = '';
                     directoryBtn.className = 'active';
                     if (skillBtn) skillBtn.className = '';
-                    if (projectsBtn) projectsBtn.className = '';
+                    if (plansBtn) plansBtn.className = '';
                 } else if (tabName === 'skills') {
                     memberSubtab.style.display = 'none';
                     directorySubtab.style.display = 'none';
                     if (skillSubtab) skillSubtab.style.display = '';
-                    if (projectsSubtab) projectsSubtab.style.display = 'none';
+                    if (plansSubtab) plansSubtab.style.display = 'none';
                     memberBtn.className = '';
                     directoryBtn.className = '';
                     if (skillBtn) skillBtn.className = 'active';
-                    if (projectsBtn) projectsBtn.className = '';
+                    if (plansBtn) plansBtn.className = '';
                 } else {
                     memberSubtab.style.display = 'none';
                     directorySubtab.style.display = 'none';
                     if (skillSubtab) skillSubtab.style.display = 'none';
-                    if (projectsSubtab) projectsSubtab.style.display = '';
+                    if (plansSubtab) plansSubtab.style.display = '';
                     memberBtn.className = '';
                     directoryBtn.className = '';
                     if (skillBtn) skillBtn.className = '';
-                    if (projectsBtn) projectsBtn.className = 'active';
+                    if (plansBtn) plansBtn.className = 'active';
                 }
 
                 this._showLoading(_isLoading, _currentTab);
@@ -272,12 +279,14 @@
 
             resetFilters: function (tabName) {
                 _filters[tabName] = Object.assign({}, _defaultFilters[tabName]);
+                _headerFilters[tabName] = this._buildHeaderFiltersFromLegacy(tabName);
                 this._renderTable(tabName);
                 this._updateFilterBadge();
             },
 
             setFilters: function (tabName, nextFilters) {
                 _filters[tabName] = Object.assign({}, _filters[tabName], nextFilters);
+                _headerFilters[tabName] = this._buildHeaderFiltersFromLegacy(tabName);
                 this._renderTable(tabName);
                 this._updateFilterBadge();
             },
@@ -327,7 +336,7 @@
                     App.modals.newSkill.open();
                     return;
                 }
-                if (_currentTab === 'projects' && App.modals.newPlan && App.modals.newPlan.open) {
+                if (_currentTab === 'plans' && App.modals.newPlan && App.modals.newPlan.open) {
                     App.modals.newPlan.open();
                 }
             },
@@ -336,7 +345,7 @@
                 if (tabName === 'member') return 'メンバー';
                 if (tabName === 'directory') return 'ディレクトリ';
                 if (tabName === 'skills') return 'スキル';
-                if (tabName === 'projects') return '企画';
+                if (tabName === 'plans') return '企画';
                 return 'メンバー';
             },
 
@@ -344,11 +353,11 @@
                 var memberLoading = document.getElementById(_loadingIds.member);
                 var dirLoading = document.getElementById(_loadingIds.directory);
                 var skillLoading = document.getElementById(_loadingIds.skills);
-                var projectsLoading = document.getElementById(_loadingIds.projects);
+                var plansLoading = document.getElementById(_loadingIds.plans);
                 var memberContainer = document.getElementById(_containers.member);
                 var dirContainer = document.getElementById(_containers.directory);
                 var skillContainer = document.getElementById(_containers.skills);
-                var projectsContainer = document.getElementById(_containers.projects);
+                var plansContainer = document.getElementById(_containers.plans);
                 if (tab === 'member') {
                     if (memberLoading) memberLoading.style.display = show ? '' : 'none';
                     if (memberContainer) memberContainer.style.display = show ? 'none' : '';
@@ -359,8 +368,8 @@
                     if (skillLoading) skillLoading.style.display = show ? '' : 'none';
                     if (skillContainer) skillContainer.style.display = show ? 'none' : '';
                 } else {
-                    if (projectsLoading) projectsLoading.style.display = show ? '' : 'none';
-                    if (projectsContainer) projectsContainer.style.display = show ? 'none' : '';
+                    if (plansLoading) plansLoading.style.display = show ? '' : 'none';
+                    if (plansContainer) plansContainer.style.display = show ? 'none' : '';
                 }
             },
 
@@ -382,18 +391,34 @@
 
             _buildDirectoryRows: function (directories, assignments) {
                 const typeMap = (KEY_LABELS && KEY_LABELS.DIRECTORY_TYPE) ? KEY_LABELS.DIRECTORY_TYPE : {};
-                return directories.map(function (directory) {
+                const rowById = {};
+
+                directories.forEach(function (directory) {
                     const parent = directories.find(function (item) { return item.id === directory.parent_directory_id; });
                     const memberCount = assignments.filter(function (assignment) {
                         return assignment.directory_id === directory.id && assignment.is_active !== false;
                     }).length;
-                    return Object.assign({}, directory, {
+                    rowById[directory.id] = Object.assign({}, directory, {
                         _parentName: parent ? parent.name : '',
                         _typeText: typeMap[directory.directory_type_key] || directory.directory_type_key || '',
                         _memberCount: memberCount,
-                        _statusText: directory.is_active === false ? '無効' : '有効'
+                        _statusText: directory.is_active === false ? '無効' : '有効',
+                        _children: []
                     });
                 });
+
+                const roots = [];
+                Object.keys(rowById).forEach(function (directoryId) {
+                    const row = rowById[directoryId];
+                    const parentId = row.parent_directory_id;
+                    if (!parentId || !rowById[parentId] || parentId === row.id) {
+                        roots.push(row);
+                        return;
+                    }
+                    rowById[parentId]._children.push(row);
+                });
+
+                return roots;
             },
 
             _buildSkillRows: function (skills, assignments) {
@@ -408,7 +433,7 @@
             },
 
             /* plans独立タブ化時はこの関数群を pages/plans へ移設する */
-            _buildProjectRows: function (plans, planAssignments, members) {
+            _buildPlanRows: function (plans, planAssignments, members) {
                 const memberMap = (members || []).reduce(function (acc, member) {
                     acc[member.id] = member;
                     return acc;
@@ -507,6 +532,8 @@
                     tabName: tabName,
                     rows: rows,
                     emptyText: config.emptyText,
+                    dataTree: tabName === 'directory',
+                    headerFilters: (_headerFilters[tabName] || []).slice(),
                     columns: this._getTabulatorColumns(config.columns),
                     sorters: (_sortState[tabName] || []).map(function (sorter) {
                         return { column: sorter.col, dir: sorter.dir };
@@ -514,18 +541,101 @@
                 };
             },
 
-            _getTabulatorColumns: function (columns) {
-                return columns.map(function (column) {
+            _buildHeaderFiltersFromLegacy: function (tabName) {
+                const source = _filters[tabName] || {};
+                const mapping = this._getLegacyHeaderFilterMapping(tabName);
+                const entries = [];
+                Object.keys(mapping).forEach(function (legacyKey) {
+                    const value = source[legacyKey];
+                    if (value === '' || value === null || value === undefined) return;
+                    entries.push({ field: mapping[legacyKey], value: String(value) });
+                });
+                return entries;
+            },
+
+            _syncLegacyFiltersFromHeader: function (tabName, headerFilters) {
+                const mapping = this._getLegacyHeaderFilterMapping(tabName);
+                const reverse = {};
+                Object.keys(mapping).forEach(function (legacyKey) {
+                    reverse[mapping[legacyKey]] = legacyKey;
+                });
+
+                const nextFilters = Object.assign({}, _filters[tabName] || {}, _defaultFilters[tabName] || {});
+                Object.keys(reverse).forEach(function (field) {
+                    const legacyKey = reverse[field];
+                    if (legacyKey in nextFilters) {
+                        nextFilters[legacyKey] = '';
+                    }
+                });
+
+                (headerFilters || []).forEach(function (filter) {
+                    const legacyKey = reverse[filter.field];
+                    if (!legacyKey || !(legacyKey in nextFilters)) return;
+                    nextFilters[legacyKey] = String(filter.value || '');
+                });
+
+                _filters[tabName] = nextFilters;
+                this._updateFilterBadge();
+            },
+
+            _getLegacyHeaderFilterMapping: function (tabName) {
+                if (tabName === 'member') {
                     return {
-                        title: column.label,
-                        field: column.key,
+                        display_name: 'display_name',
+                        name: 'name',
+                        email: 'email',
+                        directories: '_directoriesText',
+                        status: '_statusText'
+                    };
+                }
+                if (tabName === 'directory') {
+                    return {
+                        name: 'name',
+                        type: '_typeText',
+                        parent: '_parentName',
+                        status: '_statusText'
+                    };
+                }
+                if (tabName === 'skills') {
+                    return {
+                        title: 'title',
+                        type: 'skill_type_key',
+                        description: 'description'
+                    };
+                }
+                return {
+                    planNumber: 'plan_number',
+                    name: 'name',
+                    status: '_statusText',
+                    type: '_typeText'
+                };
+            },
+
+            _getTabulatorColumns: function (columns) {
+                const openColumn = {
+                    title: '',
+                    field: '__open_action',
+                    width: 74,
+                    headerSort: false,
+                    headerFilter: false,
+                    hozAlign: 'center',
+                    formatterKey: 'openAction',
+                    variableHeight: false,
+                    cssClass: 'members-tabulator-cell-nowrap',
+                    sorter: 'string'
+                };
+
+                return [openColumn].concat(columns).map(function (column) {
+                    return {
+                        title: column.label || column.title || '',
+                        field: column.key || column.field,
                         width: App.pages.members._parseColumnWidth(column.width),
-                        headerSort: column.sortable !== false,
-                        headerFilter: column.type === 'number' ? 'number' : 'input',
-                        hozAlign: column.align || 'left',
-                        formatterKey: column.key === '_statusText' ? 'status' : 'text',
+                        headerSort: column.headerSort !== undefined ? column.headerSort : (column.sortable !== false),
+                        headerFilter: column.headerFilter === false ? false : (column.type === 'number' ? 'number' : 'input'),
+                        hozAlign: column.hozAlign || column.align || 'left',
+                        formatterKey: column.formatterKey || ((column.key || column.field) === '_statusText' ? 'status' : 'text'),
                         variableHeight: column.wrap === true,
-                        cssClass: column.wrap ? 'members-tabulator-cell-wrap' : 'members-tabulator-cell-nowrap',
+                        cssClass: column.cssClass || (column.wrap ? 'members-tabulator-cell-wrap' : 'members-tabulator-cell-nowrap'),
                         sorter: column.type === 'number' ? 'number' : 'string'
                     };
                 });
@@ -555,6 +665,9 @@
                     '.tabulator-row.tabulator-selected{background:#eef3ff;}' +
                     '.members-tabulator-cell-wrap{white-space:normal;line-height:1.5;}' +
                     '.members-tabulator-cell-nowrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+                    '.members-open-detail-btn{padding:4px 10px;border:1px solid #c7cacf;border-radius:999px;background:#fff;color:#1f1f1f;cursor:pointer;font-size:12px;line-height:1.2;}' +
+                    '.members-open-detail-btn:hover{background:#f3f6fb;}' +
+                    '.members-cell-selected{outline:2px solid #2d3eff;outline-offset:-2px;}' +
                     '.tabulator-placeholder{display:flex;align-items:center;justify-content:center;color:#5f6368;}' +
                     '</style>' +
                     '</head>' +
@@ -564,11 +677,14 @@
                     '<script>' +
                     'const FRAME_TOKEN=' + JSON.stringify(token) + ';' +
                     'const TAB_NAME=' + JSON.stringify(tabName) + ';' +
-                    'let table=null;let tableBuilt=false;' +
+                    'let table=null;let tableBuilt=false;let selectedCell=null;' +
                     'function postMessageToParent(type,payload){window.parent.postMessage({source:"members-tabulator",type:type,tabName:TAB_NAME,token:FRAME_TOKEN,payload:payload||{}},"*");}' +
                     'function createStatusNode(value){const span=document.createElement("span");span.textContent=String(value||"");if(value==="在籍"||value==="有効"){span.style.color="#2d3eff";span.style.fontWeight="600";}else{span.style.opacity="0.6";}return span;}' +
-                    'function createColumns(columns){return (columns||[]).map(function(column){const definition={title:column.title,field:column.field,headerSort:column.headerSort!==false,headerSortClickElement:"icon",sorter:column.sorter||"string",hozAlign:column.hozAlign||"left",cssClass:column.cssClass||"",variableHeight:column.variableHeight===true,formatter:"plaintext"};if(column.width){definition.width=column.width;}if(column.formatterKey==="status"){definition.formatter=function(cell){return createStatusNode(cell.getValue());};}return definition;});}' +
-                    'function renderTable(payload){const root=document.getElementById("members-tabulator-root");if(!root){return;}const rows=Array.isArray(payload.rows)?payload.rows:[];const sorters=Array.isArray(payload.sorters)?payload.sorters:[];if(!table){tableBuilt=false;table=new Tabulator(root,{data:rows,columns:createColumns(payload.columns),layout:"fitColumns",height:"100%",placeholder:payload.emptyText||"データがありません",initialSort:sorters,index:"id",clipboard:true,clipboardCopyStyled:false,clipboardCopyConfig:{columnHeaders:true,rowGroups:false,columnCalcs:false,formatCells:true},selectableRange:1});table.on("tableBuilt",function(){tableBuilt=true;});table.on("rowClick",function(event,row){if(!row||!row.getData){return;}postMessageToParent("' + _frameMessageType.rowClick + '",{rowId:row.getData()&&row.getData().id?String(row.getData().id):""});});table.on("dataSorted",function(sorters){postMessageToParent("' + _frameMessageType.sortChange + '",{sorters:(sorters||[]).map(function(sorter){return {column:sorter.field,dir:sorter.dir};})});});return;}table.setData(rows);if(sorters.length){table.setSort(sorters);}else{table.clearSort();}}' +
+                    'function createOpenButton(cell){const button=document.createElement("button");button.type="button";button.className="members-open-detail-btn";button.textContent="開く";button.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();const row=cell&&cell.getRow?cell.getRow():null;const data=row&&row.getData?row.getData():null;postMessageToParent("' + _frameMessageType.rowClick + '",{rowId:data&&data.id?String(data.id):""});});return button;}' +
+                    'function createColumns(columns){return (columns||[]).map(function(column){const definition={title:column.title,field:column.field,headerSort:column.headerSort!==false,headerSortClickElement:"icon",sorter:column.sorter||"string",hozAlign:column.hozAlign||"left",cssClass:column.cssClass||"",variableHeight:column.variableHeight===true,formatter:"plaintext"};if(column.width){definition.width=column.width;}if(column.headerFilter!==false){definition.headerFilter=column.headerFilter||"input";}if(column.formatterKey==="status"){definition.formatter=function(cell){return createStatusNode(cell.getValue());};}if(column.formatterKey==="openAction"){definition.formatter=function(cell){return createOpenButton(cell);};}return definition;});}' +
+                    'function setupCellCopy(){window.addEventListener("keydown",function(event){if(!(event.metaKey||event.ctrlKey)||String(event.key||"").toLowerCase()!=="c"){return;}if(!selectedCell||!selectedCell.getValue){return;}event.preventDefault();const value=selectedCell.getValue();const text=value===null||value===undefined?"":String(value);if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).catch(function(){});}});}' +
+                    'function applyHeaderFilters(filters){if(!table){return;}table.clearHeaderFilter();(filters||[]).forEach(function(filter){if(!filter||!filter.field){return;}table.setHeaderFilterValue(filter.field,String(filter.value||""));});}' +
+                    'function renderTable(payload){const root=document.getElementById("members-tabulator-root");if(!root){return;}const rows=Array.isArray(payload.rows)?payload.rows:[];const sorters=Array.isArray(payload.sorters)?payload.sorters:[];const headerFilters=Array.isArray(payload.headerFilters)?payload.headerFilters:[];if(!table){tableBuilt=false;table=new Tabulator(root,{data:rows,columns:createColumns(payload.columns),layout:"fitColumns",height:"100%",placeholder:payload.emptyText||"データがありません",initialSort:sorters,index:"id",dataTree:payload.dataTree===true,dataTreeStartExpanded:false,dataTreeElementColumn:"name",dataTreeChildField:"_children",clipboard:true,clipboardCopyStyled:false,clipboardCopyConfig:{columnHeaders:false,rowGroups:false,columnCalcs:false,formatCells:true},selectableRows:false,selectableRange:1,selectableRangeColumns:true,selectableRangeRows:true});table.on("tableBuilt",function(){tableBuilt=true;});table.on("cellClick",function(event,cell){if(!cell||!cell.getColumn){return;}const field=cell.getColumn().getField();if(field==="__open_action"){return;}if(selectedCell&&selectedCell.getElement){selectedCell.getElement().classList.remove("members-cell-selected");}selectedCell=cell;if(cell.getElement){cell.getElement().classList.add("members-cell-selected");}});table.on("dataSorted",function(sorters){postMessageToParent("' + _frameMessageType.sortChange + '",{sorters:(sorters||[]).map(function(sorter){return {column:sorter.field,dir:sorter.dir};})});});table.on("dataFiltered",function(filters){postMessageToParent("' + _frameMessageType.filterChange + '",{filters:(filters||[]).map(function(filter){return {field:filter.field||"",value:filter.value===null||filter.value===undefined?"":String(filter.value)};})});});setupCellCopy();applyHeaderFilters(headerFilters);return;}table.setData(rows);if(sorters.length){table.setSort(sorters);}else{table.clearSort();}applyHeaderFilters(headerFilters);}' +
                     'window.addEventListener("message",function(event){const data=event.data||{};if(!data||data.source!=="members-host"||data.token!==FRAME_TOKEN){return;}if(data.type==="' + _frameMessageType.render + '"){try{renderTable(data.payload||{});}catch(error){postMessageToParent("' + _frameMessageType.error + '",{message:error&&error.message?error.message:"Tabulator描画に失敗しました"});}}if(data.type==="' + _frameMessageType.resize + '"&&table&&tableBuilt&&document.body&&document.body.offsetWidth>0){table.redraw(true);}});' +
                     'window.addEventListener("load",function(){postMessageToParent("' + _frameMessageType.ready + '",{});});' +
                     '<\/script>' +
@@ -628,8 +744,7 @@
             },
 
             _getVisibleRows: function (tabName) {
-                const filteredRows = this._applyFilters(tabName, _tableData[tabName] || []);
-                return this._applySort(tabName, filteredRows);
+                return (_tableData[tabName] || []).slice();
             },
 
             _applyFilters: function (tabName, rows) {
@@ -718,7 +833,7 @@
                         return;
                     }
 
-                    if (tabName === 'projects') {
+                    if (tabName === 'plans') {
                         if (App.modals.planDetail && App.modals.planDetail.open) {
                             App.modals.planDetail.open(rowId);
                         }
@@ -837,6 +952,17 @@
                     return;
                 }
 
+                if (data.type === _frameMessageType.filterChange) {
+                    const filters = (data.payload && data.payload.filters) || [];
+                    _headerFilters[data.tabName] = filters.map(function (filter) {
+                        return { field: String(filter.field || ''), value: String(filter.value || '') };
+                    }).filter(function (filter) {
+                        return filter.field && filter.value !== '';
+                    });
+                    this._syncLegacyFiltersFromHeader(data.tabName, _headerFilters[data.tabName]);
+                    return;
+                }
+
                 if (data.type === _frameMessageType.error) {
                     console.error('[Members] Tabulator iframe error:', (data.payload && data.payload.message) || 'unknown error');
                     showSnackbar('メンバー一覧の描画に失敗しました', 'error');
@@ -861,7 +987,7 @@
                     return;
                 }
 
-                if (tabName === 'projects') {
+                if (tabName === 'plans') {
                     if (App.modals.planDetail && App.modals.planDetail.open) {
                         App.modals.planDetail.open(rowId);
                     }
