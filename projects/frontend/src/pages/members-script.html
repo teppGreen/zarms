@@ -19,7 +19,15 @@
             member: {
                 display_name: '',
                 name: '',
+                name_yomi: '',
+                display_name_yomi: '',
                 email: '',
+                phone_number: '',
+                birthday: '',
+                title: '',
+                system_role_key: '',
+                slack_profile_url: '',
+                remark: '',
                 directories: '',
                 status: ''
             },
@@ -96,7 +104,15 @@
             member: [
                 { key: 'display_name', label: '表示名', type: 'text' },
                 { key: 'name', label: '氏名', type: 'text' },
+                { key: 'name_yomi', label: '氏名ヨミ', type: 'text' },
+                { key: 'display_name_yomi', label: '表示名ヨミ', type: 'text' },
                 { key: 'email', label: 'メールアドレス', type: 'text' },
+                { key: 'phone_number', label: '電話番号', type: 'text' },
+                { key: 'birthday', label: '生年月日', type: 'text' },
+                { key: 'title', label: '筆頭役職', type: 'text' },
+                { key: 'system_role_key', label: 'システム権限', type: 'text' },
+                { key: 'slack_profile_url', label: 'SlackプロフィールURL(末尾11桁)', type: 'text' },
+                { key: 'remark', label: '備考', type: 'text' },
                 { key: 'directories', label: '所属組織', type: 'text' },
                 { key: 'status', label: 'ステータス', type: 'select', options: [{ value: '', label: 'すべて' }, { value: '在籍', label: '在籍' }, { value: '退籍', label: '退籍' }] }
             ],
@@ -128,11 +144,19 @@
             member: {
                 emptyText: 'メンバーがありません',
                 columns: [
-                    { key: 'display_name', label: '表示名', width: '160px' },
-                    { key: 'name', label: '氏名', width: '160px' },
+                    { key: 'display_name', label: '表示名', width: '190px', formatterKey: 'memberNameLink' },
+                    { key: 'name', label: '氏名', width: '150px' },
+                    { key: 'name_yomi', label: '氏名ヨミ', width: '150px' },
+                    { key: 'display_name_yomi', label: '表示名ヨミ', width: '150px' },
                     { key: 'email', label: 'メールアドレス', width: '220px' },
-                    { key: '_directoriesText', label: '所属組織', width: '220px', wrap: true },
-                    { key: '_statusText', label: 'ステータス', width: '110px', align: 'center' }
+                    { key: 'phone_number', label: '電話番号', width: '130px' },
+                    { key: 'birthday', label: '生年月日', width: '120px' },
+                    { key: 'title', label: '筆頭役職', width: '120px' },
+                    { key: 'system_role_key', label: 'システム権限', width: '120px' },
+                    { key: '_slackProfileTail', label: 'Slack', width: '110px' },
+                    { key: 'remark', label: '備考', width: '180px', wrap: true },
+                    { key: '_directoriesText', label: '所属組織', width: '180px', wrap: true },
+                    { key: '_statusText', label: 'ステータス', width: '88px', align: 'center' }
                 ]
             },
             directory: {
@@ -254,6 +278,9 @@
                 this._showLoading(_isLoading, _currentTab);
                 if (!_isLoading) {
                     this._renderTable(_currentTab);
+                    requestAnimationFrame(function () {
+                        App.pages.members._applyTableHeight(_currentTab);
+                    });
                 }
             },
 
@@ -383,10 +410,21 @@
                         return directory ? directory.name : null;
                     }).filter(Boolean);
                     return Object.assign({}, member, {
+                        _slackProfileTail: App.pages.members._extractSlackProfileTail(member.slack_profile_url),
                         _directoriesText: names.join(' / '),
                         _statusText: member.is_active === false ? '退籍' : '在籍'
                     });
                 });
+            },
+
+            _extractSlackProfileTail: function (value) {
+                if (!value) return '';
+                const trimmed = String(value).trim();
+                if (!trimmed) return '';
+                const normalized = trimmed.replace(/\/+$/, '');
+                const token = normalized.split(/[\/?#]/).filter(Boolean).pop() || '';
+                if (token.length <= 11) return token;
+                return token.slice(-11);
             },
 
             _buildDirectoryRows: function (directories, assignments) {
@@ -583,7 +621,15 @@
                     return {
                         display_name: 'display_name',
                         name: 'name',
+                        name_yomi: 'name_yomi',
+                        display_name_yomi: 'display_name_yomi',
                         email: 'email',
+                        phone_number: 'phone_number',
+                        birthday: 'birthday',
+                        title: 'title',
+                        system_role_key: 'system_role_key',
+                        slack_profile_url: '_slackProfileTail',
+                        remark: 'remark',
                         directories: '_directoriesText',
                         status: '_statusText'
                     };
@@ -667,6 +713,10 @@
                     '.members-tabulator-cell-nowrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
                     '.members-open-detail-btn{padding:4px 10px;border:1px solid #c7cacf;border-radius:999px;background:#fff;color:#1f1f1f;cursor:pointer;font-size:12px;line-height:1.2;}' +
                     '.members-open-detail-btn:hover{background:#f3f6fb;}' +
+                    '.members-name-cell{display:flex;align-items:center;gap:8px;min-width:0;}' +
+                    '.members-name-link{border:0;background:transparent;color:#2d3eff;cursor:pointer;display:block;text-align:left;padding:0;min-width:0;max-width:100%;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:underline;}' +
+                    '.members-copy-btn{border:1px solid #d2d7df;background:#fff;border-radius:999px;cursor:pointer;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;line-height:1;color:#1f1f1f;flex-shrink:0;}' +
+                    '.members-copy-btn:hover{background:#f3f6fb;}' +
                     '.members-cell-selected{outline:2px solid #2d3eff;outline-offset:-2px;}' +
                     '.tabulator-placeholder{display:flex;align-items:center;justify-content:center;color:#5f6368;}' +
                     '</style>' +
@@ -681,7 +731,8 @@
                     'function postMessageToParent(type,payload){window.parent.postMessage({source:"members-tabulator",type:type,tabName:TAB_NAME,token:FRAME_TOKEN,payload:payload||{}},"*");}' +
                     'function createStatusNode(value){const span=document.createElement("span");span.textContent=String(value||"");if(value==="在籍"||value==="有効"){span.style.color="#2d3eff";span.style.fontWeight="600";}else{span.style.opacity="0.6";}return span;}' +
                     'function createOpenButton(cell){const button=document.createElement("button");button.type="button";button.className="members-open-detail-btn";button.textContent="開く";button.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();const row=cell&&cell.getRow?cell.getRow():null;const data=row&&row.getData?row.getData():null;postMessageToParent("' + _frameMessageType.rowClick + '",{rowId:data&&data.id?String(data.id):""});});return button;}' +
-                    'function createColumns(columns){return (columns||[]).map(function(column){const definition={title:column.title,field:column.field,headerSort:column.headerSort!==false,headerSortClickElement:"icon",sorter:column.sorter||"string",hozAlign:column.hozAlign||"left",cssClass:column.cssClass||"",variableHeight:column.variableHeight===true,formatter:"plaintext"};if(column.width){definition.width=column.width;}if(column.headerFilter!==false){definition.headerFilter=column.headerFilter||"input";}if(column.formatterKey==="status"){definition.formatter=function(cell){return createStatusNode(cell.getValue());};}if(column.formatterKey==="openAction"){definition.formatter=function(cell){return createOpenButton(cell);};}return definition;});}' +
+                    'function createMemberNameCell(cell){const wrapper=document.createElement("div");wrapper.className="members-name-cell";const nameText=document.createElement("span");nameText.className="members-name-link";const cellValue=cell&&cell.getValue?cell.getValue():"";nameText.textContent=cellValue===null||cellValue===undefined?"":String(cellValue);const row=cell&&cell.getRow?cell.getRow():null;const data=row&&row.getData?row.getData():{};const slackUrl=data&&data.slack_profile_url?String(data.slack_profile_url):"";if(!slackUrl){nameText.style.color="#9aa0a6";nameText.style.textDecoration="none";}const openSlack=function(){if(!slackUrl){return;}window.open(slackUrl,"_blank","noopener,noreferrer");};wrapper.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();openSlack();});const copyBtn=document.createElement("button");copyBtn.type="button";copyBtn.className="members-copy-btn";copyBtn.title="表示名をコピー";copyBtn.innerHTML="<i>content_copy</i>";copyBtn.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();const text=nameText.textContent||"";if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).catch(function(){});}});wrapper.appendChild(nameText);wrapper.appendChild(copyBtn);return wrapper;}' +
+                    'function createColumns(columns){return (columns||[]).map(function(column){const definition={title:column.title,field:column.field,headerSort:column.headerSort!==false,headerSortClickElement:"icon",sorter:column.sorter||"string",hozAlign:column.hozAlign||"left",cssClass:column.cssClass||"",variableHeight:column.variableHeight===true,formatter:"plaintext"};if(column.width){definition.width=column.width;}if(column.headerFilter!==false){definition.headerFilter=column.headerFilter||"input";}if(column.formatterKey==="status"){definition.formatter=function(cell){return createStatusNode(cell.getValue());};}if(column.formatterKey==="openAction"){definition.formatter=function(cell){return createOpenButton(cell);};}if(column.formatterKey==="memberNameLink"){definition.formatter=function(cell){return createMemberNameCell(cell);};}return definition;});}' +
                     'function setupCellCopy(){window.addEventListener("keydown",function(event){if(!(event.metaKey||event.ctrlKey)||String(event.key||"").toLowerCase()!=="c"){return;}if(!selectedCell||!selectedCell.getValue){return;}event.preventDefault();const value=selectedCell.getValue();const text=value===null||value===undefined?"":String(value);if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).catch(function(){});}});}' +
                     'function applyHeaderFilters(filters){if(!table){return;}table.clearHeaderFilter();(filters||[]).forEach(function(filter){if(!filter||!filter.field){return;}table.setHeaderFilterValue(filter.field,String(filter.value||""));});}' +
                     'function renderTable(payload){const root=document.getElementById("members-tabulator-root");if(!root){return;}const rows=Array.isArray(payload.rows)?payload.rows:[];const sorters=Array.isArray(payload.sorters)?payload.sorters:[];const headerFilters=Array.isArray(payload.headerFilters)?payload.headerFilters:[];if(!table){tableBuilt=false;table=new Tabulator(root,{data:rows,columns:createColumns(payload.columns),layout:"fitColumns",height:"100%",placeholder:payload.emptyText||"データがありません",initialSort:sorters,index:"id",dataTree:payload.dataTree===true,dataTreeStartExpanded:false,dataTreeElementColumn:"name",dataTreeChildField:"_children",clipboard:true,clipboardCopyStyled:false,clipboardCopyConfig:{columnHeaders:false,rowGroups:false,columnCalcs:false,formatCells:true},selectableRows:false,selectableRange:1,selectableRangeColumns:true,selectableRangeRows:true});table.on("tableBuilt",function(){tableBuilt=true;});table.on("cellClick",function(event,cell){if(!cell||!cell.getColumn){return;}const field=cell.getColumn().getField();if(field==="__open_action"){return;}if(selectedCell&&selectedCell.getElement){selectedCell.getElement().classList.remove("members-cell-selected");}selectedCell=cell;if(cell.getElement){cell.getElement().classList.add("members-cell-selected");}});table.on("dataSorted",function(sorters){postMessageToParent("' + _frameMessageType.sortChange + '",{sorters:(sorters||[]).map(function(sorter){return {column:sorter.field,dir:sorter.dir};})});});table.on("dataFiltered",function(filters){postMessageToParent("' + _frameMessageType.filterChange + '",{filters:(filters||[]).map(function(filter){return {field:filter.field||"",value:filter.value===null||filter.value===undefined?"":String(filter.value)};})});});setupCellCopy();applyHeaderFilters(headerFilters);return;}table.setData(rows);if(sorters.length){table.setSort(sorters);}else{table.clearSort();}applyHeaderFilters(headerFilters);}' +
@@ -753,7 +804,15 @@
                     if (tabName === 'member') {
                         return App.pages.members._matchText(row.display_name, filters.display_name) &&
                             App.pages.members._matchText(row.name, filters.name) &&
+                            App.pages.members._matchText(row.name_yomi, filters.name_yomi) &&
+                            App.pages.members._matchText(row.display_name_yomi, filters.display_name_yomi) &&
                             App.pages.members._matchText(row.email, filters.email) &&
+                            App.pages.members._matchText(row.phone_number, filters.phone_number) &&
+                            App.pages.members._matchText(row.birthday, filters.birthday) &&
+                            App.pages.members._matchText(row.title, filters.title) &&
+                            App.pages.members._matchText(row.system_role_key, filters.system_role_key) &&
+                            App.pages.members._matchText(row._slackProfileTail, filters.slack_profile_url) &&
+                            App.pages.members._matchText(row.remark, filters.remark) &&
                             App.pages.members._matchText(row._directoriesText, filters.directories) &&
                             App.pages.members._matchSelect(row._statusText, filters.status);
                     }
