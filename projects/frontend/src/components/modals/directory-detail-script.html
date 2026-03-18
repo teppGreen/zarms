@@ -24,6 +24,7 @@
                 if (!this.currentId) return;
 
                 const errorEl = document.getElementById('directory-detail-error');
+                const saveBtn = document.getElementById('directory-detail-save-btn');
                 const name = (document.getElementById('directory-detail-name-input')?.value || '').trim();
                 const typeKey = document.getElementById('directory-detail-type-select')?.value || null;
                 const parentId = document.getElementById('directory-detail-parent-select')?.value || null;
@@ -49,6 +50,8 @@
                 }
 
                 if (errorEl) errorEl.style.display = 'none';
+                if (saveBtn) saveBtn.disabled = true;
+                showSnackbar('ディレクトリを保存しています...', 'info', 'top', 0);
 
                 const updateSet = {
                     name: name,
@@ -81,10 +84,13 @@
                     this.close();
                 } catch (err) {
                     console.error('[directoryDetail] save failed', err);
+                    showSnackbar('更新に失敗しました', 'error');
                     if (errorEl) {
                         errorEl.textContent = '更新に失敗しました';
                         errorEl.style.display = '';
                     }
+                } finally {
+                    if (saveBtn) saveBtn.disabled = false;
                 }
             },
 
