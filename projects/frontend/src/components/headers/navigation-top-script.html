@@ -536,7 +536,9 @@
         // 検索機能用の名前空間を初期化
         if (!App.utils) App.utils = {};
 
-        App.utils.search = {
+        if (!App.utils.search) App.utils.search = {};
+
+        Object.assign(App.utils.search, {
             /**
              * キーダウンハンドラー（Enter検索）
              */
@@ -586,10 +588,11 @@
                     // 全角数字を半角に変換してから数値チェック（共通ユーティリティを使用）
                     const { normalizedValue, numericValue, isNumericInput } = App.utils.search.getNormalizedSearchInfo(searchValue);
 
-                    // 1. マイボードタブに移動（既に移動している場合は無視）
-                    if (App.utils.navigation && App.utils.navigation.switchTab) {
-                        await App.utils.navigation.switchTab('board-my-board', false, false, true);
-                    }
+                    const switchToMyBoardTab = async () => {
+                        if (App.utils.navigation && App.utils.navigation.switchTab) {
+                            await App.utils.navigation.switchTab('board-my-board', false, false, true);
+                        }
+                    };
 
                     if (isNumericInput) {
                         // 数値入力の場合: display_id でタスクを特定する
@@ -605,6 +608,9 @@
                         } catch (e) {
                             console.error('[Search] display_id 検索エラー:', e);
                         }
+
+                        // display_id 検索完了後にマイボードへ移動
+                        await switchToMyBoardTab();
 
                         if (foundTask && App.pages.boards) {
                             // 2. 特定したタスク名でマイボードフィルタを適用
@@ -629,6 +635,7 @@
                         }
                     } else {
                         // 通常の文字列検索
+                        await switchToMyBoardTab();
                         if (App.pages.boards) {
                             App.pages.boards.initializeMyBoardFilters(false);
                             App.pages.boards.myBoardFilters.title = searchValue;
@@ -648,6 +655,6 @@
                     setLoading(false);
                 }
             }
-        };
+        });
     })();
 </script>
