@@ -180,6 +180,50 @@
                 this._reset();
             },
 
+            copyField: async function (fieldId, mode) {
+                const text = this._buildCopyText(fieldId, mode);
+                if (!text) {
+                    showSnackbar('コピー対象の値がありません', 'error');
+                    return;
+                }
+
+                try {
+                    await this._copyToClipboard(text);
+                    showSnackbar('コピーしました', 'success');
+                } catch (err) {
+                    console.error('[MemberDetail] コピーエラー:', err);
+                    showSnackbar('コピーに失敗しました', 'error');
+                }
+            },
+
+            _buildCopyText: function (fieldId, mode) {
+                const value = (document.getElementById(fieldId)?.value || '').trim();
+                if (!value && mode !== 'email') return '';
+
+                if (mode === 'email') {
+                    const email = (document.getElementById('member-detail-email-input')?.value || '').trim();
+                    if (!email) return '';
+                    const displayName = (document.getElementById('member-detail-display-name-input')?.value || '').trim();
+                    const name = (document.getElementById('member-detail-name-input')?.value || '').trim();
+                    const title = displayName || name;
+                    if (!title) return '<' + email + '>';
+                    return title + '(' + name + ') <' + email + '>';
+                }
+
+                if (mode === 'slackTail') {
+                    return this._extractSlackProfileTail(value);
+                }
+
+                return value;
+            },
+
+            _copyToClipboard: function (text) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    return navigator.clipboard.writeText(text);
+                }
+                return Promise.reject(new Error('Clipboard API is not available'));
+            },
+
             switchTab: function (el, tabName) {
                 const tabs = document.querySelectorAll('#member-detail-tabs > a');
                 tabs.forEach(function (a) { a.className = ''; });
@@ -609,6 +653,7 @@
                 setVal('member-detail-title-input', member.title);
                 setVal('member-detail-website-url-input', member.website_url);
                 setVal('member-detail-slack-url-input', member.slack_profile_url);
+                setVal('member-detail-slack-tail-input', this._extractSlackProfileTail(member.slack_profile_url));
                 setVal('member-detail-photo-file-url-input', member.profile_photo_file_url);
                 setVal('member-detail-photo-url-input', member.profile_photo_url);
                 setVal('member-detail-system-role-key-input', member.system_role_key);
@@ -670,6 +715,18 @@
                     el.addEventListener('change', function () { self.isDirty = true; });
                     el.dataset.memberDetailBound = '1';
                 });
+
+                var slackInput = document.getElementById('member-detail-slack-url-input');
+                if (slackInput && slackInput.dataset.memberDetailSlackTailBound !== '1') {
+                    const updateTail = function () {
+                        const tailEl = document.getElementById('member-detail-slack-tail-input');
+                        if (!tailEl) return;
+                        tailEl.value = self._extractSlackProfileTail(slackInput.value || '');
+                    };
+                    slackInput.addEventListener('input', updateTail);
+                    slackInput.addEventListener('change', updateTail);
+                    slackInput.dataset.memberDetailSlackTailBound = '1';
+                }
 
                 if (this.quill && this.quill.__memberDetailDirtyBound !== true) {
                     this.quill.on('text-change', function () {
@@ -786,6 +843,7 @@
                     'member-detail-title-input',
                     'member-detail-website-url-input',
                     'member-detail-slack-url-input',
+                    'member-detail-slack-tail-input',
                     'member-detail-photo-file-url-input',
                     'member-detail-photo-url-input',
                     'member-detail-system-role-key-input',
@@ -818,6 +876,15 @@
 
                 var profileTabBtn = document.querySelector('#member-detail-tabs > a');
                 this.switchTab(profileTabBtn, 'profile');
+            },
+
+            _extractSlackProfileTail: function (value) {
+                if (!value) return '';
+                var normalized = String(value).trim().replace(/\/+$/, '');
+                if (!normalized) return '';
+                var token = normalized.split(/[\/?#]/).filter(Boolean).pop() || '';
+                if (token.length <= 11) return token;
+                return token.slice(-11);
             }
         };
     })();
