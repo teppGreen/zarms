@@ -215,6 +215,40 @@
                 }
             },
 
+            updateMemberRole: async function (assignmentId, roleValue) {
+                if (!assignmentId) return;
+
+                const assignments = App.state.data.directoryAssignments || [];
+                const target = assignments.find(function (a) { return a.id === assignmentId; });
+                if (!target) return;
+
+                const normalizedRole = (roleValue || '').trim() || null;
+                const prevRole = target.role || null;
+                if (normalizedRole === prevRole) return;
+
+                target.role = normalizedRole;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', assignmentId] },
+                        set: { role: normalizedRole }
+                    }, '所属メンバーの役割を更新');
+                    showSnackbar('役割を更新しました', 'success');
+                } catch (err) {
+                    console.error('[directoryDetail] updateMemberRole failed', err);
+                    target.role = prevRole;
+                    showSnackbar('役割の更新に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    }
+                }
+
+                const directory = (App.state.data.directories || []).find(function (item) { return item.id === this.currentId; }, this);
+                if (directory) {
+                    this._render(directory);
+                }
+            },
+
             _populateSelects: function (currentId) {
                 const typeSelect = document.getElementById('directory-detail-type-select');
                 const parentSelect = document.getElementById('directory-detail-parent-select');
@@ -253,6 +287,7 @@
                 const chips = assignments.map(function (assignment) {
                     const member = members.find(function (item) { return item.id === assignment.member_id; });
                     const label = member ? (member.display_name || member.name || member.email || '不明') : '不明';
+                    const role = assignment.role || '';
                     const openButton = member && member.id
                         ? '<button class="small border round" onclick="App.modals.directoryDetail.openMemberDetail(\'' + escapeHtmlAttribute(member.id) + '\')">詳細<\/button>'
                         : '';
@@ -262,7 +297,13 @@
 
                     return '<div class="row middle-align tiny-space padding">' +
                         '<i>person<\/i>' +
-                        '<div class="max"><p class="no-margin small">' + escapeHtml(label) + '<\/p><\/div>' +
+                        '<div class="max">' +
+                        '<p class="no-margin small">' + escapeHtml(label) + '<\/p>' +
+                        '<div class="field border label small top-margin no-margin">' +
+                        '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(role) + '" onchange="App.modals.directoryDetail.updateMemberRole(\'' + escapeHtmlAttribute(assignment.id || '') + '\', this.value)">' +
+                        '<label>役割</label>' +
+                        '<\/div>' +
+                        '<\/div>' +
                         '<div class="row tiny-space">' + openButton + removeButton + '<\/div>' +
                         '<\/div>';
                 }).join('');
