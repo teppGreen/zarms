@@ -35,6 +35,7 @@
             save: async function () {
                 if (!this.currentId) return;
 
+                const saveBtn = document.getElementById('skill-detail-save-btn');
                 const title = (document.getElementById('skill-detail-title-input')?.value || '').trim();
                 const typeKey = (document.getElementById('skill-detail-type-input')?.value || '').trim() || null;
                 const description = (document.getElementById('skill-detail-description-input')?.value || '').trim() || null;
@@ -49,6 +50,8 @@
                     return;
                 }
                 if (errorEl) errorEl.style.display = 'none';
+                if (saveBtn) saveBtn.disabled = true;
+                showSnackbar('スキルを保存しています...', 'info', 'top', 0);
 
                 const updates = {
                     title: title,
@@ -109,6 +112,8 @@
                     } else if (App.pages.members && App.pages.members.loadData) {
                         App.pages.members.loadData(true);
                     }
+                } finally {
+                    if (saveBtn) saveBtn.disabled = false;
                 }
             },
 

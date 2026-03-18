@@ -4,7 +4,7 @@
       currentId: null,
       currentItem: null,
       originalData: null, // 元のデータを保持（変更検知用）
-      isDirty: true, // 変更フラグ
+      isDirty: false, // 変更フラグ
       quill: null, // Quillエディタインスタンス
       currentLists: [], // 現在のタスクに紐づくリストデータ
       originalLists: [], // リストの元のデータ（変更検知用）
@@ -113,7 +113,7 @@
         this.loadLists(taskId);
         this.loadRelatedTasks(taskId);
         this.loadAssets(taskId);
-        this.isDirty = defaultDirty;
+        this.isDirty = defaultDirty === true;
       },
 
       /**
@@ -631,6 +631,7 @@
         this.currentId = null;
         this.currentItem = null;
         this.originalData = null;
+        this.isDirty = false;
         this.currentLists = [];
         this.originalLists = [];
         this.deletedListIds = [];
