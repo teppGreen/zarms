@@ -146,7 +146,7 @@
           // キャッシュヒット: 即座に描画
           this.currentTask = task;
           this.currentId = task.id;
-          dialog.classList.add('active');
+          ui(dialog, true);
           this.renderTaskDetail(task);
 
           // バックグラウンドで最新データを取得して再描画（キャッシュが古い場合の対策）
@@ -170,7 +170,7 @@
               <progress class="circle large"></progress>
             </div>
           `;
-          dialog.classList.add('active');
+          ui(dialog, true);
 
           try {
             const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
@@ -476,7 +476,7 @@
 
         const dialog = document.getElementById('modal-mobile-detail-task');
         if (dialog) {
-          dialog.classList.remove('active');
+          ui(dialog, false);
         }
 
         // URLパラメータから削除

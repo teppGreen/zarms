@@ -34,13 +34,13 @@
                 if (nameInput) nameInput.value = '';
 
                 // モーダルを表示
-                ui('#modal-new-task');
+                ui('#modal-new-task', true);
 
                 // 通常タブの場合、inputにフォーカス
                 if (tab === 'simple') {
                     setTimeout(() => {
                         if (nameInput) nameInput.focus();
-                    }, 100);
+                    }, 200);
                 }
             },
 
@@ -50,17 +50,17 @@
             close: function () {
                 // プレビューモーダルが開いている場合は先に閉じる
                 const previewModal = document.getElementById('modal-new-task-preview');
-                if (previewModal && previewModal.classList.contains('active')) {
-                    previewModal.classList.remove('active');
+                if (previewModal && (previewModal.classList.contains('active') || previewModal.hasAttribute('open'))) {
+                    ui('#modal-new-task-preview', false);
                 }
-                ui('#modal-new-task');
+                ui('#modal-new-task', false);
             },
 
             /**
              * プレビューモーダルを閉じる（modal-new-taskは開いたまま）
              */
             closePreview: function () {
-                document.getElementById('modal-new-task-preview').classList.remove('active');
+                ui('#modal-new-task-preview', false);
             },
 
             /**
@@ -256,7 +256,7 @@
              * アシスタントのプレビューモーダルを開く
              */
             showAssistantPreview: function () {
-                document.getElementById('modal-new-task-preview').classList.add('active');
+                ui('#modal-new-task-preview', true);
             },
 
             /**

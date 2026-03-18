@@ -303,17 +303,20 @@
    */
   function getOpenModals(sorted = false) {
     // 1. dialog要素で開いているものを取得
-    const dialogModals = Array.from(document.querySelectorAll('dialog[open], dialog.active'));
+    const dialogModals = Array.from(document.querySelectorAll('dialog[open], dialog.active')).filter(modal => {
+      return modal && modal.id && modal.id.startsWith('modal-');
+    });
 
-    // 2. classに'modal'が含まれ、かつ表示されている要素を取得
+    // 2. classに'modal'が含まれ、activeまたはopenの要素を取得
     const modalElements = Array.from(document.querySelectorAll('[class*="modal"]'));
     const visibleModals = modalElements.filter(modal => {
-      // activeクラスがある、またはdisplayがnone以外の場合は開いていると判断
+      if (!modal || !modal.id || !modal.id.startsWith('modal-')) {
+        return false;
+      }
       const isActive = modal.classList.contains('active');
-      const computedStyle = window.getComputedStyle(modal);
-      const isVisible = computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden';
+      const hasOpenAttr = modal.hasAttribute('open') || modal.open === true;
 
-      return isActive || isVisible;
+      return isActive || hasOpenAttr;
     });
 
     // 重複を除去してマージ
@@ -484,7 +487,7 @@
             App.state.data.skillAssignments = freshSkillAssignments;
 
             // ナビゲーションを更新（アクティブ状態を保持）
-            const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#boards-nav a.active');
+            const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#board-nav a.active');
             const activeBoardId = activeLink ? activeLink.dataset.boardId : null;
             App.utils.navigation.renderBoardsNavigation();
             if (activeBoardId) {
@@ -570,7 +573,7 @@
       // ナビゲーションを更新
       if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
         // 現在のアクティブなボードIDを取得
-        const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#boards-nav a.active');
+        const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#board-nav a.active');
         const activeBoardId = activeLink ? activeLink.dataset.boardId : null;
 
         App.utils.navigation.renderBoardsNavigation();
@@ -870,13 +873,20 @@
   }
 
   function closeModal(id) {
+    if (App.utils.modal && typeof App.utils.modal.close === 'function') {
+      App.utils.modal.close(id);
+      return;
+    }
+
+    if (typeof ui === 'function') {
+      ui(`#${id}`, false);
+      return;
+    }
+
     const modal = document.getElementById(id);
     if (modal) {
       modal.classList.remove('active');
-    }
-    const overlay = document.getElementById('overlay');
-    if (overlay) {
-      overlay.classList.remove('active');
+      modal.removeAttribute('open');
     }
   }
 
@@ -1267,7 +1277,12 @@
      */
     closeTopModal: function (skipUrlUpdate = false) {
       const openModals = getOpenModals(true); // 優先順位でソート済み
-      if (openModals.length === 0) return true;
+      if (openModals.length === 0) {
+        if (App.utils.modal && typeof App.utils.modal.syncOverlayWithManagedModals === 'function') {
+          App.utils.modal.syncOverlayWithManagedModals();
+        }
+        return true;
+      }
 
       const targetModal = openModals[0];
       const modalId = targetModal.id;
@@ -1291,21 +1306,17 @@
       }
 
       // ハンドラが見つからない場合は汎用的な閉じ処理
-      if (typeof ui === 'function') {
-        ui(`#${modalId}`);
+      if (App.utils.modal && typeof App.utils.modal.close === 'function') {
+        App.utils.modal.close(modalId);
+      } else if (typeof ui === 'function') {
+        ui(`#${modalId}`, false);
       } else {
         targetModal.classList.remove('active');
         targetModal.removeAttribute('open');
       }
 
-      // all-overlayを使用しているモーダルの場合、他にモーダルが開いていなければoverlayも閉じる
-      const remainingModals = getOpenModals(false);
-
-      if (remainingModals.length === 0) {
-        const allOverlay = document.getElementById('all-overlay');
-        if (allOverlay) allOverlay.classList.remove('active');
-        const overlay = document.getElementById('overlay');
-        if (overlay) overlay.classList.remove('active');
+      if (App.utils.modal && typeof App.utils.modal.syncOverlayWithManagedModals === 'function') {
+        App.utils.modal.syncOverlayWithManagedModals();
       }
 
       return true;
@@ -1321,6 +1332,311 @@
    * モーダル関連のユーティリティ関数
    */
   App.utils.modal = {
+    _beerUiOriginal: null,
+    _uiBridgeInstalled: false,
+    _overlayPrefix: 'overlay-for-',
+    _overlayRemoveDelayMs: 300,
+
+    /**
+     * モーダル参照（id/selector/element）からモーダルIDを解決します
+     * @param {string|HTMLElement} target - モーダル参照
+     * @returns {string|null} モーダルID
+     */
+    getModalId: function (target) {
+      if (!target) return null;
+
+      if (typeof target === 'string') {
+        if (target.startsWith('#')) {
+          return target.slice(1);
+        }
+        return target;
+      }
+
+      if (target.id) {
+        return target.id;
+      }
+
+      return null;
+    },
+
+    /**
+     * 対象がselect系モーダルか判定します
+     * @param {string|HTMLElement} target - モーダル参照
+     * @returns {boolean} select系ならtrue
+     */
+    isSelectModal: function (target) {
+      const modalId = this.getModalId(target);
+      return !!modalId && modalId.startsWith('modal-select-');
+    },
+
+    /**
+     * モーダル要素を取得します
+     * @param {string|HTMLElement} target - モーダル参照
+     * @returns {HTMLElement|null} モーダル要素
+     */
+    getModalElement: function (target) {
+      if (!target) return null;
+      if (target instanceof HTMLElement) return target;
+
+      const modalId = this.getModalId(target);
+      if (!modalId) return null;
+      return document.getElementById(modalId);
+    },
+
+    /**
+     * モーダルが開いているか判定します
+     * @param {string|HTMLElement} target - モーダル参照
+     * @returns {boolean} 開いている場合true
+     */
+    isOpen: function (target) {
+      const modal = this.getModalElement(target);
+      if (!modal) return false;
+
+      const hasOpenAttr = modal.hasAttribute('open') || modal.open === true;
+      const hasActiveClass = modal.classList.contains('active');
+
+      return hasOpenAttr || hasActiveClass;
+    },
+
+    /**
+     * モーダル専用overlay要素のIDを返します
+     * @param {string} modalId - モーダルID
+     * @returns {string} overlay要素ID
+     */
+    getOverlayId: function (modalId) {
+      return `${this._overlayPrefix}${modalId}`;
+    },
+
+    /**
+     * モーダルに紐づくoverlay要素を返します
+     * @param {string} modalId - モーダルID
+     * @returns {HTMLElement|null} overlay要素
+     */
+    getOverlayElement: function (modalId) {
+      if (!modalId) return null;
+      return document.getElementById(this.getOverlayId(modalId));
+    },
+
+    /**
+     * モーダル直前にoverlay要素を生成・配置します
+     * @param {string} modalId - モーダルID
+     * @param {HTMLElement} modal - モーダル要素
+     * @returns {HTMLElement|null} overlay要素
+     */
+    createOverlayForModal: function (modalId, modal) {
+      if (!modalId || !modal) return null;
+
+      let overlay = this.getOverlayElement(modalId);
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = this.getOverlayId(modalId);
+        overlay.className = 'overlay dark js-managed-modal-overlay';
+        overlay.dataset.modalId = modalId;
+        overlay.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.close(modalId);
+        });
+      }
+
+      if (modal.parentNode) {
+        modal.parentNode.insertBefore(overlay, modal);
+      }
+
+      if (overlay.dataset.removeTimerId) {
+        clearTimeout(parseInt(overlay.dataset.removeTimerId, 10));
+        overlay.dataset.removeTimerId = '';
+      }
+
+      overlay.classList.remove('active');
+      overlay.style.display = '';
+      overlay.style.pointerEvents = 'auto';
+
+      // 挿入直後にactiveを付与して表示状態へ遷移させる
+      requestAnimationFrame(() => {
+        if (document.body.contains(overlay)) {
+          overlay.classList.add('active');
+        }
+      });
+
+      return overlay;
+    },
+
+    /**
+     * モーダルに紐づくoverlay要素を削除します
+     * @param {string} modalId - モーダルID
+     */
+    removeOverlayForModal: function (modalId) {
+      const overlay = this.getOverlayElement(modalId);
+      if (!overlay) return;
+
+      if (overlay.dataset.removeTimerId) {
+        clearTimeout(parseInt(overlay.dataset.removeTimerId, 10));
+      }
+
+      overlay.classList.remove('active');
+      overlay.style.pointerEvents = 'none';
+
+      const timerId = setTimeout(() => {
+        if (!document.body.contains(overlay)) return;
+        if (overlay.classList.contains('active')) return;
+        overlay.style.display = 'none';
+        overlay.remove();
+      }, this._overlayRemoveDelayMs);
+
+      overlay.dataset.removeTimerId = String(timerId);
+    },
+
+    /**
+     * 管理対象（全モーダル）のうち何かが開いているか判定します
+     * @returns {boolean} 開いている場合true
+     */
+    hasAnyManagedModalOpen: function () {
+      const openModals = getOpenModals(false);
+      return openModals.some(modal => {
+        return modal && modal.id && modal.id.startsWith('modal-');
+      });
+    },
+
+    /**
+     * 管理対象モーダルの状態に応じて #overlay を同期します
+     */
+    syncOverlayWithManagedModals: function () {
+      const openManagedModals = getOpenModals(false).filter(modal => {
+        return modal && modal.id && modal.id.startsWith('modal-');
+      });
+      const openManagedModalIds = new Set(openManagedModals.map(modal => modal.id));
+
+      openManagedModals.forEach(modal => {
+        this.createOverlayForModal(modal.id, modal);
+      });
+
+      const overlays = document.querySelectorAll('.js-managed-modal-overlay');
+      overlays.forEach(overlay => {
+        const modalId = overlay.dataset.modalId;
+        if (!openManagedModalIds.has(modalId)) {
+          this.removeOverlayForModal(modalId);
+        }
+      });
+    },
+
+    /**
+     * BeerCSSのui()を呼び出します
+     * @param {...any} args - ui()へ渡す引数
+     * @returns {any} ui()の戻り値
+     */
+    callBeerUi: function (...args) {
+      const handler = this._beerUiOriginal || (typeof window.ui === 'function' ? window.ui : null);
+      if (typeof handler !== 'function') return null;
+      return handler(...args);
+    },
+
+    /**
+     * モーダル開閉時にBeerCSSが自動生成したoverlay要素を除去します
+     */
+    removeAutoGeneratedOverlays: function () {
+      const overlays = document.querySelectorAll('.overlay');
+      overlays.forEach(overlay => {
+        if (overlay && !overlay.classList.contains('js-managed-modal-overlay')) {
+          overlay.remove();
+        }
+      });
+    },
+
+    /**
+     * モーダルを開きます
+     * @param {string|HTMLElement} target - モーダル参照
+     */
+    open: function (target) {
+      const modalId = this.getModalId(target);
+      const modal = this.getModalElement(target);
+      if (!modalId || !modal) return;
+
+      if (!this.isOpen(modal)) {
+        // showModalはネイティブbackdropがoverlayクリックを阻害するため使わない
+        modal.setAttribute('open', '');
+        modal.classList.add('active');
+      }
+
+      this.createOverlayForModal(modalId, modal);
+
+      this.removeAutoGeneratedOverlays();
+    },
+
+    /**
+     * モーダルを閉じます
+     * @param {string|HTMLElement} target - モーダル参照
+     */
+    close: function (target) {
+      const modalId = this.getModalId(target);
+      const modal = this.getModalElement(target);
+      if (!modalId || !modal) return;
+
+      // 念のため明示的に閉じる（環境差異対策）
+      modal.classList.remove('active');
+      modal.removeAttribute('open');
+      modal.open = false;
+
+      this.removeOverlayForModal(modalId);
+      this.syncOverlayWithManagedModals();
+
+      this.removeAutoGeneratedOverlays();
+    },
+
+    /**
+     * モーダルをトグルします
+     * @param {string|HTMLElement} target - モーダル参照
+     */
+    toggle: function (target) {
+      if (this.isOpen(target)) {
+        this.close(target);
+      } else {
+        this.open(target);
+      }
+    },
+
+    /**
+     * BeerCSS ui() をラップし、モーダルは独自開閉、その他はBeerCSSへ委譲します
+     */
+    installUiBridge: function () {
+      if (this._uiBridgeInstalled) return;
+      if (typeof window.ui !== 'function') return;
+
+      this._beerUiOriginal = window.ui.bind(window);
+      const self = this;
+
+      window.ui = function (...args) {
+        const target = args[0];
+        const forceState = args[1];
+        const modalId = self.getModalId(target);
+        const isModalSelector = typeof modalId === 'string' && modalId.startsWith('modal-');
+
+        if (!isModalSelector) {
+          return self._beerUiOriginal(...args);
+        }
+
+        if (forceState === true) {
+          self.open(modalId);
+          return Promise.resolve(self.getModalElement(modalId));
+        }
+
+        if (forceState === false) {
+          self.close(modalId);
+          return Promise.resolve(self.getModalElement(modalId));
+        }
+
+        if (self.isOpen(modalId)) {
+          self.close(modalId);
+        } else {
+          self.open(modalId);
+        }
+
+        return Promise.resolve(self.getModalElement(modalId));
+      };
+
+      this._uiBridgeInstalled = true;
+    },
+
     /**
      * 入力フィールドにフォーカスを設定します（リトライ機能付き）
      * @param {string} selector - 入力フィールドのセレクタ
@@ -1474,6 +1790,8 @@
       }
     }
   };
+
+  App.utils.modal.installUiBridge();
 
   /**
    * テキスト操作ユーティリティ
