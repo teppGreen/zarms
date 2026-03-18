@@ -1,0 +1,351 @@
+<script>
+    (function () {
+        App.pages.boardsList = {
+            clickHandler: null,
+            contextMenuHandler: null,
+            boardTaskStats: {},
+            sortState: [
+                { col: 'board_state', dir: 'desc' },
+                { col: 'name', dir: 'desc' }
+            ],
+
+            loadData: async function (isRefresh = false) {
+                if (!isRefresh) {
+                    this.renderTable(true);
+                }
+
+                try {
+                    const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
+                        columns: ['board_id', 'task_status_key', 'updated_at']
+                    }, null, true);
+
+                    const tasks = result?.data || result || [];
+                    this.buildBoardTaskStats(tasks);
+                } catch (error) {
+                    console.error('[boardsList] Failed to load tasks for stats:', error);
+                    this.boardTaskStats = {};
+                }
+
+                this.renderTable(false);
+            },
+
+            buildBoardTaskStats: function (tasks) {
+                const stats = {};
+                (tasks || []).forEach(task => {
+                    const boardId = task && task.board_id;
+                    if (!boardId || boardId === 'null') return;
+
+                    if (!stats[boardId]) {
+                        stats[boardId] = {
+                            todo: 0,
+                            in_progress: 0,
+                            in_review: 0,
+                            done: 0,
+                            total: 0,
+                            latestUpdatedAt: null
+                        };
+                    }
+
+                    const entry = stats[boardId];
+                    entry.total += 1;
+
+                    if (task.task_status_key === 'TODO') {
+                        entry.todo += 1;
+                    } else if (task.task_status_key === 'IN_PROGRESS') {
+                        entry.in_progress += 1;
+                    } else if (task.task_status_key === 'IN_REVIEW') {
+                        entry.in_review += 1;
+                    } else if (task.task_status_key === 'DONE') {
+                        entry.done += 1;
+                    }
+
+                    const updatedAt = task.updated_at ? new Date(task.updated_at).getTime() : null;
+                    if (!updatedAt || Number.isNaN(updatedAt)) return;
+                    if (!entry.latestUpdatedAt || updatedAt > entry.latestUpdatedAt) {
+                        entry.latestUpdatedAt = updatedAt;
+                    }
+                });
+
+                this.boardTaskStats = stats;
+            },
+
+            getBoardStateLabel: function (board) {
+                return board && board.is_active ? 'アクティブ' : 'アーカイブ';
+            },
+
+            getBoardSortValue: function (board, colKey) {
+                const stats = this.boardTaskStats[board.id] || {};
+
+                if (colKey === 'board_state') return board.is_active ? 1 : 0;
+                if (colKey === 'name') return String(board.name || '');
+                if (colKey === 'description') return String(board.description || '');
+                if (colKey === 'todo_count') return Number(stats.todo || 0);
+                if (colKey === 'in_progress_count') return Number(stats.in_progress || 0);
+                if (colKey === 'in_review_count') return Number(stats.in_review || 0);
+                if (colKey === 'done_count') return Number(stats.done || 0);
+                if (colKey === 'task_total') return Number(stats.total || 0);
+                if (colKey === 'latest_task_updated_at') return Number(stats.latestUpdatedAt || 0);
+
+                return '';
+            },
+
+            sortBoards: function (boards) {
+                const criteria = this.sortState || [];
+                if (!criteria.length) return boards;
+
+                return [...boards].sort((a, b) => {
+                    for (const criterion of criteria) {
+                        const va = this.getBoardSortValue(a, criterion.col);
+                        const vb = this.getBoardSortValue(b, criterion.col);
+                        let comparison = 0;
+
+                        if (typeof va === 'number' && typeof vb === 'number') {
+                            comparison = va - vb;
+                        } else {
+                            const sa = String(va || '');
+                            const sb = String(vb || '');
+                            comparison = sa.localeCompare(sb, undefined, { numeric: true, sensitivity: 'base' });
+                        }
+
+                        if (comparison !== 0) {
+                            return criterion.dir === 'desc' ? -comparison : comparison;
+                        }
+                    }
+                    return 0;
+                });
+            },
+
+            sortList: function (colKey) {
+                const current = this.sortState || [];
+                const primary = current[0];
+
+                if (primary && primary.col === colKey) {
+                    primary.dir = primary.dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    const filtered = current.filter(item => item.col !== colKey);
+                    this.sortState = [{ col: colKey, dir: 'asc' }, ...filtered];
+                }
+
+                this.renderTable(false);
+            },
+
+            renderTable: function (isLoading = false) {
+                const container = document.getElementById('boards-list-canvas');
+                if (!container) return;
+
+                const columns = [
+                    { key: '_menu', label: '', sortable: false },
+                    { key: 'board_state', label: '状態' },
+                    { key: 'name', label: 'ボード名' },
+                    { key: 'description', label: '説明' },
+                    { key: 'todo_count', label: '未着手', icon: 'red'},
+                    { key: 'in_progress_count', label: '進行中', icon: 'amber'},
+                    { key: 'in_review_count', label: '確認中', icon: 'purple'},
+                    { key: 'done_count', label: '完了', icon: 'green'},
+                    { key: 'task_total', label: '合計' },
+                    { key: 'latest_task_updated_at', label: '最終更新' }
+                ];
+
+                const boards = App.state.data.boards || [];
+                const sortedBoards = this.sortBoards(boards);
+
+                const theadHtml = `<thead class="fixed"><tr>${columns.map(col => {
+                    const sortable = col.sortable !== false;
+                    const primary = this.sortState && this.sortState[0];
+                    const isActiveSort = sortable && primary && primary.col === col.key;
+                    const icon = isActiveSort ? (primary.dir === 'asc' ? 'expand_less' : 'expand_more') : '';
+                    const clickAttr = sortable
+                        ? `onclick="App.pages.boardsList.sortList('${col.key}')" style="cursor:pointer; user-select:none; white-space:nowrap;"`
+                        : 'style="white-space:nowrap;"';
+                    return `<th ${clickAttr} title="${col.label}"><div class="row tiny-space">${col.icon ? `<i class="tiny circle ${col.icon}"></i>` : ''}${!col.icon ? col.label : ''}<i>${icon}</i></div></th>`;
+                }).join('')}</tr></thead>`;
+
+                let tbodyHtml;
+                if (isLoading) {
+                    tbodyHtml = Array(8).fill(0).map(() =>
+                        `<tr><td colspan="${columns.length}" class="shimmer-loading" style="height:1rem;"></td></tr>`
+                    ).join('');
+                } else if (sortedBoards.length === 0) {
+                    tbodyHtml = `<tr><td colspan="${columns.length}" class="center-align secondary-text">ボードがありません</td></tr>`;
+                } else {
+                    tbodyHtml = sortedBoards.map(board => {
+                        const boardName = board.name || '';
+                        const desc = board.description || '';
+                        const isActive = !!board.is_active;
+                        const stateLabel = this.getBoardStateLabel(board);
+                        const stateIcon = isActive ? 'folder' : 'folder_off';
+                        const stateColor = isActive ? '' : 'secondary-text';
+                        const stats = this.boardTaskStats[board.id] || {
+                            todo: 0,
+                            in_progress: 0,
+                            in_review: 0,
+                            done: 0,
+                            total: 0,
+                            latestUpdatedAt: null
+                        };
+
+                        const displayName = boardName.length > 19 ? boardName.substring(0, 19) + '…' : boardName;
+                        const displayDesc = desc.length > 19 ? desc.substring(0, 19) + '…' : desc;
+                        const archiveActionLabel = isActive ? 'ボードをアーカイブする' : 'ボードをアーカイブ解除する';
+                        const latestUpdated = stats.latestUpdatedAt
+                            ? formatDateTimeForDisplay(new Date(stats.latestUpdatedAt).toISOString(), 'MM/dd(E) HH:mm')
+                            : '';
+
+                        return `<tr style="cursor:pointer;" data-board-id="${board.id}" class="${stateColor}">` +
+                            `<td>` +
+                            `<div class="boards-list-menu-container">` +
+                            `<button class="transparent circle boards-list-menu-btn" data-board-id="${board.id}"><i>menu</i></button>` +
+                            `<menu class="surface-container-lowest small-round no-line small-margin no-wrap min" id="boards-list-menu-${board.id}" data-board-id="${board.id}">` +
+                            `<li class="row no-margin" data-action="open" data-board-id="${board.id}">` +
+                            `<i>open_in_new</i>` +
+                            `<span>ボードを開く</span>` +
+                            `</li>` +
+                            `<li class="row no-margin" data-action="settings" data-board-id="${board.id}">` +
+                            `<i>settings</i>` +
+                            `<span>ボード設定を変更する</span>` +
+                            `</li>` +
+                            `<li class="row no-margin" data-action="toggle-archive" data-board-id="${board.id}">` +
+                            `<i>${isActive ? 'archive' : 'unarchive'}</i>` +
+                            `<span>${archiveActionLabel}</span>` +
+                            `</li>` +
+                            `</menu>` +
+                            `</div>` +
+                            `</td>` +
+                            `<td><i title="${stateLabel}">${stateIcon}</i></td>` +
+                            `<td title="${escapeHtml(boardName)}">${escapeHtml(displayName)}</td>` +
+                            `<td title="${escapeHtml(desc)}">${escapeHtml(displayDesc)}</td>` +
+                            `<td class="font-number">${stats.todo}</td>` +
+                            `<td class="font-number">${stats.in_progress}</td>` +
+                            `<td class="font-number">${stats.in_review}</td>` +
+                            `<td class="font-number">${stats.done}</td>` +
+                            `<td class="font-number">${stats.total}</td>` +
+                            `<td class="font-number">${latestUpdated}</td>` +
+                            `</tr>`;
+                    }).join('');
+                }
+
+                container.innerHTML =
+                    '<div class="scroll surface-container-low list-table-scroll">' +
+                    `<table class="border">${theadHtml}<tbody>${tbodyHtml}</tbody></table>` +
+                    '</div>';
+
+                container.querySelectorAll('thead th').forEach(th => {
+                    th.style.position = 'sticky';
+                    th.style.top = '0';
+                    th.style.zIndex = '1';
+                });
+
+                this.bindEvents(container);
+            },
+
+            closeAllMenus: function () {
+                document.querySelectorAll('.boards-list-menu-container menu.active').forEach(menu => {
+                    menu.classList.remove('active');
+                });
+            },
+
+            toggleMenu: function (boardId) {
+                const menu = document.getElementById(`boards-list-menu-${boardId}`);
+                if (!menu) return;
+
+                const willOpen = !menu.classList.contains('active');
+                this.closeAllMenus();
+                if (willOpen) {
+                    menu.classList.add('active');
+                }
+            },
+
+            handleMenuAction: async function (action, boardId) {
+                if (!boardId) return;
+
+                if (action === 'open') {
+                    await App.utils.navigation.switchTab(`board-${boardId}`);
+                    return;
+                }
+
+                if (action === 'settings') {
+                    if (App.pages.boards && App.pages.boards.openBoardSettingsModal) {
+                        App.pages.boards.openBoardSettingsModal(boardId);
+                    }
+                    return;
+                }
+
+                if (action === 'toggle-archive') {
+                    if (App.pages.boards && App.pages.boards.toggleBoardArchive) {
+                        await App.pages.boards.toggleBoardArchive(boardId);
+                    }
+                }
+            },
+
+            bindEvents: function (container) {
+                if (!container) return;
+
+                if (this.clickHandler) {
+                    container.removeEventListener('click', this.clickHandler);
+                }
+                if (this.contextMenuHandler) {
+                    container.removeEventListener('contextmenu', this.contextMenuHandler);
+                }
+
+                this.clickHandler = async (event) => {
+                    const menuBtn = event.target.closest('.boards-list-menu-btn');
+                    if (menuBtn) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const boardId = menuBtn.dataset.boardId;
+                        this.toggleMenu(boardId);
+                        return;
+                    }
+
+                    const menuItem = event.target.closest('li[data-action]');
+                    if (menuItem) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const action = menuItem.dataset.action;
+                        const boardId = menuItem.dataset.boardId;
+                        this.closeAllMenus();
+                        await this.handleMenuAction(action, boardId);
+                        return;
+                    }
+
+                    if (event.target.closest('menu')) {
+                        return;
+                    }
+
+                    this.closeAllMenus();
+
+                    if (event.target.closest('.boards-list-menu-container')) {
+                        return;
+                    }
+
+                    const row = event.target.closest('tr[data-board-id]');
+                    if (row) {
+                        const boardId = row.dataset.boardId;
+                        if (boardId) {
+                            await App.utils.navigation.switchTab(`board-${boardId}`);
+                        }
+                    }
+                };
+
+                this.contextMenuHandler = (event) => {
+                    const row = event.target.closest('tr[data-board-id]');
+                    if (!row) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const boardId = row.dataset.boardId;
+                    this.toggleMenu(boardId);
+                };
+
+                container.addEventListener('click', this.clickHandler);
+                container.addEventListener('contextmenu', this.contextMenuHandler);
+            }
+        };
+
+        document.addEventListener('click', function (event) {
+            const boardsTab = document.getElementById('tab-boards');
+            if (!boardsTab || boardsTab.style.display === 'none') return;
+            if (event.target.closest('.boards-list-menu-container')) return;
+            App.pages.boardsList.closeAllMenus();
+        });
+    })();
+</script>
