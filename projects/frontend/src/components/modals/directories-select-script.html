@@ -10,16 +10,21 @@
             selectedType: '',
             displayedIds: [], // 表示されているノードのID
             isRefreshing: false,
+            isConfirming: false,
+            initialSelectedIds: [],
 
             open: async function (options = {}) {
                 this.callback = options.callback || null;
                 this.multiSelect = options.multiSelect || false;
                 this.selectedIds = options.preSelected || [];
+                this.initialSelectedIds = [...this.selectedIds];
                 this.expandedNodes = {}; // リセット
                 this.searchTerm = '';
                 this.selectedType = '';
                 this.displayedIds = [];
                 this.isRefreshing = false;
+                this.isConfirming = false;
+                this._setFilterSummary();
 
                 // 検索入力をリセット
                 const searchInput = document.getElementById('directory-search-input');
@@ -30,9 +35,26 @@
                 this.render();
                 await ui('#modal-select-directories');
                 App.utils.modal.focusInput('#directory-search-input');
+                this._attachKeyboardShortcuts();
+                this._updateSelectionFeedback();
+                this._syncActionStates();
 
                 // 背景更新: モーダル表示後に最新化
                 this.refreshInBackground();
+            },
+
+            close: function (options = {}) {
+                const force = options.force === true;
+                if (this.isConfirming && !force) return;
+                if (!force && this._hasSelectionChanged()) {
+                    const proceed = confirm('選択内容に変更があります。閉じてもよろしいですか？');
+                    if (!proceed) return;
+                }
+                if (this.isRefreshing) {
+                    const proceed = confirm('組織情報を更新中です。閉じてもよろしいですか？');
+                    if (!proceed) return;
+                }
+                ui('#modal-select-directories');
             },
 
             refreshInBackground: function () {
@@ -44,6 +66,8 @@
                     statusEl.textContent = '更新中';
                     statusEl.style.display = '';
                 }
+                this._setFooterStatus('最新の組織情報を確認しています...');
+                this._syncActionStates();
 
                 callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'select', {}, null, true)
                     .then(result => {
@@ -51,15 +75,18 @@
                         this.allDirectories = directories;
                         App.state.data.directories = directories;
                         this.render();
+                        this._setFooterStatus('対象を選択して適用してください');
                     })
                     .catch(error => {
                         console.error('[selectDirectories] refresh failed', error);
+                        this._setFooterStatus('更新に失敗しました。表示中の情報で選択を続けられます');
                     })
                     .finally(() => {
                         this.isRefreshing = false;
                         if (statusEl) {
                             statusEl.style.display = 'none';
                         }
+                        this._syncActionStates();
                     });
             },
 
@@ -117,8 +144,23 @@
 
                 this.searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
                 this.selectedType = typeFilter ? typeFilter.value : '';
+                this._setFooterStatus(this.searchTerm || this.selectedType ? '絞り込み結果から対象を選択してください' : '対象を選択して適用してください');
 
+                this._setFilterSummary();
                 this.renderTree();
+            },
+
+            clearFilters: function () {
+                if (this.isRefreshing || this.isConfirming) return;
+                const searchInput = document.getElementById('directory-search-input');
+                const typeFilter = document.getElementById('directory-type-filter');
+                if (searchInput) searchInput.value = '';
+                if (typeFilter) typeFilter.value = '';
+                this.searchTerm = '';
+                this.selectedType = '';
+                this._setFilterSummary();
+                this.renderTree();
+                this._setFooterStatus('絞り込みを解除しました');
             },
 
             /**
@@ -231,8 +273,12 @@
                 } else {
                     tbody.innerHTML = html;
                 }
+                this._bindTreeRowInteractions();
 
                 self.updateSelectAllCheckbox();
+                self._updateSelectionFeedback();
+                self._setFilterSummary();
+                self._syncActionStates();
             },
 
             updateSelectAllCheckbox: function () {
@@ -296,11 +342,199 @@
                 this.renderTree();
             },
 
-            confirm: function () {
-                if (this.callback) {
-                    this.callback(this.selectedIds);
+            openCreateDirectoryFromSelect: function () {
+                if (App.modals.newDirectory && App.modals.newDirectory.open) {
+                    const self = this;
+                    App.modals.newDirectory.open({
+                        afterCreate: function () {
+                            self.refreshInBackground();
+                            self._setFooterStatus('新しい組織を反映しました。必要に応じて選択してください');
+                        }
+                    });
+                    this._setFooterStatus('必要な組織を登録後、この画面で再選択してください');
                 }
-                ui('#modal-select-directories');
+            },
+
+            confirm: function () {
+                if (this.isConfirming) return;
+                if (!this.selectedIds || this.selectedIds.length === 0) {
+                    this._setFooterStatus('組織を1件以上選択してください');
+                    return;
+                }
+                this.isConfirming = true;
+                this._setConfirmingState(true);
+                try {
+                    if (this.callback) {
+                        this.callback(this.selectedIds);
+                    }
+                    this.close({ force: true });
+                } finally {
+                    this._setConfirmingState(false);
+                    this.isConfirming = false;
+                }
+            },
+
+            _updateSelectionFeedback: function () {
+                const count = this.selectedIds.length;
+                const countChip = document.getElementById('directory-select-count');
+                if (countChip) {
+                    countChip.textContent = count + '件選択';
+                }
+                const guidance = document.getElementById('directory-select-guidance');
+                if (guidance) {
+                    if (!this.multiSelect) {
+                        guidance.textContent = '1件のみ選択できます';
+                    } else if (this.displayedIds.length === 0) {
+                        guidance.textContent = '表示中の組織はありません';
+                    } else {
+                        guidance.textContent = '表示中 ' + this.displayedIds.length + '件';
+                    }
+                }
+                const confirmBtn = document.getElementById('directory-select-confirm-btn');
+                if (confirmBtn) {
+                    confirmBtn.disabled = count === 0 || this.isConfirming || this.isRefreshing;
+                }
+                if (count > 0) {
+                    this._setFooterStatus(count + '件を適用できます');
+                }
+                this._syncOperationHint();
+            },
+
+            _setConfirmingState: function (isConfirming) {
+                const confirmBtn = document.getElementById('directory-select-confirm-btn');
+                const cancelBtn = document.getElementById('directory-select-cancel-btn');
+                const createBtn = document.getElementById('directory-select-create-btn');
+                if (confirmBtn) {
+                    confirmBtn.disabled = !!isConfirming || this.selectedIds.length === 0 || this.isRefreshing;
+                }
+                if (cancelBtn) {
+                    cancelBtn.disabled = !!isConfirming;
+                }
+                if (createBtn) {
+                    createBtn.disabled = !!isConfirming;
+                }
+                const statusEl = document.getElementById('directory-select-status');
+                if (statusEl) {
+                    if (isConfirming) {
+                        statusEl.textContent = '適用中';
+                        statusEl.style.display = '';
+                    } else if (!this.isRefreshing) {
+                        statusEl.style.display = 'none';
+                    }
+                }
+                this._syncActionStates();
+            },
+
+            _setFooterStatus: function (text) {
+                const footer = document.getElementById('directory-select-footer-status');
+                if (!footer) return;
+                footer.textContent = text || '対象を選択して適用してください';
+            },
+
+            _setFilterSummary: function () {
+                const summaryEl = document.getElementById('directory-select-filter-summary');
+                if (!summaryEl) return;
+                const hasKeyword = !!this.searchTerm;
+                const hasType = !!this.selectedType;
+                if (!hasKeyword && !hasType) {
+                    summaryEl.textContent = '検索・絞り込みで対象を見つけて選択してください';
+                    return;
+                }
+                const parts = [];
+                if (hasKeyword) parts.push('キーワード: ' + this.searchTerm);
+                if (hasType) {
+                    const label = (KEY_LABELS && KEY_LABELS.DIRECTORY_TYPE && KEY_LABELS.DIRECTORY_TYPE[this.selectedType]) ? KEY_LABELS.DIRECTORY_TYPE[this.selectedType] : this.selectedType;
+                    parts.push('タイプ: ' + label);
+                }
+                summaryEl.textContent = parts.join(' / ');
+            },
+
+            _syncActionStates: function () {
+                const isBusy = this.isRefreshing || this.isConfirming;
+                const clearBtn = document.getElementById('directory-select-clear-filter-btn');
+                const searchInput = document.getElementById('directory-search-input');
+                const typeFilter = document.getElementById('directory-type-filter');
+                const selectAll = document.getElementById('directory-select-all-checkbox');
+                const createBtn = document.getElementById('directory-select-create-btn');
+                const cancelBtn = document.getElementById('directory-select-cancel-btn');
+                const confirmBtn = document.getElementById('directory-select-confirm-btn');
+
+                if (clearBtn) clearBtn.disabled = isBusy || (!this.searchTerm && !this.selectedType);
+                if (searchInput) searchInput.disabled = isBusy;
+                if (typeFilter) typeFilter.disabled = isBusy;
+                if (selectAll) selectAll.disabled = isBusy || !this.multiSelect || this.displayedIds.length === 0;
+                if (createBtn) createBtn.disabled = !!this.isConfirming;
+                if (cancelBtn) cancelBtn.disabled = !!this.isConfirming;
+                if (confirmBtn) confirmBtn.disabled = this.selectedIds.length === 0 || isBusy;
+            },
+
+            _syncOperationHint: function () {
+                const hint = document.getElementById('directory-select-operation-hint');
+                if (!hint) return;
+                if (this.isRefreshing) {
+                    hint.textContent = '最新データを取得中です。完了後に選択できます';
+                    return;
+                }
+                if (this.isConfirming) {
+                    hint.textContent = '適用処理中です。しばらくお待ちください';
+                    return;
+                }
+                if (this._hasSelectionChanged()) {
+                    hint.textContent = '選択内容を変更しています。問題なければ「適用」を押してください';
+                    return;
+                }
+                if (!this.multiSelect) {
+                    hint.textContent = '単一選択では行をダブルクリックすると即適用できます';
+                    return;
+                }
+                hint.textContent = '必要な組織がない場合は「組織を追加」から登録できます';
+            },
+
+            _hasSelectionChanged: function () {
+                const current = [...this.selectedIds].sort();
+                const initial = [...this.initialSelectedIds].sort();
+                if (current.length !== initial.length) return true;
+                for (let i = 0; i < current.length; i++) {
+                    if (current[i] !== initial[i]) return true;
+                }
+                return false;
+            },
+
+            _attachKeyboardShortcuts: function () {
+                const searchInput = document.getElementById('directory-search-input');
+                if (!searchInput || searchInput.dataset.directorySelectShortcutBound === '1') return;
+                const self = this;
+                searchInput.addEventListener('keydown', function (event) {
+                    if (!event) return;
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        self.close();
+                        return;
+                    }
+                    if (event.key === 'Enter' && !self.multiSelect && self.selectedIds.length > 0 && !self.isConfirming && !self.isRefreshing) {
+                        event.preventDefault();
+                        self.confirm();
+                    }
+                });
+                searchInput.dataset.directorySelectShortcutBound = '1';
+            },
+
+            _bindTreeRowInteractions: function () {
+                const tbody = document.getElementById('directory-tree-body');
+                if (!tbody) return;
+                const self = this;
+                Array.from(tbody.querySelectorAll('tr[data-id]')).forEach(function (row) {
+                    if (row.dataset.directorySelectRowBound === '1') return;
+                    row.addEventListener('dblclick', function () {
+                        if (self.multiSelect || self.isRefreshing || self.isConfirming) return;
+                        const id = row.getAttribute('data-id');
+                        if (!id) return;
+                        self.selectedIds = [id];
+                        self.renderTree();
+                        self.confirm();
+                    });
+                    row.dataset.directorySelectRowBound = '1';
+                });
             }
         };
     })();

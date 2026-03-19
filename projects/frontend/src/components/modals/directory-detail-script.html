@@ -2,6 +2,8 @@
     (function () {
         App.modals.directoryDetail = {
             currentId: null,
+            isSaving: false,
+            hasDirtyInput: false,
 
             open: function (directoryId) {
                 if (!directoryId) return;
@@ -10,6 +12,8 @@
                 if (!directory) return;
 
                 this.currentId = directoryId;
+                this.isSaving = false;
+                this.hasDirtyInput = false;
                 this._populateSelects(directoryId);
                 this._render(directory);
                 this.loadComments(directoryId);
@@ -17,41 +21,54 @@
             },
 
             close: function () {
+                if (this.hasDirtyInput && !this.isSaving) {
+                    const proceed = confirm('未保存の変更があります。閉じてもよろしいですか？');
+                    if (!proceed) return;
+                }
                 ui('#modal-detail-directory');
                 this.currentId = null;
+                this.isSaving = false;
+                this.hasDirtyInput = false;
             },
 
             save: async function () {
                 if (!this.currentId) return;
+                if (this.isSaving) return;
 
                 const errorEl = document.getElementById('directory-detail-error');
                 const saveBtn = document.getElementById('directory-detail-save-btn');
                 const name = (document.getElementById('directory-detail-name-input')?.value || '').trim();
                 const typeKey = document.getElementById('directory-detail-type-select')?.value || null;
                 const parentId = document.getElementById('directory-detail-parent-select')?.value || null;
-                const slackUrl = (document.getElementById('directory-detail-slack-url-input')?.value || '').trim() || null;
+                const slackUrl = this._normalizeSlackUrl(document.getElementById('directory-detail-slack-url-input')?.value || '') || null;
                 const gfolderId = (document.getElementById('directory-detail-gfolder-id-input')?.value || '').trim() || null;
                 const isActive = document.getElementById('directory-detail-is-active-input')?.checked !== false;
                 const remark = (document.getElementById('directory-detail-remark-input')?.value || '').trim() || null;
 
                 if (!name) {
-                    if (errorEl) {
-                        errorEl.textContent = '組織名は必須です';
-                        errorEl.style.display = '';
-                    }
+                    this._showValidationError('組織名は必須です');
                     return;
                 }
 
+                if (slackUrl && !this._isValidSlackChannelUrl(slackUrl)) {
+                    this._showValidationError('SlackチャンネルURLの形式が正しくありません');
+                    return;
+                }
+                const slackInput = document.getElementById('directory-detail-slack-url-input');
+                if (slackInput) slackInput.value = slackUrl || '';
+
                 if (parentId && this._hasParentCycle(parentId, this.currentId)) {
-                    if (errorEl) {
-                        errorEl.textContent = '親組織に自身または子孫組織は設定できません';
-                        errorEl.style.display = '';
-                    }
+                    this._showValidationError('親組織に自身または子孫組織は設定できません');
+                    return;
+                }
+                if (this._hasDuplicateSiblingName(name, parentId, this.currentId)) {
+                    this._showValidationError('同じ親組織配下に同名の組織があります');
                     return;
                 }
 
                 if (errorEl) errorEl.style.display = 'none';
-                if (saveBtn) saveBtn.disabled = true;
+                this.isSaving = true;
+                this._setSaveState(true, '保存中');
                 showSnackbar('ディレクトリを保存しています...', 'info', 'top', 0);
 
                 const updateSet = {
@@ -81,7 +98,9 @@
                         App.pages.members.loadData(true);
                     }
 
+                    this._setFooterStatus('保存が完了しました。画面を閉じます。');
                     showSnackbar('ディレクトリを更新しました', 'success');
+                    this.hasDirtyInput = false;
                     this.close();
                 } catch (err) {
                     console.error('[directoryDetail] save failed', err);
@@ -90,8 +109,14 @@
                         errorEl.textContent = '更新に失敗しました';
                         errorEl.style.display = '';
                     }
+                    this._setSaveState(false, '保存失敗');
+                    this._setFooterStatus('保存に失敗しました。入力内容を確認して再試行してください。');
                 } finally {
+                    this.isSaving = false;
                     if (saveBtn) saveBtn.disabled = false;
+                    if (errorEl && errorEl.style.display === 'none') {
+                        this._setSaveState(false);
+                    }
                 }
             },
 
@@ -432,6 +457,11 @@
                 if (membersEl) membersEl.innerHTML = chips || '<p class="small-text secondary-text">所属メンバーはありません</p>';
                 const errorEl = document.getElementById('directory-detail-error');
                 if (errorEl) errorEl.style.display = 'none';
+                this._setSaveState(false);
+                this._setFooterStatus('未保存の変更は保存ボタンで反映されます');
+                this._attachInputListeners();
+                this._updateValidationHint();
+                this._updateSaveAvailability();
             },
 
             _hasParentCycle: function (parentId, currentId) {
@@ -448,6 +478,223 @@
                 }
 
                 return false;
+            },
+
+            _setSaveState: function (isSaving, text) {
+                const saveBtn = document.getElementById('directory-detail-save-btn');
+                const chip = document.getElementById('directory-detail-status-chip');
+                if (saveBtn) {
+                    saveBtn.disabled = !!isSaving;
+                }
+                if (!chip) return;
+                if (isSaving) {
+                    chip.textContent = text || '保存中';
+                    chip.style.display = '';
+                    return;
+                }
+                if (text) {
+                    chip.textContent = text;
+                    chip.style.display = '';
+                    this._updateSaveAvailability();
+                    return;
+                }
+                chip.style.display = 'none';
+                this._updateSaveAvailability();
+            },
+
+            _setFooterStatus: function (text) {
+                const footerStatus = document.getElementById('directory-detail-footer-status');
+                if (!footerStatus) return;
+                footerStatus.textContent = text || '未保存の変更は保存ボタンで反映されます';
+            },
+
+            _showValidationError: function (message) {
+                const errorEl = document.getElementById('directory-detail-error');
+                if (errorEl) {
+                    errorEl.textContent = message || '入力内容に不備があります';
+                    errorEl.style.display = '';
+                }
+                this._setSaveState(false, '入力エラー');
+                this._setFooterStatus('必須項目または入力内容を確認してください');
+            },
+
+            _attachInputListeners: function () {
+                const self = this;
+                const fieldIds = ['directory-detail-name-input', 'directory-detail-type-select', 'directory-detail-parent-select', 'directory-detail-slack-url-input', 'directory-detail-gfolder-id-input', 'directory-detail-is-active-input', 'directory-detail-remark-input'];
+                fieldIds.forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (!el || el.dataset.directoryDetailBound === '1') return;
+                    const handler = function () {
+                        self.hasDirtyInput = true;
+                        self._clearError();
+                        self._setFooterStatus('変更があります。保存して反映してください');
+                        self._updateValidationHint();
+                        self._updateSaveAvailability();
+                    };
+                    el.addEventListener('input', handler);
+                    el.addEventListener('change', handler);
+                    el.addEventListener('keydown', function (event) {
+                        self._handleEnterSave(event);
+                    });
+                    el.dataset.directoryDetailBound = '1';
+                });
+                const slackInput = document.getElementById('directory-detail-slack-url-input');
+                if (slackInput && slackInput.dataset.directoryDetailBlurBound !== '1') {
+                    slackInput.addEventListener('blur', function () {
+                        if (self.isSaving) return;
+                        const normalized = self._normalizeSlackUrl(slackInput.value || '');
+                        if (slackInput.value !== normalized) {
+                            slackInput.value = normalized;
+                            self.hasDirtyInput = true;
+                            self._updateValidationHint();
+                            self._updateSaveAvailability();
+                            self._setFooterStatus(normalized ? 'Slack URLを自動整形しました。保存して反映してください' : 'Slack URL入力欄を空にしました');
+                        }
+                    });
+                    slackInput.dataset.directoryDetailBlurBound = '1';
+                }
+                const folderInput = document.getElementById('directory-detail-gfolder-id-input');
+                if (folderInput && folderInput.dataset.directoryDetailFolderBound !== '1') {
+                    folderInput.addEventListener('blur', function () {
+                        if (self.isSaving) return;
+                        const extracted = self._extractGoogleDriveFolderId(folderInput.value || '');
+                        if (extracted && folderInput.value !== extracted) {
+                            folderInput.value = extracted;
+                            self.hasDirtyInput = true;
+                            self._updateValidationHint();
+                            self._updateSaveAvailability();
+                            self._setFooterStatus('Google DriveフォルダIDを自動抽出しました。保存して反映してください');
+                        }
+                    });
+                    folderInput.dataset.directoryDetailFolderBound = '1';
+                }
+            },
+
+            _updateValidationHint: function () {
+                const hint = document.getElementById('directory-detail-validation-hint');
+                if (!hint) return;
+                const name = (document.getElementById('directory-detail-name-input')?.value || '').trim();
+                const slackUrl = this._normalizeSlackUrl(document.getElementById('directory-detail-slack-url-input')?.value || '');
+                const parentId = document.getElementById('directory-detail-parent-select')?.value || null;
+                if (!name) {
+                    hint.textContent = '組織名は必須です';
+                    return;
+                }
+                if (slackUrl && !this._isValidSlackChannelUrl(slackUrl)) {
+                    hint.textContent = 'Slack URLは https:\\/\\/slack.com\\/ などの形式で入力してください';
+                    return;
+                }
+                if (this.currentId && this._hasDuplicateSiblingName(name, parentId, this.currentId)) {
+                    hint.textContent = '同じ親組織配下に同名の組織があります';
+                    return;
+                }
+                hint.textContent = this.hasDirtyInput ? '入力内容は有効です。保存できます' : '変更後に保存を押すと反映されます';
+            },
+
+            _updateSaveAvailability: function () {
+                const saveBtn = document.getElementById('directory-detail-save-btn');
+                if (!saveBtn) return;
+                if (this.isSaving) {
+                    saveBtn.disabled = true;
+                    return;
+                }
+                const name = (document.getElementById('directory-detail-name-input')?.value || '').trim();
+                const slackUrl = this._normalizeSlackUrl(document.getElementById('directory-detail-slack-url-input')?.value || '');
+                const parentId = document.getElementById('directory-detail-parent-select')?.value || null;
+                const hasInvalidParent = !!(parentId && this.currentId && this._hasParentCycle(parentId, this.currentId));
+                const hasInvalidUrl = !!(slackUrl && !this._isValidSlackChannelUrl(slackUrl));
+                const hasDuplicate = !!(this.currentId && this._hasDuplicateSiblingName(name, parentId, this.currentId));
+                saveBtn.disabled = !this.hasDirtyInput || !name || hasInvalidParent || hasInvalidUrl || hasDuplicate;
+            },
+
+            normalizeSlackUrl: function () {
+                if (this.isSaving) return;
+                const input = document.getElementById('directory-detail-slack-url-input');
+                if (!input) return;
+                const normalized = this._normalizeSlackUrl(input.value || '');
+                input.value = normalized;
+                this.hasDirtyInput = true;
+                this._clearError();
+                this._updateValidationHint();
+                this._updateSaveAvailability();
+                this._setFooterStatus(normalized ? 'Slack URLを整形しました。保存して反映してください' : 'Slack URL入力欄を空にしました');
+            },
+
+            extractGfolderId: function () {
+                if (this.isSaving) return;
+                const input = document.getElementById('directory-detail-gfolder-id-input');
+                if (!input) return;
+                const extracted = this._extractGoogleDriveFolderId(input.value || '');
+                if (!extracted) {
+                    this._setFooterStatus('Google DriveフォルダIDを抽出できませんでした');
+                    return;
+                }
+                input.value = extracted;
+                this.hasDirtyInput = true;
+                this._clearError();
+                this._updateValidationHint();
+                this._updateSaveAvailability();
+                this._setFooterStatus('Google DriveフォルダIDを抽出しました。保存して反映してください');
+            },
+
+            _clearError: function () {
+                const errorEl = document.getElementById('directory-detail-error');
+                if (!errorEl) return;
+                errorEl.style.display = 'none';
+                errorEl.textContent = '';
+            },
+
+            _normalizeSlackUrl: function (value) {
+                const trimmed = String(value || '').trim();
+                if (!trimmed) return '';
+                if (/^https?:\\/\\//i.test(trimmed)) return trimmed;
+                return 'https:\\/\\/' + trimmed.replace(/^\\/+/, '');
+            },
+
+            _extractGoogleDriveFolderId: function (value) {
+                const trimmed = String(value || '').trim();
+                if (!trimmed) return '';
+                const folderMatch = trimmed.match(/\\/folders\\/([a-zA-Z0-9_-]{10,})/);
+                if (folderMatch && folderMatch[1]) return folderMatch[1];
+                const queryMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+                if (queryMatch && queryMatch[1]) return queryMatch[1];
+                if (/^[a-zA-Z0-9_-]{10,}$/.test(trimmed)) return trimmed;
+                return '';
+            },
+
+            _isValidSlackChannelUrl: function (value) {
+                if (!value) return true;
+                try {
+                    const parsed = new URL(value);
+                    return parsed.protocol === 'https:' && /(^|\\.)slack\\.com$/i.test(parsed.hostname);
+                } catch (_) {
+                    return false;
+                }
+            },
+
+            _handleEnterSave: function (event) {
+                if (this.isSaving || !event || event.key !== 'Enter') return;
+                const target = event.target;
+                if (!target) return;
+                const tagName = (target.tagName || '').toLowerCase();
+                const inputType = (target.type || '').toLowerCase();
+                const shouldIgnore = tagName === 'textarea' || tagName === 'select' || inputType === 'checkbox';
+                if (shouldIgnore) return;
+                event.preventDefault();
+                this.save();
+            },
+
+            _hasDuplicateSiblingName: function (name, parentId, currentId) {
+                const normalizedName = String(name || '').trim().toLowerCase();
+                if (!normalizedName) return false;
+                const normalizedParent = parentId || null;
+                const directories = App.state.data.directories || [];
+                return directories.some(function (dir) {
+                    if (!dir || dir.id === currentId) return false;
+                    const dirName = String(dir.name || '').trim().toLowerCase();
+                    const dirParent = dir.parent_directory_id || null;
+                    return dirName === normalizedName && dirParent === normalizedParent;
+                });
             }
         };
     })();
