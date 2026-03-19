@@ -16,6 +16,40 @@
         });
 
         App.utils.header = {
+            shortcuts: {
+                open: function () {
+                    const dialog = document.getElementById('modal-shortcuts-help');
+                    if (!dialog) return;
+                    this.render();
+                    ui('#modal-shortcuts-help', true);
+                },
+
+                close: function () {
+                    closeModal('modal-shortcuts-help');
+                },
+
+                render: function () {
+                    const container = document.getElementById('shortcuts-help-list');
+                    if (!container) return;
+                    const defs = (App.utils.shortcuts && App.utils.shortcuts.getDefinitions)
+                        ? App.utils.shortcuts.getDefinitions()
+                        : [];
+                    if (!defs.length) {
+                        container.innerHTML = '<div class="secondary-text small-text">ショートカット定義がありません</div>';
+                        return;
+                    }
+                    container.innerHTML = defs.map(function (item) {
+                        const keyText = escapeHtml(item.keys || '');
+                        const actionText = escapeHtml(item.action || '');
+                        return '' +
+                            '<div class="row wrap tiny-space middle-align small-margin">' +
+                            '<span class="chip border small"><b>' + keyText + '</b></span>' +
+                            '<span class="small-text">' + actionText + '</span>' +
+                            '</div>';
+                    }).join('');
+                }
+            },
+
             /**
              * appsテーブルのデータからアプリリンクを動的に生成します
              */

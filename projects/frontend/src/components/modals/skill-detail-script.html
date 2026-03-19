@@ -4,6 +4,7 @@
             currentId: null,
             currentItem: null,
             originalData: null,
+            isDirty: false,
             quill: null,
 
             open: function (skillId) {
@@ -18,6 +19,7 @@
                 this.currentId = skillId;
                 this.currentItem = Object.assign({}, skill);
                 this.originalData = Object.assign({}, skill);
+                this.isDirty = false;
 
                 if (!this.quill) {
                     this.quill = App.utils.quill.init('#skill-description-editor', {
@@ -30,11 +32,21 @@
                 this._render(skill);
                 this._renderMembers(skillId);
                 this.loadComments(skillId);
+                this._bindDirtyWatchers();
+                this._bindEscClose();
             },
 
-            close: function () {
+            close: function (skipUrlUpdate, closeReason) {
+                if (this.isDirty) {
+                    const message = closeReason === 'escape'
+                        ? '未保存の変更があります。変更を破棄して閉じますか？'
+                        : '変更を破棄して閉じますか？';
+                    const proceed = confirm(message);
+                    if (!proceed) return false;
+                }
                 closeModal('modal-detail-skill');
                 this._reset();
+                return true;
             },
 
             save: async function () {
@@ -103,6 +115,7 @@
                     if (latest) {
                         this.currentItem = Object.assign({}, latest);
                         this.originalData = Object.assign({}, latest);
+                        this.isDirty = false;
                         this._render(latest);
                     }
                 } catch (err) {
@@ -258,6 +271,7 @@
                 if (updatedAtInput) updatedAtInput.value = skill.updated_at ? formatDateTimeForDisplay(skill.updated_at) : '';
                 const errorEl = document.getElementById('skill-detail-error');
                 if (errorEl) errorEl.style.display = 'none';
+                this.isDirty = false;
 
                 if (lastUpdatedEl) {
                     if (skill.updated_at) {
@@ -508,6 +522,7 @@
                 this.currentId = null;
                 this.currentItem = null;
                 this.originalData = null;
+                this.isDirty = false;
 
                 const container = document.getElementById('skill-detail-members-list');
                 if (container) container.innerHTML = '';
@@ -535,6 +550,41 @@
                 if (comments) comments.innerHTML = '';
                 if (this.quill) App.utils.quill.clear(this.quill);
                 if (errorEl) errorEl.style.display = 'none';
+            },
+
+            _bindDirtyWatchers: function () {
+                const self = this;
+                const watchIds = [
+                    'skill-detail-title-input',
+                    'skill-detail-type-input',
+                    'skill-detail-remark-input'
+                ];
+                watchIds.forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (!el || el.dataset.skillDetailDirtyBound === '1') return;
+                    el.addEventListener('input', function () { self.isDirty = true; });
+                    el.addEventListener('change', function () { self.isDirty = true; });
+                    el.dataset.skillDetailDirtyBound = '1';
+                });
+                if (this.quill && this.quill.__skillDetailDirtyBound !== true) {
+                    this.quill.on('text-change', function () {
+                        self.isDirty = true;
+                    });
+                    this.quill.__skillDetailDirtyBound = true;
+                }
+            },
+
+            _bindEscClose: function () {
+                const dialog = document.getElementById('modal-detail-skill');
+                if (!dialog || dialog.dataset.skillEscBound === '1') return;
+                const self = this;
+                dialog.addEventListener('keydown', function (event) {
+                    if (!event || event.key !== 'Escape') return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    self.close(false, 'escape');
+                });
+                dialog.dataset.skillEscBound = '1';
             }
         };
     })();

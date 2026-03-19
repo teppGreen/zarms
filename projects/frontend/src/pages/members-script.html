@@ -3,12 +3,6 @@
         let _isLoading = false;
         let _currentTab = 'member';
         let _resizeHandlerBound = false;
-        const _onboardingState = {
-            key: 'members_onboarding_round14',
-            quickGuideShown: false,
-            completed: false
-        };
-        let _isOnboardingStateInitialized = false;
         const _tableData = {
             member: [],
             directory: [],
@@ -208,10 +202,6 @@
 
         App.pages.members = {
             loadData: async function (isRefresh) {
-                if (!_isOnboardingStateInitialized) {
-                    this._loadOnboardingState();
-                    _isOnboardingStateInitialized = true;
-                }
                 _isLoading = true;
                 this._showLoading(true, _currentTab);
                 this._updateSummary();
@@ -240,7 +230,6 @@
                     this._showLoading(false, _currentTab);
                     this._renderTable(_currentTab);
                     this._updateSummary();
-                    this._ensureFirstVisitOnboarding();
                 }
             },
 
@@ -393,25 +382,6 @@
                 }
             },
 
-            showFilterGuide: function () {
-                const tabLabel = this.getCurrentTabLabel();
-                showSnackbar(tabLabel + '一覧は列見出しの下から絞り込みできます。入力または候補選択で条件を追加できます', 'info');
-            },
-
-            showOpenGuide: function () {
-                const tabLabel = this.getCurrentTabLabel();
-                showSnackbar(tabLabel + 'の詳細は各行の「開く」ボタンから表示できます', 'info');
-            },
-
-            showShortcutGuide: function () {
-                showSnackbar('セルをクリック後に Ctrl/⌘ + C で値をコピーできます', 'info');
-            },
-
-            showDailyWorkflowGuide: function () {
-                const tabLabel = this.getCurrentTabLabel();
-                showSnackbar('日次は「確認→絞込→開く→更新」の順です。' + tabLabel + '一覧を確認し、列見出し下で条件を絞り、行の「開く」で詳細を開いて更新してください', 'info');
-            },
-
             clearDirectoryFilters: function () {
                 this.resetFilters('directory');
             },
@@ -561,26 +531,6 @@
                     console.error('[Members] 推奨手順のコピーに失敗:', err);
                     showSnackbar('推奨手順のコピーに失敗しました', 'error');
                 }
-            },
-
-            startQuickOnboarding: function () {
-                this.switchTab('member');
-                this.showFilterGuide();
-                setTimeout(function () {
-                    App.pages.members.showOpenGuide();
-                }, 1300);
-                setTimeout(function () {
-                    App.pages.members.showShortcutGuide();
-                }, 2600);
-                setTimeout(function () {
-                    App.pages.members.showSnackbarForAddGuide();
-                }, 3900);
-                this._markOnboardingProgress({ quickGuideShown: true });
-            },
-
-            showSnackbarForAddGuide: function () {
-                const tabLabel = this.getCurrentTabLabel();
-                showSnackbar('最後に「' + tabLabel + 'を追加」ボタンから新規追加できます。見つける→絞る→開く→追加 の流れで進めてください', 'info');
             },
 
             _getTabLabel: function (tabName) {
@@ -1490,10 +1440,7 @@
             _updateSummary: function () {
                 const countElement = document.getElementById('members-summary-count');
                 const actionElement = document.getElementById('members-summary-action');
-                const shortcutElement = document.getElementById('members-summary-shortcut');
-                const workflowElement = document.getElementById('members-summary-workflow');
-                const addLabelElement = document.getElementById('members-quick-add-label');
-                const onboardingStatusElement = document.getElementById('members-onboarding-status');
+                const addLabelElement = document.getElementById('members-create-action-label');
                 if (countElement) {
                     const rows = _tableData[_currentTab] || [];
                     const count = this._countRows(rows);
@@ -1505,53 +1452,10 @@
                     else if (_currentTab === 'skills') actionElement.textContent = '行の「開く」でスキル詳細';
                     else actionElement.textContent = '行の「開く」で企画詳細';
                 }
-                if (shortcutElement) {
-                    shortcutElement.textContent = 'Ctrl/⌘ + C で選択セルをコピー';
-                }
-                if (workflowElement) {
-                    workflowElement.textContent = this._getTabLabel(_currentTab) + 'の日次は 確認→絞込→開く→更新 の順で進めます';
-                }
                 if (addLabelElement) {
                     addLabelElement.textContent = this._getTabLabel(_currentTab) + 'を追加';
                 }
-                if (onboardingStatusElement) {
-                    const tabLabel = this._getTabLabel(_currentTab);
-                    if (_onboardingState.completed) {
-                        onboardingStatusElement.textContent = '導入済み: ' + tabLabel + 'の操作に慣れたら日次4ステップで運用';
-                    } else if (_onboardingState.quickGuideShown) {
-                        onboardingStatusElement.textContent = '初見向け: 次は「' + tabLabel + 'を追加」で最初の成功体験を完了';
-                    } else {
-                        onboardingStatusElement.textContent = '初見向け: 見つける→絞る→開く→追加';
-                    }
-                }
                 this._updateDirectoryUxSummary();
-            },
-
-            _getOnboardingStateFromStorage: function () {
-                if (!App.state || !App.state.getUserProperty) return {};
-                return App.state.getUserProperty(_onboardingState.key, {});
-            },
-
-            _markOnboardingProgress: function (progress) {
-                const current = this._getOnboardingStateFromStorage();
-                const next = Object.assign({}, current, progress);
-                _onboardingState.quickGuideShown = next.quickGuideShown === true;
-                _onboardingState.completed = next.completed === true;
-                this._updateSummary();
-                if (App.state && App.state.saveUserProperty) {
-                    App.state.saveUserProperty(_onboardingState.key, next);
-                }
-            },
-
-            _loadOnboardingState: function () {
-                const current = this._getOnboardingStateFromStorage();
-                _onboardingState.quickGuideShown = current.quickGuideShown === true;
-                _onboardingState.completed = current.completed === true;
-            },
-
-            _ensureFirstVisitOnboarding: function () {
-                if (_onboardingState.quickGuideShown) return;
-                this.startQuickOnboarding();
             },
 
             _ensureResizeHandler: function () {
@@ -1591,7 +1495,6 @@
                 }
 
                 if (data.type === _frameMessageType.rowClick) {
-                    this._markOnboardingProgress({ completed: true, quickGuideShown: true });
                     this._handleFrameRowClick(data.tabName, data.payload || {});
                     return;
                 }
