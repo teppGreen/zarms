@@ -1,8 +1,9 @@
 <dialog id="modal-select-directories" class="modal large-width bottom">
     <nav class="small-padding bottom-margin">
         <h5 class="max">組織を選択</h5>
+        <span id="directory-select-count" class="chip small">0件選択</span>
         <span id="directory-select-status" class="chip small border" style="display: none;">更新中</span>
-        <button class="circle transparent" onclick="ui('#modal-select-directories')">
+        <button class="circle transparent" onclick="App.modals.selectDirectories.close()">
             <i>close</i>
         </button>
     </nav>
@@ -23,7 +24,13 @@
                 </select>
                 <label>組織タイプ</label>
             </div>
+            <button id="directory-select-clear-filter-btn" class="small border round" type="button" onclick="App.modals.selectDirectories.clearFilters()">
+                <i>filter_alt_off</i>
+                <span>絞り込み解除</span>
+            </button>
         </div>
+        <p id="directory-select-filter-summary" class="small-text secondary-text top-margin bottom-margin">検索・絞り込みで対象を見つけて選択してください</p>
+        <p class="small-text secondary-text no-margin">検索欄で Enter で適用、Esc で閉じる、単一選択では行ダブルクリックで即適用できます</p>
 
         <!-- 全選択チェックボックス (複数選択時のみ表示) -->
         <div id="directory-select-all-container" class="row middle-align split-margin" style="display: none;">
@@ -32,7 +39,9 @@
                     onchange="App.modals.selectDirectories.toggleSelectAll(this.checked)">
                 <span>すべて選択</span>
             </label>
+            <p id="directory-select-guidance" class="small-text secondary-text no-margin"></p>
         </div>
+        <p id="directory-select-operation-hint" class="small-text secondary-text top-margin bottom-margin">必要な組織がない場合は「組織を追加」から登録できます</p>
     </div>
 
     <div>
@@ -50,8 +59,13 @@
 
     <footer class="">
         <nav class="right-align">
-            <button class="border" onclick="ui('#modal-select-directories')">キャンセル</button>
-            <button onclick="App.modals.selectDirectories.confirm()">適用</button>
+            <span id="directory-select-footer-status" class="small-text secondary-text max">対象を選択して適用してください</span>
+            <button id="directory-select-create-btn" class="border" onclick="App.modals.selectDirectories.openCreateDirectoryFromSelect()">
+                <i>add</i>
+                <span>組織を追加</span>
+            </button>
+            <button id="directory-select-cancel-btn" class="border" onclick="App.modals.selectDirectories.close()">キャンセル</button>
+            <button id="directory-select-confirm-btn" onclick="App.modals.selectDirectories.confirm()">適用</button>
         </nav>
     </footer>
 </dialog>
