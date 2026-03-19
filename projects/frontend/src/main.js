@@ -306,19 +306,35 @@ function checkAppAuthorization() {
 function getDriveImageDataUrl(driveUrl) {
   const url = String(driveUrl || '').trim();
   if (!url) {
-    throw new Error('URLが指定されていません');
+    throw _createThumbnailPreviewError('empty_url', 'URLが指定されていません');
+  }
+
+  if (!_isGoogleDriveUrl(url)) {
+    throw _createThumbnailPreviewError('invalid_drive_url', 'Google DriveのURLを指定してください');
   }
 
   const fileId = _extractDriveFileId(url);
   if (!fileId) {
-    throw new Error('Google DriveファイルIDを抽出できませんでした');
+    throw _createThumbnailPreviewError('invalid_drive_url', 'Google DriveファイルIDを抽出できませんでした');
   }
 
-  const file = DriveApp.getFileById(fileId);
-  const blob = file.getBlob();
+  let file;
+  try {
+    file = DriveApp.getFileById(fileId);
+  } catch (error) {
+    throw _mapDriveFileError(error);
+  }
+
+  let blob;
+  try {
+    blob = file.getBlob();
+  } catch (error) {
+    throw _mapDriveFileError(error);
+  }
+
   const mimeType = blob.getContentType() || '';
   if (mimeType.indexOf('image/') !== 0) {
-    throw new Error('指定されたファイルは画像ではありません');
+    throw _createThumbnailPreviewError('not_image', '指定されたファイルは画像ではありません（MIME: ' + (mimeType || 'unknown') + '）');
   }
 
   const bytes = blob.getBytes();
@@ -330,12 +346,80 @@ function getDriveImageDataUrl(driveUrl) {
 }
 
 /**
+ * サムネイルプレビュー用の統一エラーを作成します
+ * @param {string} code - エラーコード
+ * @param {string} message - 表示メッセージ
+ * @returns {Error} フロント解析しやすいError
+ */
+function _createThumbnailPreviewError(code, message) {
+  const safeCode = String(code || 'unknown_error').trim() || 'unknown_error';
+  const safeMessage = String(message || '不明なエラーが発生しました').trim() || '不明なエラーが発生しました';
+  return new Error('THUMBNAIL_ERROR:' + safeCode + ':' + safeMessage);
+}
+
+/**
+ * Drive関連の例外をサムネイル表示向けエラーへ正規化します
+ * @param {Error|string} error - 例外情報
+ * @returns {Error} 正規化済みエラー
+ */
+function _mapDriveFileError(error) {
+  const text = String(error && error.message ? error.message : error || '');
+  if (/No item with the given ID|指定されたファイル|見つかりません/i.test(text)) {
+    return _createThumbnailPreviewError('file_not_found', '指定されたファイルが見つかりません');
+  }
+  if (/permission|権限|アクセス|authorized|許可/i.test(text)) {
+    return _createThumbnailPreviewError('permission_denied', '指定されたファイルへのアクセス権限がありません');
+  }
+  return _createThumbnailPreviewError('fetch_failed', 'サムネイルの取得に失敗しました');
+}
+
+/**
+ * Google Drive URLかを判定します
+ * @param {string} url - URL文字列
+ * @returns {boolean} Drive関連URLならtrue
+ */
+function _isGoogleDriveUrl(url) {
+  const text = String(url || '').trim();
+  if (!text) return false;
+  if (/^[A-Za-z0-9_-]{25,}$/.test(text)) return true;
+  try {
+    const parsed = new URL(text);
+    const host = String(parsed.hostname || '').toLowerCase();
+    return host === 'drive.google.com' || host === 'docs.google.com';
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
  * Google Drive URLからファイルIDを抽出します
  * @param {string} url - Google Drive URL
  * @returns {string|null} ファイルID
  */
 function _extractDriveFileId(url) {
-  const directMatch = String(url).match(/[-\w]{25,}/);
+  const text = String(url || '').trim();
+  if (!text) return null;
+
+  if (/^[A-Za-z0-9_-]{25,}$/.test(text)) {
+    return text;
+  }
+
+  try {
+    const parsed = new URL(text);
+    const queryId = parsed.searchParams.get('id');
+    if (queryId && /^[A-Za-z0-9_-]{25,}$/.test(queryId)) {
+      return queryId;
+    }
+
+    const pathMatch = parsed.pathname.match(/\/d\/([A-Za-z0-9_-]{25,})/);
+    if (pathMatch && pathMatch[1]) {
+      return pathMatch[1];
+    }
+  } catch (error) {
+    // URLとして解釈できない場合は最後の手段で抽出
+  }
+
+  const directMatch = text.match(/[-\w]{25,}/);
   if (directMatch && directMatch[0]) {
     return directMatch[0];
   }
