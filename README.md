@@ -97,10 +97,13 @@ zarms/
 
 本プロジェクトの詳細な仕様やガイドラインについては、以下のドキュメントを参照してください：
 
-* **[データベーススキーマ](database_schema.mmd)**: テーブル構造やリレーションの定義
-* **[APIリファレンス](docs/api_reference.md)**: Database API のリクエスト形式やセキュリティ設計、権限評価ルール
+* **[データベーススキーマ](docs/database-schema.mmd)**: テーブル構造やリレーションの定義
+* **[APIリファレンス](docs/api-reference.md)**: Database API のリクエスト形式やセキュリティ設計、権限評価ルール
 * **[テストガイド](docs/testing-guide.md)**: ローカルでの結合テスト実行方法
-* **[AIエージェント向けガイドライン](AGENTS.md)**: AIが開発・計画を行うためのプロジェクト規約・振る舞い指示
+* **[docsとskillsの使い分け](docs/docs-skills-boundary.md)**: 仕様文書と実行ガイドの責務分担
+* **[Copilot Skills（正本）](.agents/skills/)**: Copilot/Codex がタスク実行時に参照するスキル集
+* **[Beer CSS / Tabulator リファレンス](docs/beercss-tabulator-reference.md)**: 実装方針と更新運用
+* **[AIエージェント向けガイドライン](.github/copilot-instructions.md)**: AIが開発・計画を行うためのプロジェクト規約・振る舞い指示
 
 ## 開発環境とデプロイ
 
