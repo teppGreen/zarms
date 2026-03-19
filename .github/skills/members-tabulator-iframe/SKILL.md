@@ -66,4 +66,6 @@ Beer CSS とのスタイル干渉を避けつつ、既存モーダル連携を�
 ## 補足
 
 - GAS HTML では URL や `</script>` のエスケープに注意する。
-- 詳細な共通規約は AGENTS.md を参照する。
+- 詳細な共通規約は `.github/copilot-instructions.md` を参照する。
+- UI構成やスタイル方針の参照は `docs/beercss-tabulator-reference.md` を使う。
+- `docs` と `skills` の役割境界は `docs/docs-skills-boundary.md` を正とする。

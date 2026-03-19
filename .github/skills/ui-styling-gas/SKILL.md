@@ -6,7 +6,7 @@ description: ZARMSの画面実装でBeer CSSクラス選定とUI状態表現を�
 # Skill: ZARMS Beer CSS UI Styling
 
 このスキルは、ZARMS の画面実装で Beer CSS クラスを選定する際の実践ガイドです。
-プロジェクト全体の規約は AGENTS.md を正とし、このスキルでは「クラス選びと画面構成」に限定して扱います。
+プロジェクト全体の規約は `.github/copilot-instructions.md` を正とし、このスキルでは「クラス選びと画面構成」に限定して扱います。
 
 ## このスキルを使う場面
 
@@ -46,4 +46,6 @@ description: ZARMSの画面実装でBeer CSSクラス選定とUI状態表現を�
 ## 注意
 
 - GAS 固有の制約やテンプレート安全策は別スキルに分離して管理する。
-- 規約判断が必要なときは AGENTS.md を優先して参照する。
+- 規約判断が必要なときは `.github/copilot-instructions.md` を優先して参照する。
+- 詳細仕様や背景説明は `docs/beercss-tabulator-reference.md` と `docs/references/beercss-llms.md` を参照する。
+- `docs` と `skills` の役割境界は `docs/docs-skills-boundary.md` を正とする。

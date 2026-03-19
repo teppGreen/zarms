@@ -5,8 +5,8 @@ description: GAS HTML Service 実装時の安全策と構成指針を適用す�
 
 # Skill: GAS HTML Service 実装注意点（追加ガイド）
 
-このスキルは、AGENTS.md に未記載の実装上の注意点だけを補足するためのガイドです。
-規約そのものの正本は AGENTS.md とし、ここでは運用で詰まりやすい点に限定します。
+このスキルは、`.github/copilot-instructions.md` に未記載の実装上の注意点だけを補足するためのガイドです。
+規約そのものの正本は `.github/copilot-instructions.md` とし、ここでは運用で詰まりやすい点に限定します。
 
 ## このスキルを使う場面
 
@@ -45,5 +45,6 @@ description: GAS HTML Service 実装時の安全策と構成指針を適用す�
 
 ## 補足
 
-- AGENTS.md と重複する規約は本スキルに再掲しない。
-- 仕様詳細は docs/api_reference.md と docs/testing-guide.md を参照する。
+- `.github/copilot-instructions.md` と重複する規約は本スキルに再掲しない。
+- 仕様詳細は `docs/api-reference.md` と `docs/testing-guide.md` を参照する。
+- `docs` と `skills` の役割境界は `docs/docs-skills-boundary.md` を正とする。

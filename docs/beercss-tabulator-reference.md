@@ -22,3 +22,15 @@ members系・task-detail系のUI実装で、ライブラリの推奨パターン
 2. 失敗時はモーダルを閉じず、対象エリアだけエラーメッセージを表示する。
 3. 保存後の全体再同期は非同期で実行し、操作の体感待ち時間を増やさない。
 4. Board / task-detail で使っている余白・列配置・操作導線を優先して踏襲する。
+
+## バージョン更新運用
+
+- 更新実行は `scripts/update-ui-deps.js` を使用する（手動置換は原則禁止）。
+- 実行コマンド:
+
+```bash
+npm run update:ui-deps -- --beercss=<version> --material-dynamic-colors=<version> --tabulator=<version>
+```
+
+- 更新手順の実行ガイドは skill `update-ui-dependencies` を参照する。
+- BeerCSS の詳細資料は `docs/references/beercss-llms.md` を参照する。
