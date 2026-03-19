@@ -34,14 +34,19 @@
                 this._renderSkills(memberId);
                 this.loadComments(memberId);
                 this.switchTab(document.querySelector('#member-detail-tabs > a'), 'profile');
+                this._bindEscClose();
             },
 
-            close: function (skipDirtyCheck) {
+            close: function (skipDirtyCheck, closeReason) {
                 if (!skipDirtyCheck && this.isDirty) {
-                    if (!confirm('変更を破棄して閉じますか？')) return;
+                    const message = closeReason === 'escape'
+                        ? '未保存の変更があります。変更を破棄して閉じますか？'
+                        : '変更を破棄して閉じますか？';
+                    if (!confirm(message)) return false;
                 }
                 closeModal('modal-detail-member');
                 this._reset();
+                return true;
             },
 
             discard: function () {
@@ -885,6 +890,19 @@
                 var token = normalized.split(/[\/?#]/).filter(Boolean).pop() || '';
                 if (token.length <= 11) return token;
                 return token.slice(-11);
+            },
+
+            _bindEscClose: function () {
+                const dialog = document.getElementById('modal-detail-member');
+                if (!dialog || dialog.dataset.memberEscBound === '1') return;
+                const self = this;
+                dialog.addEventListener('keydown', function (event) {
+                    if (!event || event.key !== 'Escape') return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    self.close(false, 'escape');
+                });
+                dialog.dataset.memberEscBound = '1';
             }
         };
     })();

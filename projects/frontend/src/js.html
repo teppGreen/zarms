@@ -692,37 +692,110 @@
 
   // グローバルショートカットキーの設定
   function setupGlobalShortcuts() {
-    document.addEventListener('keydown', (e) => {
+    if (!App.utils.shortcuts) App.utils.shortcuts = {};
 
-      // 検索
-      if (!e.isComposing && e.altKey && e.code === 'KeyF') {
-        e.preventDefault();
-        const searchInput = document.getElementById('search-input');
-        searchInput.focus();
-        searchInput.select();
+    App.utils.shortcuts.getDefinitions = function () {
+      return [
+        { keys: 'Alt + F', action: '検索欄にフォーカス' },
+        { keys: 'Alt + T', action: '新規タスクを開く' },
+        { keys: 'Alt + B', action: '新規ボードを作成' },
+        { keys: 'Alt + H', action: 'ショートカット一覧を開く' },
+        { keys: 'Alt + M', action: 'カタログタブへ移動' },
+        { keys: 'Alt + 1', action: 'ホームタブへ移動' },
+        { keys: 'Alt + 2', action: 'ボード一覧タブへ移動' },
+        { keys: 'Alt + 3', action: 'カレンダータブへ移動' },
+        { keys: 'Alt + R', action: '表示中データを再読み込み' },
+        { keys: 'Esc', action: '最前面モーダルを閉じる（詳細系は保存確認）' }
+      ];
+    };
+
+    const isEditableTarget = function (target) {
+      if (!target || !(target instanceof HTMLElement)) return false;
+      if (target.isContentEditable) return true;
+      const tagName = (target.tagName || '').toLowerCase();
+      if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') return true;
+      return !!target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]');
+    };
+
+    const focusSearch = function () {
+      const searchInput = document.getElementById('search-input');
+      if (!searchInput) return;
+      searchInput.focus();
+      searchInput.select();
+    };
+
+    const openShortcutsHelp = function () {
+      if (App.utils.header && App.utils.header.shortcuts && App.utils.header.shortcuts.open) {
+        App.utils.header.shortcuts.open();
+        return;
+      }
+      const modal = document.getElementById('modal-shortcuts-help');
+      if (modal) ui('#modal-shortcuts-help', true);
+    };
+
+    document.addEventListener('keydown', (e) => {
+      if (!e || e.isComposing) return;
+
+      if (e.key === 'Escape') {
+        App.utils.ui.closeTopModal(false, 'escape');
+        return;
       }
 
-      // 新規タスク作成
-      if (!e.isComposing && e.altKey && e.code === 'KeyT') {
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+
+      if (e.code === 'KeyF') {
+        e.preventDefault();
+        focusSearch();
+        return;
+      }
+
+      if (e.code === 'KeyH') {
+        e.preventDefault();
+        openShortcutsHelp();
+        return;
+      }
+
+      if (isEditableTarget(e.target)) return;
+
+      if (e.code === 'KeyT' && App.modals.newTask && App.modals.newTask.open) {
         e.preventDefault();
         App.modals.newTask.open();
+        return;
       }
 
-      // 新規ボード作成
-      if (!e.isComposing && e.altKey && e.code === 'KeyB') {
+      if (e.code === 'KeyB' && App.pages.boards && App.pages.boards.createBoard) {
         e.preventDefault();
         App.pages.boards.createBoard();
+        return;
       }
 
-      // // 新規コメント作成
-      // if (!e.isComposing && e.altKey && e.code === 'KeyC') {
-      //   e.preventDefault();
-      //   App.modals.newComment.open();
-      // }
+      if (e.code === 'KeyM' && App.utils.navigation && App.utils.navigation.switchTab) {
+        e.preventDefault();
+        App.utils.navigation.switchTab('members');
+        return;
+      }
 
-      // Esc: モーダルを閉じる
-      if (e.key === 'Escape') {
-        App.utils.ui.closeTopModal(false);
+      if (e.code === 'Digit1' && App.utils.navigation && App.utils.navigation.switchTab) {
+        e.preventDefault();
+        App.utils.navigation.switchTab('home');
+        return;
+      }
+
+      if (e.code === 'Digit2' && App.utils.navigation && App.utils.navigation.switchTab) {
+        e.preventDefault();
+        App.utils.navigation.switchTab('boards');
+        return;
+      }
+
+      if (e.code === 'Digit3' && App.utils.navigation && App.utils.navigation.switchTab) {
+        e.preventDefault();
+        App.utils.navigation.switchTab('calendar');
+        return;
+      }
+
+      if (e.code === 'KeyR') {
+        e.preventDefault();
+        refreshData();
       }
     });
   }
@@ -1312,7 +1385,7 @@
      * @param {boolean} skipUrlUpdate - URL更新をスキップするかどうか
      * @returns {boolean} モーダルを閉じた場合はtrue
      */
-    closeTopModal: function (skipUrlUpdate = false) {
+    closeTopModal: function (skipUrlUpdate = false, reason = 'generic') {
       const openModals = getOpenModals(true); // 優先順位でソート済み
       if (openModals.length === 0) {
         if (App.utils.modal && typeof App.utils.modal.syncOverlayWithManagedModals === 'function') {
@@ -1337,7 +1410,7 @@
 
         // close メソッドがある場合はそれを使う
         if (typeof handler.close === 'function') {
-          const result = handler.close(skipUrlUpdate);
+          const result = handler.close(skipUrlUpdate, reason);
           return result !== false; // falseが返された場合のみfalse扱い
         }
       }

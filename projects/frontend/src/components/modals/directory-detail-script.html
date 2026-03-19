@@ -18,17 +18,22 @@
                 this._render(directory);
                 this.loadComments(directoryId);
                 ui('#modal-detail-directory');
+                this._bindEscClose();
             },
 
-            close: function () {
+            close: function (skipUrlUpdate, closeReason) {
                 if (this.hasDirtyInput && !this.isSaving) {
-                    const proceed = confirm('未保存の変更があります。閉じてもよろしいですか？');
-                    if (!proceed) return;
+                    const message = closeReason === 'escape'
+                        ? '未保存の変更があります。変更を破棄して閉じますか？'
+                        : '未保存の変更があります。閉じてもよろしいですか？';
+                    const proceed = confirm(message);
+                    if (!proceed) return false;
                 }
                 ui('#modal-detail-directory');
                 this.currentId = null;
                 this.isSaving = false;
                 this.hasDirtyInput = false;
+                return true;
             },
 
             save: async function () {
@@ -682,6 +687,19 @@
                 if (shouldIgnore) return;
                 event.preventDefault();
                 this.save();
+            },
+
+            _bindEscClose: function () {
+                const dialog = document.getElementById('modal-detail-directory');
+                if (!dialog || dialog.dataset.directoryEscBound === '1') return;
+                const self = this;
+                dialog.addEventListener('keydown', function (event) {
+                    if (!event || event.key !== 'Escape') return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    self.close(false, 'escape');
+                });
+                dialog.dataset.directoryEscBound = '1';
             },
 
             _hasDuplicateSiblingName: function (name, parentId, currentId) {
