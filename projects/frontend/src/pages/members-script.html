@@ -152,28 +152,28 @@
                     { key: 'phone_number', label: '電話番号', width: '130px' },
                     { key: 'birthday', label: '生年月日', width: '120px' },
                     { key: 'title', label: '筆頭役職', width: '120px' },
-                    { key: 'system_role_key', label: 'システム権限', width: '120px' },
+                    { key: 'system_role_key', label: 'システム権限', width: '120px', headerFilter: 'listDynamicMemberRoles' },
                     { key: '_slackProfileTail', label: 'Slack', width: '110px' },
                     { key: 'remark', label: '備考', width: '180px', wrap: true },
                     { key: '_directoriesText', label: '所属組織', width: '180px', wrap: true },
-                    { key: '_statusText', label: 'ステータス', width: '88px', align: 'center' }
+                    { key: '_statusText', label: 'ステータス', width: '88px', align: 'center', headerFilter: 'listMemberStatus' }
                 ]
             },
             directory: {
                 emptyText: 'ディレクトリがありません',
                 columns: [
                     { key: 'name', label: '組織名', width: '180px' },
-                    { key: '_typeText', label: '種別', width: '130px' },
+                    { key: '_typeText', label: '種別', width: '130px', headerFilter: 'listDirectoryTypes' },
                     { key: '_parentName', label: '親組織', width: '180px' },
                     { key: '_memberCount', label: 'メンバー数', width: '110px', type: 'number', align: 'right' },
-                    { key: '_statusText', label: 'ステータス', width: '110px', align: 'center' }
+                    { key: '_statusText', label: 'ステータス', width: '110px', align: 'center', headerFilter: 'listDirectoryStatus' }
                 ]
             },
             skills: {
                 emptyText: 'スキルがありません',
                 columns: [
                     { key: 'title', label: 'タイトル', width: '180px' },
-                    { key: 'skill_type_key', label: '種別', width: '140px' },
+                    { key: 'skill_type_key', label: '種別', width: '140px', headerFilter: 'listDynamicSkillTypes' },
                     { key: 'description', label: '説明', width: '260px', wrap: true },
                     { key: '_memberCount', label: 'メンバー数', width: '110px', type: 'number', align: 'right' }
                 ]
@@ -183,8 +183,8 @@
                 columns: [
                     { key: 'plan_number', label: '企画番号', width: '140px' },
                     { key: 'name', label: '企画名', width: '220px' },
-                    { key: '_statusText', label: '状態', width: '140px' },
-                    { key: '_typeText', label: '種別', width: '140px' },
+                    { key: '_statusText', label: '状態', width: '140px', headerFilter: 'listPlanStatus' },
+                    { key: '_typeText', label: '種別', width: '140px', headerFilter: 'listDynamicPlanTypes' },
                     { key: '_memberCount', label: '関係者数', width: '110px', type: 'number', align: 'right' },
                     { key: '_updatedAtText', label: '更新日時', width: '180px' }
                 ]
@@ -572,7 +572,7 @@
                     emptyText: config.emptyText,
                     dataTree: tabName === 'directory',
                     headerFilters: (_headerFilters[tabName] || []).slice(),
-                    columns: this._getTabulatorColumns(config.columns),
+                    columns: this._getTabulatorColumns(config.columns, tabName, rows),
                     sorters: (_sortState[tabName] || []).map(function (sorter) {
                         return { column: sorter.col, dir: sorter.dir };
                     })
@@ -657,13 +657,65 @@
                 };
             },
 
-            _getTabulatorColumns: function (columns) {
+            _buildListFilterValues: function (filterKey, tabName, rows) {
+                const sourceRows = Array.isArray(rows) ? rows : [];
+                const uniqueByField = function (field) {
+                    const values = sourceRows.map(function (row) {
+                        return row && row[field] !== undefined && row[field] !== null ? String(row[field]).trim() : '';
+                    }).filter(function (value) {
+                        return value !== '';
+                    });
+                    return Array.from(new Set(values)).sort(function (a, b) {
+                        return a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
+                    });
+                };
+
+                if (filterKey === 'listMemberStatus') return ['在籍', '退籍'];
+                if (filterKey === 'listDirectoryStatus') return ['有効', '無効'];
+                if (filterKey === 'listPlanStatus') {
+                    return Object.keys((KEY_LABELS && KEY_LABELS.PLAN_STATUS) ? KEY_LABELS.PLAN_STATUS : {}).map(function (statusKey) {
+                        return KEY_LABELS.PLAN_STATUS[statusKey];
+                    }).filter(function (value) {
+                        return value && String(value).trim() !== '';
+                    });
+                }
+                if (filterKey === 'listDirectoryTypes') {
+                    return Object.keys((KEY_LABELS && KEY_LABELS.DIRECTORY_TYPE) ? KEY_LABELS.DIRECTORY_TYPE : {}).map(function (typeKey) {
+                        return KEY_LABELS.DIRECTORY_TYPE[typeKey];
+                    }).filter(function (value) {
+                        return value && String(value).trim() !== '';
+                    });
+                }
+                if (filterKey === 'listDynamicMemberRoles') return uniqueByField('system_role_key');
+                if (filterKey === 'listDynamicSkillTypes') return uniqueByField('skill_type_key');
+                if (filterKey === 'listDynamicPlanTypes') return uniqueByField('_typeText');
+                return [];
+            },
+
+            _resolveHeaderFilterDefinition: function (column, tabName, rows) {
+                if (column.headerFilter === false) {
+                    return { type: false, values: [] };
+                }
+                if (column.headerFilter && String(column.headerFilter).indexOf('list') === 0) {
+                    return {
+                        type: 'list',
+                        values: this._buildListFilterValues(column.headerFilter, tabName, rows)
+                    };
+                }
+                if (column.headerFilter === 'number' || column.type === 'number') {
+                    return { type: 'number', values: [] };
+                }
+                return { type: 'input', values: [] };
+            },
+
+            _getTabulatorColumns: function (columns, tabName, rows) {
                 const openColumn = {
                     title: '',
                     field: '__open_action',
                     width: 74,
                     headerSort: false,
-                    headerFilter: false,
+                    headerFilterType: false,
+                    headerFilterValues: [],
                     hozAlign: 'center',
                     formatterKey: 'openAction',
                     variableHeight: false,
@@ -672,12 +724,14 @@
                 };
 
                 return [openColumn].concat(columns).map(function (column) {
+                    const filterDefinition = App.pages.members._resolveHeaderFilterDefinition(column, tabName, rows);
                     return {
                         title: column.label || column.title || '',
                         field: column.key || column.field,
                         width: App.pages.members._parseColumnWidth(column.width),
                         headerSort: column.headerSort !== undefined ? column.headerSort : (column.sortable !== false),
-                        headerFilter: column.headerFilter === false ? false : (column.type === 'number' ? 'number' : 'input'),
+                        headerFilterType: filterDefinition.type,
+                        headerFilterValues: filterDefinition.values,
                         hozAlign: column.hozAlign || column.align || 'left',
                         formatterKey: column.formatterKey || ((column.key || column.field) === '_statusText' ? 'status' : 'text'),
                         variableHeight: column.wrap === true,
@@ -714,8 +768,11 @@
                     '.members-open-detail-btn{padding:4px 10px;border:1px solid #c7cacf;border-radius:999px;background:#fff;color:#1f1f1f;cursor:pointer;font-size:12px;line-height:1.2;}' +
                     '.members-open-detail-btn:hover{background:#f3f6fb;}' +
                     '.members-name-cell{display:flex;align-items:center;gap:8px;min-width:0;}' +
-                    '.members-name-link{border:0;background:transparent;color:#2d3eff;cursor:pointer;display:block;text-align:left;padding:0;min-width:0;max-width:100%;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:underline;}' +
-                    '.members-copy-btn{border:1px solid #d2d7df;background:#fff;border-radius:999px;cursor:pointer;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;line-height:1;color:#1f1f1f;flex-shrink:0;}' +
+                    '.members-avatar{width:22px;height:22px;border-radius:50%;overflow:hidden;background:#d8dce3;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;color:#37474f;font-style:normal;font-weight:600;}' +
+                    '.members-avatar .responsive{width:100%;height:100%;object-fit:cover;display:block;}' +
+                    '.members-name-link{color:#2d3eff;cursor:pointer;display:block;text-align:left;padding:0;min-width:0;max-width:100%;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:underline;}' +
+                    '.members-name-label{display:block;min-width:0;max-width:100%;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#9aa0a6;text-decoration:none;}' +
+                    '.members-copy-btn{border:1px solid #d2d7df;background:#fff;border-radius:999px;cursor:pointer;min-width:44px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;line-height:1;color:#1f1f1f;flex-shrink:0;padding:0 8px;}' +
                     '.members-copy-btn:hover{background:#f3f6fb;}' +
                     '.members-cell-selected{outline:2px solid #2d3eff;outline-offset:-2px;}' +
                     '.tabulator-placeholder{display:flex;align-items:center;justify-content:center;color:#5f6368;}' +
@@ -731,8 +788,9 @@
                     'function postMessageToParent(type,payload){window.parent.postMessage({source:"members-tabulator",type:type,tabName:TAB_NAME,token:FRAME_TOKEN,payload:payload||{}},"*");}' +
                     'function createStatusNode(value){const span=document.createElement("span");span.textContent=String(value||"");if(value==="在籍"||value==="有効"){span.style.color="#2d3eff";span.style.fontWeight="600";}else{span.style.opacity="0.6";}return span;}' +
                     'function createOpenButton(cell){const button=document.createElement("button");button.type="button";button.className="members-open-detail-btn";button.textContent="開く";button.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();const row=cell&&cell.getRow?cell.getRow():null;const data=row&&row.getData?row.getData():null;postMessageToParent("' + _frameMessageType.rowClick + '",{rowId:data&&data.id?String(data.id):""});});return button;}' +
-                    'function createMemberNameCell(cell){const wrapper=document.createElement("div");wrapper.className="members-name-cell";const nameText=document.createElement("span");nameText.className="members-name-link";const cellValue=cell&&cell.getValue?cell.getValue():"";nameText.textContent=cellValue===null||cellValue===undefined?"":String(cellValue);const row=cell&&cell.getRow?cell.getRow():null;const data=row&&row.getData?row.getData():{};const slackUrl=data&&data.slack_profile_url?String(data.slack_profile_url):"";if(!slackUrl){nameText.style.color="#9aa0a6";nameText.style.textDecoration="none";}const openSlack=function(){if(!slackUrl){return;}window.open(slackUrl,"_blank","noopener,noreferrer");};wrapper.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();openSlack();});const copyBtn=document.createElement("button");copyBtn.type="button";copyBtn.className="members-copy-btn";copyBtn.title="表示名をコピー";copyBtn.innerHTML="<i>content_copy</i>";copyBtn.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();const text=nameText.textContent||"";if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).catch(function(){});}});wrapper.appendChild(nameText);wrapper.appendChild(copyBtn);return wrapper;}' +
-                    'function createColumns(columns){return (columns||[]).map(function(column){const definition={title:column.title,field:column.field,headerSort:column.headerSort!==false,headerSortClickElement:"icon",sorter:column.sorter||"string",hozAlign:column.hozAlign||"left",cssClass:column.cssClass||"",variableHeight:column.variableHeight===true,formatter:"plaintext"};if(column.width){definition.width=column.width;}if(column.headerFilter!==false){definition.headerFilter=column.headerFilter||"input";}if(column.formatterKey==="status"){definition.formatter=function(cell){return createStatusNode(cell.getValue());};}if(column.formatterKey==="openAction"){definition.formatter=function(cell){return createOpenButton(cell);};}if(column.formatterKey==="memberNameLink"){definition.formatter=function(cell){return createMemberNameCell(cell);};}return definition;});}' +
+                    'function normalizeExternalUrl(value){const raw=value===null||value===undefined?"":String(value).trim();if(!raw){return"";}if(!/^https?:\\/\\//i.test(raw)){return "https:\\/\\/"+raw.replace(/^\\/+/, "");}return raw;}' +
+                    'function createMemberNameCell(cell){const wrapper=document.createElement("div");wrapper.className="members-name-cell";const row=cell&&cell.getRow?cell.getRow():null;const data=row&&row.getData?row.getData():{};const cellValue=cell&&cell.getValue?cell.getValue():"";const displayName=cellValue===null||cellValue===undefined?"":String(cellValue);const avatar=document.createElement("i");avatar.className="circle small members-avatar";const photoUrl=data&&data.profile_photo_url?String(data.profile_photo_url).trim():"";if(photoUrl){const img=document.createElement("img");img.className="responsive";img.alt=displayName;img.src=photoUrl;avatar.appendChild(img);}else{avatar.textContent=(displayName||"?").slice(0,1).toUpperCase();}const slackUrl=normalizeExternalUrl(data&&data.slack_profile_url?data.slack_profile_url:"");let nameNode;if(slackUrl){const link=document.createElement("a");link.className="members-name-link";link.href=slackUrl;link.target="_blank";link.rel="noopener noreferrer";link.textContent=displayName;link.addEventListener("click",function(event){event.stopPropagation();});nameNode=link;}else{const span=document.createElement("span");span.className="members-name-label";span.textContent=displayName;nameNode=span;}const copyBtn=document.createElement("button");copyBtn.type="button";copyBtn.className="members-copy-btn";copyBtn.title="表示名をコピー";copyBtn.textContent="Copy";copyBtn.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();const text=displayName||"";if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).catch(function(){});}});wrapper.appendChild(avatar);wrapper.appendChild(nameNode);wrapper.appendChild(copyBtn);return wrapper;}' +
+                    'function createColumns(columns){return (columns||[]).map(function(column){const definition={title:column.title,field:column.field,headerSort:column.headerSort!==false,headerSortClickElement:"icon",sorter:column.sorter||"string",hozAlign:column.hozAlign||"left",cssClass:column.cssClass||"",variableHeight:column.variableHeight===true,formatter:"plaintext"};if(column.width){definition.width=column.width;}if(column.headerFilterType!==false){if(column.headerFilterType==="list"){definition.headerFilter="list";definition.headerFilterParams={values:Array.isArray(column.headerFilterValues)?column.headerFilterValues:[],clearable:true};}else{definition.headerFilter=column.headerFilterType||"input";}}if(column.formatterKey==="status"){definition.formatter=function(cell){return createStatusNode(cell.getValue());};}if(column.formatterKey==="openAction"){definition.formatter=function(cell){return createOpenButton(cell);};}if(column.formatterKey==="memberNameLink"){definition.formatter=function(cell){return createMemberNameCell(cell);};}return definition;});}' +
                     'function setupCellCopy(){window.addEventListener("keydown",function(event){if(!(event.metaKey||event.ctrlKey)||String(event.key||"").toLowerCase()!=="c"){return;}if(!selectedCell||!selectedCell.getValue){return;}event.preventDefault();const value=selectedCell.getValue();const text=value===null||value===undefined?"":String(value);if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).catch(function(){});}});}' +
                     'function applyHeaderFilters(filters){if(!table){return;}table.clearHeaderFilter();(filters||[]).forEach(function(filter){if(!filter||!filter.field){return;}table.setHeaderFilterValue(filter.field,String(filter.value||""));});}' +
                     'function renderTable(payload){const root=document.getElementById("members-tabulator-root");if(!root){return;}const rows=Array.isArray(payload.rows)?payload.rows:[];const sorters=Array.isArray(payload.sorters)?payload.sorters:[];const headerFilters=Array.isArray(payload.headerFilters)?payload.headerFilters:[];if(!table){tableBuilt=false;table=new Tabulator(root,{data:rows,columns:createColumns(payload.columns),layout:"fitColumns",height:"100%",placeholder:payload.emptyText||"データがありません",initialSort:sorters,index:"id",dataTree:payload.dataTree===true,dataTreeStartExpanded:false,dataTreeElementColumn:"name",dataTreeChildField:"_children",clipboard:true,clipboardCopyStyled:false,clipboardCopyConfig:{columnHeaders:false,rowGroups:false,columnCalcs:false,formatCells:true},selectableRows:false,selectableRange:1,selectableRangeColumns:true,selectableRangeRows:true});table.on("tableBuilt",function(){tableBuilt=true;});table.on("cellClick",function(event,cell){if(!cell||!cell.getColumn){return;}const field=cell.getColumn().getField();if(field==="__open_action"){return;}if(selectedCell&&selectedCell.getElement){selectedCell.getElement().classList.remove("members-cell-selected");}selectedCell=cell;if(cell.getElement){cell.getElement().classList.add("members-cell-selected");}});table.on("dataSorted",function(sorters){postMessageToParent("' + _frameMessageType.sortChange + '",{sorters:(sorters||[]).map(function(sorter){return {column:sorter.field,dir:sorter.dir};})});});table.on("dataFiltered",function(filters){postMessageToParent("' + _frameMessageType.filterChange + '",{filters:(filters||[]).map(function(filter){return {field:filter.field||"",value:filter.value===null||filter.value===undefined?"":String(filter.value)};})});});setupCellCopy();applyHeaderFilters(headerFilters);return;}table.setData(rows);if(sorters.length){table.setSort(sorters);}else{table.clearSort();}applyHeaderFilters(headerFilters);}' +

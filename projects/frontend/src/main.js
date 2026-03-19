@@ -297,3 +297,47 @@ function checkAppAuthorization() {
     url: authInfo.getAuthorizationUrl()
   };
 }
+
+/**
+ * Google Drive画像URLを data URL(base64) に変換します
+ * @param {string} driveUrl - Google Drive上の画像URL
+ * @returns {{dataUrl: string, mimeType: string}} 変換結果
+ */
+function getDriveImageDataUrl(driveUrl) {
+  const url = String(driveUrl || '').trim();
+  if (!url) {
+    throw new Error('URLが指定されていません');
+  }
+
+  const fileId = _extractDriveFileId(url);
+  if (!fileId) {
+    throw new Error('Google DriveファイルIDを抽出できませんでした');
+  }
+
+  const file = DriveApp.getFileById(fileId);
+  const blob = file.getBlob();
+  const mimeType = blob.getContentType() || '';
+  if (mimeType.indexOf('image/') !== 0) {
+    throw new Error('指定されたファイルは画像ではありません');
+  }
+
+  const bytes = blob.getBytes();
+  const base64 = Utilities.base64Encode(bytes);
+  return {
+    dataUrl: 'data:' + mimeType + ';base64,' + base64,
+    mimeType: mimeType
+  };
+}
+
+/**
+ * Google Drive URLからファイルIDを抽出します
+ * @param {string} url - Google Drive URL
+ * @returns {string|null} ファイルID
+ */
+function _extractDriveFileId(url) {
+  const directMatch = String(url).match(/[-\w]{25,}/);
+  if (directMatch && directMatch[0]) {
+    return directMatch[0];
+  }
+  return null;
+}
