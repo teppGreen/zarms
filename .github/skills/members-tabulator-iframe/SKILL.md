@@ -1,3 +1,8 @@
+---
+name: members-tabulator-iframe
+description: members画面のTabulatorをiframe隔離で実装・改修する際に使う。親子postMessage連携、token検証、高さ同期、既存モーダル導線維持が必要なときに適用する。
+---
+
 # Skill: Members Tabulator iframe 実装
 
 このスキルは、members 画面で Tabulator を iframe 内に隔離して描画する実装を再利用するためのガイドです。

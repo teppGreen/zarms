@@ -1,3 +1,8 @@
+---
+name: gas-html-service-practices
+description: GAS HTML Service 実装時の安全策と構成指針を適用する。HTMLテンプレート分割、script終端エスケープ、初期描画データ最適化、失敗時フォールバックの実装時に使う。
+---
+
 # Skill: GAS HTML Service 実装注意点（追加ガイド）
 
 このスキルは、AGENTS.md に未記載の実装上の注意点だけを補足するためのガイドです。

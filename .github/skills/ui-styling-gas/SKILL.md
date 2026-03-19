@@ -1,3 +1,8 @@
+---
+name: ui-styling-gas
+description: ZARMSの画面実装でBeer CSSクラス選定とUI状態表現を統一する際に使う。レイアウト構成、可読性改善、ローディング/空/エラー状態の設計時に適用する。
+---
+
 # Skill: ZARMS Beer CSS UI Styling
 
 このスキルは、ZARMS の画面実装で Beer CSS クラスを選定する際の実践ガイドです。
