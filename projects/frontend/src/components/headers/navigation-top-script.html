@@ -55,6 +55,8 @@
             comments: {
                 /** キャッシュされたコメントデータ */
                 cachedComments: null,
+                /** フィルタ適用後のコメントデータ */
+                filteredComments: null,
                 /** 最終更新日時 */
                 lastUpdatedAt: null,
                 /** 初回ロード済みフラグ */
@@ -63,21 +65,30 @@
                 isLoading: false,
 
                 /**
-                 * コメントメニューの表示切替とデータロード
+                 * コメントハブの表示切替とデータロード
                  */
                 toggle: function () {
-                    const container = document.getElementById('comments-list');
-                    if (!container) return;
+                    const dialog = document.getElementById('modal-comments-hub');
+                    const container = document.getElementById('comments-hub-list');
+                    if (!dialog || !container) return;
+
+                    ui('#modal-comments-hub', true);
+                    this.showShimmer(container);
 
                     if (this.isLoaded && this.cachedComments) {
-                        // ロード済み: キャッシュデータを即時描画し、バックグラウンドで最新データを取得
                         this.render(this.cachedComments);
                         this.loadData(true);
-                    } else {
-                        // 未ロード: シマーを表示してデータ取得
-                        this.showShimmer(container);
-                        this.loadData(false);
+                        return;
                     }
+                    this.loadData(false);
+                },
+
+                closeHub: function () {
+                    closeModal('modal-comments-hub');
+                },
+
+                refreshHub: function () {
+                    this.loadData(true);
                 },
 
                 /**
@@ -89,7 +100,7 @@
                             <progress class="circle indeterminate small"></progress>
                             <span>読み込み中...</span>
                         </div>
-                    `
+                    `;
                 },
 
                 /**
@@ -120,7 +131,7 @@
                         }
                     } catch (error) {
                         console.error('[Comments] Error loading data:', error);
-                        const container = document.getElementById('comments-list');
+                        const container = document.getElementById('comments-hub-list');
                         if (container && !this.cachedComments) {
                             container.innerHTML = '<div class="padding center-align error-text"><i>error_outline</i><span>コメントの読み込みに失敗しました</span></div>';
                         }
@@ -161,26 +172,51 @@
                 },
 
                 /**
-                 * コメント一覧を描画
+                 * コメント一覧を描画（フィルタ適用含む）
                  * @param {Array} comments - コメントデータ
                  */
                 render: function (comments) {
-                    const container = document.getElementById('comments-list');
+                    const container = document.getElementById('comments-hub-list');
                     if (!container) return;
 
-                    // バッジ更新とデータのクリーンアップを先に実行
                     this.checkAndUpdateBadge(comments);
+                    this.applyHubFilters();
+                },
+
+                applyHubFilters: function () {
+                    const comments = this.cachedComments || [];
+                    const tableFilter = document.getElementById('comments-hub-table-filter')?.value || '';
+                    const unreadOnly = document.getElementById('comments-hub-unread-only')?.checked === true;
+                    const savedData = App.state.getUserProperty('comment_read_status', {});
+
+                    this.filteredComments = comments.filter(comment => {
+                        if (tableFilter && comment.related_table !== tableFilter) return false;
+                        if (unreadOnly && savedData[comment.id] === true) return false;
+                        return true;
+                    });
+
+                    this.renderHubList(this.filteredComments || [], comments.length);
+                },
+
+                renderHubList: function (comments, totalCount) {
+                    const container = document.getElementById('comments-hub-list');
+                    if (!container) return;
+                    const savedData = App.state.getUserProperty('comment_read_status', {});
+                    let html = '';
+
+                    const summaryEl = document.getElementById('comments-hub-summary');
+                    if (summaryEl) {
+                        summaryEl.textContent = `${comments.length}件 / 全${totalCount || 0}件`;
+                    }
 
                     if (!comments || comments.length === 0) {
-                        container.innerHTML = '<div class="padding center-align row tiny-space secondary-text"><i>info</i><span>コメントはありません</span></div>';
+                        container.innerHTML = '<div class="padding center-align row tiny-space secondary-text"><i>info</i><span>条件に一致するコメントはありません</span></div>';
                         return;
                     }
 
-                    const savedData = App.state.getUserProperty('comment_read_status', {});
-                    let html = '<div class="padding center-align secondary-text small-text"><span>あなたが担当者 かつ ステータスが「完了」以外のタスクに作成されたコメント（新着順）</span></div>';
                     html += comments.map(comment => {
                         const isRead = savedData[comment.id] === true;
-                        const readClass = isRead ? 'background' : 'error-container';
+                        const readClass = isRead ? 'surface-container-low' : 'error-container';
                         const readIcon = isRead ? 'mark_email_read' : 'mark_email_unread';
 
                         // プロフィール写真
@@ -194,21 +230,28 @@
                             : '';
 
 
-                        const contentLengthLimit = 75;
+                        const contentLengthLimit = 110;
                         // コメント内容（最初の75文字まで、改行はスペースに置き換え）
                         let commentContent = comment.content ? comment.content : '';
                         // 改行をスペースに置き換え（プレビューなので）
                         commentContent = commentContent.replace(/\r\n/g, ' ').replace(/\n/g, ' ');
                         // 75文字でトリミング
-                        const commentContent75 = commentContent.substring(0, contentLengthLimit);
+                        let commentContent75 = commentContent.substring(0, contentLengthLimit);
 
                         if (commentContent.length > contentLengthLimit) {
                             commentContent75 += '…';
                         }
 
+                        const targetLabel = escapeHtml(comment.related_table_label || '');
+                        const targetName = escapeHtml(comment.target_name || '');
+                        const targetSubtitle = escapeHtml(comment.target_subtitle || '');
+                        const targetLine = targetSubtitle
+                            ? `${targetName} · ${targetSubtitle}`
+                            : targetName;
+
                         return `
                             <article class="no-elevate padding top-align small-margin small-round ${readClass}"
-                               onclick="App.utils.header.comments.openComment('${comment.id}', '${comment.task_id}', '${comment.task_board_id}')">
+                               onclick="App.utils.header.comments.openCommentById('${comment.id}')">
                                 <div class="row">
                                 <div>
                                 	<i class="circle extra">${avatarHtml}</i>
@@ -218,7 +261,11 @@
                                         <span class="bold small-text">${escapeHtml(comment.display_name)}</span>
                                         <span class="small-text secondary-text font-number">${updatedAt}</span>
                                     </div>
-                                    <div class="small-text secondary-text">${escapeHtml(comment.task_name)} <span class="font-number secondary-text">#${comment.task_display_id}</span></div>
+                                    <div class="small-text row tiny-space middle-align secondary-text">
+                                        <i class="small">${this._tableIcon(comment.related_table)}</i>
+                                        <span>${targetLabel}</span>
+                                        <span>${targetLine}</span>
+                                    </div>
                                 </div>
                                 <div>
                                     <button class="transparent circle small no-margin"
@@ -233,7 +280,6 @@
                         `;
                     }).join('');
 
-                    // 最終更新日時の追加
                     if (this.lastUpdatedAt) {
                         const timeStr = formatDateTimeForDisplay(this.lastUpdatedAt, 'yyyy/MM/dd(E) HH:mm');
                         html += `<div class="row padding no-margin center-align secondary-text small-text tiny-space"><span>最終更新: ${timeStr}</span></div>`;
@@ -243,21 +289,54 @@
                 },
 
                 /**
-                 * コメントをクリックしてタスクを開く
-                 * @param {string} commentId - コメントID
-                 * @param {string} taskId - タスクID
-                 * @param {string} boardId - ボードID
+                 * コメントIDからコメントを開く
                  */
-                openComment: function (commentId, taskId, boardId) {
-                    ui('#comments-menu');
+                openCommentById: function (commentId) {
+                    const comment = (this.cachedComments || []).find(function (item) {
+                        return item.id === commentId;
+                    });
+                    if (!comment) return;
+                    this.openComment(comment);
+                },
 
-                    // 既読にマーク
-                    this.markAsRead(commentId);
+                /**
+                 * コメントをクリックして対象レコードを開く
+                 * @param {Object} comment - コメントデータ
+                 */
+                openComment: function (comment) {
+                    if (!comment || !comment.id) return;
+                    this.markAsRead(comment.id);
+                    this.closeHub();
 
-                    // タスクを開く（home.htmlのopenTaskFromHomeを再利用）
-                    if (App.pages.home && App.pages.home.openTaskFromHome) {
-                        App.pages.home.openTaskFromHome(taskId, boardId);
+                    if (comment.related_table === 'tasks') {
+                        if (App.pages.home && App.pages.home.openTaskFromHome) {
+                            App.pages.home.openTaskFromHome(comment.task_id || comment.related_id, comment.task_board_id || '');
+                            return;
+                        }
+                        if (App.modals.taskDetail && App.modals.taskDetail.open) {
+                            App.modals.taskDetail.open(comment.task_id || comment.related_id);
+                            return;
+                        }
                     }
+
+                    if (comment.related_table === 'members' && App.modals.memberDetail?.open) {
+                        App.modals.memberDetail.open(comment.related_id);
+                        return;
+                    }
+                    if (comment.related_table === 'directories' && App.modals.directoryDetail?.open) {
+                        App.modals.directoryDetail.open(comment.related_id);
+                        return;
+                    }
+                    if (comment.related_table === 'skills' && App.modals.skillDetail?.open) {
+                        App.modals.skillDetail.open(comment.related_id);
+                        return;
+                    }
+                    if (comment.related_table === 'plans' && App.modals.planDetail?.open) {
+                        App.modals.planDetail.open(comment.related_id);
+                        return;
+                    }
+
+                    showSnackbar('対象レコードを開けませんでした', 'error');
                 },
 
                 /**
@@ -273,7 +352,7 @@
 
                     // 描画を更新
                     if (this.cachedComments) {
-                        this.render(this.cachedComments);
+                        this.applyHubFilters();
                     }
                 },
 
@@ -287,6 +366,7 @@
 
                     // 更新後の状態を渡してクリーンアップと保存を実行
                     this.checkAndUpdateBadge(this.cachedComments, savedData);
+                    this.applyHubFilters();
                 },
 
                 /**
@@ -304,7 +384,7 @@
 
                     this.cachedComments.forEach(comment => {
                         // タスクIDが一致 かつ 未読の場合
-                        if (comment.task_id === taskId && savedData[comment.id] !== true) {
+                        if (comment.related_table === 'tasks' && (comment.related_id === taskId || comment.task_id === taskId) && savedData[comment.id] !== true) {
                             savedData[comment.id] = true;
                             hasChanges = true;
                         }
@@ -314,9 +394,19 @@
                         console.log(`[Comments] Marked comments for task ${taskId} as read.`);
                         // 更新後の状態を渡してクリーンアップと保存を実行
                         this.checkAndUpdateBadge(this.cachedComments, savedData);
-                        // 描画を更新（メニューが開いている可能性があるため）
-                        this.render(this.cachedComments);
+                        this.applyHubFilters();
                     }
+                },
+
+                _tableIcon: function (tableName) {
+                    const icons = {
+                        tasks: 'checklist',
+                        members: 'person',
+                        directories: 'account_tree',
+                        skills: 'workspace_premium',
+                        plans: 'event_note'
+                    };
+                    return icons[tableName] || 'comment';
                 }
             }
         };

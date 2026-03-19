@@ -9,19 +9,16 @@
 
 /**
  * コメント通知用のデータを取得します
- * ユーザーが関与するアクティブタスクに紐づくコメントを取得し、
- * 投稿者情報を付与して返します。
+ * タスクに加えて、メンバー・組織・スキル・企画に紐づくコメントを集約して返します。
  *
  * @param {string} userId - 現在のユーザーID
  * @param {boolean} forceRefresh - キャッシュを無視して強制再取得するか
  * @returns {Object} { comments: Array, isCached: boolean }
- *   comments: コメントデータ（投稿者情報付き）
  */
 function getCommentNavData(userId, forceRefresh = false) {
     const cacheKey = `comment_nav_data_${userId}`;
     const cachePublicRange = 'script';
 
-    // selectかつforceRefreshがfalseの場合、キャッシュを使用
     if (!forceRefresh) {
         try {
             const cached = CacheManager.get(cacheKey, cachePublicRange);
@@ -38,110 +35,179 @@ function getCommentNavData(userId, forceRefresh = false) {
             throw new ValidationError('userId is required', 'userId', userId);
         }
 
-        // 1. アクティブなタスクを取得（task_status_key が DONE ではない）
         const tasksResult = select(TABLE_NAMES.TASKS, {
             where: { task_status_key: ['!=', 'DONE'] }
-        });
+        }) || [];
+        const commentsResult = select(TABLE_NAMES.COMMENTS, {
+            where: { created_by: ['!=', userId] }
+        }) || [];
 
-        if (!tasksResult || tasksResult.length === 0) {
-            return { comments: [], tasks: [] };
+        if (commentsResult.length === 0) {
+            return sanitizeForClient({ comments: [], isCached: false });
         }
 
-        // 2. ユーザーが関与するタスクをフィルタリング
-        //    created_by / processed_by / reviewed_by / received_by のいずれかが userId
-        //    かつ task_status_key が NULL / 空欄でもないもの
-        const userTasks = tasksResult.filter(task => {
+        const membersResult = select(TABLE_NAMES.MEMBERS, {}) || [];
+        const directoriesResult = select(TABLE_NAMES.DIRECTORIES, {}) || [];
+        const skillsResult = select(TABLE_NAMES.SKILLS, {}) || [];
+        const plansResult = select(TABLE_NAMES.PLANS, {}) || [];
+        const directoryAssignments = select(TABLE_NAMES.DIRECTORY_ASSIGNMENTS, {
+            where: { member_id: ['=', userId] }
+        }) || [];
+        const skillAssignments = select(TABLE_NAMES.SKILL_ASSIGNMENTS, {
+            where: { member_id: ['=', userId] }
+        }) || [];
+        const planAssignments = select(TABLE_NAMES.PLAN_ASSIGNMENTS, {
+            where: { member_id: ['=', userId] }
+        }) || [];
+
+        const userTasks = tasksResult.filter(function (task) {
             const status = task.task_status_key;
             if (!status || status === '' || status === 'DONE') return false;
-
             return task.created_by === userId ||
                 task.processed_by === userId ||
                 task.reviewed_by === userId ||
                 task.received_by === userId;
         });
 
-        if (userTasks.length === 0) {
-            return { comments: [], tasks: [] };
-        }
-
-        // タスクIDのSetを作成（高速検索用）
-        const userTaskIds = new Set(userTasks.map(t => t.id));
-
-        // 3. commentsテーブルから related_table = 'tasks' のコメントを取得
-        const commentsResult = select(TABLE_NAMES.COMMENTS, {
-            where: {
-                related_table: ['=', 'tasks'],
-                created_by: ['!=', userId]
-            }
-        });
-
-        if (!commentsResult || commentsResult.length === 0) {
-            return { comments: [], tasks: [] };
-        }
-
-        // 4. ユーザーのタスクに関連するコメントのみフィルタ
-        const relevantComments = commentsResult.filter(comment =>
-            userTaskIds.has(comment.related_id)
+        const userTaskIds = new Set(userTasks.map(function (task) { return task.id; }));
+        const userDirectoryIds = new Set(
+            directoryAssignments
+                .filter(function (assignment) { return assignment.is_active !== false; })
+                .map(function (assignment) { return assignment.directory_id; })
+        );
+        const userSkillIds = new Set(skillAssignments.map(function (assignment) { return assignment.skill_id; }));
+        const userPlanIds = new Set(
+            planAssignments
+                .filter(function (assignment) { return assignment.is_active !== false; })
+                .map(function (assignment) { return assignment.plan_id; })
         );
 
-        if (relevantComments.length === 0) {
-            return { comments: [], tasks: [] };
-        }
-
-        // 5. メンバー情報を取得（投稿者の display_name, profile_photo_url のため）
-        const membersResult = select(TABLE_NAMES.MEMBERS, {});
         const membersMap = new Map();
-        if (membersResult) {
-            membersResult.forEach(m => {
-                membersMap.set(m.id, {
-                    display_name: m.display_name || m.name || '',
-                    profile_photo_url: m.profile_photo_url || ''
-                });
-            });
-        }
-
-        // 6. タスク情報のMapを作成
-        const tasksMap = new Map();
-        userTasks.forEach(t => {
-            tasksMap.set(t.id, {
-                id: t.id,
-                name: t.name,
-                display_id: t.display_id,
-                board_id: t.board_id,
-                task_status_key: t.task_status_key
+        membersResult.forEach(function (member) {
+            membersMap.set(member.id, {
+                name: member.display_name || member.name || '',
+                subtitle: member.email || '',
+                profile_photo_url: member.profile_photo_url || ''
             });
         });
 
-        // 7. コメントデータを加工（投稿者情報 + タスク情報を付与）
-        const enrichedComments = relevantComments.map(comment => {
+        const tasksMap = new Map();
+        userTasks.forEach(function (task) {
+            tasksMap.set(task.id, {
+                name: task.name || '',
+                subtitle: task.display_id ? `#${task.display_id}` : '',
+                board_id: task.board_id || '',
+                display_id: task.display_id || ''
+            });
+        });
+
+        const directoriesMap = new Map();
+        directoriesResult.forEach(function (directory) {
+            directoriesMap.set(directory.id, {
+                name: directory.name || '',
+                subtitle: directory.directory_type_key || ''
+            });
+        });
+
+        const skillsMap = new Map();
+        skillsResult.forEach(function (skill) {
+            skillsMap.set(skill.id, {
+                name: skill.title || '',
+                subtitle: skill.skill_type_key || ''
+            });
+        });
+
+        const plansMap = new Map();
+        plansResult.forEach(function (plan) {
+            plansMap.set(plan.id, {
+                name: plan.name || '',
+                subtitle: plan.zarms_code || plan.plan_number || ''
+            });
+        });
+
+        const tableLabelMap = {
+            tasks: 'タスク',
+            members: 'メンバー',
+            directories: '組織',
+            skills: 'スキル',
+            plans: '企画'
+        };
+
+        const relevantComments = commentsResult.filter(function (comment) {
+            if (!comment || !comment.related_table || !comment.related_id) return false;
+
+            if (comment.related_table === 'tasks') return userTaskIds.has(comment.related_id);
+            if (comment.related_table === 'members') return comment.related_id === userId;
+            if (comment.related_table === 'directories') return userDirectoryIds.has(comment.related_id);
+            if (comment.related_table === 'skills') return userSkillIds.has(comment.related_id);
+            if (comment.related_table === 'plans') return userPlanIds.has(comment.related_id);
+
+            return false;
+        });
+
+        const enrichedComments = relevantComments.map(function (comment) {
             const memberInfo = membersMap.get(comment.updated_by) || {
-                display_name: '不明',
+                name: '不明',
+                subtitle: '',
                 profile_photo_url: ''
             };
-            const taskInfo = tasksMap.get(comment.related_id) || {};
+
+            let targetName = '';
+            let targetSubtitle = '';
+            let taskBoardId = '';
+            let taskDisplayId = '';
+            let taskName = '';
+
+            if (comment.related_table === 'tasks') {
+                const taskInfo = tasksMap.get(comment.related_id) || {};
+                targetName = taskInfo.name || '';
+                targetSubtitle = taskInfo.subtitle || '';
+                taskBoardId = taskInfo.board_id || '';
+                taskDisplayId = taskInfo.display_id || '';
+                taskName = taskInfo.name || '';
+            } else if (comment.related_table === 'members') {
+                const record = membersMap.get(comment.related_id) || {};
+                targetName = record.name || '';
+                targetSubtitle = record.subtitle || '';
+            } else if (comment.related_table === 'directories') {
+                const record = directoriesMap.get(comment.related_id) || {};
+                targetName = record.name || '';
+                targetSubtitle = record.subtitle || '';
+            } else if (comment.related_table === 'skills') {
+                const record = skillsMap.get(comment.related_id) || {};
+                targetName = record.name || '';
+                targetSubtitle = record.subtitle || '';
+            } else if (comment.related_table === 'plans') {
+                const record = plansMap.get(comment.related_id) || {};
+                targetName = record.name || '';
+                targetSubtitle = record.subtitle || '';
+            }
 
             return {
                 id: comment.id,
                 content: comment.content,
                 updated_at: comment.updated_at,
                 updated_by: comment.updated_by,
-                display_name: memberInfo.display_name,
+                display_name: memberInfo.name,
                 profile_photo_url: memberInfo.profile_photo_url,
-                task_id: comment.related_id,
-                task_name: taskInfo.name || '',
-                task_display_id: taskInfo.display_id || '',
-                task_board_id: taskInfo.board_id || ''
+                related_table: comment.related_table,
+                related_id: comment.related_id,
+                related_table_label: tableLabelMap[comment.related_table] || comment.related_table,
+                target_name: targetName,
+                target_subtitle: targetSubtitle,
+                task_id: comment.related_table === 'tasks' ? comment.related_id : '',
+                task_name: taskName,
+                task_display_id: taskDisplayId,
+                task_board_id: taskBoardId
             };
         });
 
-        // 8. updated_at で降順ソート（新しい順）
-        enrichedComments.sort((a, b) => {
+        enrichedComments.sort(function (a, b) {
             const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
             const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
             return dateB - dateA;
         });
 
-        // 9. キャッシュに保存
         try {
             CacheManager.put(cacheKey, enrichedComments, cachePublicRange);
         } catch (cacheError) {
