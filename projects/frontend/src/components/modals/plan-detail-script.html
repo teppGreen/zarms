@@ -9,6 +9,7 @@
             isDeleteRequested: false,
             isDirty: false,
             quill: null,
+            thumbnailPreviewToken: '',
 
             open: function (planId) {
                 if (!planId) return;
@@ -111,6 +112,7 @@
                 this.currentAssignments = nextAssignments;
                 this.toggleDirty(true);
                 this._renderAssignments();
+                this._refreshThumbnailPreviewFromInput();
             },
 
             updateAssignmentRole: function (index, roleValue) {
@@ -569,6 +571,7 @@
                 setText('plan-detail-updated-at-input', plan.updated_at ? formatDateTimeForDisplay(plan.updated_at) : '');
 
                 this._renderAssignments();
+                this._refreshThumbnailPreviewFromInput();
             },
 
             _renderAssignments: function () {
@@ -662,6 +665,16 @@
                     el.onchange = function () { App.modals.planDetail.toggleDirty(true); };
                 });
 
+                const thumbnailInput = document.getElementById('plan-detail-thumbnail-url-input');
+                if (thumbnailInput && thumbnailInput.__thumbnailPreviewBound !== true) {
+                    const refreshPreview = function () {
+                        App.modals.planDetail._refreshThumbnailPreviewFromInput();
+                    };
+                    thumbnailInput.addEventListener('input', refreshPreview);
+                    thumbnailInput.addEventListener('change', refreshPreview);
+                    thumbnailInput.__thumbnailPreviewBound = true;
+                }
+
                 if (this.quill && this.quill.__planDetailDirtyBound !== true) {
                     this.quill.on('text-change', function () {
                         App.modals.planDetail.toggleDirty(true);
@@ -678,6 +691,7 @@
                 this.originalAssignments = [];
                 this.isDeleteRequested = false;
                 this.isDirty = false;
+                this.thumbnailPreviewToken = '';
 
                 if (this.quill) {
                     App.utils.quill.clear(this.quill);
@@ -685,6 +699,53 @@
 
                 const comments = document.getElementById('plan-comments-list');
                 if (comments) comments.innerHTML = '';
+                this._setThumbnailPreviewState('サムネイルURLを入力するとプレビューを表示します', null);
+            },
+
+            _setThumbnailPreviewState: function (message, dataUrl) {
+                const stateEl = document.getElementById('plan-detail-thumbnail-preview-state');
+                const imageEl = document.getElementById('plan-detail-thumbnail-preview-image');
+                if (stateEl) {
+                    stateEl.textContent = message || '';
+                    stateEl.style.display = dataUrl ? 'none' : '';
+                }
+                if (imageEl) {
+                    if (dataUrl) {
+                        imageEl.src = dataUrl;
+                        imageEl.style.display = '';
+                    } else {
+                        imageEl.removeAttribute('src');
+                        imageEl.style.display = 'none';
+                    }
+                }
+            },
+
+            _refreshThumbnailPreviewFromInput: async function () {
+                const inputEl = document.getElementById('plan-detail-thumbnail-url-input');
+                if (!inputEl) return;
+                const url = String(inputEl.value || '').trim();
+                if (!url) {
+                    this._setThumbnailPreviewState('サムネイルURLを入力するとプレビューを表示します', null);
+                    return;
+                }
+
+                const requestToken = String(Date.now()) + '-' + String(Math.random()).slice(2);
+                this.thumbnailPreviewToken = requestToken;
+                this._setThumbnailPreviewState('サムネイルを読み込み中です...', null);
+
+                try {
+                    const result = await callGAS('getDriveImageDataUrl', url);
+                    if (this.thumbnailPreviewToken !== requestToken) return;
+                    const dataUrl = result && result.dataUrl ? String(result.dataUrl) : '';
+                    if (!dataUrl) {
+                        throw new Error('画像データを取得できませんでした');
+                    }
+                    this._setThumbnailPreviewState('', dataUrl);
+                } catch (error) {
+                    if (this.thumbnailPreviewToken !== requestToken) return;
+                    console.error('[PlanDetail] サムネイルプレビュー取得エラー:', error);
+                    this._setThumbnailPreviewState('サムネイルの取得に失敗しました（Drive画像URLを確認してください）', null);
+                }
             },
 
             _escapeHtml: function (value) {
