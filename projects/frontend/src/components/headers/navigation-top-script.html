@@ -206,7 +206,10 @@
 
                     const summaryEl = document.getElementById('comments-hub-summary');
                     if (summaryEl) {
-                        summaryEl.textContent = `${comments.length}件 / 全${totalCount || 0}件`;
+                        const unreadCount = comments.filter(function (item) {
+                            return savedData[item.id] !== true;
+                        }).length;
+                        summaryEl.textContent = `${comments.length}件 / 全${totalCount || 0}件（未読${unreadCount}件）`;
                     }
 
                     if (!comments || comments.length === 0) {
@@ -353,6 +356,29 @@
                     // 描画を更新
                     if (this.cachedComments) {
                         this.applyHubFilters();
+                    }
+                },
+
+                markCurrentAsRead: function () {
+                    const targetComments = this.filteredComments || this.cachedComments || [];
+                    if (!targetComments.length) {
+                        showSnackbar('既読にするコメントがありません', 'info');
+                        return;
+                    }
+                    const savedData = App.state.getUserProperty('comment_read_status', {});
+                    let changed = 0;
+                    targetComments.forEach(function (comment) {
+                        if (savedData[comment.id] !== true) {
+                            savedData[comment.id] = true;
+                            changed += 1;
+                        }
+                    });
+                    this.checkAndUpdateBadge(this.cachedComments, savedData);
+                    this.applyHubFilters();
+                    if (changed > 0) {
+                        showSnackbar(`${changed}件を既読にしました`, 'success');
+                    } else {
+                        showSnackbar('表示中のコメントは既読です', 'info');
                     }
                 },
 
