@@ -1,7 +1,10 @@
 <div id="tab-members" style="display: none;">
     <header class="small-margin">
         <nav class="no-padding no-margin row">
-            <h3 class="bold small">カタログ</h3>
+            <div>
+                <h3 class="bold small no-margin">メンバーカタログ</h3>
+                <p class="small-text no-margin">一覧を確認して、必要な項目を開いて更新できます</p>
+            </div>
             <div class="max"></div>
             <nav class="tabbed background small max" id="members-tab-nav" title="表示切替">
                 <a class="active" id="members-tab-btn-member" title="メンバー" onclick="App.pages.members.switchTab('member')">
@@ -24,6 +27,77 @@
         </nav>
     </header>
 
+    <section class="small-margin">
+        <article class="border small-round surface-container-low small-padding">
+            <div class="row wrap small-space center-align">
+                <div class="row tiny-space center-align">
+                    <i>groups</i>
+                    <div>
+                        <div class="small-text secondary-text">件数</div>
+                        <h5 id="members-summary-count" class="no-margin">0</h5>
+                    </div>
+                </div>
+                <div class="row tiny-space center-align">
+                    <i>filter_alt</i>
+                    <span class="small-text secondary-text">有効条件</span>
+                    <span id="members-filter-count" class="badge">0</span>
+                </div>
+                <div class="row tiny-space center-align">
+                    <i>open_in_new</i>
+                    <span class="small-text secondary-text">主要操作</span>
+                    <span id="members-summary-action" class="small-text">行の「開く」で詳細</span>
+                </div>
+                <div class="row tiny-space center-align">
+                    <i>keyboard</i>
+                    <span id="members-summary-shortcut" class="small-text secondary-text">Ctrl/⌘ + C で選択セルをコピー</span>
+                </div>
+                <div class="row tiny-space center-align">
+                    <i>timeline</i>
+                    <span id="members-summary-workflow" class="small-text secondary-text">確認→絞込→開く→更新 の順で進めます</span>
+                </div>
+            </div>
+            <div class="small-margin top-border">
+                <div class="row wrap tiny-space center-align">
+                    <i>school</i>
+                    <span id="members-onboarding-status" class="small-text secondary-text">初見向け: 見つける→絞る→開く→追加</span>
+                    <button class="chip border" type="button" onclick="App.pages.members.startQuickOnboarding()">
+                        <i>play_circle</i>
+                        <span>1分ガイド</span>
+                    </button>
+                </div>
+                <div class="row wrap small-space center-align">
+                    <button class="border" type="button" onclick="App.pages.members.showFilterGuide()">
+                        <i>filter_alt</i>
+                        <span>絞り込みの使い方</span>
+                    </button>
+                    <button class="border" type="button" onclick="App.pages.members.openCreateModal()">
+                        <i>add</i>
+                        <span id="members-quick-add-label">メンバーを追加</span>
+                    </button>
+                    <button class="border" type="button" onclick="App.pages.members.showOpenGuide()">
+                        <i>open_in_new</i>
+                        <span>詳細を開く方法</span>
+                    </button>
+                    <button class="border" type="button" onclick="App.pages.members.showShortcutGuide()">
+                        <i>keyboard</i>
+                        <span>ショートカット</span>
+                    </button>
+                    <button class="border" type="button" onclick="App.pages.members.showDailyWorkflowGuide()">
+                        <i>timeline</i>
+                        <span>日次4ステップ</span>
+                    </button>
+                </div>
+                <div class="row wrap tiny-space top-margin">
+                    <button class="chip border" type="button" onclick="App.pages.members.switchTab('member')">1. 見つける</button>
+                    <button class="chip border" type="button" onclick="App.pages.members.showFilterGuide()">2. 絞込</button>
+                    <button class="chip border" type="button" onclick="App.pages.members.showOpenGuide()">3. 開く</button>
+                    <button class="chip border" type="button" onclick="App.pages.members.openCreateModal()">4. 追加</button>
+                    <button class="chip border" type="button" onclick="App.pages.members.showDailyWorkflowGuide()">日次4ステップ</button>
+                </div>
+            </div>
+        </article>
+    </section>
+
     <div id="members-subtab-member" class="small-margin small-round">
         <div>
             <div id="members-table-loading" class="row center-align padding">
@@ -34,6 +108,122 @@
     </div>
 
     <div id="members-subtab-directory" style="display: none;" class="small-margin small-round">
+        <article class="border small-round surface-container-low small-padding">
+            <div class="row wrap small-space center-align">
+                <div class="row tiny-space center-align">
+                    <i>account_tree</i>
+                    <div>
+                        <div class="small-text secondary-text">表示中 / 全体</div>
+                        <h6 id="directory-summary-visible" class="no-margin">0 / 0</h6>
+                    </div>
+                </div>
+                <div class="row tiny-space center-align">
+                    <i>group</i>
+                    <div>
+                        <div class="small-text secondary-text">表示中の所属人数</div>
+                        <h6 id="directory-summary-members" class="no-margin">0 人</h6>
+                    </div>
+                </div>
+                <div class="row tiny-space center-align">
+                    <i>filter_alt</i>
+                    <span class="small-text secondary-text">適用条件</span>
+                    <span id="directory-summary-filters" class="badge">0</span>
+                </div>
+                <div class="max"></div>
+                <button id="directory-clear-filters-btn" class="border" type="button" onclick="App.pages.members.clearDirectoryFilters()" disabled>
+                    <i>filter_alt_off</i>
+                    <span>絞り込みを解除</span>
+                </button>
+                <button id="directory-open-first-btn" class="border" type="button" onclick="App.pages.members.openFirstDirectoryFromVisible()" disabled>
+                    <i>open_in_new</i>
+                    <span>先頭を開く</span>
+                </button>
+                <button id="directory-open-largest-btn" class="border" type="button" onclick="App.pages.members.openLargestDirectoryFromVisible()" disabled>
+                    <i>leaderboard</i>
+                    <span>最多人数を開く</span>
+                </button>
+                <button id="directory-open-empty-btn" class="border" type="button" onclick="App.pages.members.openFirstEmptyDirectoryFromVisible()" disabled>
+                    <i>person_off</i>
+                    <span>0人組織を開く</span>
+                </button>
+            </div>
+            <div class="row wrap tiny-space top-margin center-align">
+                <button id="directory-focus-active-btn" class="chip border" type="button" onclick="App.pages.members.applyDirectoryFocusFilter('active')">
+                    <i>done_all</i>
+                    <span>有効のみ</span>
+                </button>
+                <button id="directory-focus-empty-btn" class="chip border" type="button" onclick="App.pages.members.applyDirectoryFocusFilter('empty')">
+                    <i>person_off</i>
+                    <span>0人のみ</span>
+                </button>
+                <button id="directory-focus-roots-btn" class="chip border" type="button" onclick="App.pages.members.applyDirectoryFocusFilter('roots')">
+                    <i>account_tree</i>
+                    <span>親なしのみ</span>
+                </button>
+                <button id="directory-focus-descendants-btn" class="chip border" type="button" onclick="App.pages.members.applyDirectoryFocusFilter('descendants')">
+                    <i>subdirectory_arrow_right</i>
+                    <span>親ありのみ</span>
+                </button>
+            </div>
+            <div class="row wrap tiny-space top-margin center-align">
+                <span class="small-text secondary-text">適用中の条件:</span>
+                <span id="directory-filter-details" class="small-text">なし</span>
+            </div>
+            <div class="row wrap small-space top-margin center-align">
+                <div class="row tiny-space center-align">
+                    <i>verified</i>
+                    <span id="directory-summary-status" class="small-text secondary-text">有効 0 / 無効 0</span>
+                </div>
+                <div class="row tiny-space center-align">
+                    <i>person_off</i>
+                    <span id="directory-summary-empty-count" class="small-text secondary-text">0人組織 0</span>
+                </div>
+                <div class="row tiny-space center-align">
+                    <i>fork_right</i>
+                    <span id="directory-summary-structure" class="small-text secondary-text">親なし 0 / 親あり 0</span>
+                </div>
+                <div class="row tiny-space center-align">
+                    <i>groups</i>
+                    <span id="directory-summary-average" class="small-text secondary-text">平均人数 0.0</span>
+                </div>
+                <div class="row tiny-space center-align">
+                    <i>percent</i>
+                    <span id="directory-summary-empty-rate" class="small-text secondary-text">0人率 0.0%</span>
+                </div>
+                <div class="max"></div>
+                <span id="directory-summary-peak" class="small-text secondary-text">最大人数: -</span>
+            </div>
+            <div id="directory-top-comparison" class="small-margin top-border secondary-text">
+                比較メモ: 人数上位の組織を並べて比較できます。
+            </div>
+            <div class="row wrap tiny-space top-margin center-align">
+                <button id="directory-run-recommended-btn" class="border" type="button" onclick="App.pages.members.executeDirectoryRecommendedAction()" disabled>
+                    <i>assistant</i>
+                    <span>推奨アクションを実行</span>
+                </button>
+                <button id="directory-copy-comparison-btn" class="border" type="button" onclick="App.pages.members.copyDirectoryComparisonMemo()" disabled>
+                    <i>content_copy</i>
+                    <span>比較メモをコピー</span>
+                </button>
+                <button id="directory-copy-brief-btn" class="border" type="button" onclick="App.pages.members.copyDirectoryBriefShare()" disabled>
+                    <i>share</i>
+                    <span>共有サマリーをコピー</span>
+                </button>
+                <button id="directory-copy-action-btn" class="border" type="button" onclick="App.pages.members.copyDirectoryActionMemo()" disabled>
+                    <i>assignment</i>
+                    <span>推奨手順をコピー</span>
+                </button>
+            </div>
+            <div id="directory-empty-guide" class="small-margin top-border secondary-text" style="display: none;">
+                条件に一致するディレクトリがありません。絞り込みを解除して再確認し、必要なら「ディレクトリを追加」から新規作成してください。
+            </div>
+            <div id="directory-next-action" class="small-margin secondary-text">
+                推奨手順: 種別・親組織で絞り込み → 件数確認 → 行の「開く」で詳細更新
+            </div>
+            <div id="directory-share-preview" class="small-text secondary-text">
+                共有プレビュー: 件数・上位比較・次アクションをまとめてコピーできます。
+            </div>
+        </article>
         <div>
             <div id="directories-table-loading" class="row center-align padding" style="display: none;">
                 <progress class="circle small"></progress>
@@ -60,4 +250,3 @@
         </div>
     </div>
 </div>
-
