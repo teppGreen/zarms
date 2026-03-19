@@ -3,6 +3,12 @@
         let _isLoading = false;
         let _currentTab = 'member';
         let _resizeHandlerBound = false;
+        const _onboardingState = {
+            key: 'members_onboarding_round14',
+            quickGuideShown: false,
+            completed: false
+        };
+        let _isOnboardingStateInitialized = false;
         const _tableData = {
             member: [],
             directory: [],
@@ -36,6 +42,7 @@
                 type: '',
                 parent: '',
                 status: '',
+                parentMode: '',
                 memberCountMin: '',
                 memberCountMax: ''
             },
@@ -66,6 +73,14 @@
             directory: [],
             skills: [],
             plans: []
+        };
+        const _directoryUxState = {
+            recommendedAction: '',
+            recommendedTargetId: '',
+            recommendedMessage: '',
+            comparisonMemoText: '',
+            quickShareMemoText: '',
+            actionMemoText: ''
         };
         const _containers = {
             member: 'members-table-container',
@@ -142,7 +157,7 @@
         };
         const _tableConfig = {
             member: {
-                emptyText: 'メンバーがありません',
+                emptyText: 'メンバーが見つかりません。条件を見直すか、絞り込みを解除してください',
                 columns: [
                     { key: 'display_name', label: '表示名', width: '190px', formatterKey: 'memberNameLink' },
                     { key: 'name', label: '氏名', width: '150px' },
@@ -160,7 +175,7 @@
                 ]
             },
             directory: {
-                emptyText: 'ディレクトリがありません',
+                emptyText: 'ディレクトリが見つかりません。条件を見直すか、絞り込みを解除してください',
                 columns: [
                     { key: 'name', label: '組織名', width: '180px' },
                     { key: '_typeText', label: '種別', width: '130px', headerFilter: 'listDirectoryTypes' },
@@ -170,7 +185,7 @@
                 ]
             },
             skills: {
-                emptyText: 'スキルがありません',
+                emptyText: 'スキルが見つかりません。条件を見直すか、絞り込みを解除してください',
                 columns: [
                     { key: 'title', label: 'タイトル', width: '180px' },
                     { key: 'skill_type_key', label: '種別', width: '140px', headerFilter: 'listDynamicSkillTypes' },
@@ -179,7 +194,7 @@
                 ]
             },
             plans: {
-                emptyText: '企画がありません',
+                emptyText: '企画が見つかりません。条件を見直すか、絞り込みを解除してください',
                 columns: [
                     { key: 'plan_number', label: '企画番号', width: '140px' },
                     { key: 'name', label: '企画名', width: '220px' },
@@ -193,8 +208,13 @@
 
         App.pages.members = {
             loadData: async function (isRefresh) {
+                if (!_isOnboardingStateInitialized) {
+                    this._loadOnboardingState();
+                    _isOnboardingStateInitialized = true;
+                }
                 _isLoading = true;
                 this._showLoading(true, _currentTab);
+                this._updateSummary();
 
                 try {
                     const members = App.state.data.members || [];
@@ -214,11 +234,13 @@
                     this._renderAllTables();
                 } catch (err) {
                     console.error('[Members] データ読み込みエラー:', err);
-                    showSnackbar('データの読み込みに失敗しました', 'error');
+                    showSnackbar('データを読み込めませんでした。通信状態を確認して再読み込みしてください', 'error');
                 } finally {
                     _isLoading = false;
                     this._showLoading(false, _currentTab);
                     this._renderTable(_currentTab);
+                    this._updateSummary();
+                    this._ensureFirstVisitOnboarding();
                 }
             },
 
@@ -282,6 +304,7 @@
                         App.pages.members._applyTableHeight(_currentTab);
                     });
                 }
+                this._updateSummary();
             },
 
             sortTable: function (tabName, colKey) {
@@ -309,6 +332,7 @@
                 _headerFilters[tabName] = this._buildHeaderFiltersFromLegacy(tabName);
                 this._renderTable(tabName);
                 this._updateFilterBadge();
+                this._updateSummary();
             },
 
             setFilters: function (tabName, nextFilters) {
@@ -316,6 +340,7 @@
                 _headerFilters[tabName] = this._buildHeaderFiltersFromLegacy(tabName);
                 this._renderTable(tabName);
                 this._updateFilterBadge();
+                this._updateSummary();
             },
 
             getFilterFields: function (tabName) {
@@ -366,6 +391,196 @@
                 if (_currentTab === 'plans' && App.modals.newPlan && App.modals.newPlan.open) {
                     App.modals.newPlan.open();
                 }
+            },
+
+            showFilterGuide: function () {
+                const tabLabel = this.getCurrentTabLabel();
+                showSnackbar(tabLabel + '一覧は列見出しの下から絞り込みできます。入力または候補選択で条件を追加できます', 'info');
+            },
+
+            showOpenGuide: function () {
+                const tabLabel = this.getCurrentTabLabel();
+                showSnackbar(tabLabel + 'の詳細は各行の「開く」ボタンから表示できます', 'info');
+            },
+
+            showShortcutGuide: function () {
+                showSnackbar('セルをクリック後に Ctrl/⌘ + C で値をコピーできます', 'info');
+            },
+
+            showDailyWorkflowGuide: function () {
+                const tabLabel = this.getCurrentTabLabel();
+                showSnackbar('日次は「確認→絞込→開く→更新」の順です。' + tabLabel + '一覧を確認し、列見出し下で条件を絞り、行の「開く」で詳細を開いて更新してください', 'info');
+            },
+
+            clearDirectoryFilters: function () {
+                this.resetFilters('directory');
+            },
+
+            applyDirectoryFocusFilter: function (focusType) {
+                const current = Object.assign({}, _filters.directory || {});
+                current.parentMode = '';
+                if (focusType === 'active') {
+                    current.status = '有効';
+                } else if (focusType === 'empty') {
+                    current.memberCountMin = '0';
+                    current.memberCountMax = '0';
+                } else if (focusType === 'roots') {
+                    current.parent = '';
+                    current.parentMode = 'roots';
+                } else if (focusType === 'descendants') {
+                    current.parent = '';
+                    current.parentMode = 'descendants';
+                } else {
+                    return;
+                }
+                this.setFilters('directory', current);
+            },
+
+            openFirstDirectoryFromVisible: function () {
+                const visibleRows = this._getDirectoryVisibleRows();
+                if (!visibleRows.length) {
+                    showSnackbar('表示中のディレクトリがありません。絞り込み条件を見直してください', 'info');
+                    return;
+                }
+                const sortedRows = this._applySort('directory', visibleRows);
+                const firstRow = sortedRows[0];
+                if (!firstRow || !firstRow.id) return;
+                if (App.modals.directoryDetail && App.modals.directoryDetail.open) {
+                    App.modals.directoryDetail.open(String(firstRow.id));
+                }
+            },
+
+            openLargestDirectoryFromVisible: function () {
+                const visibleRows = this._getDirectoryVisibleRows();
+                if (!visibleRows.length) {
+                    showSnackbar('表示中のディレクトリがありません。絞り込み条件を見直してください', 'info');
+                    return;
+                }
+                const sortedRows = visibleRows.slice().sort(function (left, right) {
+                    const countDiff = Number(right._memberCount || 0) - Number(left._memberCount || 0);
+                    if (countDiff !== 0) return countDiff;
+                    return String(left.name || '').localeCompare(String(right.name || ''), undefined, { numeric: true, sensitivity: 'base' });
+                });
+                const target = sortedRows[0];
+                if (!target || !target.id) return;
+                if (App.modals.directoryDetail && App.modals.directoryDetail.open) {
+                    App.modals.directoryDetail.open(String(target.id));
+                }
+            },
+
+            openFirstEmptyDirectoryFromVisible: function () {
+                const visibleRows = this._getDirectoryVisibleRows();
+                const emptyRows = visibleRows.filter(function (row) {
+                    return Number(row._memberCount || 0) === 0;
+                });
+                if (!emptyRows.length) {
+                    showSnackbar('表示中に0人のディレクトリはありません', 'info');
+                    return;
+                }
+                const sortedRows = this._applySort('directory', emptyRows);
+                const target = sortedRows[0];
+                if (!target || !target.id) return;
+                if (App.modals.directoryDetail && App.modals.directoryDetail.open) {
+                    App.modals.directoryDetail.open(String(target.id));
+                }
+            },
+
+            executeDirectoryRecommendedAction: function () {
+                const action = String(_directoryUxState.recommendedAction || '');
+                if (action === 'openFirst') {
+                    this.openFirstDirectoryFromVisible();
+                    return;
+                }
+                if (action === 'openLargest') {
+                    this.openLargestDirectoryFromVisible();
+                    return;
+                }
+                if (action === 'openEmpty') {
+                    this.openFirstEmptyDirectoryFromVisible();
+                    return;
+                }
+                if (action === 'clearFilters') {
+                    this.clearDirectoryFilters();
+                    return;
+                }
+                showSnackbar(_directoryUxState.recommendedMessage || '実行できる推奨アクションがありません', 'info');
+            },
+
+            copyDirectoryComparisonMemo: async function () {
+                const memo = String(_directoryUxState.comparisonMemoText || '').trim();
+                if (!memo) {
+                    showSnackbar('コピー対象の比較メモがありません', 'info');
+                    return;
+                }
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(memo);
+                        showSnackbar('比較メモをコピーしました', 'success');
+                        return;
+                    }
+                    throw new Error('Clipboard API unavailable');
+                } catch (err) {
+                    console.error('[Members] 比較メモのコピーに失敗:', err);
+                    showSnackbar('比較メモのコピーに失敗しました', 'error');
+                }
+            },
+
+            copyDirectoryBriefShare: async function () {
+                const memo = String(_directoryUxState.quickShareMemoText || '').trim();
+                if (!memo) {
+                    showSnackbar('コピー対象の共有サマリーがありません', 'info');
+                    return;
+                }
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(memo);
+                        showSnackbar('共有サマリーをコピーしました', 'success');
+                        return;
+                    }
+                    throw new Error('Clipboard API unavailable');
+                } catch (err) {
+                    console.error('[Members] 共有サマリーのコピーに失敗:', err);
+                    showSnackbar('共有サマリーのコピーに失敗しました', 'error');
+                }
+            },
+
+            copyDirectoryActionMemo: async function () {
+                const memo = String(_directoryUxState.actionMemoText || '').trim();
+                if (!memo) {
+                    showSnackbar('コピー対象の推奨手順がありません', 'info');
+                    return;
+                }
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(memo);
+                        showSnackbar('推奨手順をコピーしました', 'success');
+                        return;
+                    }
+                    throw new Error('Clipboard API unavailable');
+                } catch (err) {
+                    console.error('[Members] 推奨手順のコピーに失敗:', err);
+                    showSnackbar('推奨手順のコピーに失敗しました', 'error');
+                }
+            },
+
+            startQuickOnboarding: function () {
+                this.switchTab('member');
+                this.showFilterGuide();
+                setTimeout(function () {
+                    App.pages.members.showOpenGuide();
+                }, 1300);
+                setTimeout(function () {
+                    App.pages.members.showShortcutGuide();
+                }, 2600);
+                setTimeout(function () {
+                    App.pages.members.showSnackbarForAddGuide();
+                }, 3900);
+                this._markOnboardingProgress({ quickGuideShown: true });
+            },
+
+            showSnackbarForAddGuide: function () {
+                const tabLabel = this.getCurrentTabLabel();
+                showSnackbar('最後に「' + tabLabel + 'を追加」ボタンから新規追加できます。見つける→絞る→開く→追加 の流れで進めてください', 'info');
             },
 
             _getTabLabel: function (tabName) {
@@ -614,6 +829,7 @@
 
                 _filters[tabName] = nextFilters;
                 this._updateFilterBadge();
+                this._updateSummary();
             },
 
             _getLegacyHeaderFilterMapping: function (tabName) {
@@ -639,7 +855,9 @@
                         name: 'name',
                         type: '_typeText',
                         parent: '_parentName',
-                        status: '_statusText'
+                        status: '_statusText',
+                        memberCountMin: '_memberCount',
+                        memberCountMax: '_memberCount'
                     };
                 }
                 if (tabName === 'skills') {
@@ -875,8 +1093,14 @@
                             App.pages.members._matchSelect(row._statusText, filters.status);
                     }
                     if (tabName === 'directory') {
+                        const parentMode = String(filters.parentMode || '');
+                        const hasParent = String(row._parentName || '').trim() !== '';
+                        const parentModeMatch = parentMode === 'roots'
+                            ? !hasParent
+                            : (parentMode === 'descendants' ? hasParent : true);
                         return App.pages.members._matchText(row.name, filters.name) &&
                             App.pages.members._matchSelect(row._typeText, filters.type) &&
+                            parentModeMatch &&
                             App.pages.members._matchText(row._parentName, filters.parent) &&
                             App.pages.members._matchSelect(row._statusText, filters.status) &&
                             App.pages.members._matchMinMax(row._memberCount, filters.memberCountMin, filters.memberCountMax);
@@ -1017,7 +1241,317 @@
                     return value !== '' && value !== null && value !== undefined;
                 });
                 badge.textContent = String(values.length);
-                badge.style.display = values.length > 0 ? '' : 'none';
+                badge.style.display = '';
+            },
+
+            _countRows: function (rows) {
+                if (!Array.isArray(rows)) return 0;
+                return rows.reduce(function (count, row) {
+                    if (!row || typeof row !== 'object') return count;
+                    const children = Array.isArray(row._children) ? row._children : [];
+                    return count + 1 + App.pages.members._countRows(children);
+                }, 0);
+            },
+
+            _flattenRows: function (rows) {
+                if (!Array.isArray(rows)) return [];
+                return rows.reduce(function (acc, row) {
+                    if (!row || typeof row !== 'object') return acc;
+                    acc.push(row);
+                    const children = Array.isArray(row._children) ? row._children : [];
+                    if (children.length) {
+                        acc = acc.concat(App.pages.members._flattenRows(children));
+                    }
+                    return acc;
+                }, []);
+            },
+
+            _getDirectoryVisibleRows: function () {
+                const allRows = this._flattenRows(_tableData.directory || []);
+                return this._applyFilters('directory', allRows);
+            },
+
+            _updateDirectoryUxSummary: function () {
+                const visibleElement = document.getElementById('directory-summary-visible');
+                const memberElement = document.getElementById('directory-summary-members');
+                const filterElement = document.getElementById('directory-summary-filters');
+                const clearButton = document.getElementById('directory-clear-filters-btn');
+                const openButton = document.getElementById('directory-open-first-btn');
+                const openLargestButton = document.getElementById('directory-open-largest-btn');
+                const openEmptyButton = document.getElementById('directory-open-empty-btn');
+                const emptyGuide = document.getElementById('directory-empty-guide');
+                const nextAction = document.getElementById('directory-next-action');
+                const filterDetails = document.getElementById('directory-filter-details');
+                const statusSummary = document.getElementById('directory-summary-status');
+                const emptyCountSummary = document.getElementById('directory-summary-empty-count');
+                const structureSummary = document.getElementById('directory-summary-structure');
+                const peakSummary = document.getElementById('directory-summary-peak');
+                const topComparison = document.getElementById('directory-top-comparison');
+                const averageSummary = document.getElementById('directory-summary-average');
+                const emptyRateSummary = document.getElementById('directory-summary-empty-rate');
+                const focusActiveButton = document.getElementById('directory-focus-active-btn');
+                const focusEmptyButton = document.getElementById('directory-focus-empty-btn');
+                const focusRootsButton = document.getElementById('directory-focus-roots-btn');
+                const focusDescendantsButton = document.getElementById('directory-focus-descendants-btn');
+                const runRecommendedButton = document.getElementById('directory-run-recommended-btn');
+                const copyComparisonButton = document.getElementById('directory-copy-comparison-btn');
+                const copyBriefButton = document.getElementById('directory-copy-brief-btn');
+                const copyActionButton = document.getElementById('directory-copy-action-btn');
+                const sharePreview = document.getElementById('directory-share-preview');
+                const totalCount = this._countRows(_tableData.directory || []);
+                const visibleRows = this._getDirectoryVisibleRows();
+                const visibleCount = visibleRows.length;
+                const visibleMemberCount = visibleRows.reduce(function (sum, row) {
+                    return sum + Number(row._memberCount || 0);
+                }, 0);
+                const activeCount = visibleRows.filter(function (row) {
+                    return row._statusText === '有効';
+                }).length;
+                const inactiveCount = visibleCount - activeCount;
+                const emptyDirectoryCount = visibleRows.filter(function (row) {
+                    return Number(row._memberCount || 0) === 0;
+                }).length;
+                const rootCount = visibleRows.filter(function (row) {
+                    return !row.parent_directory_id;
+                }).length;
+                const descendantCount = visibleCount - rootCount;
+                const appliedFilters = Object.values(_filters.directory || {}).filter(function (value) {
+                    return value !== '' && value !== null && value !== undefined;
+                }).length;
+                const topRows = visibleRows.slice().sort(function (left, right) {
+                    const countDiff = Number(right._memberCount || 0) - Number(left._memberCount || 0);
+                    if (countDiff !== 0) return countDiff;
+                    return String(left.name || '').localeCompare(String(right.name || ''), undefined, { numeric: true, sensitivity: 'base' });
+                }).slice(0, 3);
+                const avgMemberCount = visibleCount > 0 ? (visibleMemberCount / visibleCount) : 0;
+                const emptyRate = visibleCount > 0 ? (emptyDirectoryCount / visibleCount) * 100 : 0;
+                const topGap = topRows.length > 1
+                    ? Math.max(0, Number(topRows[0]._memberCount || 0) - Number(topRows[1]._memberCount || 0))
+                    : (topRows.length === 1 ? Number(topRows[0]._memberCount || 0) : 0);
+                const peakText = topRows.length
+                    ? String(topRows[0].name || '-') + '（' + String(Number(topRows[0]._memberCount || 0)) + '人）'
+                    : '-';
+                const filterPairs = [];
+                const currentFilter = _filters.directory || {};
+                if (currentFilter.name) filterPairs.push('組織名: ' + String(currentFilter.name));
+                if (currentFilter.type) filterPairs.push('種別: ' + String(currentFilter.type));
+                if (currentFilter.parentMode === 'roots') filterPairs.push('親組織: なしのみ');
+                else if (currentFilter.parentMode === 'descendants') filterPairs.push('親組織: ありのみ');
+                else if (currentFilter.parent) filterPairs.push('親組織: ' + String(currentFilter.parent));
+                if (currentFilter.status) filterPairs.push('ステータス: ' + String(currentFilter.status));
+                if (currentFilter.memberCountMin !== '' || currentFilter.memberCountMax !== '') {
+                    const minText = currentFilter.memberCountMin !== '' ? String(currentFilter.memberCountMin) : '0';
+                    const maxText = currentFilter.memberCountMax !== '' ? String(currentFilter.memberCountMax) : '∞';
+                    filterPairs.push('メンバー数: ' + minText + '〜' + maxText);
+                }
+
+                if (visibleElement) {
+                    visibleElement.textContent = String(visibleCount) + ' / ' + String(totalCount);
+                }
+                if (memberElement) {
+                    memberElement.textContent = String(visibleMemberCount) + ' 人';
+                }
+                if (filterElement) {
+                    filterElement.textContent = String(appliedFilters);
+                }
+                if (clearButton) {
+                    clearButton.disabled = _isLoading || appliedFilters === 0;
+                }
+                if (openButton) {
+                    openButton.disabled = _isLoading || visibleCount === 0;
+                }
+                if (openLargestButton) {
+                    openLargestButton.disabled = _isLoading || visibleCount === 0;
+                }
+                if (openEmptyButton) {
+                    openEmptyButton.disabled = _isLoading || emptyDirectoryCount === 0;
+                }
+                if (focusActiveButton) {
+                    focusActiveButton.disabled = _isLoading;
+                }
+                if (focusEmptyButton) {
+                    focusEmptyButton.disabled = _isLoading;
+                }
+                if (focusRootsButton) {
+                    focusRootsButton.disabled = _isLoading;
+                }
+                if (focusDescendantsButton) {
+                    focusDescendantsButton.disabled = _isLoading;
+                }
+                if (filterDetails) {
+                    filterDetails.textContent = filterPairs.length ? filterPairs.join(' / ') : 'なし';
+                }
+                if (statusSummary) {
+                    statusSummary.textContent = '有効 ' + String(activeCount) + ' / 無効 ' + String(inactiveCount);
+                }
+                if (emptyCountSummary) {
+                    emptyCountSummary.textContent = '0人組織 ' + String(emptyDirectoryCount);
+                }
+                if (structureSummary) {
+                    structureSummary.textContent = '親なし ' + String(rootCount) + ' / 親あり ' + String(descendantCount);
+                }
+                if (peakSummary) {
+                    peakSummary.textContent = '最大人数: ' + peakText;
+                }
+                if (topComparison) {
+                    if (!topRows.length) {
+                        _directoryUxState.comparisonMemoText = '';
+                        topComparison.textContent = '比較メモ: 対象データがありません。';
+                    } else {
+                        const comparisonBody = topRows.map(function (row, index) {
+                            return String(index + 1) + '. ' + String(row.name || '-') + '（' + String(Number(row._memberCount || 0)) + '人）';
+                        }).join(' / ');
+                        const filterDetailsText = filterPairs.length ? filterPairs.join(' / ') : 'なし';
+                        _directoryUxState.comparisonMemoText = [
+                            'ディレクトリ比較メモ',
+                            '表示件数: ' + String(visibleCount) + ' / ' + String(totalCount),
+                            '表示中人数: ' + String(visibleMemberCount) + '人',
+                            '平均人数: ' + avgMemberCount.toFixed(1) + '人',
+                            '0人率: ' + emptyRate.toFixed(1) + '%',
+                            '上位比較: ' + comparisonBody,
+                            '条件: ' + filterDetailsText
+                        ].join('\n');
+                        topComparison.textContent = '比較メモ: ' + comparisonBody;
+                    }
+                }
+                const briefPrimaryTarget = topRows.length ? String(topRows[0].name || '-') : '-';
+                const briefPrimaryCount = topRows.length ? String(Number(topRows[0]._memberCount || 0)) : '0';
+                _directoryUxState.quickShareMemoText = [
+                    'ディレクトリ共有サマリー',
+                    '表示件数: ' + String(visibleCount) + ' / ' + String(totalCount),
+                    '表示中人数: ' + String(visibleMemberCount) + '人',
+                    '0人組織: ' + String(emptyDirectoryCount) + '件（' + emptyRate.toFixed(1) + '%）',
+                    '最多: ' + briefPrimaryTarget + '（' + briefPrimaryCount + '人）',
+                    '条件: ' + (filterPairs.length ? filterPairs.join(' / ') : 'なし')
+                ].join('\n');
+                if (averageSummary) {
+                    averageSummary.textContent = '平均人数 ' + avgMemberCount.toFixed(1);
+                }
+                if (emptyRateSummary) {
+                    emptyRateSummary.textContent = '0人率 ' + emptyRate.toFixed(1) + '%';
+                }
+                if (emptyGuide) {
+                    emptyGuide.style.display = !_isLoading && visibleCount === 0 ? '' : 'none';
+                }
+                if (nextAction) {
+                    _directoryUxState.recommendedAction = '';
+                    _directoryUxState.recommendedTargetId = '';
+                    _directoryUxState.recommendedMessage = '';
+                    if (_isLoading) {
+                        _directoryUxState.recommendedMessage = '読み込み中です。完了後に件数を確認して詳細を開いてください。';
+                    } else if (visibleCount === 0 && appliedFilters > 0) {
+                        _directoryUxState.recommendedAction = 'clearFilters';
+                        _directoryUxState.recommendedMessage = '一致するディレクトリがありません。まず「絞り込みを解除」で全体を確認してください。';
+                    } else if (emptyDirectoryCount > 0) {
+                        _directoryUxState.recommendedAction = 'openEmpty';
+                        _directoryUxState.recommendedMessage = '次の操作: 0人組織が ' + String(emptyDirectoryCount) + ' 件あります。「推奨アクションを実行」で更新対象を確認してください。';
+                    } else if (visibleCount === 0) {
+                        _directoryUxState.recommendedMessage = 'ディレクトリが未登録です。「ディレクトリを追加」から作成してください。';
+                    } else if (topRows.length && topGap >= 3) {
+                        _directoryUxState.recommendedAction = 'openLargest';
+                        _directoryUxState.recommendedTargetId = String(topRows[0].id || '');
+                        _directoryUxState.recommendedMessage = '次の操作: 「' + String(topRows[0].name || '') + '」が次点より ' + String(topGap) + ' 人多い状態です。優先して負荷分散を確認してください。';
+                    } else if (topRows.length && Number(topRows[0]._memberCount || 0) >= 10) {
+                        _directoryUxState.recommendedAction = 'openLargest';
+                        _directoryUxState.recommendedTargetId = String(topRows[0].id || '');
+                        _directoryUxState.recommendedMessage = '次の操作: 人数が多い「' + String(topRows[0].name || '') + '」から担当・階層の妥当性を確認してください。';
+                    } else {
+                        _directoryUxState.recommendedAction = 'openFirst';
+                        _directoryUxState.recommendedTargetId = visibleRows[0] && visibleRows[0].id ? String(visibleRows[0].id) : '';
+                        _directoryUxState.recommendedMessage = '次の操作: 「' + String(visibleRows[0].name || '') + '」など対象行の「開く」から詳細を更新してください。';
+                    }
+                    _directoryUxState.actionMemoText = [
+                        'ディレクトリ推奨手順',
+                        '推奨アクション: ' + (_directoryUxState.recommendedAction || 'なし'),
+                        _directoryUxState.recommendedMessage || '推奨手順はありません',
+                        '比較観点: 0人組織=' + String(emptyDirectoryCount) + '件 / 平均=' + avgMemberCount.toFixed(1) + '人 / 最大差=' + String(topGap) + '人',
+                        '条件: ' + (filterPairs.length ? filterPairs.join(' / ') : 'なし')
+                    ].join('\n');
+                    nextAction.textContent = _directoryUxState.recommendedMessage;
+                }
+                if (runRecommendedButton) {
+                    runRecommendedButton.disabled = _isLoading || !_directoryUxState.recommendedAction;
+                }
+                if (copyComparisonButton) {
+                    copyComparisonButton.disabled = _isLoading || !_directoryUxState.comparisonMemoText;
+                }
+                if (copyBriefButton) {
+                    copyBriefButton.disabled = _isLoading || !_directoryUxState.quickShareMemoText;
+                }
+                if (copyActionButton) {
+                    copyActionButton.disabled = _isLoading || !_directoryUxState.actionMemoText;
+                }
+                if (sharePreview) {
+                    const previewLine = _directoryUxState.recommendedMessage || '推奨手順を作成中です';
+                    sharePreview.textContent = '共有プレビュー: ' + String(visibleCount) + '件 / ' + String(visibleMemberCount) + '人 / ' + previewLine;
+                }
+            },
+
+            _updateSummary: function () {
+                const countElement = document.getElementById('members-summary-count');
+                const actionElement = document.getElementById('members-summary-action');
+                const shortcutElement = document.getElementById('members-summary-shortcut');
+                const workflowElement = document.getElementById('members-summary-workflow');
+                const addLabelElement = document.getElementById('members-quick-add-label');
+                const onboardingStatusElement = document.getElementById('members-onboarding-status');
+                if (countElement) {
+                    const rows = _tableData[_currentTab] || [];
+                    const count = this._countRows(rows);
+                    countElement.textContent = String(count);
+                }
+                if (actionElement) {
+                    if (_currentTab === 'member') actionElement.textContent = '行の「開く」でメンバー詳細';
+                    else if (_currentTab === 'directory') actionElement.textContent = '行の「開く」でディレクトリ詳細';
+                    else if (_currentTab === 'skills') actionElement.textContent = '行の「開く」でスキル詳細';
+                    else actionElement.textContent = '行の「開く」で企画詳細';
+                }
+                if (shortcutElement) {
+                    shortcutElement.textContent = 'Ctrl/⌘ + C で選択セルをコピー';
+                }
+                if (workflowElement) {
+                    workflowElement.textContent = this._getTabLabel(_currentTab) + 'の日次は 確認→絞込→開く→更新 の順で進めます';
+                }
+                if (addLabelElement) {
+                    addLabelElement.textContent = this._getTabLabel(_currentTab) + 'を追加';
+                }
+                if (onboardingStatusElement) {
+                    const tabLabel = this._getTabLabel(_currentTab);
+                    if (_onboardingState.completed) {
+                        onboardingStatusElement.textContent = '導入済み: ' + tabLabel + 'の操作に慣れたら日次4ステップで運用';
+                    } else if (_onboardingState.quickGuideShown) {
+                        onboardingStatusElement.textContent = '初見向け: 次は「' + tabLabel + 'を追加」で最初の成功体験を完了';
+                    } else {
+                        onboardingStatusElement.textContent = '初見向け: 見つける→絞る→開く→追加';
+                    }
+                }
+                this._updateDirectoryUxSummary();
+            },
+
+            _getOnboardingStateFromStorage: function () {
+                if (!App.state || !App.state.getUserProperty) return {};
+                return App.state.getUserProperty(_onboardingState.key, {});
+            },
+
+            _markOnboardingProgress: function (progress) {
+                const current = this._getOnboardingStateFromStorage();
+                const next = Object.assign({}, current, progress);
+                _onboardingState.quickGuideShown = next.quickGuideShown === true;
+                _onboardingState.completed = next.completed === true;
+                this._updateSummary();
+                if (App.state && App.state.saveUserProperty) {
+                    App.state.saveUserProperty(_onboardingState.key, next);
+                }
+            },
+
+            _loadOnboardingState: function () {
+                const current = this._getOnboardingStateFromStorage();
+                _onboardingState.quickGuideShown = current.quickGuideShown === true;
+                _onboardingState.completed = current.completed === true;
+            },
+
+            _ensureFirstVisitOnboarding: function () {
+                if (_onboardingState.quickGuideShown) return;
+                this.startQuickOnboarding();
             },
 
             _ensureResizeHandler: function () {
@@ -1057,6 +1591,7 @@
                 }
 
                 if (data.type === _frameMessageType.rowClick) {
+                    this._markOnboardingProgress({ completed: true, quickGuideShown: true });
                     this._handleFrameRowClick(data.tabName, data.payload || {});
                     return;
                 }
@@ -1082,7 +1617,7 @@
 
                 if (data.type === _frameMessageType.error) {
                     console.error('[Members] Tabulator iframe error:', (data.payload && data.payload.message) || 'unknown error');
-                    showSnackbar('メンバー一覧の描画に失敗しました', 'error');
+                    showSnackbar('一覧を表示できませんでした。再読み込みしてください', 'error');
                 }
             },
 
