@@ -8,8 +8,16 @@
             originalAssignments: [],
             isDeleteRequested: false,
             isDirty: false,
+            isSaving: false,
+            isDeleting: false,
             quill: null,
             thumbnailPreviewToken: '',
+            thumbnailPreviewStatus: 'empty',
+            thumbnailPreviewErrorCode: '',
+            thumbnailPreviewRecommendedAction: 'none',
+            thumbnailPreviewDebounceTimer: null,
+            thumbnailCopyFeedbackTimer: null,
+            lastOperationState: 'idle',
 
             open: function (planId) {
                 if (!planId) return;
@@ -37,6 +45,8 @@
                 });
                 this.isDeleteRequested = false;
                 this.isDirty = false;
+                this.isSaving = false;
+                this.isDeleting = false;
 
                 if (!this.quill) {
                     this.quill = App.utils.quill.init('#plan-description-editor', {
@@ -49,11 +59,17 @@
                 this._bindChangeListeners();
                 this.loadComments(planId);
                 this.switchTab(document.querySelector('#plan-detail-tabs > a'), 'description');
+                this._setErrorMessage('', 'error');
+                this._setOperationState('idle');
 
                 this._syncLatest(planId);
             },
 
             close: function (skipDirtyCheck) {
+                if (this.isSaving || this.isDeleting) {
+                    showSnackbar('保存処理中は閉じられません', 'info');
+                    return;
+                }
                 if (!skipDirtyCheck && this.isDirty) {
                     if (!confirm('変更を破棄して閉じますか？')) return;
                 }
@@ -62,6 +78,10 @@
             },
 
             discard: function () {
+                if (this.isSaving || this.isDeleting) {
+                    showSnackbar('保存処理中は破棄できません', 'info');
+                    return;
+                }
                 if (this.isDirty && !confirm('変更を破棄しますか？')) return;
                 closeModal('modal-detail-plan');
                 this._reset();
@@ -138,17 +158,21 @@
 
             save: async function () {
                 if (!this.currentId) return;
+                if (this.isSaving || this.isDeleting) return;
 
-                const errorEl = document.getElementById('plan-detail-error');
-                const name = (document.getElementById('plan-detail-name-input')?.value || '').trim();
-                if (!name) {
-                    if (errorEl) {
-                        errorEl.textContent = '企画名は必須です';
-                        errorEl.style.display = '';
+                const validationResult = this._validatePlanInputs();
+                if (!validationResult.canSave) {
+                    this._setErrorMessage(validationResult.message, validationResult.level === 'warning' ? 'warning' : 'error');
+                    if (validationResult.fieldId) {
+                        const invalidField = document.getElementById(validationResult.fieldId);
+                        if (invalidField && typeof invalidField.focus === 'function') {
+                            invalidField.focus();
+                        }
                     }
                     return;
                 }
-                if (errorEl) errorEl.style.display = 'none';
+                this._setErrorMessage('', 'error');
+                const name = (document.getElementById('plan-detail-name-input')?.value || '').trim();
 
                 const updates = {
                     plan_number: (document.getElementById('plan-detail-plan-number-input')?.value || '').trim() || null,
@@ -202,6 +226,9 @@
                 });
 
                 if (this.isDeleteRequested === true) {
+                    this.isDeleting = true;
+                    this._setOperationState('deleting');
+                    this._updateActionButtons();
                     showSnackbar('企画を削除しています...', 'info', 'top', 0);
                     try {
                         await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLANS, 'remove', {
@@ -214,11 +241,19 @@
                         showSnackbar('企画を削除しました', 'success');
                     } catch (error) {
                         console.error('[PlanDetail] 削除エラー:', error);
+                        this._setOperationState('delete_error');
+                        this._setErrorMessage('企画の削除に失敗しました。時間をおいて再試行してください。', 'error');
                         showSnackbar('企画の削除に失敗しました', 'error');
+                    } finally {
+                        this.isDeleting = false;
+                        this._updateActionButtons();
                     }
                     return;
                 }
 
+                this.isSaving = true;
+                this._setOperationState('saving');
+                this._updateActionButtons();
                 showSnackbar('企画を保存しています...', 'info', 'top', 0);
 
                 try {
@@ -246,22 +281,35 @@
                     this._render();
 
                     showSnackbar('企画を保存しました', 'success');
+                    this._setErrorMessage('', 'error');
+                    this._setOperationState('save_success');
                 } catch (error) {
                     console.error('[PlanDetail] 保存エラー:', error);
+                    this._setErrorMessage('企画の保存に失敗しました。入力内容を確認して再試行してください。', 'error');
+                    this._setOperationState('save_error');
                     showSnackbar('企画の保存に失敗しました', 'error');
+                } finally {
+                    this.isSaving = false;
+                    this._updateActionButtons();
                 }
             },
 
             requestDelete: function () {
                 if (!this.currentId) return;
+                if (this.isSaving || this.isDeleting) return;
+                if (this.isDeleteRequested === true) {
+                    if (!confirm('削除予約を解除しますか？')) return;
+                    this.isDeleteRequested = false;
+                    this.toggleDirty(true);
+                    this._setOperationState(this.isDirty ? 'dirty' : 'idle');
+                    this._setErrorMessage('', 'error');
+                    return;
+                }
                 if (!confirm('この企画を削除対象として保存しますか？\n「変更を保存」で確定します。')) return;
                 this.isDeleteRequested = true;
                 this.toggleDirty(true);
-                const errorEl = document.getElementById('plan-detail-error');
-                if (errorEl) {
-                    errorEl.textContent = 'この企画は削除予定です。「変更を保存」で確定します。';
-                    errorEl.style.display = '';
-                }
+                this._setErrorMessage('この企画は削除予定です。「変更を保存」で確定します。', 'warning');
+                this._setOperationState('delete_reserved');
             },
 
             switchTab: function (el, tabName) {
@@ -276,6 +324,14 @@
                 if (descriptionTab) descriptionTab.className = tabName === 'description' ? 'page medium-height active' : 'page medium-height';
                 if (metaTab) metaTab.className = tabName === 'meta' ? 'page medium-height active scroll' : 'page medium-height scroll';
                 if (membersTab) membersTab.className = tabName === 'members' ? 'page medium-height active scroll' : 'page medium-height scroll';
+
+                const saveButton = document.getElementById('plan-detail-save-button');
+                if (saveButton) {
+                    saveButton.innerHTML = tabName === 'members'
+                        ? '<i>save<\/i><span>関係者の変更を保存</span>'
+                        : '<i>save<\/i><span>変更を保存</span>';
+                }
+                this._updateActionButtons();
             },
 
             openNewComment: function () {
@@ -486,6 +542,7 @@
                     }
                     updatedEl.textContent = parts.join(' / ');
                 }
+                this._updateStatusChipColor(status);
 
                 const mappings = [
                     ['plan-detail-plan-number-input', plan.plan_number || ''],
@@ -572,6 +629,7 @@
 
                 this._renderAssignments();
                 this._refreshThumbnailPreviewFromInput();
+                this._updateActionButtons();
             },
 
             _renderAssignments: function () {
@@ -661,23 +719,33 @@
                 ids.forEach(function (id) {
                     const el = document.getElementById(id);
                     if (!el) return;
-                    el.oninput = function () { App.modals.planDetail.toggleDirty(true); };
-                    el.onchange = function () { App.modals.planDetail.toggleDirty(true); };
+                    el.oninput = function () {
+                        App.modals.planDetail.toggleDirty(true);
+                        App.modals.planDetail._setErrorMessage('', 'error');
+                    };
+                    el.onchange = function () {
+                        App.modals.planDetail.toggleDirty(true);
+                        App.modals.planDetail._setErrorMessage('', 'error');
+                    };
                 });
 
                 const thumbnailInput = document.getElementById('plan-detail-thumbnail-url-input');
                 if (thumbnailInput && thumbnailInput.__thumbnailPreviewBound !== true) {
-                    const refreshPreview = function () {
-                        App.modals.planDetail._refreshThumbnailPreviewFromInput();
+                    const refreshPreviewDebounced = function () {
+                        App.modals.planDetail._scheduleThumbnailPreviewRefresh();
                     };
-                    thumbnailInput.addEventListener('input', refreshPreview);
-                    thumbnailInput.addEventListener('change', refreshPreview);
+                    const refreshPreviewImmediately = function () {
+                        App.modals.planDetail._refreshThumbnailPreviewFromInput(true);
+                    };
+                    thumbnailInput.addEventListener('input', refreshPreviewDebounced);
+                    thumbnailInput.addEventListener('change', refreshPreviewImmediately);
                     thumbnailInput.__thumbnailPreviewBound = true;
                 }
 
                 if (this.quill && this.quill.__planDetailDirtyBound !== true) {
                     this.quill.on('text-change', function () {
                         App.modals.planDetail.toggleDirty(true);
+                        App.modals.planDetail._setErrorMessage('', 'error');
                     });
                     this.quill.__planDetailDirtyBound = true;
                 }
@@ -691,7 +759,14 @@
                 this.originalAssignments = [];
                 this.isDeleteRequested = false;
                 this.isDirty = false;
+                this.isSaving = false;
+                this.isDeleting = false;
                 this.thumbnailPreviewToken = '';
+                this.thumbnailPreviewStatus = 'empty';
+                this.thumbnailPreviewErrorCode = '';
+                this.thumbnailPreviewRecommendedAction = 'none';
+                this._cancelThumbnailPreviewRefresh();
+                this._clearThumbnailCopyFeedbackTimer();
 
                 if (this.quill) {
                     App.utils.quill.clear(this.quill);
@@ -699,18 +774,48 @@
 
                 const comments = document.getElementById('plan-comments-list');
                 if (comments) comments.innerHTML = '';
-                this._setThumbnailPreviewState('サムネイルURLを入力するとプレビューを表示します', null);
+                this._setErrorMessage('', 'error');
+                this._setOperationState('idle');
+                this._setThumbnailPreviewState('サムネイルURLを入力するとプレビューを表示します', null, 'empty');
+                this._updateActionButtons();
             },
 
-            _setThumbnailPreviewState: function (message, dataUrl) {
+            _setThumbnailPreviewState: function (message, dataUrl, status) {
                 const stateEl = document.getElementById('plan-detail-thumbnail-preview-state');
+                const guideEl = document.getElementById('plan-detail-thumbnail-preview-guide');
                 const imageEl = document.getElementById('plan-detail-thumbnail-preview-image');
+                const chipEl = document.getElementById('plan-detail-thumbnail-preview-chip');
+                const retryButton = document.getElementById('plan-detail-thumbnail-preview-retry');
+                const openButton = document.getElementById('plan-detail-thumbnail-preview-open');
+                const manualRefreshButton = document.getElementById('plan-detail-thumbnail-refresh-button');
+                const normalizeButton = document.getElementById('plan-detail-thumbnail-normalize-button');
+                const normalizeRefreshButton = document.getElementById('plan-detail-thumbnail-normalize-refresh-button');
+                const nextActionButton = document.getElementById('plan-detail-thumbnail-next-action-button');
+                const copyUrlButton = document.getElementById('plan-detail-thumbnail-copy-url-button');
+                const copyNoteButton = document.getElementById('plan-detail-thumbnail-copy-note-button');
+                const copyFeedbackEl = document.getElementById('plan-detail-thumbnail-copy-feedback');
+                const inputHintEl = document.getElementById('plan-detail-thumbnail-input-hint');
+                const recoveryFlowEl = document.getElementById('plan-detail-thumbnail-recovery-flow');
+                const recoveryHintEl = document.getElementById('plan-detail-thumbnail-recovery-hint');
+                const recoveryStep1Button = document.getElementById('plan-detail-thumbnail-recovery-step1-button');
+                const recoveryStep2Button = document.getElementById('plan-detail-thumbnail-recovery-step2-button');
+                const recoveryStep3Button = document.getElementById('plan-detail-thumbnail-recovery-step3-button');
+                const recoveryStep1LabelEl = recoveryStep1Button ? recoveryStep1Button.querySelector('span') : null;
+                const retryLabelEl = retryButton ? retryButton.querySelector('span') : null;
+                const nextActionLabelEl = nextActionButton ? nextActionButton.querySelector('span') : null;
+                const hasImage = !!dataUrl;
+                const statusKey = status || (hasImage ? 'success' : 'empty');
+                this.thumbnailPreviewStatus = statusKey;
+                this.thumbnailPreviewRecommendedAction = this._resolveThumbnailRecommendedAction(statusKey, this.thumbnailPreviewErrorCode);
+                this._updateThumbnailDiagnostics(statusKey, this.thumbnailPreviewErrorCode, this.thumbnailPreviewRecommendedAction);
+                this._updateThumbnailInitialTriage(statusKey, this.thumbnailPreviewErrorCode, this.thumbnailPreviewRecommendedAction);
+
                 if (stateEl) {
                     stateEl.textContent = message || '';
-                    stateEl.style.display = dataUrl ? 'none' : '';
+                    stateEl.style.display = hasImage ? 'none' : '';
                 }
                 if (imageEl) {
-                    if (dataUrl) {
+                    if (hasImage) {
                         imageEl.src = dataUrl;
                         imageEl.style.display = '';
                     } else {
@@ -718,20 +823,231 @@
                         imageEl.style.display = 'none';
                     }
                 }
+                if (chipEl) {
+                    if (statusKey === 'loading') chipEl.textContent = '読み込み中';
+                    if (statusKey === 'success') chipEl.textContent = '表示中';
+                    if (statusKey === 'error') {
+                        if (this.thumbnailPreviewErrorCode === 'invalid_drive_url') chipEl.textContent = 'URL不正';
+                        else if (this.thumbnailPreviewErrorCode === 'permission_denied') chipEl.textContent = '権限不足';
+                        else if (this.thumbnailPreviewErrorCode === 'not_image') chipEl.textContent = '非画像';
+                        else if (this.thumbnailPreviewErrorCode === 'file_not_found') chipEl.textContent = '未検出';
+                        else chipEl.textContent = '取得失敗';
+                    }
+                    if (statusKey === 'empty') chipEl.textContent = '未設定';
+                }
+                if (guideEl) {
+                    if (statusKey === 'loading') {
+                        guideEl.textContent = 'プレビューを取得中です。完了後に表示される画像を確認し、問題なければ保存してください';
+                    } else if (statusKey === 'success') {
+                        guideEl.textContent = '表示OKです。このまま保存できます（保存されるのは画像データではなくURL文字列です）';
+                    } else if (statusKey === 'error') {
+                        if (this.thumbnailPreviewErrorCode === 'invalid_drive_url') {
+                            guideEl.textContent = 'Drive共有URLの形式が不正です。「Drive URLを整形」を押し、続けて「入力内容で確認」で再確認してください';
+                        } else if (this.thumbnailPreviewErrorCode === 'permission_denied') {
+                            guideEl.textContent = 'Driveの共有設定で「リンクを知っている全員が閲覧可」に変更後、「入力内容で確認」で再確認してください';
+                        } else if (this.thumbnailPreviewErrorCode === 'not_image') {
+                            guideEl.textContent = '画像以外のファイルです。PNG/JPG等の画像ファイルURLに変更し、「入力内容で確認」で再確認してください';
+                        } else if (this.thumbnailPreviewErrorCode === 'file_not_found') {
+                            guideEl.textContent = '対象ファイルが見つかりません。URL内のファイルIDを確認し、必要なら「Drive URLを整形」後に「入力内容で確認」を実行してください';
+                        } else {
+                            guideEl.textContent = '取得に失敗しました。URLとDriveの状態を確認し、「入力内容で確認」を押してください';
+                        }
+                    } else {
+                        guideEl.textContent = '1. Drive共有URLを貼り付け 2. 「Drive URLを整形」 3. 「入力内容で確認」 4. 表示できたら保存（保存値はURL）';
+                    }
+                }
+                if (inputHintEl) {
+                    if (statusKey === 'loading') {
+                        inputHintEl.textContent = '読み込み中です。結果が出たら表示画像を確認してください';
+                    } else if (statusKey === 'success') {
+                        inputHintEl.textContent = '確認完了: URL文字列のまま保存されます。問題なければ保存してください';
+                    } else if (statusKey === 'error') {
+                        if (this.thumbnailPreviewErrorCode === 'invalid_drive_url') {
+                            inputHintEl.textContent = '次アクション: 「Drive URLを整形」→「入力内容で確認」';
+                        } else if (this.thumbnailPreviewErrorCode === 'permission_denied') {
+                            inputHintEl.textContent = '次アクション: Drive共有を閲覧可能に変更 → 「入力内容で確認」';
+                        } else if (this.thumbnailPreviewErrorCode === 'not_image') {
+                            inputHintEl.textContent = '次アクション: 画像ファイルURLへ変更 → 「入力内容で確認」';
+                        } else if (this.thumbnailPreviewErrorCode === 'file_not_found') {
+                            inputHintEl.textContent = '次アクション: ファイルID確認（必要なら整形）→「入力内容で確認」';
+                        } else {
+                            inputHintEl.textContent = '次アクション: URLを見直して「入力内容で確認」';
+                        }
+                    } else {
+                        inputHintEl.textContent = '迷ったら「Drive URLを整形」→「入力内容で確認」。表示できたらURL文字列のまま保存できます';
+                    }
+                }
+                if (retryButton) {
+                    retryButton.disabled = statusKey === 'loading' || this.isSaving || this.isDeleting;
+                    if (retryLabelEl) {
+                        retryLabelEl.textContent = statusKey === 'error' ? '再試行' : '再読込';
+                    }
+                }
+                if (manualRefreshButton) {
+                    manualRefreshButton.disabled = statusKey === 'loading' || this.isSaving || this.isDeleting;
+                }
+                if (normalizeButton) {
+                    normalizeButton.disabled = this.isSaving || this.isDeleting;
+                }
+                if (normalizeRefreshButton) {
+                    normalizeRefreshButton.disabled = statusKey === 'loading' || this.isSaving || this.isDeleting;
+                }
+                if (nextActionButton) {
+                    nextActionButton.disabled = statusKey === 'loading' || this.isSaving || this.isDeleting || this.thumbnailPreviewRecommendedAction === 'none';
+                    if (nextActionLabelEl) {
+                        if (this.thumbnailPreviewRecommendedAction === 'normalize_refresh') {
+                            nextActionLabelEl.textContent = '整形して確認';
+                        } else if (this.thumbnailPreviewRecommendedAction === 'refresh') {
+                            nextActionLabelEl.textContent = '入力内容で確認';
+                        } else if (this.thumbnailPreviewRecommendedAction === 'open_source') {
+                            nextActionLabelEl.textContent = 'URLを開く';
+                        } else {
+                            nextActionLabelEl.textContent = '次アクション';
+                        }
+                    }
+                }
+                if (recoveryStep1Button) {
+                    recoveryStep1Button.disabled = nextActionButton ? nextActionButton.disabled : true;
+                }
+                if (recoveryStep1LabelEl) {
+                    const resolvedLabel = String(nextActionLabelEl?.textContent || '').trim() || this._getThumbnailDiagnosticActionLabel(this.thumbnailPreviewRecommendedAction);
+                    recoveryStep1LabelEl.textContent = '1. ' + resolvedLabel;
+                }
+                if (recoveryStep2Button) {
+                    recoveryStep2Button.disabled = statusKey === 'loading' || this.isSaving || this.isDeleting;
+                }
+                if (recoveryStep3Button) {
+                    const url = this._getThumbnailUrl();
+                    recoveryStep3Button.disabled = !url || this.isSaving || this.isDeleting;
+                }
+                if (openButton) {
+                    const url = this._getThumbnailUrl();
+                    openButton.disabled = !url || this.isSaving || this.isDeleting;
+                }
+                if (copyUrlButton) {
+                    const url = this._getThumbnailUrl();
+                    copyUrlButton.disabled = !url || this.isSaving || this.isDeleting;
+                }
+                if (copyNoteButton) {
+                    const url = this._getThumbnailUrl();
+                    copyNoteButton.disabled = !url || this.isSaving || this.isDeleting;
+                }
+                if (copyFeedbackEl && !String(copyFeedbackEl.dataset.locked || '').trim()) {
+                    if (statusKey === 'success') {
+                        copyFeedbackEl.className = 'small-text secondary-text';
+                        copyFeedbackEl.textContent = '共有時は「URLをコピー」または「引き継ぎ情報をコピー」を利用できます';
+                    } else if (statusKey === 'error') {
+                        copyFeedbackEl.className = 'small-text tertiary-text';
+                        copyFeedbackEl.textContent = '次アクション実行後も失敗する場合は「引き継ぎ情報をコピー」でエラー分類と次アクションを共有できます';
+                    } else if (statusKey === 'loading') {
+                        copyFeedbackEl.className = 'small-text tertiary-text';
+                        copyFeedbackEl.textContent = '判定中です。完了後にコピー導線を利用してください';
+                    } else {
+                        copyFeedbackEl.className = 'small-text secondary-text';
+                        copyFeedbackEl.textContent = 'URL入力後にコピー導線が有効になります';
+                    }
+                }
+                if (recoveryFlowEl) {
+                    recoveryFlowEl.style.display = statusKey === 'error' ? '' : 'none';
+                }
+                if (recoveryHintEl) {
+                    if (statusKey === 'error') {
+                        const step1Label = String(recoveryStep1LabelEl?.textContent || '').trim() || '1. 次アクション';
+                        recoveryHintEl.textContent = step1Label + ' → 2. 入力内容で確認 → 3. 引き継ぎ情報をコピー の順で進めてください';
+                    } else if (statusKey === 'loading') {
+                        recoveryHintEl.textContent = '判定中です。失敗が確定したら 1 → 2 → 3 の順で進めます';
+                    } else if (statusKey === 'success') {
+                        recoveryHintEl.textContent = '表示成功です。失敗時のみ復旧順を表示します';
+                    } else {
+                        recoveryHintEl.textContent = '失敗したら 1 → 2 → 3 の順で押すと最短で復旧・引き継ぎできます';
+                    }
+                }
             },
 
-            _refreshThumbnailPreviewFromInput: async function () {
+            _getThumbnailDiagnosticCodeLabel: function (statusKey, errorCode) {
+                if (statusKey === 'success') return 'ok';
+                if (statusKey === 'loading') return 'checking';
+                if (statusKey === 'empty') return 'none';
+                return String(errorCode || 'fetch_failed').trim() || 'fetch_failed';
+            },
+
+            _getThumbnailDiagnosticMeaningLabel: function (statusKey, errorCode) {
+                if (statusKey === 'success') return '表示に成功。保存時はURL文字列が保存されます';
+                if (statusKey === 'loading') return 'URLから画像取得を確認中です';
+                if (statusKey === 'empty') return '未入力のため未判定です';
+                if (errorCode === 'invalid_drive_url') return 'Drive共有URLの形式が不正、またはURLとして解釈できません';
+                if (errorCode === 'permission_denied') return '対象ファイルを閲覧する権限が不足しています';
+                if (errorCode === 'not_image') return '対象ファイルは画像ではありません';
+                if (errorCode === 'file_not_found') return 'ファイルIDに対応するファイルが見つかりません';
+                return '画像取得処理に失敗しました';
+            },
+
+            _getThumbnailDiagnosticActionLabel: function (recommendedAction) {
+                if (recommendedAction === 'normalize_refresh') return 'Drive URLを整形 → 入力内容で確認';
+                if (recommendedAction === 'refresh') return '入力内容で確認';
+                if (recommendedAction === 'open_source') return 'URLを開く';
+                return '入力内容で確認';
+            },
+
+            _updateThumbnailDiagnostics: function (statusKey, errorCode, recommendedAction) {
+                const codeEl = document.getElementById('plan-detail-thumbnail-diagnostic-code');
+                const meaningEl = document.getElementById('plan-detail-thumbnail-diagnostic-meaning');
+                const actionEl = document.getElementById('plan-detail-thumbnail-diagnostic-action');
+                const diagnosticsEl = document.getElementById('plan-detail-thumbnail-diagnostics');
+                if (codeEl) codeEl.textContent = this._getThumbnailDiagnosticCodeLabel(statusKey, errorCode);
+                if (meaningEl) meaningEl.textContent = this._getThumbnailDiagnosticMeaningLabel(statusKey, errorCode);
+                if (actionEl) actionEl.textContent = this._getThumbnailDiagnosticActionLabel(recommendedAction);
+                if (diagnosticsEl) {
+                    diagnosticsEl.className = statusKey === 'error'
+                        ? 'small-text tertiary-text top-margin'
+                        : 'small-text secondary-text top-margin';
+                }
+            },
+
+            _resolveThumbnailRecommendedAction: function (statusKey, errorCode) {
+                if (statusKey === 'success') return 'open_source';
+                if (statusKey !== 'error') return 'none';
+                if (errorCode === 'invalid_drive_url') return 'normalize_refresh';
+                return 'refresh';
+            },
+
+            _scheduleThumbnailPreviewRefresh: function () {
+                this._cancelThumbnailPreviewRefresh();
+                this.thumbnailPreviewDebounceTimer = setTimeout(function () {
+                    App.modals.planDetail.thumbnailPreviewDebounceTimer = null;
+                    App.modals.planDetail._refreshThumbnailPreviewFromInput(false);
+                }, 350);
+            },
+
+            _cancelThumbnailPreviewRefresh: function () {
+                if (!this.thumbnailPreviewDebounceTimer) return;
+                clearTimeout(this.thumbnailPreviewDebounceTimer);
+                this.thumbnailPreviewDebounceTimer = null;
+            },
+
+            _refreshThumbnailPreviewFromInput: async function (forceImmediate) {
+                if (forceImmediate === true) {
+                    this._cancelThumbnailPreviewRefresh();
+                }
                 const inputEl = document.getElementById('plan-detail-thumbnail-url-input');
                 if (!inputEl) return;
                 const url = String(inputEl.value || '').trim();
                 if (!url) {
-                    this._setThumbnailPreviewState('サムネイルURLを入力するとプレビューを表示します', null);
+                    this.thumbnailPreviewErrorCode = '';
+                    this._setThumbnailPreviewState('サムネイルURLを入力するとプレビューを表示します', null, 'empty');
+                    return;
+                }
+
+                if (!this._isHttpOrHttpsUrl(url)) {
+                    this.thumbnailPreviewErrorCode = 'invalid_drive_url';
+                    this._setThumbnailPreviewState('URLはhttp/https形式で入力してください', null, 'error');
                     return;
                 }
 
                 const requestToken = String(Date.now()) + '-' + String(Math.random()).slice(2);
                 this.thumbnailPreviewToken = requestToken;
-                this._setThumbnailPreviewState('サムネイルを読み込み中です...', null);
+                this.thumbnailPreviewErrorCode = '';
+                this._setThumbnailPreviewState('サムネイルを読み込み中です...', null, 'loading');
 
                 try {
                     const result = await callGAS('getDriveImageDataUrl', url);
@@ -740,11 +1056,640 @@
                     if (!dataUrl) {
                         throw new Error('画像データを取得できませんでした');
                     }
-                    this._setThumbnailPreviewState('', dataUrl);
+                    this.thumbnailPreviewErrorCode = '';
+                    this._setThumbnailPreviewState('', dataUrl, 'success');
                 } catch (error) {
                     if (this.thumbnailPreviewToken !== requestToken) return;
                     console.error('[PlanDetail] サムネイルプレビュー取得エラー:', error);
-                    this._setThumbnailPreviewState('サムネイルの取得に失敗しました（Drive画像URLを確認してください）', null);
+                    const errorInfo = this._parseThumbnailPreviewError(error);
+                    this.thumbnailPreviewErrorCode = errorInfo.code;
+                    this._setThumbnailPreviewState(errorInfo.message, null, 'error');
+                }
+            },
+
+            retryThumbnailPreview: function () {
+                this._refreshThumbnailPreviewFromInput(true);
+            },
+
+            manualRefreshThumbnailPreview: function () {
+                this._refreshThumbnailPreviewFromInput(true);
+            },
+
+            normalizeThumbnailUrlInput: function () {
+                const inputEl = document.getElementById('plan-detail-thumbnail-url-input');
+                if (!inputEl) return;
+                const current = String(inputEl.value || '').trim();
+                if (!current) {
+                    this.thumbnailPreviewErrorCode = 'invalid_drive_url';
+                    this._setThumbnailPreviewState('サムネイルURLを入力してから整形してください', null, 'error');
+                    return;
+                }
+                const normalized = this._normalizeDriveFileUrl(current);
+                if (!normalized) {
+                    this.thumbnailPreviewErrorCode = 'invalid_drive_url';
+                    this._setThumbnailPreviewState('Drive共有URLを入力してください（file/d/{id} または open?id=）', null, 'error');
+                    return;
+                }
+                if (normalized !== current) {
+                    inputEl.value = normalized;
+                    this.toggleDirty(true);
+                }
+                this.thumbnailPreviewErrorCode = '';
+                this._setThumbnailPreviewState('Drive画像URLを整形しました。表示確認を実行します', null, 'loading');
+                this._refreshThumbnailPreviewFromInput(true);
+            },
+
+            normalizeAndRefreshThumbnailPreview: function () {
+                const inputEl = document.getElementById('plan-detail-thumbnail-url-input');
+                if (!inputEl) return;
+                const current = String(inputEl.value || '').trim();
+                if (!current) {
+                    this.thumbnailPreviewErrorCode = 'invalid_drive_url';
+                    this._setThumbnailPreviewState('サムネイルURLを入力してから整形してください', null, 'error');
+                    return;
+                }
+                const normalized = this._normalizeDriveFileUrl(current);
+                if (!normalized) {
+                    this.thumbnailPreviewErrorCode = 'invalid_drive_url';
+                    this._setThumbnailPreviewState('Drive共有URLを入力してください（file/d/{id} または open?id=）', null, 'error');
+                    return;
+                }
+                if (normalized !== current) {
+                    inputEl.value = normalized;
+                    this.toggleDirty(true);
+                }
+                this.thumbnailPreviewErrorCode = '';
+                this._setThumbnailPreviewState('Drive画像URLを整形し、表示確認を実行します', null, 'loading');
+                this._refreshThumbnailPreviewFromInput(true);
+            },
+
+            runThumbnailNextAction: function () {
+                const action = this.thumbnailPreviewRecommendedAction || 'none';
+                if (action === 'normalize_refresh') {
+                    this.normalizeAndRefreshThumbnailPreview();
+                    return;
+                }
+                if (action === 'refresh') {
+                    this.manualRefreshThumbnailPreview();
+                    return;
+                }
+                if (action === 'open_source') {
+                    this.openThumbnailSource();
+                }
+            },
+
+            openThumbnailSource: function () {
+                const url = this._getThumbnailUrl();
+                if (!url) return;
+                window.open(url, '_blank', 'noopener,noreferrer');
+            },
+
+            _setThumbnailCopyFeedback: function (message, level, hold) {
+                const feedbackEl = document.getElementById('plan-detail-thumbnail-copy-feedback');
+                if (!feedbackEl) return;
+                const kind = level === 'error' ? 'error' : (level === 'warning' ? 'warning' : (level === 'success' ? 'success' : 'info'));
+                feedbackEl.className = kind === 'error'
+                    ? 'small-text error-text'
+                    : (kind === 'warning' ? 'small-text tertiary-text' : 'small-text secondary-text');
+                feedbackEl.textContent = String(message || '').trim() || 'URL入力後にコピー導線が有効になります';
+                feedbackEl.dataset.locked = hold === true ? '1' : '';
+            },
+
+            _clearThumbnailCopyFeedbackTimer: function () {
+                if (!this.thumbnailCopyFeedbackTimer) return;
+                clearTimeout(this.thumbnailCopyFeedbackTimer);
+                this.thumbnailCopyFeedbackTimer = null;
+            },
+
+            _setThumbnailCopyFeedbackTemporarily: function (message, level) {
+                this._clearThumbnailCopyFeedbackTimer();
+                this._setThumbnailCopyFeedback(message, level, true);
+                this.thumbnailCopyFeedbackTimer = setTimeout(function () {
+                    App.modals.planDetail.thumbnailCopyFeedbackTimer = null;
+                    const feedbackEl = document.getElementById('plan-detail-thumbnail-copy-feedback');
+                    if (feedbackEl) feedbackEl.dataset.locked = '';
+                    App.modals.planDetail._setThumbnailPreviewState(
+                        document.getElementById('plan-detail-thumbnail-preview-state')?.textContent || '',
+                        document.getElementById('plan-detail-thumbnail-preview-image')?.getAttribute('src') || '',
+                        App.modals.planDetail.thumbnailPreviewStatus || 'empty'
+                    );
+                }, 3000);
+            },
+
+            _copyTextToClipboard: async function (text) {
+                const payload = String(text || '');
+                if (!payload) return false;
+                if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                    await navigator.clipboard.writeText(payload);
+                    return true;
+                }
+                const tempArea = document.createElement('textarea');
+                tempArea.value = payload;
+                tempArea.setAttribute('readonly', 'readonly');
+                tempArea.style.position = 'fixed';
+                tempArea.style.top = '-9999px';
+                document.body.appendChild(tempArea);
+                tempArea.select();
+                tempArea.setSelectionRange(0, tempArea.value.length);
+                const copied = document.execCommand('copy');
+                document.body.removeChild(tempArea);
+                if (!copied) {
+                    throw new Error('copy_command_failed');
+                }
+                return true;
+            },
+
+            _getThumbnailPreviewStatusLabel: function () {
+                if (this.thumbnailPreviewStatus === 'success') return '表示OK';
+                if (this.thumbnailPreviewStatus === 'loading') return '確認中';
+                if (this.thumbnailPreviewStatus === 'empty') return '未確認';
+                if (this.thumbnailPreviewErrorCode === 'invalid_drive_url') return 'URL形式エラー';
+                if (this.thumbnailPreviewErrorCode === 'permission_denied') return '権限不足';
+                if (this.thumbnailPreviewErrorCode === 'not_image') return '非画像ファイル';
+                if (this.thumbnailPreviewErrorCode === 'file_not_found') return 'ファイル未検出';
+                return '取得失敗';
+            },
+
+            _getThumbnailNextActionLabel: function () {
+                if (this.thumbnailPreviewRecommendedAction === 'none') return '特になし';
+                return this._getThumbnailDiagnosticActionLabel(this.thumbnailPreviewRecommendedAction);
+            },
+
+            _getThumbnailErrorClassificationLabel: function () {
+                if (this.thumbnailPreviewStatus !== 'error') return 'なし';
+                const code = this._getThumbnailDiagnosticCodeLabel('error', this.thumbnailPreviewErrorCode);
+                const meaning = this._getThumbnailDiagnosticMeaningLabel('error', this.thumbnailPreviewErrorCode);
+                return code + '（' + meaning + '）';
+            },
+
+            _getThumbnailInitialHint: function (statusKey, recommendedAction) {
+                const nextAction = this._getThumbnailDiagnosticActionLabel(recommendedAction);
+                if (statusKey === 'success') {
+                    return '初動確認完了です。必要時のみ「URLをコピー」または「引き継ぎ情報をコピー」を使って共有してください';
+                }
+                if (statusKey === 'loading') {
+                    return '初動確認中です。完了後に診断コードと次アクションを確認してください';
+                }
+                if (statusKey === 'error') {
+                    return '初動は「診断コード確認 → ' + nextAction + ' → 入力内容で確認」。継続失敗時は「引き継ぎ情報をコピー」で共有します';
+                }
+                return '初動は「診断コード確認 → 次アクション実行 → 入力内容で確認」。共有時は「引き継ぎ情報をコピー」を使います';
+            },
+
+            _getThumbnailQuickJudgementLabel: function (statusKey, errorCode) {
+                if (statusKey === 'success') {
+                    return '表示OK（このまま保存して問題ありません）';
+                }
+                if (statusKey === 'loading') {
+                    return '確認中（判定結果を待機中）';
+                }
+                if (statusKey === 'empty') {
+                    return '未確認（URL入力後に判定されます）';
+                }
+                if (errorCode === 'invalid_drive_url') {
+                    return '要対応（URL形式を修正してください）';
+                }
+                if (errorCode === 'permission_denied') {
+                    return '要対応（Drive共有権限を変更してください）';
+                }
+                if (errorCode === 'not_image') {
+                    return '要対応（画像ファイルURLに変更してください）';
+                }
+                if (errorCode === 'file_not_found') {
+                    return '要対応（ファイルIDを確認してください）';
+                }
+                return '要対応（再確認してください）';
+            },
+
+            _updateThumbnailInitialTriage: function (statusKey, errorCode, recommendedAction) {
+                const quickJudgementEl = document.getElementById('plan-detail-thumbnail-quick-judgement');
+                const statusEl = document.getElementById('plan-detail-thumbnail-initial-status');
+                const codeEl = document.getElementById('plan-detail-thumbnail-initial-code');
+                const nextActionEl = document.getElementById('plan-detail-thumbnail-initial-next-action');
+                const hintEl = document.getElementById('plan-detail-thumbnail-initial-hint');
+                if (quickJudgementEl) {
+                    quickJudgementEl.textContent = this._getThumbnailQuickJudgementLabel(statusKey, errorCode);
+                }
+                if (statusEl) statusEl.textContent = this._getThumbnailPreviewStatusLabel();
+                if (codeEl) codeEl.textContent = this._getThumbnailDiagnosticCodeLabel(statusKey, errorCode);
+                if (nextActionEl) nextActionEl.textContent = this._getThumbnailDiagnosticActionLabel(recommendedAction);
+                if (hintEl) {
+                    hintEl.className = statusKey === 'error'
+                        ? 'small-text tertiary-text'
+                        : 'small-text secondary-text';
+                    hintEl.textContent = this._getThumbnailInitialHint(statusKey, recommendedAction);
+                }
+            },
+
+            _buildThumbnailShareNote: function () {
+                const url = this._getThumbnailUrl();
+                if (!url) return '';
+                const statusMessage = String(document.getElementById('plan-detail-thumbnail-preview-state')?.textContent || '').trim();
+                const guideMessage = String(document.getElementById('plan-detail-thumbnail-preview-guide')?.textContent || '').trim();
+                const inputHintMessage = String(document.getElementById('plan-detail-thumbnail-input-hint')?.textContent || '').trim();
+                const nextActionButtonLabel = String(document.getElementById('plan-detail-thumbnail-next-action-button')?.querySelector('span')?.textContent || '').trim() || '次アクション';
+                const planCode = String(this.currentItem?.plan_number || this.currentItem?.zarms_code || this.currentId || '').trim();
+                const planName = String(this.currentItem?.name || '').trim();
+                return [
+                    '【thumbnail_url引き継ぎメモ】',
+                    planCode ? ('企画: ' + planCode) : '',
+                    planName ? ('企画名: ' + planName) : '',
+                    'URL: ' + url,
+                    '判定: ' + this._getThumbnailPreviewStatusLabel(),
+                    'エラー分類: ' + this._getThumbnailErrorClassificationLabel(),
+                    statusMessage ? ('状態: ' + statusMessage) : '',
+                    guideMessage ? ('ガイド: ' + guideMessage) : '',
+                    inputHintMessage ? ('入力ヒント: ' + inputHintMessage) : '',
+                    '次アクション: ' + this._getThumbnailNextActionLabel(),
+                    '次アクションボタン表示: ' + nextActionButtonLabel,
+                    '確認導線: Drive URLを整形 / 入力内容で確認 / 次アクション',
+                    '保存仕様: thumbnail_url はURL文字列のまま保存'
+                ].filter(Boolean).join('\n');
+            },
+
+            copyThumbnailUrl: async function () {
+                const url = this._getThumbnailUrl();
+                if (!url) {
+                    this._setThumbnailCopyFeedbackTemporarily('サムネイルURLを入力してからコピーしてください', 'warning');
+                    return;
+                }
+                try {
+                    await this._copyTextToClipboard(url);
+                    showSnackbar('サムネイルURLをコピーしました', 'success');
+                    this._setThumbnailCopyFeedbackTemporarily('URLをコピーしました。共有先へそのまま貼り付けできます', 'success');
+                } catch (error) {
+                    console.error('[PlanDetail] サムネイルURLのコピーに失敗:', error);
+                    showSnackbar('URLのコピーに失敗しました', 'error');
+                    this._setThumbnailCopyFeedbackTemporarily('コピーに失敗しました。権限を確認して再試行してください', 'error');
+                }
+            },
+
+            copyThumbnailShareNote: async function () {
+                const note = this._buildThumbnailShareNote();
+                if (!note) {
+                    this._setThumbnailCopyFeedbackTemporarily('サムネイルURLを入力すると状態メモをコピーできます', 'warning');
+                    return;
+                }
+                try {
+                    await this._copyTextToClipboard(note);
+                    showSnackbar('引き継ぎ情報をコピーしました', 'success');
+                    this._setThumbnailCopyFeedbackTemporarily('引き継ぎ情報をコピーしました。エラー分類と次アクションを共有できます', 'success');
+                } catch (error) {
+                    console.error('[PlanDetail] サムネイル状態メモのコピーに失敗:', error);
+                    showSnackbar('引き継ぎ情報のコピーに失敗しました', 'error');
+                    this._setThumbnailCopyFeedbackTemporarily('引き継ぎ情報のコピーに失敗しました。再試行してください', 'error');
+                }
+            },
+
+            _getThumbnailUrl: function () {
+                const inputEl = document.getElementById('plan-detail-thumbnail-url-input');
+                return String(inputEl?.value || '').trim();
+            },
+
+            _normalizeDriveFileUrl: function (urlText) {
+                const text = String(urlText || '').trim();
+                if (!text) return '';
+                if (!this._isHttpOrHttpsUrl(text)) return '';
+                try {
+                    const parsed = new URL(text);
+                    const host = String(parsed.hostname || '').toLowerCase();
+                    let fileId = '';
+                    if (host.indexOf('drive.google.com') === -1 && host.indexOf('docs.google.com') === -1) {
+                        return '';
+                    }
+                    const pathMatch = parsed.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                    if (pathMatch && pathMatch[1]) {
+                        fileId = pathMatch[1];
+                    }
+                    if (!fileId) {
+                        fileId = parsed.searchParams.get('id') || '';
+                    }
+                    if (!fileId) return '';
+                    return 'https://drive.google.com/file/d/' + fileId + '/view';
+                } catch (error) {
+                    return '';
+                }
+            },
+
+            _parseThumbnailPreviewError: function (error) {
+                const raw = String(error && error.message ? error.message : error || '');
+                const normalized = raw.replace(/^Exception:\s*/, '');
+                const tagged = normalized.match(/THUMBNAIL_ERROR:([^:]+):([\s\S]*)/);
+                if (tagged) {
+                    const code = String(tagged[1] || 'fetch_failed').trim() || 'fetch_failed';
+                    const message = String(tagged[2] || 'サムネイルの取得に失敗しました').trim() || 'サムネイルの取得に失敗しました';
+                    return { code: code, message: message };
+                }
+
+                if (/Google DriveのURL|DriveファイルID|invalid|URL/.test(normalized)) {
+                    return { code: 'invalid_drive_url', message: 'Google Driveの画像URLを指定してください' };
+                }
+                if (/権限|アクセス|permission|authorized/i.test(normalized)) {
+                    return { code: 'permission_denied', message: '指定されたファイルへのアクセス権限がありません' };
+                }
+                if (/画像ではありません|image/i.test(normalized)) {
+                    return { code: 'not_image', message: '指定されたファイルは画像ではありません' };
+                }
+                return {
+                    code: 'fetch_failed',
+                    message: 'サムネイルの取得に失敗しました'
+                };
+            },
+
+            _isNonNegativeIntegerText: function (value) {
+                const text = String(value || '').trim();
+                if (!text) return true;
+                if (!/^\d+$/.test(text)) return false;
+                const number = Number(text);
+                return Number.isFinite(number) && number >= 0;
+            },
+
+            _isHttpOrHttpsUrl: function (value) {
+                const text = String(value || '').trim();
+                if (!text) return true;
+                try {
+                    const parsed = new URL(text);
+                    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+                } catch (error) {
+                    return false;
+                }
+            },
+
+            _validatePlanInputs: function () {
+                if (this.isDeleteRequested === true) {
+                    return {
+                        canSave: true,
+                        level: 'info',
+                        message: ''
+                    };
+                }
+
+                const name = String(document.getElementById('plan-detail-name-input')?.value || '').trim();
+                if (!name) {
+                    return {
+                        canSave: false,
+                        level: 'warning',
+                        message: '企画名を入力すると保存できます',
+                        fieldId: 'plan-detail-name-input'
+                    };
+                }
+
+                const integerFields = [
+                    { id: 'plan-detail-plan-type-sequence-number-input', label: '企画種別内連番' },
+                    { id: 'plan-detail-estimated-staff-count-input', label: '推定運営者数' },
+                    { id: 'plan-detail-estimated-participant-count-input', label: '推定参加者数' },
+                    { id: 'plan-detail-estimated-total-cost-input', label: '推定合計費用' },
+                    { id: 'plan-detail-actual-staff-count-input', label: '実績運営者数' },
+                    { id: 'plan-detail-actual-participant-count-input', label: '実績参加者数' },
+                    { id: 'plan-detail-actual-total-cost-input', label: '実績合計費用' }
+                ];
+                for (let i = 0; i < integerFields.length; i += 1) {
+                    const field = integerFields[i];
+                    const text = String(document.getElementById(field.id)?.value || '').trim();
+                    if (!text) continue;
+                    if (!this._isNonNegativeIntegerText(text)) {
+                        return {
+                            canSave: false,
+                            level: 'error',
+                            message: field.label + ' は0以上の整数で入力してください',
+                            fieldId: field.id
+                        };
+                    }
+                }
+
+                const urlFields = [
+                    { id: 'plan-detail-selection-presentation-url-input', label: '選考プレゼン動画URL' },
+                    { id: 'plan-detail-online-media-url-input', label: 'オンライン媒体URL' },
+                    { id: 'plan-detail-website-url-input', label: '特設サイトURL' },
+                    { id: 'plan-detail-sheet-url-input', label: 'シートURL' },
+                    { id: 'plan-detail-folder-url-input', label: 'フォルダURL' },
+                    { id: 'plan-detail-document-url-input', label: 'ドキュメントURL' },
+                    { id: 'plan-detail-slide-url-input', label: 'スライドURL' },
+                    { id: 'plan-detail-script-url-input', label: '台本URL' },
+                    { id: 'plan-detail-thumbnail-url-input', label: 'サムネイルURL' },
+                    { id: 'plan-detail-slack-channel-url-input', label: 'SlackチャンネルURL' }
+                ];
+                for (let i = 0; i < urlFields.length; i += 1) {
+                    const field = urlFields[i];
+                    const text = String(document.getElementById(field.id)?.value || '').trim();
+                    if (!text) continue;
+                    if (!this._isHttpOrHttpsUrl(text)) {
+                        return {
+                            canSave: false,
+                            level: 'error',
+                            message: field.label + ' はhttp/https形式で入力してください',
+                            fieldId: field.id
+                        };
+                    }
+                }
+
+                return {
+                    canSave: true,
+                    level: 'info',
+                    message: ''
+                };
+            },
+
+            _setErrorMessage: function (message, level) {
+                const containerEl = document.getElementById('plan-detail-error-container');
+                const errorEl = document.getElementById('plan-detail-error');
+                const iconEl = document.getElementById('plan-detail-error-icon');
+                if (!containerEl || !errorEl || !iconEl) return;
+
+                const text = String(message || '').trim();
+                if (!text) {
+                    containerEl.style.display = 'none';
+                    errorEl.textContent = '';
+                    iconEl.textContent = 'error';
+                    containerEl.className = 'small-round padding top-margin';
+                    return;
+                }
+
+                const kind = level === 'warning' ? 'warning' : 'error';
+                containerEl.className = kind === 'warning'
+                    ? 'small-round padding top-margin secondary-container'
+                    : 'small-round padding top-margin error-container';
+                iconEl.textContent = kind === 'warning' ? 'warning' : 'error';
+                errorEl.className = kind === 'warning' ? 'small-text no-margin' : 'small-text no-margin error-text';
+                errorEl.textContent = text;
+                containerEl.style.display = '';
+            },
+
+            _updateActionButtons: function () {
+                const saveButton = document.getElementById('plan-detail-save-button');
+                const discardButton = document.getElementById('plan-detail-discard-button');
+                const requestDeleteButton = document.getElementById('plan-detail-request-delete-button');
+                const closeButton = document.getElementById('plan-detail-close-button');
+                const newCommentHeaderButton = document.getElementById('plan-detail-new-comment-header-button');
+                const newCommentSideButton = document.getElementById('plan-detail-new-comment-side-button');
+                const openMembersButton = document.getElementById('plan-detail-open-members-button');
+                const unsavedIndicator = document.getElementById('plan-detail-unsaved-indicator');
+                const saveReadinessChip = document.getElementById('plan-detail-save-readiness-chip');
+                const processing = this.isSaving || this.isDeleting;
+                const hasChanges = this.isDirty === true;
+                const validationResult = this._validatePlanInputs();
+                const canSave = hasChanges && !processing && validationResult.canSave;
+                if (saveButton) {
+                    saveButton.disabled = !canSave;
+                    const isMembersTab = document.getElementById('plan-detail-tab-members')?.classList.contains('active') === true;
+                    const defaultLabel = isMembersTab
+                        ? '<i>save<\/i><span>関係者の変更を保存</span>'
+                        : '<i>save<\/i><span>変更を保存</span>';
+                    saveButton.innerHTML = defaultLabel;
+                    if (this.isDeleting) {
+                        saveButton.innerHTML = '<progress class="circle small"></progress><span>削除を実行中...</span>';
+                    } else if (this.isSaving) {
+                        saveButton.innerHTML = '<progress class="circle small"></progress><span>保存中...</span>';
+                    } else if (this.isDeleteRequested) {
+                        saveButton.innerHTML = '<i>delete</i><span>削除を確定</span>';
+                    }
+                }
+                if (saveReadinessChip) {
+                    saveReadinessChip.className = 'chip small';
+                    if (processing) {
+                        saveReadinessChip.textContent = '判定保留';
+                        saveReadinessChip.className += ' tertiary-container';
+                    } else if (!hasChanges) {
+                        saveReadinessChip.textContent = '保存不要';
+                    } else if (validationResult.canSave) {
+                        saveReadinessChip.textContent = '保存可能';
+                        saveReadinessChip.className += ' secondary-container';
+                    } else {
+                        saveReadinessChip.textContent = '保存不可';
+                        saveReadinessChip.className += ' error-container';
+                    }
+                }
+                if (discardButton) {
+                    discardButton.disabled = !hasChanges || processing;
+                }
+                if (requestDeleteButton) requestDeleteButton.disabled = processing;
+                if (closeButton) closeButton.disabled = processing;
+                if (newCommentHeaderButton) newCommentHeaderButton.disabled = processing;
+                if (newCommentSideButton) newCommentSideButton.disabled = processing;
+                if (openMembersButton) openMembersButton.disabled = processing;
+                if (unsavedIndicator) {
+                    unsavedIndicator.className = this.isDeleteRequested ? 'chip small error-container' : 'chip small';
+                    if (this.isDeleting) {
+                        unsavedIndicator.textContent = '削除処理中';
+                    } else if (this.isSaving) {
+                        unsavedIndicator.textContent = '保存処理中';
+                    } else if (this.isDeleteRequested) {
+                        unsavedIndicator.textContent = '削除予約中';
+                    } else {
+                        unsavedIndicator.textContent = hasChanges ? '未保存の変更あり' : '保存済み';
+                    }
+                }
+                if (!processing && this.lastOperationState === 'dirty') {
+                    if (validationResult.canSave) {
+                        this._setOperationState('dirty');
+                    } else {
+                        this._setOperationState('dirty_invalid', validationResult.message);
+                    }
+                }
+                this._setInputsDisabled(processing);
+            },
+
+            _setInputsDisabled: function (disabled) {
+                const dialog = document.getElementById('modal-detail-plan');
+                if (!dialog) return;
+                const controls = dialog.querySelectorAll('input, textarea, select, button');
+                controls.forEach(function (el) {
+                    if (!el) return;
+                    if (
+                        el.id === 'plan-detail-save-button' ||
+                        el.id === 'plan-detail-discard-button' ||
+                        el.id === 'plan-detail-request-delete-button' ||
+                        el.id === 'plan-detail-close-button' ||
+                        el.id === 'plan-detail-thumbnail-preview-retry' ||
+                        el.id === 'plan-detail-thumbnail-preview-open' ||
+                        el.id === 'plan-detail-thumbnail-normalize-button' ||
+                        el.id === 'plan-detail-thumbnail-normalize-refresh-button' ||
+                        el.id === 'plan-detail-thumbnail-refresh-button' ||
+                        el.id === 'plan-detail-thumbnail-next-action-button' ||
+                        el.id === 'plan-detail-thumbnail-copy-url-button' ||
+                        el.id === 'plan-detail-thumbnail-copy-note-button' ||
+                        el.id === 'plan-detail-new-comment-header-button' ||
+                        el.id === 'plan-detail-new-comment-side-button' ||
+                        el.id === 'plan-detail-open-members-button'
+                    ) {
+                        return;
+                    }
+                    el.disabled = disabled === true;
+                });
+            },
+
+            _setOperationState: function (state, detailMessage) {
+                const operationEl = document.getElementById('plan-detail-operation-state');
+                if (!operationEl) return;
+                this.lastOperationState = state;
+
+                if (state === 'saving') {
+                    operationEl.className = 'small-text tertiary-text bottom-margin';
+                    operationEl.textContent = '保存中です。処理が完了するまで操作をロックしています';
+                    return;
+                }
+                if (state === 'save_success') {
+                    operationEl.className = 'small-text secondary-text bottom-margin';
+                    operationEl.textContent = '保存が完了しました';
+                    return;
+                }
+                if (state === 'save_error') {
+                    operationEl.className = 'small-text error-text bottom-margin';
+                    operationEl.textContent = '保存に失敗しました。入力内容を確認して再試行してください';
+                    return;
+                }
+                if (state === 'delete_reserved') {
+                    operationEl.className = 'small-text error-text bottom-margin';
+                    operationEl.textContent = '削除予約中です。「削除を確定」で削除が実行されます';
+                    return;
+                }
+                if (state === 'deleting') {
+                    operationEl.className = 'small-text error-text bottom-margin';
+                    operationEl.textContent = '削除処理中です。完了までお待ちください';
+                    return;
+                }
+                if (state === 'delete_error') {
+                    operationEl.className = 'small-text error-text bottom-margin';
+                    operationEl.textContent = '削除に失敗しました。時間をおいて再試行してください';
+                    return;
+                }
+                if (state === 'dirty') {
+                    const validationResult = this._validatePlanInputs();
+                    if (!validationResult.canSave) {
+                        operationEl.className = 'small-text error-text bottom-margin';
+                        operationEl.textContent = '未保存の変更があります。' + validationResult.message;
+                        return;
+                    }
+                    operationEl.className = 'small-text secondary-text bottom-margin';
+                    operationEl.textContent = '未保存の変更があります';
+                    return;
+                }
+                if (state === 'dirty_invalid') {
+                    operationEl.className = 'small-text error-text bottom-margin';
+                    operationEl.textContent = detailMessage ? ('未保存の変更があります。' + detailMessage) : '未保存の変更があります。入力内容を確認してください';
+                    return;
+                }
+                operationEl.className = 'small-text secondary-text bottom-margin';
+                operationEl.textContent = '編集すると「未保存の変更あり」に変わります';
+            },
+
+            _updateStatusChipColor: function (status) {
+                const chipEl = document.getElementById('plan-detail-status-chip');
+                if (!chipEl) return;
+                const warningStatuses = ['RETURNED', 'REJECTED', 'DISCARDED'];
+                const successStatuses = ['APPROVED', 'READY', 'PUBLISHED'];
+                const processingStatuses = ['IN_REVIEW1', 'IN_REVIEW2', 'IN_PREPARATION'];
+                chipEl.className = 'chip small';
+                if (warningStatuses.indexOf(status) !== -1) {
+                    chipEl.className += ' error-container';
+                    return;
+                }
+                if (successStatuses.indexOf(status) !== -1) {
+                    chipEl.className += ' secondary-container';
+                    return;
+                }
+                if (processingStatuses.indexOf(status) !== -1) {
+                    chipEl.className += ' tertiary-container';
                 }
             },
 
@@ -760,6 +1705,21 @@
             _escapeAttr: function (value) {
                 return this._escapeHtml(value).replace(/`/g, '&#96;');
             }
+        };
+
+        const originalToggleDirty = App.modals.planDetail.toggleDirty;
+        App.modals.planDetail.toggleDirty = function (nextValue) {
+            originalToggleDirty.call(this, nextValue);
+            if (!this.isSaving && !this.isDeleting) {
+                if (this.isDeleteRequested) {
+                    this._setOperationState('delete_reserved');
+                } else if (this.isDirty) {
+                    this._setOperationState('dirty');
+                } else {
+                    this._setOperationState('idle');
+                }
+            }
+            this._updateActionButtons();
         };
     })();
 </script>
