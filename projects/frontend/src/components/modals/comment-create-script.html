@@ -205,6 +205,13 @@
 
                 const relatedTable = this.relatedTable;
                 const relatedId = this.relatedId;
+
+                // タスク詳細モーダル内のコメントはDB即時反映せず、保存待ちとしてキューに積む
+                if (relatedTable === 'tasks' && App.modals.taskDetail && App.modals.taskDetail.currentId === relatedId && App.modals.taskDetail.queuePendingComment) {
+                    App.modals.taskDetail.queuePendingComment(content);
+                    this.close();
+                    return;
+                }
                 
                 // 即座にUIに反映（Optimistic UI Update）
                 const tempComment = {
@@ -270,10 +277,7 @@
                         }
 
                         showSnackbar('コメントを作成しました', 'success');
-                        // 成功時は正式なデータで再読み込み
-                        if (relatedTable === 'tasks' && App.modals.taskDetail && App.modals.taskDetail.currentId === relatedId) {
-                            App.modals.taskDetail.loadComments(relatedId, true);
-                        }
+                        // tasksはOptimistic UIで反映済みのため、成功時の再読み込みは行わない
                         if (relatedTable === 'members' && App.modals.memberDetail && App.modals.memberDetail.currentId === relatedId) {
                             App.modals.memberDetail.loadComments(relatedId, true);
                         }

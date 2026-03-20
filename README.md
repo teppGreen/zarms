@@ -101,7 +101,7 @@ zarms/
 * **[APIリファレンス](docs/api-reference.md)**: Database API のリクエスト形式やセキュリティ設計、権限評価ルール
 * **[テストガイド](docs/testing-guide.md)**: ローカルでの結合テスト実行方法
 * **[docsとskillsの使い分け](docs/docs-skills-boundary.md)**: 仕様文書と実行ガイドの責務分担
-* **[Copilot Skills（正本）](.agents/skills/)**: Copilot/Codex がタスク実行時に参照するスキル集
+* **[Copilot Skills（正本）](.github/skills/)**: GitHub Copilot がタスク実行時に参照するスキル集
 * **[Beer CSS / Tabulator リファレンス](docs/beercss-tabulator-reference.md)**: 実装方針と更新運用
 * **[AIエージェント向けガイドライン](.github/copilot-instructions.md)**: AIが開発・計画を行うためのプロジェクト規約・振る舞い指示
 

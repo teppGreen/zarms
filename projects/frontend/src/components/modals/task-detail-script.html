@@ -15,7 +15,9 @@
       currentChildTasks: [], // 子タスクの配列
       originalParentTaskId: null, // 元の親タスクID（変更検知用）
       originalChildTaskIds: [], // 元の子タスクIDの配列（変更検知用）
+      addedChildTaskIds: [], // 追加された子タスクIDの配列（変更検知用）
       deletedChildTaskIds: [], // 削除された子タスクIDの配列
+      pendingComments: [], // モーダル内で作成された保存待ちコメント
 
       applyAssigneeLabels: function () {
         const roleLabels = {
@@ -32,6 +34,128 @@
             element.textContent = roleLabels[id];
           }
         });
+      },
+
+      markDirty: function (reason = '') {
+        this.syncDirtyState(reason);
+      },
+
+      updateActionButtons: function () {
+        const primaryBtn = document.getElementById('task-primary-action-btn');
+        const discardBtn = document.getElementById('task-discard-btn');
+
+        if (primaryBtn) {
+          primaryBtn.textContent = this.isDirty ? '変更を保存' : '閉じる';
+        }
+
+        if (discardBtn) {
+          discardBtn.style.display = this.isDirty ? '' : 'none';
+        }
+      },
+
+      syncDirtyState: function (reason = '') {
+        const nextDirty = this.hasUnsavedChanges();
+        const changed = this.isDirty !== nextDirty;
+        this.isDirty = nextDirty;
+        this.updateActionButtons();
+        if (changed && reason) {
+          console.log(`[TaskDetail] isDirty changed to ${nextDirty} (${reason})`);
+        }
+      },
+
+      hasUnsavedChanges: function () {
+        if (!this.currentId || !this.originalData || !this.currentItem) return false;
+
+        if ((this.pendingComments || []).length > 0) return true;
+
+        const originalData = this.originalData;
+        const currentItem = this.currentItem;
+
+        const nameInput = document.getElementById('task-name-input');
+        const statusSelect = document.getElementById('task-status-select');
+        const prioritySelect = document.getElementById('task-priority-select');
+        const boardSelect = document.getElementById('task-board-select');
+        const startsAtInput = document.getElementById('task-starts-at-input');
+        const endsAtInput = document.getElementById('task-ends-at-input');
+
+        if (nameInput && nameInput.value !== (originalData.name || '')) return true;
+
+        const description = this.getDescription();
+        if (description !== (originalData.description || '')) return true;
+
+        if (statusSelect && statusSelect.value !== (originalData.task_status_key || '')) return true;
+        if (prioritySelect && prioritySelect.value !== (originalData.priority_key || '')) return true;
+        if (boardSelect && boardSelect.value !== (originalData.board_id || '')) return true;
+
+        if (startsAtInput) {
+          const newStartsAt = startsAtInput.value ? new Date(startsAtInput.value).toISOString() : '';
+          const oldStartsAt = originalData.starts_at || '';
+          if (newStartsAt !== oldStartsAt) return true;
+        }
+
+        if (endsAtInput) {
+          const newEndsAt = endsAtInput.value ? new Date(endsAtInput.value).toISOString() : '';
+          const oldEndsAt = originalData.ends_at || '';
+          if (newEndsAt !== oldEndsAt) return true;
+        }
+
+        const memberRoles = ['processed_by', 'reviewed_by', 'received_by'];
+        for (const role of memberRoles) {
+          if (currentItem[role] !== originalData[role]) return true;
+        }
+
+        const listChanges = this.getListChanges();
+        if (listChanges.toInsert.length > 0 || listChanges.toUpdate.length > 0 || listChanges.toDelete.length > 0) return true;
+
+        const relatedChanges = this.getRelatedTaskChanges();
+        if (relatedChanges.hasParentChange || relatedChanges.childTasksToAdd.length > 0 || relatedChanges.childTasksToRemove.length > 0) return true;
+
+        return false;
+      },
+
+      queuePendingComment: function (content) {
+        if (!content || !this.currentId) return null;
+
+        const pendingComment = {
+          id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          content: content,
+          related_table: 'tasks',
+          related_id: this.currentId,
+          created_by: App.state.userId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        this.pendingComments.push({
+          content: content,
+          related_table: 'tasks',
+          related_id: this.currentId
+        });
+
+        this.appendCommentToUI(pendingComment);
+        this.syncDirtyState('queuePendingComment');
+        return pendingComment;
+      },
+
+      requestClose: function (reason = 'generic', skipUrlUpdate = false) {
+        this.syncDirtyState(`requestClose:${reason}`);
+        const hasUnsavedChanges = this.hasUnsavedChanges();
+
+        if (hasUnsavedChanges) {
+          const shouldSave = confirm('変更を保存しますか？');
+          if (shouldSave) {
+            this.save();
+            return true;
+          }
+          return false;
+        }
+
+        this.close(skipUrlUpdate, true);
+        return true;
+      },
+
+      onPrimaryAction: function () {
+        this.requestClose('primary-action');
       },
 
       open: async function (taskId, skipUrlUpdate = false, defaultDirty = false) {
@@ -118,7 +242,9 @@
 
         this.loadLists(taskId);
         this.loadRelatedTasks(taskId);
-        this.isDirty = defaultDirty === true;
+
+        // defaultDirtyは互換目的で受け取るが、保存必要判定は常に差分計算を使用する
+        this.syncDirtyState('open');
       },
 
       /**
@@ -186,15 +312,21 @@
           const el = document.getElementById(id);
           if (el) {
             el.addEventListener('input', () => {
-              this.isDirty = true;
-              console.log('Dirty flag set to true');
+              this.syncDirtyState(`input: ${id}`);
             });
             el.addEventListener('change', () => {
-              this.isDirty = true;
-              console.log('Dirty flag set to true');
+              this.syncDirtyState(`change: ${id}`);
             });
           }
         });
+
+        // Quillはinputイベントを発火しないため専用で変更検知する
+        if (this.quill && !this._boundQuillDirtyHandler) {
+          this.quill.on('text-change', () => {
+            this.syncDirtyState('quill text-change');
+          });
+          this._boundQuillDirtyHandler = true;
+        }
 
         const statusSelect = document.getElementById('task-status-select');
         if (statusSelect) {
@@ -225,14 +357,18 @@
        * モーダルを閉じる
        * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
        */
-      close: function (skipUrlUpdate = false, skipDirtyCheck = false, skipClose = false) {
-        // Quillの変更をチェック
-        const currentDescription = this.getDescription();
-        const originalDescription = this.originalData?.description || '';
-        const descriptionChanged = currentDescription !== originalDescription;
+      close: function (skipUrlUpdate = false, skipDirtyCheckOrReason = false, skipClose = false) {
+        // 共通モーダルクローズ呼び出しとの互換性:
+        // App.utils.ui.closeTopModal から close(skipUrlUpdate, reason) で呼ばれるため、
+        // 第2引数が文字列の場合は保存確認をスキップしない。
+        const skipDirtyCheck = typeof skipDirtyCheckOrReason === 'boolean'
+          ? skipDirtyCheckOrReason
+          : false;
+
+        const hasUnsavedChanges = this.hasUnsavedChanges();
 
         // 変更がある場合は確認
-        if (!skipDirtyCheck && (this.isDirty || descriptionChanged)) {
+        if (!skipDirtyCheck && hasUnsavedChanges) {
           const shouldSave = confirm('変更を保存しますか？');
           if (shouldSave) {
             // 保存を実行
@@ -272,12 +408,7 @@
        * 変更を破棄してモーダルを閉じる
        */
       discard: function () {
-        // Quillの変更をチェック
-        const currentDescription = this.getDescription();
-        const originalDescription = this.originalData?.description || '';
-        const descriptionChanged = currentDescription !== originalDescription;
-
-        if (this.isDirty || descriptionChanged) {
+        if (this.hasUnsavedChanges()) {
           if (!confirm('変更を破棄しますか？')) {
             return;
           }
@@ -333,6 +464,7 @@
         if (!targetTaskId || targetTaskId === this.currentId) {
           // 変更フラグをクリア
           this.isDirty = false;
+          this.updateActionButtons();
           // モーダルを閉じる
           this.close(false, true);
         }
@@ -470,6 +602,7 @@
         const hasRelatedChanges = relatedChanges.hasParentChange ||
           relatedChanges.childTasksToAdd.length > 0 ||
           relatedChanges.childTasksToRemove.length > 0;
+        const hasPendingComments = (this.pendingComments || []).length > 0;
 
         // 親タスクの変更をupdatesに含める
         if (relatedChanges.hasParentChange) {
@@ -477,7 +610,7 @@
           hasChanges = true;
         }
 
-        if (!hasChanges && !hasListChanges && !hasRelatedChanges) {
+        if (!hasChanges && !hasListChanges && !hasRelatedChanges && !hasPendingComments) {
           this.close(false, true, skipClose);
           return;
         }
@@ -488,6 +621,7 @@
 
         // 変更フラグをクリアしてモーダルを閉じる
         this.isDirty = false;
+        this.updateActionButtons();
         closeModal('modal-detail-task');
 
         // URLパラメータを更新
@@ -527,6 +661,11 @@
             await this.saveRelatedTaskChanges(id, relatedChanges);
           }
 
+          // コメントの変更を保存
+          if (hasPendingComments) {
+            await this.savePendingComments();
+          }
+
           console.log('[TaskDetail] Update successful');
           showSnackbar('変更を保存しました', 'success');
 
@@ -537,7 +676,9 @@
             this.originalLinks = JSON.parse(JSON.stringify(this.currentLinks));
             this.originalFiles = JSON.parse(JSON.stringify(this.currentFiles));
             this.deletedListIds = [];
+            this.pendingComments = [];
             this.isDirty = false;
+            this.updateActionButtons();
           }
 
           // ── cachedBoardTasks も更新（updateLocalDataはApp.state.data.tasksのみ更新するため）──
@@ -639,7 +780,9 @@
         this.currentChildTasks = [];
         this.originalParentTaskId = null;
         this.originalChildTaskIds = [];
+        this.addedChildTaskIds = [];
         this.deletedChildTaskIds = [];
+        this.pendingComments = [];
 
         // 入力フィールドをクリア
         const fields = [
@@ -682,6 +825,8 @@
           badge.textContent = '0';
           badge.style.display = 'none';
         });
+
+        this.updateActionButtons();
       },
 
       /**
@@ -843,6 +988,7 @@
         }
 
         this.renderLastUpdated();
+        this.syncDirtyState('render');
       },
 
       renderStatusIcon: function (statusKey) {
@@ -1122,10 +1268,6 @@
           return;
         }
 
-        // Dirty フラグを立てる
-        this.isDirty = true;
-        console.log('updatedMemberField: Dirty flag set to true');
-
         // ローカル状態を更新
         this.currentItem[role] = memberId;
 
@@ -1147,6 +1289,7 @@
           this.renderMemberAvatar(role, null, null);
         }
 
+        this.syncDirtyState(`updateMemberField: ${role}`);
         console.log(`[TaskDetail] Member field ${role} updated locally to ${memberId}`);
       },
 
@@ -1194,6 +1337,7 @@
         this.isListLoadingFresh = true;
         const listContainer = document.getElementById('task-list-items');
         listContainer.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
+        this._renderListAddButton(true);
 
         const query = {
           where: {
@@ -1218,6 +1362,7 @@
             this.isListLoadingFresh = results?.isCached || false;
             this.renderLists(this.isListLoadingFresh);
             this.updateListBadge();
+            this.syncDirtyState('loadLists:initial');
 
             if (results?.isCached) {
               console.log('[TaskDetail] Lists are cached, refetching...');
@@ -1231,6 +1376,7 @@
                   this.isListLoadingFresh = false;
                   this.renderLists();
                   this.updateListBadge();
+                  this.syncDirtyState('loadLists:refetch');
                 })
             }
           })
@@ -1246,6 +1392,9 @@
         const container = document.getElementById('task-list-items');
         if (!container) return;
 
+        // キャッシュ由来データ表示中は、追加ボタンを常に無効化する
+        const effectiveDisabled = !!disabled || this.isListLoadingFresh === true;
+
         // SortableJSインスタンスを破棄
         if (this.listSortable) {
           this.listSortable.destroy();
@@ -1254,7 +1403,7 @@
 
         if (!this.currentLists || this.currentLists.length === 0) {
           container.innerHTML = '<p>リスト項目はありません</p>';
-          this._renderListAddButton(disabled);
+          this._renderListAddButton(effectiveDisabled);
           return;
         }
 
@@ -1300,7 +1449,7 @@
 
         container.innerHTML = html;
         this.setupListSortable();
-        this._renderListAddButton(disabled);
+        this._renderListAddButton(effectiveDisabled);
       },
 
       /**
@@ -1343,8 +1492,7 @@
        */
       onListReorder: function (evt) {
         // isDirtyフラグを立てる
-        this.isDirty = true;
-        console.log('[TaskDetail] isDirty set to true (onListReorder)');
+        this.markDirty('onListReorder');
 
         const oldIndex = evt.oldIndex;
         const newIndex = evt.newIndex;
@@ -1380,8 +1528,7 @@
         if (!this.currentId) return;
 
         // isDirtyフラグを立てる
-        this.isDirty = true;
-        console.log('[TaskDetail] isDirty set to true (createListItem)');
+        this.markDirty('createListItem');
 
         const newList = {
           id: crypto.randomUUID(),
@@ -1422,8 +1569,7 @@
         if (!list) return;
 
         // isDirtyフラグを立てる
-        this.isDirty = true;
-        console.log(`[TaskDetail] isDirty set to true (updateListField: ${field})`);
+        this.markDirty(`updateListField: ${field}`);
 
         list[field] = value;
 
@@ -1444,8 +1590,7 @@
         if (!list) return;
 
         // isDirtyフラグを立てる
-        this.isDirty = true;
-        console.log('[TaskDetail] isDirty set to true (deleteListItem)');
+        this.markDirty('deleteListItem');
 
         // ローカルデータから削除
         this.currentLists = this.currentLists.filter(l => l.id !== listId);
@@ -1580,12 +1725,9 @@
         const originalParentId = this.originalParentTaskId || null;
         const hasParentChange = currentParentId !== originalParentId;
 
-        // 新しく追加された子タスク
-        const currentChildIds = this.currentChildTasks.map(t => t.id);
-        const childTasksToAdd = currentChildIds.filter(id => !this.originalChildTaskIds.includes(id));
-
-        // 削除された子タスク
-        const childTasksToRemove = this.deletedChildTaskIds;
+        // 明示的に差分を管理し、再描画やキャッシュ更新の影響を受けないようにする
+        const childTasksToAdd = [...new Set(this.addedChildTaskIds)];
+        const childTasksToRemove = [...new Set(this.deletedChildTaskIds)];
 
         return {
           hasParentChange,
@@ -1602,22 +1744,56 @@
         console.log(`[saveRelatedTaskChanges] ${JSON.stringify(relatedChanges)}`);
 
         // すべての現在の子タスクのparent_task_idをcurrentIdに設定
-        for (const childTask of childTasksToAdd) {
-          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
-            where: { id: ["=", childTask] },
+        for (const childTaskId of childTasksToAdd) {
+          const updateResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
+            where: { id: ["=", childTaskId] },
             set: { parent_task_id: currentTaskId }
           });
+
+          if (!updateResult || (Array.isArray(updateResult) && updateResult.length === 0)) {
+            throw new Error(`Failed to assign parent_task_id for child task: ${childTaskId}`);
+          }
+
+          updateLocalData(TABLE_NAMES.TASKS, childTaskId, { parent_task_id: currentTaskId });
         }
 
         // 削除された子タスクのparent_task_idをnullに設定
-        for (const childTask of childTasksToRemove) {
-          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
-            where: { id: ["=", childTask] },
+        for (const childTaskId of childTasksToRemove) {
+          const updateResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
+            where: { id: ["=", childTaskId] },
             set: { parent_task_id: '' }
           });
+
+          if (!updateResult || (Array.isArray(updateResult) && updateResult.length === 0)) {
+            throw new Error(`Failed to clear parent_task_id for child task: ${childTaskId}`);
+          }
+
+          updateLocalData(TABLE_NAMES.TASKS, childTaskId, { parent_task_id: '' });
         }
 
+        this.addedChildTaskIds = [];
+        this.deletedChildTaskIds = [];
+
         console.log('[TaskDetail] Related task changes saved');
+      },
+
+      savePendingComments: async function () {
+        const comments = this.pendingComments || [];
+        if (comments.length === 0) return;
+
+        for (const comment of comments) {
+          const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'insert', {
+            content: comment.content,
+            related_table: comment.related_table,
+            related_id: comment.related_id
+          }, 'コメントを作成');
+
+          if (!result || (Array.isArray(result) && result.length === 0)) {
+            throw new Error('Failed to save pending comment');
+          }
+        }
+
+        this.pendingComments = [];
       },
 
       /**
@@ -1668,10 +1844,12 @@
 
         this.currentChildTasks = childTasks ? childTasks.data : [];
         this.originalChildTaskIds = (childTasks ? childTasks.data : []).map(t => t.id);
+        this.addedChildTaskIds = [];
         this.deletedChildTaskIds = [];
 
         this.renderChildTasks();
         this.updateRelatedBadge();
+        this.syncDirtyState('loadRelatedTasks:initial');
 
         if (parentTask?.isCached) {
           await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_parent, null, true)
@@ -1679,6 +1857,7 @@
               if (this.currentId !== taskId) return;
               this.currentParentTask = results ? results?.data[0] : null;
               this.renderParentTask();
+              this.syncDirtyState('loadRelatedTasks:parentRefetch');
             })
         }
 
@@ -1689,10 +1868,12 @@
               this.currentChildTasks = results ? results?.data : [];
               this.originalChildTaskIds = (results ? results?.data : []).map(t => t.id);
               this.renderChildTasks();
+              this.syncDirtyState('loadRelatedTasks:childRefetch');
             })
         }
 
         this.updateRelatedBadge();
+        this.syncDirtyState('loadRelatedTasks:done');
       },
 
       /**
@@ -1777,7 +1958,7 @@
             }
             this.renderParentTask();
             this.updateRelatedBadge();
-            this.isDirty = true;
+            this.markDirty('editParentTask');
           }
         });
       },
@@ -1814,9 +1995,13 @@
             // 子タスクリストに追加（callbackから受け取った情報を使用）
             if (!this.currentChildTasks.find(t => t.id === selectedTask.id)) {
               this.currentChildTasks.push(selectedTask);
+              if (!this.originalChildTaskIds.includes(selectedTask.id) && !this.addedChildTaskIds.includes(selectedTask.id)) {
+                this.addedChildTaskIds.push(selectedTask.id);
+              }
+              this.deletedChildTaskIds = this.deletedChildTaskIds.filter(id => id !== selectedTask.id);
               this.renderChildTasks();
               this.updateRelatedBadge();
-              this.isDirty = true;
+              this.markDirty('addChildTask');
             }
           }
         });
@@ -1827,8 +2012,11 @@
        * @param {string} taskId - タスクID
        */
       removeChildTask: function (taskId) {
+        // 追加直後に削除された項目は追加差分から除外
+        this.addedChildTaskIds = this.addedChildTaskIds.filter(id => id !== taskId);
+
         // 削除リストに追加
-        if (!this.deletedChildTaskIds.includes(taskId)) {
+        if (this.originalChildTaskIds.includes(taskId) && !this.deletedChildTaskIds.includes(taskId)) {
           this.deletedChildTaskIds.push(taskId);
         }
 
@@ -1837,7 +2025,7 @@
 
         this.renderChildTasks();
         this.updateRelatedBadge();
-        this.isDirty = true;
+        this.markDirty('removeChildTask');
       },
 
       /**
