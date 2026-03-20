@@ -78,7 +78,7 @@
 
                 if (colKey === 'board_state') return board.is_active ? 1 : 0;
                 if (colKey === 'name') return String(board.name || '');
-                if (colKey === 'description') return String(board.description || '');
+                if (colKey === 'user_note') return String(board.user_note || board.description || '');
                 if (colKey === 'todo_count') return Number(stats.todo || 0);
                 if (colKey === 'in_progress_count') return Number(stats.in_progress || 0);
                 if (colKey === 'in_review_count') return Number(stats.in_review || 0);
@@ -137,7 +137,7 @@
                     { key: '_menu', label: '', sortable: false },
                     { key: 'board_state', label: '状態' },
                     { key: 'name', label: 'ボード名' },
-                    { key: 'description', label: '説明' },
+                    { key: 'user_note', label: 'ボード説明' },
                     { key: 'todo_count', label: KEY_LABELS.TASK_STATUS.TODO, icon: 'red'},
                     { key: 'in_progress_count', label: KEY_LABELS.TASK_STATUS.IN_PROGRESS, icon: 'amber'},
                     { key: 'in_review_count', label: KEY_LABELS.TASK_STATUS.IN_REVIEW, icon: 'purple'},
@@ -170,7 +170,7 @@
                 } else {
                     tbodyHtml = sortedBoards.map(board => {
                         const boardName = board.name || '';
-                        const desc = board.description || '';
+                        const desc = board.user_note || board.description || '';
                         const isActive = !!board.is_active;
                         const stateLabel = this.getBoardStateLabel(board);
                         const stateIcon = isActive ? 'folder' : 'folder_off';

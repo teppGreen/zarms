@@ -1471,7 +1471,7 @@
             },
 
             /**
-             * ボード設定モーダル（タイトル・説明）を開く
+             * ボード設定モーダル（タイトル・メモ）を開く
              */
             openBoardSettingsModal: function (boardId) {
                 const board = App.state.data.boards.find(b => b.id === boardId);
@@ -1498,7 +1498,7 @@
                                 <label>ボード名</label>
                             </div>
                             <div class="field border large label">
-                                <textarea id="textarea-board-description-${boardId}" rows="10" onblur="this.placeholder=' '" onfocus="this.placeholder='〇〇ユニットの△△業務に関わるタスクを管理するボード。'" placeholder=" ">${escapeHtml(board.description || '')}</textarea>
+                                <textarea id="textarea-board-description-${boardId}" rows="10" onblur="this.placeholder=' '" onfocus="this.placeholder='〇〇ユニットの△△業務に関わるタスクを管理するボード。'" placeholder=" ">${escapeHtml(board.user_note || board.description || '')}</textarea>
                                 <label>ボード説明</label>
                             </div>
                         </div>
@@ -1521,7 +1521,7 @@
             },
 
             /**
-             * ボード設定（タイトル・説明）を保存
+             * ボード設定（タイトル・メモ）を保存
              */
             saveBoardSettings: async function (boardId) {
                 const inputName = document.getElementById(`input-board-name-${boardId}`);
@@ -1540,7 +1540,7 @@
                 if (!board) return;
 
                 const oldName = board.name;
-                const oldDescription = board.description;
+                const oldDescription = board.user_note || board.description || '';
 
                 // 変更がない場合は閉じるだけ
                 if (oldName === newName && oldDescription === newDescription) {
@@ -1550,7 +1550,7 @@
 
                 // Optimistic UI update
                 board.name = newName;
-                board.description = newDescription;
+                board.user_note = newDescription;
 
                 // ヘッダーのタイトル表示を更新
                 const headerTitle = document.querySelector(`#board-tab-header-${boardId} h3`);
@@ -1572,9 +1572,9 @@
                 try {
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'update', {
                         where: { id: ["=", boardId] },
-                        set: { 
+                        set: {
                             name: newName,
-                            description: newDescription 
+                            user_note: newDescription
                         }
                     }, 'ボード設定を更新');
 
@@ -1583,7 +1583,7 @@
                     console.error('Failed to update board settings:', error);
                     // ロールバック
                     board.name = oldName;
-                    board.description = oldDescription;
+                    board.user_note = oldDescription;
                     
                     // ヘッダーのタイトル表示を戻す
                     if (headerTitle) {
