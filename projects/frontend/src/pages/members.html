@@ -1,19 +1,19 @@
-<div id="tab-members" style="display: none;">
+<div id="tab-catalog" style="display: none;">
     <header class="small-margin no-padding">
-        <div class="tabs" id="members-tab-nav" title="表示切替">
-            <a class="active" data-ui="#members-subtab-member" data-members-tab="member" title="メンバー">
+        <div class="tabs" id="catalog-table-nav" title="表示切替">
+            <a class="active" data-catalog-table="members" title="人物">
                 <i>person</i>
                 <span class="m l">人物</span>
             </a>
-            <a data-ui="#members-subtab-directory" data-members-tab="directory" title="ディレクトリ">
+            <a data-ui="#catalog-subtab-directories" data-catalog-table="directories" title="組織">
                 <i>account_tree</i>
                 <span class="m l">組織</span>
             </a>
-            <a data-ui="#members-subtab-skills" data-members-tab="skills" title="スキル">
+            <a data-ui="#catalog-subtab-skills" data-catalog-table="skills" title="技能">
                 <i>psychology</i>
                 <span class="m l">技能</span>
             </a>
-            <a data-ui="#members-subtab-plans" data-members-tab="plans" title="企画">
+            <a data-ui="#catalog-subtab-plans" data-catalog-table="plans" title="企画">
                 <i>store</i>
                 <span class="m l">企画</span>
             </a>
@@ -41,15 +41,15 @@
                     <span id="members-summary-action" class="small-text">行の「開く」で詳細</span>
                 </div>
                 <div class="max"></div>
-                <button class="border" type="button" onclick="App.pages.members.resetFilters(App.pages.members.getCurrentTab())">
+                <button class="border" type="button" onclick="App.pages.catalog.resetFilters(App.pages.catalog.getCurrentTab())">
                     <i>filter_alt_off</i>
                     <span>条件をクリア</span>
                 </button>
-                <button class="border" type="button" onclick="App.pages.members.loadData(true)">
+                <button class="border" type="button" onclick="App.pages.catalog.loadData(true)">
                     <i>refresh</i>
                     <span>再読み込み</span>
                 </button>
-                <button class="primary" type="button" onclick="App.pages.members.openCreateModal()">
+                <button class="primary" type="button" onclick="App.pages.catalog.openCreateModal()">
                     <i>add</i>
                     <span id="members-create-action-label">新規追加</span>
                 </button>
@@ -57,7 +57,7 @@
         </article>
     </section>
 
-    <div id="members-subtab-member" class="page active small-margin small-round">
+    <div id="catalog-subtab-members" class="page active small-margin small-round">
         <div>
             <div id="members-table-loading" class="row center-align padding">
                 <progress class="circle small"></progress>
@@ -66,7 +66,7 @@
         </div>
     </div>
 
-    <div id="members-subtab-directory" style="display: none;" class="page small-margin small-round">
+    <div id="catalog-subtab-directories" style="display: none;" class="page small-margin small-round">
         <article class="border small-round surface-container-low small-padding">
             <div class="row wrap small-space center-align">
                 <div class="row tiny-space center-align">
@@ -89,33 +89,33 @@
                     <span id="directory-summary-filters" class="badge">0</span>
                 </div>
                 <div class="max"></div>
-                <button id="directory-open-first-btn" class="border" type="button" onclick="App.pages.members.openFirstDirectoryFromVisible()" disabled>
+                <button id="directory-open-first-btn" class="border" type="button" onclick="App.pages.catalog.openFirstDirectoryFromVisible()" disabled>
                     <i>open_in_new</i>
                     <span>先頭を開く</span>
                 </button>
-                <button id="directory-open-largest-btn" class="border" type="button" onclick="App.pages.members.openLargestDirectoryFromVisible()" disabled>
+                <button id="directory-open-largest-btn" class="border" type="button" onclick="App.pages.catalog.openLargestDirectoryFromVisible()" disabled>
                     <i>leaderboard</i>
                     <span>最多人数を開く</span>
                 </button>
-                <button id="directory-open-empty-btn" class="border" type="button" onclick="App.pages.members.openFirstEmptyDirectoryFromVisible()" disabled>
+                <button id="directory-open-empty-btn" class="border" type="button" onclick="App.pages.catalog.openFirstEmptyDirectoryFromVisible()" disabled>
                     <i>person_off</i>
                     <span>0人組織を開く</span>
                 </button>
             </div>
             <div class="row wrap tiny-space top-margin center-align">
-                <button id="directory-focus-active-btn" class="chip border" type="button" onclick="App.pages.members.applyDirectoryFocusFilter('active')">
+                <button id="directory-focus-active-btn" class="chip border" type="button" onclick="App.pages.catalog.applyDirectoryFocusFilter('active')">
                     <i>done_all</i>
                     <span>有効のみ</span>
                 </button>
-                <button id="directory-focus-empty-btn" class="chip border" type="button" onclick="App.pages.members.applyDirectoryFocusFilter('empty')">
+                <button id="directory-focus-empty-btn" class="chip border" type="button" onclick="App.pages.catalog.applyDirectoryFocusFilter('empty')">
                     <i>person_off</i>
                     <span>0人のみ</span>
                 </button>
-                <button id="directory-focus-roots-btn" class="chip border" type="button" onclick="App.pages.members.applyDirectoryFocusFilter('roots')">
+                <button id="directory-focus-roots-btn" class="chip border" type="button" onclick="App.pages.catalog.applyDirectoryFocusFilter('roots')">
                     <i>account_tree</i>
                     <span>親なしのみ</span>
                 </button>
-                <button id="directory-focus-descendants-btn" class="chip border" type="button" onclick="App.pages.members.applyDirectoryFocusFilter('descendants')">
+                <button id="directory-focus-descendants-btn" class="chip border" type="button" onclick="App.pages.catalog.applyDirectoryFocusFilter('descendants')">
                     <i>subdirectory_arrow_right</i>
                     <span>親ありのみ</span>
                 </button>
@@ -152,19 +152,19 @@
                 比較メモ: 人数上位の組織を並べて比較できます。
             </div>
             <div class="row wrap tiny-space top-margin center-align">
-                <button id="directory-run-recommended-btn" class="border" type="button" onclick="App.pages.members.executeDirectoryRecommendedAction()" disabled>
+                <button id="directory-run-recommended-btn" class="border" type="button" onclick="App.pages.catalog.executeDirectoryRecommendedAction()" disabled>
                     <i>assistant</i>
                     <span>推奨アクションを実行</span>
                 </button>
-                <button id="directory-copy-comparison-btn" class="border" type="button" onclick="App.pages.members.copyDirectoryComparisonMemo()" disabled>
+                <button id="directory-copy-comparison-btn" class="border" type="button" onclick="App.pages.catalog.copyDirectoryComparisonMemo()" disabled>
                     <i>content_copy</i>
                     <span>比較メモをコピー</span>
                 </button>
-                <button id="directory-copy-brief-btn" class="border" type="button" onclick="App.pages.members.copyDirectoryBriefShare()" disabled>
+                <button id="directory-copy-brief-btn" class="border" type="button" onclick="App.pages.catalog.copyDirectoryBriefShare()" disabled>
                     <i>share</i>
                     <span>共有サマリーをコピー</span>
                 </button>
-                <button id="directory-copy-action-btn" class="border" type="button" onclick="App.pages.members.copyDirectoryActionMemo()" disabled>
+                <button id="directory-copy-action-btn" class="border" type="button" onclick="App.pages.catalog.copyDirectoryActionMemo()" disabled>
                     <i>assignment</i>
                     <span>推奨手順をコピー</span>
                 </button>
@@ -187,7 +187,7 @@
         </div>
     </div>
 
-    <div id="members-subtab-skills" style="display: none;" class="page small-margin small-round">
+    <div id="catalog-subtab-skills" style="display: none;" class="page small-margin small-round">
         <div>
             <div id="skills-table-loading" class="row center-align padding" style="display: none;">
                 <progress class="circle small"></progress>
@@ -196,7 +196,7 @@
         </div>
     </div>
 
-    <div id="members-subtab-plans" style="display: none;" class="page small-margin small-round">
+    <div id="catalog-subtab-plans" style="display: none;" class="page small-margin small-round">
         <div>
             <div id="plans-table-loading" class="row center-align padding" style="display: none;">
                 <progress class="circle small"></progress>

@@ -5,6 +5,18 @@
         let _resizeHandlerBound = false;
         let _tabNavigationBound = false;
         const _memberTabNames = ['member', 'directory', 'skills', 'plans'];
+        const _tableParamToTab = {
+            members: 'member',
+            directories: 'directory',
+            skills: 'skills',
+            plans: 'plans'
+        };
+        const _tabToTableParam = {
+            member: 'members',
+            directory: 'directories',
+            skills: 'skills',
+            plans: 'plans'
+        };
         const _tableData = {
             member: [],
             directory: [],
@@ -203,10 +215,12 @@
             }
         };
 
-        App.pages.members = {
+        App.pages.catalog = {
             loadData: async function (isRefresh) {
                 _isLoading = true;
                 this._ensureTabNavigation();
+            this._applyTableParamFromUrl();
+                this._syncTableParam(_currentTab, true);
                 this._showLoading(true, _currentTab);
                 this._updateSummary();
 
@@ -237,13 +251,20 @@
                 }
             },
 
-            switchTab: function (tabName) {
+            switchTab: function (tabName, options) {
                 this._ensureTabNavigation();
-                if (_memberTabNames.indexOf(tabName) === -1) {
+                const normalizedTab = this._normalizeTabName(tabName);
+                if (_memberTabNames.indexOf(normalizedTab) === -1) {
                     tabName = 'member';
+                } else {
+                    tabName = normalizedTab;
                 }
                 _currentTab = tabName;
                 this._setActiveTabUi(tabName);
+                const syncUrl = !options || options.syncUrl !== false;
+                if (syncUrl) {
+                    this._syncTableParam(tabName, options && options.replaceHistory === true);
+                }
 
                 this._showLoading(_isLoading, _currentTab);
                 if (!_isLoading) {
@@ -257,35 +278,74 @@
 
             _ensureTabNavigation: function () {
                 if (_tabNavigationBound) return;
-                const tabNav = document.getElementById('members-tab-nav');
+                const tabNav = document.getElementById('catalog-table-nav');
                 if (!tabNav) return;
                 _tabNavigationBound = true;
                 tabNav.addEventListener('click', function (event) {
-                    const tabButton = event.target.closest('[data-members-tab]');
+                    const tabButton = event.target.closest('[data-catalog-table]');
                     if (!tabButton || !tabNav.contains(tabButton)) {
                         return;
                     }
-                    const nextTab = tabButton.getAttribute('data-members-tab');
+                    const nextTab = tabButton.getAttribute('data-catalog-table');
                     if (!nextTab) {
                         return;
                     }
-                    App.pages.members.switchTab(nextTab);
+                    App.pages.catalog.switchTab(nextTab);
                 });
             },
 
             _setActiveTabUi: function (activeTab) {
                 _memberTabNames.forEach(function (tabName) {
-                    const button = document.querySelector('#members-tab-nav [data-members-tab="' + tabName + '"]');
+                    const tableParam = _tabToTableParam[tabName] || 'members';
+                    const button = document.querySelector('#catalog-table-nav [data-catalog-table="' + tableParam + '"]');
                     if (button) {
                         button.classList.toggle('active', tabName === activeTab);
                     }
 
-                    const panel = document.getElementById('members-subtab-' + tabName);
+                    const panel = document.getElementById('catalog-subtab-' + tableParam);
                     if (panel) {
                         panel.classList.toggle('active', tabName === activeTab);
                         panel.style.display = tabName === activeTab ? '' : 'none';
                     }
                 });
+            },
+
+            _normalizeTabName: function (tabName) {
+                const key = String(tabName || '').trim();
+                if (!key) return 'member';
+                if (_memberTabNames.indexOf(key) !== -1) return key;
+                if (Object.prototype.hasOwnProperty.call(_tableParamToTab, key)) {
+                    return _tableParamToTab[key];
+                }
+                return 'member';
+            },
+
+            _syncTableParam: function (tabName, replaceHistory) {
+                if (!App.utils || !App.utils.url || !App.utils.url.getParams || !App.utils.url.updateParams) {
+                    return;
+                }
+                const params = App.utils.url.getParams();
+                params.tab = 'catalog';
+                params.table = _tabToTableParam[tabName] || 'members';
+                App.utils.url.updateParams(params, replaceHistory === true);
+            },
+
+            _applyTableParamFromUrl: function () {
+                if (!App.utils || !App.utils.url || !App.utils.url.getParams) {
+                    return;
+                }
+                const params = App.utils.url.getParams();
+                if (!params || !params.table) {
+                    return;
+                }
+                const requestedTab = this._normalizeTabName(params.table);
+                if (_memberTabNames.indexOf(requestedTab) === -1) {
+                    return;
+                }
+                if (_currentTab !== requestedTab) {
+                    _currentTab = requestedTab;
+                    this._setActiveTabUi(_currentTab);
+                }
             },
 
             sortTable: function (tabName, colKey) {
@@ -1675,5 +1735,6 @@
                 return this._escapeHtml(value).replace(/`/g, '&#96;');
             }
         };
+        App.pages.members = App.pages.catalog;
     })();
 </script>

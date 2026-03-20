@@ -148,7 +148,8 @@
 
     } else if (urlParams.tab && urlParams.tab !== 'home') {
       // その他のタブの場合
-      await App.utils.navigation.switchTab(urlParams.tab, true);
+      const requestedTab = urlParams.tab === 'members' ? 'catalog' : urlParams.tab;
+      await App.utils.navigation.switchTab(requestedTab, true);
     } else {
       // タブ指定がない、またはhomeの場合
       App.pages.home.loadData();
@@ -246,7 +247,7 @@
         if (params.tab === 'board' && params.board_id) {
           tabId = 'board-' + params.board_id;
         } else if (params.tab !== 'board') {
-          tabId = params.tab;
+          tabId = params.tab === 'members' ? 'catalog' : params.tab;
         }
 
         if (App.utils.navigation && App.utils.navigation.switchTab) {
@@ -625,7 +626,7 @@
         return;
       }
 
-      const tabId = currentTab.id; // 例: 'tab-home', 'tab-members', 'tab-board'
+      const tabId = currentTab.id; // 例: 'tab-home', 'tab-catalog', 'tab-board'
       console.log('[refreshData] 現在のタブ:', tabId);
 
       // タブ種別に応じて必要なデータのみを取得
@@ -646,8 +647,8 @@
         }
       }
 
-      if (tabId === 'tab-members') {
-        if (App.pages.members && App.pages.members.loadData) {
+      if (tabId === 'tab-catalog') {
+        if (App.pages.catalog && App.pages.catalog.loadData) {
           const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, [
             { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: true },
             { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: true },
@@ -667,7 +668,7 @@
           App.state.data.plans = r.plans?.data || r.plans || [];
           App.state.data.planAssignments = r.planAssignments?.data || r.planAssignments || [];
 
-          await App.pages.members.loadData(true);
+          await App.pages.catalog.loadData(true);
         }
       }
       if (tabId === 'tab-boards') {
@@ -778,7 +779,7 @@
 
       if (e.code === 'KeyM' && App.utils.navigation && App.utils.navigation.switchTab) {
         e.preventDefault();
-        App.utils.navigation.switchTab('members');
+        App.utils.navigation.switchTab('catalog');
         return;
       }
 
@@ -1285,6 +1286,7 @@
         return null;
       }
 
+      if (params.tab === 'members') return 'catalog';
       return params.tab;
     },
 
@@ -1300,7 +1302,7 @@
         params.tab = 'board';
         params.board_id = tabId.replace('board-', '');
       } else {
-        params.tab = tabId;
+        params.tab = tabId === 'members' ? 'catalog' : tabId;
       }
 
       return params;
