@@ -56,7 +56,7 @@ AIエージェントは、実装アプローチの計画やコーディングを
 * **API・セキュリティの仕様**: `/docs/api-reference.md`
 * **テスト手法**: `/docs/testing-guide.md`
 * **docs と skills の役割分担**: `/docs/docs-skills-boundary.md`
-* **Skills の正本配置**: `/.agents/skills/`（互換運用時のみ `/.github/skills/` を併用）
+* **Skills の正本配置**: `/.github/skills/`（単一配置で運用）
 
 ## **5. AIへの振る舞い指示**
 

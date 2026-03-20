@@ -1415,6 +1415,12 @@
           return true;
         }
 
+        // requestClose がある場合は優先して使用（保存確認を含む共通導線）
+        if (typeof handler.requestClose === 'function') {
+          const result = handler.requestClose(reason, skipUrlUpdate);
+          return result !== false;
+        }
+
         // close メソッドがある場合はそれを使う
         if (typeof handler.close === 'function') {
           const result = handler.close(skipUrlUpdate, reason);
@@ -1552,6 +1558,20 @@
         overlay.addEventListener('click', (event) => {
           event.preventDefault();
           event.stopPropagation();
+
+          // 詳細モーダルなどで requestClose が定義されている場合は、
+          // 保存確認を含む共通クローズ導線を優先する
+          const handler = App.utils?.ui?.resolveModalHandler
+            ? App.utils.ui.resolveModalHandler(modalId)
+            : null;
+
+          if (handler && typeof handler.requestClose === 'function') {
+            // requestClose側で「閉じる」「保存して閉じる」「閉じない(キャンセル)」を判断する。
+            // ここでcloseへフォールバックすると、キャンセル時にも閉じてしまうため禁止。
+            handler.requestClose('overlay-click');
+            return;
+          }
+
           this.close(modalId);
         });
       }

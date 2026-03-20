@@ -5,8 +5,7 @@
 ## 結論（先に要点）
 
 - `docs/` は **人間向けの仕様・運用知識の正本**。
-- `.agents/skills/` は **Copilot がタスク実行時に呼び出す実行ガイド**（正本）。
-- `.github/skills/` は **互換用の配置先**。必要に応じて同内容を維持する。
+- `.github/skills/` は **Copilot がタスク実行時に呼び出す実行ガイド**（正本）。
 
 迷った場合は、まず `docs/` に仕様を置き、`skills` には「いつ使うか」「どこを見るか」「実行手順」を短く書く。
 
@@ -18,7 +17,7 @@
 - 背景・理由・例外・制約を含む説明
 - 人間レビュー時に単体で読んで理解できる文書
 
-## `.agents/skills/` に置くもの（正本）
+## `.github/skills/` に置くもの（正本）
 
 - 特定タスクを実行するための短い手順
 - 発火条件（いつ使うか / 使わないか）
@@ -45,15 +44,15 @@
 3. `scripts` には運用背景を書かず、仕様説明は `docs` に置く。
 4. 仕様変更時は `docs` を先に更新し、必要な `skills` と `scripts` の参照先だけ更新する。
 5. 新規 skill 追加時は、対応する仕様ドキュメントが `docs` に存在することを確認する。
-6. 運用上は `.agents/skills/` を先に更新し、互換運用が必要な場合のみ `.github/skills/` を同期する。
+6. 運用上は `.github/skills/` のみを更新し、skills は単一配置で運用する。
 
 ## 現在の推奨マッピング
 
-- `.agents/skills/gas-html-service-practices`  
+- `.github/skills/gas-html-service-practices`  
   → `docs/api-reference.md`, `docs/testing-guide.md`
-- `.agents/skills/ui-styling-gas`  
+- `.github/skills/ui-styling-gas`  
   → `docs/beercss-tabulator-reference.md`, `docs/references/beercss-llms.md`
-- `.agents/skills/members-tabulator-iframe`  
+- `.github/skills/members-tabulator-iframe`  
   → `docs/beercss-tabulator-reference.md`, 対象ページの実装ファイル
 
 ## 外部参照の扱い
