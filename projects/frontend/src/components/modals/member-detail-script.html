@@ -6,6 +6,11 @@
             originalData: null,
             isDirty: false,
             quill: null,
+            // 一時保存用: 所属組織とスキルの変更を保存するまで保持
+            pendingDirectoryChanges: { toAdd: [], toRemove: [], toUpdate: [] },
+            pendingSkillChanges: { toAdd: [], toRemove: [], toUpdate: [] },
+            originalDirectories: [],
+            originalSkills: [],
 
             open: function (memberId) {
                 if (!memberId) return;
@@ -20,6 +25,20 @@
                 this.currentItem = Object.assign({}, member);
                 this.originalData = Object.assign({}, member);
                 this.isDirty = false;
+
+                // 一時保存用データをリセット
+                this.pendingDirectoryChanges = { toAdd: [], toRemove: [], toUpdate: [] };
+                this.pendingSkillChanges = { toAdd: [], toRemove: [], toUpdate: [] };
+                
+                // 現在の所属・スキルを取得して保持
+                const assignments = App.state.data.directoryAssignments || [];
+                const skillAssignments = App.state.data.skillAssignments || [];
+                this.originalDirectories = assignments
+                    .filter(function (a) { return a.member_id === memberId && a.is_active !== false; })
+                    .map(function (a) { return Object.assign({}, a); });
+                this.originalSkills = skillAssignments
+                    .filter(function (a) { return a.member_id === memberId; })
+                    .map(function (a) { return Object.assign({}, a); });
 
                 if (!this.quill) {
                     this.quill = App.utils.quill.init('#member-description-editor', {
@@ -151,7 +170,15 @@
                     }
                 }
 
-                if (!hasChanges) {
+                // 所属組織・スキルの変更があるかチェック
+                const hasDirectoryChanges = this.pendingDirectoryChanges.toAdd.length > 0 ||
+                    this.pendingDirectoryChanges.toRemove.length > 0 ||
+                    this.pendingDirectoryChanges.toUpdate.length > 0;
+                const hasSkillChanges = this.pendingSkillChanges.toAdd.length > 0 ||
+                    this.pendingSkillChanges.toRemove.length > 0 ||
+                    this.pendingSkillChanges.toUpdate.length > 0;
+
+                if (!hasChanges && !hasDirectoryChanges && !hasSkillChanges) {
                     this.isDirty = false;
                     closeModal('modal-detail-member');
                     this._reset();
@@ -167,10 +194,23 @@
                 showSnackbar('変更を保存しています...', 'info', 'top', 0);
 
                 try {
-                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'update', {
-                        where: { id: ['=', id] },
-                        set: updates
-                    }, 'メンバーを更新');
+                    // メンバー基本情報の更新
+                    if (hasChanges) {
+                        await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'update', {
+                            where: { id: ['=', id] },
+                            set: updates
+                        }, 'メンバーを更新');
+                    }
+
+                    // 所属組織の変更を保存
+                    if (hasDirectoryChanges) {
+                        await this._saveDirectoryChanges(id);
+                    }
+
+                    // スキルの変更を保存
+                    if (hasSkillChanges) {
+                        await this._saveSkillChanges(id);
+                    }
 
                     showSnackbar('変更を保存しました', 'success');
                     if (App.pages.members && App.pages.members.loadData) {
@@ -273,120 +313,104 @@
                 });
             },
 
-            applyDirectorySelection: async function (memberId, selectedIds) {
+            applyDirectorySelection: function (memberId, selectedIds) {
                 if (!memberId) return;
                 if (!selectedIds || selectedIds.length === 0) return;
 
-                const assignments = App.state.data.directoryAssignments || [];
+                const self = this;
+                
+                // 一時保存リストに追加（即座にDBに反映しない）
+                selectedIds.forEach(function (directoryId) {
+                    // 既に追加予定リストにあるかチェック
+                    const alreadyPending = self.pendingDirectoryChanges.toAdd.find(function (d) {
+                        return d.directory_id === directoryId;
+                    });
+                    if (alreadyPending) return;
 
-                showSnackbar('所属組織を登録しています...', 'info', 'top', 0);
+                    // 削除予定リストから除外
+                    self.pendingDirectoryChanges.toRemove = self.pendingDirectoryChanges.toRemove.filter(function (id) {
+                        return id !== directoryId;
+                    });
 
-                try {
-                    for (let i = 0; i < selectedIds.length; i++) {
-                        const directoryId = selectedIds[i];
-                        const existing = assignments.find(function (a) {
-                            return a.member_id === memberId && a.directory_id === directoryId;
-                        });
+                    // 既存の割り当てかチェック
+                    const existing = self.originalDirectories.find(function (d) {
+                        return d.directory_id === directoryId;
+                    });
 
-                        if (existing) {
-                            if (existing.is_active === false) {
-                                await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
-                                    where: { id: ['=', existing.id] },
-                                    set: { is_active: true }
-                                }, '所属組織を更新');
-                                existing.is_active = true;
-                            }
-                            continue;
-                        }
-
-                        const record = {
+                    if (!existing) {
+                        // 新規追加
+                        self.pendingDirectoryChanges.toAdd.push({
                             member_id: memberId,
                             directory_id: directoryId,
-                            is_active: true
-                        };
-
-                        const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'insert', record, '所属組織を追加');
-                        if (inserted && inserted.data && inserted.data.id) {
-                            record.id = inserted.data.id;
-                        }
-                        assignments.push(record);
+                            is_active: true,
+                            role: null
+                        });
                     }
+                });
 
-                    showSnackbar('所属組織を登録しました', 'success');
-                } catch (err) {
-                    console.error('[MemberDetail] 所属組織登録エラー:', err);
-                    showSnackbar('所属組織の登録に失敗しました', 'error');
-                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
-                        App.utils.modalFlow.refreshMembersDataInBackground(true);
-                    }
-                }
-
+                this.isDirty = true;
                 this._renderDirectories(memberId);
-                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
-                    App.utils.modalFlow.refreshMembersDataInBackground(false);
-                }
+                showSnackbar('所属組織を追加しました（保存ボタンで確定）', 'info');
             },
 
-            deactivateDirectoryAssignment: async function (assignmentId) {
-                if (!assignmentId) return;
+            deactivateDirectoryAssignment: function (assignmentId, directoryId) {
+                if (!directoryId) return;
                 if (!confirm('所属組織を解除しますか？')) return;
 
-                const assignments = App.state.data.directoryAssignments || [];
-                const target = assignments.find(function (a) { return a.id === assignmentId; });
-                if (!target) return;
+                // 追加予定リストから削除
+                this.pendingDirectoryChanges.toAdd = this.pendingDirectoryChanges.toAdd.filter(function (d) {
+                    return d.directory_id !== directoryId;
+                });
 
-                try {
-                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
-                        where: { id: ['=', assignmentId] },
-                        set: { is_active: false }
-                    }, '所属組織を解除');
-
-                    target.is_active = false;
-                    showSnackbar('所属組織を解除しました', 'success');
-                } catch (err) {
-                    console.error('[MemberDetail] 所属組織解除エラー:', err);
-                    showSnackbar('解除に失敗しました', 'error');
-                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
-                        App.utils.modalFlow.refreshMembersDataInBackground(true);
-                    }
+                // 削除予定リストに追加（既存のものの場合のみ）
+                const existing = this.originalDirectories.find(function (d) {
+                    return d.directory_id === directoryId;
+                });
+                if (existing && !this.pendingDirectoryChanges.toRemove.includes(directoryId)) {
+                    this.pendingDirectoryChanges.toRemove.push(directoryId);
                 }
 
+                this.isDirty = true;
                 this._renderDirectories(this.currentId);
-                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
-                    App.utils.modalFlow.refreshMembersDataInBackground(false);
-                }
+                showSnackbar('所属組織を解除しました（保存ボタンで確定）', 'info');
             },
 
-            updateDirectoryRole: async function (assignmentId, roleValue) {
-                if (!assignmentId) return;
-
-                const assignments = App.state.data.directoryAssignments || [];
-                const target = assignments.find(function (a) { return a.id === assignmentId; });
-                if (!target) return;
+            updateDirectoryRole: function (assignmentId, directoryId, roleValue) {
+                if (!directoryId) return;
 
                 const normalizedRole = (roleValue || '').trim() || null;
-                const prevRole = target.role || null;
-                if (normalizedRole === prevRole) return;
 
-                target.role = normalizedRole;
+                // 追加予定リスト内で更新
+                const pending = this.pendingDirectoryChanges.toAdd.find(function (d) {
+                    return d.directory_id === directoryId;
+                });
+                if (pending) {
+                    pending.role = normalizedRole;
+                    this.isDirty = true;
+                    return;
+                }
 
-                try {
-                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
-                        where: { id: ['=', assignmentId] },
-                        set: { role: normalizedRole }
-                    }, '組織での役割を更新');
-
-                    showSnackbar('役割を更新しました', 'success');
-                } catch (err) {
-                    console.error('[MemberDetail] 役割更新エラー:', err);
-                    target.role = prevRole;
-                    showSnackbar('役割の更新に失敗しました', 'error');
-                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
-                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                // 更新予定リストに追加
+                const updateIndex = this.pendingDirectoryChanges.toUpdate.findIndex(function (u) {
+                    return u.directory_id === directoryId;
+                });
+                if (updateIndex >= 0) {
+                    this.pendingDirectoryChanges.toUpdate[updateIndex].role = normalizedRole;
+                } else {
+                    const existing = this.originalDirectories.find(function (d) {
+                        return d.directory_id === directoryId;
+                    });
+                    if (existing && existing.role !== normalizedRole) {
+                        this.pendingDirectoryChanges.toUpdate.push({
+                            id: existing.id,
+                            directory_id: directoryId,
+                            role: normalizedRole
+                        });
                     }
                 }
 
-                this._renderDirectories(this.currentId);
+                this.isDirty = true;
+                showSnackbar('役割を変更しました（保存ボタンで確定）', 'info');
             },
 
             openAddSkill: function () {
@@ -408,113 +432,246 @@
                 });
             },
 
-            applySkillSelection: async function (memberId, selectedIds, levelKey) {
+            applySkillSelection: function (memberId, selectedIds, levelKey) {
                 if (!memberId) return;
                 if (!selectedIds || selectedIds.length === 0) return;
 
-                const assignments = App.state.data.skillAssignments || [];
+                const self = this;
                 const level = levelKey || 'BEGINNER';
 
-                showSnackbar('スキルを登録しています...', 'info', 'top', 0);
+                // 一時保存リストに追加
+                selectedIds.forEach(function (skillId) {
+                    const alreadyPending = self.pendingSkillChanges.toAdd.find(function (s) {
+                        return s.skill_id === skillId;
+                    });
+                    if (alreadyPending) return;
 
-                try {
-                    for (let i = 0; i < selectedIds.length; i++) {
-                        const skillId = selectedIds[i];
-                        const existing = assignments.find(function (a) {
-                            return a.member_id === memberId && a.skill_id === skillId;
-                        });
+                    // 削除予定リストから除外
+                    self.pendingSkillChanges.toRemove = self.pendingSkillChanges.toRemove.filter(function (id) {
+                        return id !== skillId;
+                    });
 
-                        if (existing) {
-                            if (existing.skill_level_key !== level) {
-                                await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
-                                    where: { id: ['=', existing.id] },
-                                    set: { skill_level_key: level }
-                                }, 'スキルレベルを更新');
-                                existing.skill_level_key = level;
-                            }
-                            continue;
-                        }
+                    // 既存のスキルかチェック
+                    const existing = self.originalSkills.find(function (s) {
+                        return s.skill_id === skillId;
+                    });
 
-                        const record = {
+                    if (!existing) {
+                        // 新規追加
+                        self.pendingSkillChanges.toAdd.push({
                             member_id: memberId,
                             skill_id: skillId,
-                            skill_level_key: level
-                        };
-
-                        const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'insert', record, 'スキルを追加');
-                        if (inserted && inserted.data && inserted.data.id) {
-                            record.id = inserted.data.id;
+                            skill_level_key: level,
+                            remark: null
+                        });
+                    } else if (existing.skill_level_key !== level) {
+                        // レベル更新
+                        const updateIndex = self.pendingSkillChanges.toUpdate.findIndex(function (u) {
+                            return u.skill_id === skillId;
+                        });
+                        if (updateIndex >= 0) {
+                            self.pendingSkillChanges.toUpdate[updateIndex].skill_level_key = level;
+                        } else {
+                            self.pendingSkillChanges.toUpdate.push({
+                                id: existing.id,
+                                skill_id: skillId,
+                                skill_level_key: level,
+                                remark: existing.remark
+                            });
                         }
-                        assignments.push(record);
                     }
+                });
 
-                    showSnackbar('スキルを登録しました', 'success');
-                } catch (err) {
-                    console.error('[MemberDetail] スキル登録エラー:', err);
-                    showSnackbar('スキルの登録に失敗しました', 'error');
-                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
-                        App.utils.modalFlow.refreshMembersDataInBackground(true);
-                    }
-                }
-
+                this.isDirty = true;
                 this._renderSkills(memberId);
-                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
-                    App.utils.modalFlow.refreshMembersDataInBackground(false);
-                }
+                showSnackbar('スキルを追加しました（保存ボタンで確定）', 'info');
             },
 
-            updateSkillLevel: async function (assignmentId, levelKey) {
-                if (!assignmentId) return;
-                const assignments = App.state.data.skillAssignments || [];
-                const target = assignments.find(function (a) { return a.id === assignmentId; });
-                if (!target || target.skill_level_key === levelKey) return;
+            removeSkillAssignment: function (assignmentId, skillId) {
+                if (!skillId) return;
+                if (!confirm('スキルを削除しますか？')) return;
 
-                try {
-                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
-                        where: { id: ['=', assignmentId] },
-                        set: { skill_level_key: levelKey }
-                    }, 'スキルレベルを更新');
-                    target.skill_level_key = levelKey;
-                    showSnackbar('スキルレベルを更新しました', 'success');
-                    this._renderSkills(this.currentId);
-                } catch (err) {
-                    console.error('[MemberDetail] スキル更新エラー:', err);
-                    showSnackbar('更新に失敗しました', 'error');
-                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
-                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                // 追加予定リストから削除
+                this.pendingSkillChanges.toAdd = this.pendingSkillChanges.toAdd.filter(function (s) {
+                    return s.skill_id !== skillId;
+                });
+
+                // 削除予定リストに追加（既存のものの場合のみ）
+                const existing = this.originalSkills.find(function (s) {
+                    return s.skill_id === skillId;
+                });
+                if (existing && !this.pendingSkillChanges.toRemove.includes(skillId)) {
+                    this.pendingSkillChanges.toRemove.push(skillId);
+                }
+
+                this.isDirty = true;
+                this._renderSkills(this.currentId);
+                showSnackbar('スキルを削除しました（保存ボタンで確定）', 'info');
+            },
+
+            updateSkillLevel: function (assignmentId, skillId, levelKey) {
+                if (!skillId) return;
+
+                // 追加予定リスト内で更新
+                const pending = this.pendingSkillChanges.toAdd.find(function (s) {
+                    return s.skill_id === skillId;
+                });
+                if (pending) {
+                    pending.skill_level_key = levelKey;
+                    this.isDirty = true;
+                    return;
+                }
+
+                // 更新予定リストに追加
+                const updateIndex = this.pendingSkillChanges.toUpdate.findIndex(function (u) {
+                    return u.skill_id === skillId;
+                });
+                if (updateIndex >= 0) {
+                    this.pendingSkillChanges.toUpdate[updateIndex].skill_level_key = levelKey;
+                } else {
+                    const existing = this.originalSkills.find(function (s) {
+                        return s.skill_id === skillId;
+                    });
+                    if (existing && existing.skill_level_key !== levelKey) {
+                        this.pendingSkillChanges.toUpdate.push({
+                            id: existing.id,
+                            skill_id: skillId,
+                            skill_level_key: levelKey,
+                            remark: existing.remark
+                        });
                     }
                 }
+
+                this.isDirty = true;
+                this._renderSkills(this.currentId);
+                showSnackbar('スキルレベルを変更しました（保存ボタンで確定）', 'info');
             },
 
-            updateSkillRemark: async function (assignmentId, remarkValue) {
-                if (!assignmentId) return;
-
-                const assignments = App.state.data.skillAssignments || [];
-                const target = assignments.find(function (a) { return a.id === assignmentId; });
-                if (!target) return;
+            updateSkillRemark: function (assignmentId, skillId, remarkValue) {
+                if (!skillId) return;
 
                 const normalizedRemark = (remarkValue || '').trim() || null;
-                const prevRemark = target.remark || null;
-                if (normalizedRemark === prevRemark) return;
 
-                target.remark = normalizedRemark;
+                // 追加予定リスト内で更新
+                const pending = this.pendingSkillChanges.toAdd.find(function (s) {
+                    return s.skill_id === skillId;
+                });
+                if (pending) {
+                    pending.remark = normalizedRemark;
+                    this.isDirty = true;
+                    return;
+                }
 
-                try {
-                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
-                        where: { id: ['=', assignmentId] },
-                        set: { remark: normalizedRemark }
-                    }, 'スキル備考を更新');
-                    showSnackbar('スキル備考を更新しました', 'success');
-                } catch (err) {
-                    console.error('[MemberDetail] スキル備考更新エラー:', err);
-                    target.remark = prevRemark;
-                    showSnackbar('スキル備考の更新に失敗しました', 'error');
-                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
-                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                // 更新予定リストに追加
+                const updateIndex = this.pendingSkillChanges.toUpdate.findIndex(function (u) {
+                    return u.skill_id === skillId;
+                });
+                if (updateIndex >= 0) {
+                    this.pendingSkillChanges.toUpdate[updateIndex].remark = normalizedRemark;
+                } else {
+                    const existing = this.originalSkills.find(function (s) {
+                        return s.skill_id === skillId;
+                    });
+                    if (existing && existing.remark !== normalizedRemark) {
+                        this.pendingSkillChanges.toUpdate.push({
+                            id: existing.id,
+                            skill_id: skillId,
+                            skill_level_key: existing.skill_level_key,
+                            remark: normalizedRemark
+                        });
                     }
                 }
 
-                this._renderSkills(this.currentId);
+                this.isDirty = true;
+                showSnackbar('備考を変更しました（保存ボタンで確定）', 'info');
+            },
+
+            // 保存時に呼ばれる関数: 所属組織の変更をDBに反映
+            _saveDirectoryChanges: async function (memberId) {
+                const assignments = App.state.data.directoryAssignments || [];
+
+                // 削除
+                for (let i = 0; i < this.pendingDirectoryChanges.toRemove.length; i++) {
+                    const directoryId = this.pendingDirectoryChanges.toRemove[i];
+                    const existing = assignments.find(function (a) {
+                        return a.member_id === memberId && a.directory_id === directoryId;
+                    });
+                    if (existing && existing.id) {
+                        await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                            where: { id: ['=', existing.id] },
+                            set: { is_active: false }
+                        }, '所属組織を解除');
+                        existing.is_active = false;
+                    }
+                }
+
+                // 追加
+                for (let i = 0; i < this.pendingDirectoryChanges.toAdd.length; i++) {
+                    const record = this.pendingDirectoryChanges.toAdd[i];
+                    const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'insert', record, '所属組織を追加');
+                    if (inserted && inserted.data && inserted.data.id) {
+                        record.id = inserted.data.id;
+                        assignments.push(record);
+                    }
+                }
+
+                // 更新
+                for (let i = 0; i < this.pendingDirectoryChanges.toUpdate.length; i++) {
+                    const update = this.pendingDirectoryChanges.toUpdate[i];
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', update.id] },
+                        set: { role: update.role }
+                    }, '組織での役割を更新');
+                    const target = assignments.find(function (a) { return a.id === update.id; });
+                    if (target) target.role = update.role;
+                }
+            },
+
+            // 保存時に呼ばれる関数: スキルの変更をDBに反映
+            _saveSkillChanges: async function (memberId) {
+                const assignments = App.state.data.skillAssignments || [];
+
+                // 削除
+                for (let i = 0; i < this.pendingSkillChanges.toRemove.length; i++) {
+                    const skillId = this.pendingSkillChanges.toRemove[i];
+                    const existing = assignments.find(function (a) {
+                        return a.member_id === memberId && a.skill_id === skillId;
+                    });
+                    if (existing && existing.id) {
+                        await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'remove', {
+                            where: { id: ['=', existing.id] }
+                        }, 'スキルを削除');
+                        const index = assignments.findIndex(function (a) { return a.id === existing.id; });
+                        if (index >= 0) assignments.splice(index, 1);
+                    }
+                }
+
+                // 追加
+                for (let i = 0; i < this.pendingSkillChanges.toAdd.length; i++) {
+                    const record = this.pendingSkillChanges.toAdd[i];
+                    const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'insert', record, 'スキルを追加');
+                    if (inserted && inserted.data && inserted.data.id) {
+                        record.id = inserted.data.id;
+                        assignments.push(record);
+                    }
+                }
+
+                // 更新
+                for (let i = 0; i < this.pendingSkillChanges.toUpdate.length; i++) {
+                    const update = this.pendingSkillChanges.toUpdate[i];
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', update.id] },
+                        set: {
+                            skill_level_key: update.skill_level_key,
+                            remark: update.remark
+                        }
+                    }, 'スキルを更新');
+                    const target = assignments.find(function (a) { return a.id === update.id; });
+                    if (target) {
+                        target.skill_level_key = update.skill_level_key;
+                        target.remark = update.remark;
+                    }
+                }
             },
 
             removeSkillAssignment: async function (assignmentId) {
@@ -624,6 +781,42 @@
                 }).join('');
             },
 
+            // コメントを即座にUIに追加（Optimistic UI Update）
+            appendCommentToUI: function (comment) {
+                const container = document.getElementById('member-comments-list');
+                if (!container) return;
+
+                const members = App.state.data.members || [];
+                const creator = members.find(function (m) { return m.id === comment.created_by; });
+                const creatorName = creator ? creator.display_name : '不明';
+                const creatorPhoto = creator ? creator.profile_photo_url : '';
+                const creatorSlackProfileUrl = creator ? creator.slack_profile_url : '#';
+                const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
+
+                const creatorIcon = creatorPhoto
+                    ? '<img src="' + creatorPhoto + '" alt="' + escapeHtml(creatorName) + '" class="circle tiny">'
+                    : '<i class="tiny">account_circle</i>';
+
+                const newCommentHtml = '<div class="small-padding">' +
+                    '<div class="row tiny-space">' +
+                    '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '<\/a>' +
+                    '<div class="max row tiny-space">' +
+                    '<span class="bold small-text">' + escapeHtml(creatorName) + '<\/span>' +
+                    '<span class="small-text secondary-text">' + createdAt + '<\/span>' +
+                    '<\/div>' +
+                    '<\/div>' +
+                    '<div class="tiny-space"><\/div>' +
+                    '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '<\/p>' +
+                    '<\/div>';
+
+                // 既存のコメントがある場合は先頭に追加、無い場合は置き換え
+                if (container.innerHTML.indexOf('コメントはありません') >= 0) {
+                    container.innerHTML = newCommentHtml;
+                } else {
+                    container.innerHTML = newCommentHtml + '<hr class="max small-margin">' + container.innerHTML;
+                }
+            },
+
             _render: function (member) {
                 const statusChip = document.getElementById('member-detail-status-chip');
                 if (statusChip) {
@@ -645,7 +838,7 @@
                 var findDisplayName = function (memberId) {
                     if (!memberId) return '';
                     var found = members.find(function (item) { return item.id === memberId; });
-                    return found ? (found.display_name || found.name || found.email || '') : memberId;
+                    return found ? (found.display_name || found.name || found.email || '') : '不明';
                 };
 
                 setVal('member-detail-name-input', member.name);
@@ -745,30 +938,50 @@
                 var container = document.getElementById('member-detail-directories-list');
                 if (!container) return;
 
-                var assignments = (App.state.data.directoryAssignments || []).filter(function (a) {
-                    return a.member_id === memberId;
-                });
+                var self = this;
                 var directories = App.state.data.directories || [];
+                
+                // 現在表示すべき所属組織を計算（一時保存の変更を反映）
+                var currentDirectories = [];
+                
+                // 既存の所属から開始
+                this.originalDirectories.forEach(function (orig) {
+                    // 削除予定リストに無ければ追加
+                    if (!self.pendingDirectoryChanges.toRemove.includes(orig.directory_id)) {
+                        var dir = Object.assign({}, orig);
+                        // 更新があれば反映
+                        var update = self.pendingDirectoryChanges.toUpdate.find(function (u) {
+                            return u.directory_id === orig.directory_id;
+                        });
+                        if (update) {
+                            dir.role = update.role;
+                        }
+                        currentDirectories.push(dir);
+                    }
+                });
+                
+                // 新規追加分を追加
+                this.pendingDirectoryChanges.toAdd.forEach(function (add) {
+                    currentDirectories.push(add);
+                });
 
-                if (assignments.length === 0) {
+                if (currentDirectories.length === 0) {
                     container.innerHTML = '<p class="secondary-text padding">所属組織はありません</p>';
                     return;
                 }
 
-                container.innerHTML = assignments.map(function (a) {
+                container.innerHTML = currentDirectories.map(function (a) {
                     var dir = directories.find(function (d) { return d.id === a.directory_id; });
                     var dirName = dir ? dir.name : '（削除済み組織）';
                     var role = a.role || '';
                     var isActive = a.is_active !== false;
-                    var actionBtn = a.id
-                        ? '<button class="small round border" onclick="App.modals.memberDetail.deactivateDirectoryAssignment(\'' + a.id + '\')">解除<\/button>'
-                        : '';
+                    var actionBtn = '<button class="small round border" onclick="App.modals.memberDetail.deactivateDirectoryAssignment(\'' + escapeHtmlAttribute(a.id || '') + '\', \'' + escapeHtmlAttribute(a.directory_id) + '\')">解除<\/button>';
                     return '<div class="row padding small-space">' +
                         '<i>account_tree</i>' +
                         '<div class="max">' +
                         '<p class="no-margin bold small">' + escapeHtml(dirName) + '<\/p>' +
                         '<div class="field border label small top-margin no-margin">' +
-                        '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(role) + '" onchange="App.modals.memberDetail.updateDirectoryRole(\'' + escapeHtmlAttribute(a.id || '') + '\', this.value)">' +
+                        '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(role) + '" onchange="App.modals.memberDetail.updateDirectoryRole(\'' + escapeHtmlAttribute(a.id || '') + '\', \'' + escapeHtmlAttribute(a.directory_id) + '\', this.value)">' +
                         '<label>役割</label>' +
                         '<\/div>' +
                         '<\/div>' +
@@ -781,12 +994,35 @@
                 var container = document.getElementById('member-detail-skills-list');
                 if (!container) return;
 
-                var skillAssignments = (App.state.data.skillAssignments || []).filter(function (sa) {
-                    return sa.member_id === memberId;
-                });
+                var self = this;
                 var skills = App.state.data.skills || [];
+                
+                // 現在表示すべきスキルを計算（一時保存の変更を反映）
+                var currentSkills = [];
+                
+                // 既存のスキルから開始
+                this.originalSkills.forEach(function (orig) {
+                    // 削除予定リストに無ければ追加
+                    if (!self.pendingSkillChanges.toRemove.includes(orig.skill_id)) {
+                        var sk = Object.assign({}, orig);
+                        // 更新があれば反映
+                        var update = self.pendingSkillChanges.toUpdate.find(function (u) {
+                            return u.skill_id === orig.skill_id;
+                        });
+                        if (update) {
+                            sk.skill_level_key = update.skill_level_key;
+                            sk.remark = update.remark;
+                        }
+                        currentSkills.push(sk);
+                    }
+                });
+                
+                // 新規追加分を追加
+                this.pendingSkillChanges.toAdd.forEach(function (add) {
+                    currentSkills.push(add);
+                });
 
-                if (skillAssignments.length === 0) {
+                if (currentSkills.length === 0) {
                     container.innerHTML = '<p class="secondary-text padding">スキル情報はありません</p>';
                     return;
                 }
@@ -805,13 +1041,27 @@
                     }).join('');
                 };
 
-                container.innerHTML = skillAssignments.map(function (sa) {
+                container.innerHTML = currentSkills.map(function (sa) {
                     var skill = skills.find(function (s) { return s.id === sa.skill_id; });
                     var skillName = skill ? skill.title : '（削除済みスキル）';
                     var level = levelLabels[sa.skill_level_key] || sa.skill_level_key || '';
                     var remark = sa.remark || '';
-                    var levelSelect = sa.id
-                        ? '<select class="small" onchange="App.modals.memberDetail.updateSkillLevel(\'' + sa.id + '\', this.value)">' + levelOptions(sa.skill_level_key) + '<\/select>'
+                    var levelSelect = '<select class="small" onchange="App.modals.memberDetail.updateSkillLevel(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\', this.value)">' + levelOptions(sa.skill_level_key) + '<\/select>';
+                    var remarkInput = '<input type="text" placeholder="備考" value="' + escapeHtmlAttribute(remark) + '" onchange="App.modals.memberDetail.updateSkillRemark(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\', this.value)">';
+                    var deleteBtn = '<button class="circle small transparent" onclick="App.modals.memberDetail.removeSkillAssignment(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\')"><i>delete</i><\/button>';
+                    return '<div class="row padding small-space">' +
+                        '<i>psychology</i>' +
+                        '<div class="max">' +
+                        '<p class="no-margin bold small">' + escapeHtml(skillName) + '<\/p>' +
+                        '<div class="row small-space top-margin">' +
+                        levelSelect +
+                        '<div class="field border small max no-margin">' + remarkInput + '<\/div>' +
+                        '<\/div>' +
+                        '<\/div>' +
+                        deleteBtn +
+                        '<\/div>';
+                }).join('<hr class="small-margin">');
+            },
                         : '<span class="small-text secondary-text">-<\/span>';
                     var removeBtn = sa.id
                         ? '<button class="small round border" onclick="App.modals.memberDetail.removeSkillAssignment(\'' + sa.id + '\')">解除<\/button>'

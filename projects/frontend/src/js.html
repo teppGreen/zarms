@@ -387,6 +387,7 @@
       let skills = [];
       let skillAssignments = [];
       let systemUpdates = [];
+      let tasks = [];
       let wasCached = false;
 
       if (embedded) {
@@ -400,6 +401,7 @@
         skills = embedded.skills || [];
         skillAssignments = embedded.skillAssignments || [];
         systemUpdates = embedded.systemUpdates || [];
+        tasks = embedded.tasks || [];
         wasCached = embedded.isCached || false;
         console.log('[loadAllData] Server-embedded initialData (isCached:', wasCached, ')');
       } else {
@@ -415,7 +417,8 @@
           { key: 'planAssignments', tableName: TABLE_NAMES.PLAN_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: false },
           { key: 'skills', tableName: TABLE_NAMES.SKILLS, operation: 'select', dataObject: {}, forceRefresh: false },
           { key: 'skillAssignments', tableName: TABLE_NAMES.SKILL_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: false },
-          { key: 'systemUpdates', tableName: TABLE_NAMES.SYSTEM_UPDATES, operation: 'select', dataObject: { orderBy: { created_at: 'desc' } }, forceRefresh: true }
+          { key: 'systemUpdates', tableName: TABLE_NAMES.SYSTEM_UPDATES, operation: 'select', dataObject: { orderBy: { created_at: 'desc' } }, forceRefresh: true },
+          { key: 'tasks', tableName: TABLE_NAMES.TASKS, operation: 'select', dataObject: { columns: ['id', 'display_id', 'name', 'board_id', 'task_status_key', 'is_active'], where: { is_active: ['!=', false] }, orderBy: { display_id: 'desc' } }, forceRefresh: false }
         ]);
         const r = batchResult?.results || {};
         boards = r.boards?.data || r.boards || [];
@@ -428,6 +431,7 @@
         skills = r.skills?.data || r.skills || [];
         skillAssignments = r.skillAssignments?.data || r.skillAssignments || [];
         systemUpdates = r.systemUpdates?.data || r.systemUpdates || [];
+        tasks = r.tasks?.data || r.tasks || [];
         wasCached = !batchResult?.hasAnyUncached;
       }
 
@@ -442,7 +446,7 @@
       App.state.data.skills = skills;
       App.state.data.skillAssignments = skillAssignments;
       App.state.data.systemUpdates = systemUpdates;
-      App.state.data.tasks = [];
+      App.state.data.tasks = tasks;
 
       // ── Step 3: 即座にUIを描画（Render-First） ──────────────────────────────────────────
       App.utils.navigation.renderBoardsNavigation();
@@ -481,7 +485,8 @@
               { key: 'plans', tableName: TABLE_NAMES.PLANS, operation: 'select', dataObject: {}, forceRefresh: true },
               { key: 'planAssignments', tableName: TABLE_NAMES.PLAN_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true },
               { key: 'skills', tableName: TABLE_NAMES.SKILLS, operation: 'select', dataObject: {}, forceRefresh: true },
-              { key: 'skillAssignments', tableName: TABLE_NAMES.SKILL_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true }
+              { key: 'skillAssignments', tableName: TABLE_NAMES.SKILL_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true },
+              { key: 'tasks', tableName: TABLE_NAMES.TASKS, operation: 'select', dataObject: { columns: ['id', 'display_id', 'name', 'board_id', 'task_status_key', 'is_active'], where: { is_active: ['!=', false] }, orderBy: { display_id: 'desc' } }, forceRefresh: true }
             ]);
             const r = batchResult?.results || {};
             const freshBoards = r.boards?.data || r.boards || [];
@@ -493,6 +498,7 @@
             const freshPlanAssignments = r.planAssignments?.data || r.planAssignments || [];
             const freshSkills = r.skills?.data || r.skills || [];
             const freshSkillAssignments = r.skillAssignments?.data || r.skillAssignments || [];
+            const freshTasks = r.tasks?.data || r.tasks || [];
 
             App.state.data.boards = freshBoards;
             App.state.data.apps = freshApps;
@@ -503,6 +509,7 @@
             App.state.data.planAssignments = freshPlanAssignments;
             App.state.data.skills = freshSkills;
             App.state.data.skillAssignments = freshSkillAssignments;
+            App.state.data.tasks = freshTasks;
 
             // ナビゲーションを更新（アクティブ状態を保持）
             const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#board-nav a.active');
@@ -1875,7 +1882,12 @@
 
       let html = '';
       items.forEach(item => {
-        const label = labelFormatter ? labelFormatter(item) : (item.name || item.display_name || item.id);
+        const fallbackDisplayId = item && item.display_id !== undefined && item.display_id !== null && String(item.display_id).trim() !== ''
+          ? `#${item.display_id}`
+          : '';
+        const label = labelFormatter
+          ? labelFormatter(item)
+          : (item.name || item.display_name || item.title || item.plan_number || fallbackDisplayId || '未設定');
         const safeLabel = escapeHtml(label);
         const safeId = escapeHtmlAttribute(item.id);
 
@@ -1958,6 +1970,130 @@
           where: { name: ['LIKE', `%${normalizedValue}%`] }
         };
       }
+    }
+  };
+
+  /**
+   * エンティティ横断検索ユーティリティ
+   * tasks / plans / directories / skills / members を共通方式で検索します。
+   */
+  App.utils.entitySearch = {
+    /**
+     * 検索対象の定義
+     * @returns {Object<string, Object>}
+     */
+    getConfigs: function () {
+      return {
+        tasks: { tableName: TABLE_NAMES.TASKS, nameField: 'name', label: 'タスク' },
+        plans: { tableName: TABLE_NAMES.PLANS, nameField: 'name', label: '企画' },
+        directories: { tableName: TABLE_NAMES.DIRECTORIES, nameField: 'name', label: '組織' },
+        skills: { tableName: TABLE_NAMES.SKILLS, nameField: 'title', label: 'スキル' },
+        members: { tableName: TABLE_NAMES.MEMBERS, nameField: 'display_name', label: 'メンバー' }
+      };
+    },
+
+    /**
+     * テーブルラベルを返します
+     * @param {string} table - テーブル名
+     * @returns {string}
+     */
+    getLabel: function (table) {
+      const config = this.getConfigs()[table];
+      return config ? config.label : (table || '不明');
+    },
+
+    /**
+     * エンティティ横断検索
+     * @param {string} searchValue - 検索文字列
+     * @param {Object} options - 検索オプション
+     * @param {Array<string>} options.tables - 対象テーブル
+     * @param {boolean} options.forceRefresh - キャッシュ無視
+     * @param {number} options.limit - 返却件数上限
+     * @returns {Promise<Array<Object>>}
+     */
+    searchAcross: async function (searchValue, options = {}) {
+      const { normalizedValue, numericValue, isNumericInput } = App.utils.search.getNormalizedSearchInfo(searchValue);
+      if (!normalizedValue) return [];
+
+      const configs = this.getConfigs();
+      const tables = (Array.isArray(options.tables) && options.tables.length)
+        ? options.tables.filter(function (table) { return Boolean(configs[table]); })
+        : Object.keys(configs);
+      const forceRefresh = options.forceRefresh !== false;
+      const queries = [];
+
+      tables.forEach(table => {
+        const config = configs[table];
+        const keyPrefix = `entity_${table}`;
+        queries.push({
+          key: `${keyPrefix}_name`,
+          tableName: config.tableName,
+          operation: 'select',
+          dataObject: {
+            where: { [config.nameField]: ['LIKE', `%${normalizedValue}%`] },
+            orderBy: { display_id: 'desc' }
+          },
+          forceRefresh
+        });
+        queries.push({
+          key: `${keyPrefix}_id`,
+          tableName: config.tableName,
+          operation: 'select',
+          dataObject: {
+            where: { id: ['LIKE', `%${normalizedValue}%`] },
+            orderBy: { display_id: 'desc' }
+          },
+          forceRefresh
+        });
+        if (isNumericInput) {
+          queries.push({
+            key: `${keyPrefix}_display`,
+            tableName: config.tableName,
+            operation: 'select',
+            dataObject: {
+              where: { display_id: ['=', numericValue] },
+              orderBy: { display_id: 'desc' }
+            },
+            forceRefresh
+          });
+        }
+      });
+
+      const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, queries);
+      const resultsObj = batchResult?.results || {};
+      const merged = new Map();
+
+      tables.forEach(table => {
+        const config = configs[table];
+        const keyPrefix = `entity_${table}`;
+        const rawRows = []
+          .concat(resultsObj[`${keyPrefix}_name`]?.data || resultsObj[`${keyPrefix}_name`] || [])
+          .concat(resultsObj[`${keyPrefix}_id`]?.data || resultsObj[`${keyPrefix}_id`] || [])
+          .concat(resultsObj[`${keyPrefix}_display`]?.data || resultsObj[`${keyPrefix}_display`] || []);
+
+        rawRows.forEach(row => {
+          if (!row || !row.id) return;
+          const mapKey = `${table}:${row.id}`;
+          if (merged.has(mapKey)) return;
+          merged.set(mapKey, {
+            table: table,
+            id: row.id,
+            name: row[config.nameField] || '',
+            display_id: row.display_id || null
+          });
+        });
+      });
+
+      const list = Array.from(merged.values());
+      list.sort((a, b) => {
+        const aDisplay = (typeof a.display_id === 'number') ? a.display_id : -1;
+        const bDisplay = (typeof b.display_id === 'number') ? b.display_id : -1;
+        if (aDisplay !== bDisplay) return bDisplay - aDisplay;
+        return (a.name || '').localeCompare((b.name || ''), 'ja');
+      });
+
+      const limit = Number.isInteger(options.limit) ? options.limit : 100;
+      return list.slice(0, limit);
     }
   };
 

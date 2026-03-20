@@ -8,6 +8,44 @@
         </button>
     </nav>
 
+    <article id="new-comment-related-fixed" class="small-round border small-padding bottom-margin" style="display: none;">
+        <div class="row tiny-space middle-align">
+            <i class="small secondary-text">link</i>
+            <span class="small-text secondary-text">対象</span>
+        </div>
+        <p id="new-comment-related-fixed-label" class="no-margin small-text bold">-</p>
+    </article>
+
+    <article id="new-comment-related-selector" class="small-round border small-padding bottom-margin" style="display: none;">
+        <div class="field border label suffix small bottom-margin">
+            <select id="new-comment-target-table" onchange="App.modals.newComment.handleTargetTableChange()">
+                <option value="">すべて</option>
+                <option value="tasks">タスク</option>
+                <option value="plans">企画</option>
+                <option value="directories">組織</option>
+                <option value="skills">スキル</option>
+                <option value="members">メンバー</option>
+            </select>
+            <label>対象種別</label>
+            <i>arrow_drop_down</i>
+        </div>
+
+        <div class="field border prefix small bottom-margin">
+            <i class="front" onclick="App.modals.newComment.searchTargets()">search</i>
+            <input id="new-comment-target-search" type="text" placeholder="ID・名称・表示番号で検索"
+                onkeydown="if(event.key === 'Enter' && !event.isComposing){event.preventDefault();App.modals.newComment.searchTargets();}">
+        </div>
+
+        <article id="new-comment-target-results" class="scroll small-round background small-padding no-elevate">
+            <div class="secondary-text small-text">検索キーワードを入力してください</div>
+        </article>
+
+        <div id="new-comment-target-selected" class="row tiny-space middle-align top-margin small-text secondary-text">
+            <i class="small">info</i>
+            <span>対象が未選択です</span>
+        </div>
+    </article>
+
     <div class="field no-border background scroll large-width small-round">
         <textarea id="new-comment-content" rows="10" placeholder="コメント内容を入力..."></textarea>
     </div>

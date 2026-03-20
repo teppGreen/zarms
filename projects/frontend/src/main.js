@@ -177,6 +177,16 @@ function _prefetchInitialData(userId, useApiMode = false) {
       operation: 'select',
       dataObject: { orderBy: { created_at: 'desc' } },
       forceRefresh: true  // 常に最新を取得
+    },
+    {
+      key: 'tasks',
+      tableName: TABLE_NAMES.TASKS,
+      operation: 'select',
+      dataObject: {
+        columns: ['id', 'display_id', 'name', 'board_id', 'task_status_key'],
+        orderBy: { display_id: 'desc' }
+      },
+      forceRefresh: false
     }
   ];
 
@@ -194,6 +204,7 @@ function _prefetchInitialData(userId, useApiMode = false) {
     skills: (r.skills?.data || r.skills || []),
     skillAssignments: (r.skillAssignments?.data || r.skillAssignments || []),
     systemUpdates: (r.systemUpdates?.data || r.systemUpdates || []),
+    tasks: (r.tasks?.data || r.tasks || []),
     // いずれかがキャッシュから取得された場合 true
     isCached: !batchResult.hasAnyUncached
   };
