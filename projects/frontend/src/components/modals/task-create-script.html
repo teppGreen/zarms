@@ -413,11 +413,10 @@
              * @returns {string} 優先度キー（LOW/MEDIUM/HIGH）
              */
             parsePriority: function (priorityStr) {
-                const priorityMap = {
-                    '低': 'LOW',
-                    '中': 'MEDIUM',
-                    '高': 'HIGH'
-                };
+                const priorityMap = Object.keys(KEY_LABELS.PRIORITY).reduce(function (map, key) {
+                    map[KEY_LABELS.PRIORITY[key]] = key;
+                    return map;
+                }, {});
                 return priorityMap[priorityStr] || 'MEDIUM';
             },
 
@@ -459,12 +458,7 @@
 
                     // 優先度
                     const priorityCell = document.createElement('td');
-                    const priorityDisplay = {
-                        'LOW': '低',
-                        'MEDIUM': '中',
-                        'HIGH': '高'
-                    };
-                    priorityCell.textContent = priorityDisplay[task.priority_key] || '';
+                    priorityCell.textContent = KEY_LABELS.PRIORITY[task.priority_key] || '';
                     row.appendChild(priorityCell);
 
                     previewTableBody.appendChild(row);
