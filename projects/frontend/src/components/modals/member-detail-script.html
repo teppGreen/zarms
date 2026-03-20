@@ -15,13 +15,16 @@
             open: function (memberId) {
                 if (!memberId) return;
 
-                const member = (App.state.data.members || []).find(function (m) { return m.id === memberId; });
+                const requestId = String(memberId);
+                const member = (App.state.data.members || []).find(function (m) {
+                    return m && m.id !== undefined && m.id !== null && String(m.id) === requestId;
+                });
                 if (!member) {
                     console.error('[MemberDetail] Member not found:', memberId);
                     return;
                 }
 
-                this.currentId = memberId;
+                this.currentId = member.id;
                 this.currentItem = Object.assign({}, member);
                 this.originalData = Object.assign({}, member);
                 this.isDirty = false;
@@ -34,10 +37,10 @@
                 const assignments = App.state.data.directoryAssignments || [];
                 const skillAssignments = App.state.data.skillAssignments || [];
                 this.originalDirectories = assignments
-                    .filter(function (a) { return a.member_id === memberId && a.is_active !== false; })
+                    .filter(function (a) { return String(a.member_id) === String(member.id) && a.is_active !== false; })
                     .map(function (a) { return Object.assign({}, a); });
                 this.originalSkills = skillAssignments
-                    .filter(function (a) { return a.member_id === memberId; })
+                    .filter(function (a) { return String(a.member_id) === String(member.id); })
                     .map(function (a) { return Object.assign({}, a); });
 
                 if (!this.quill) {
@@ -49,9 +52,9 @@
                 ui('#modal-detail-member', true);
 
                 this._render(member);
-                this._renderDirectories(memberId);
-                this._renderSkills(memberId);
-                this.loadComments(memberId);
+                this._renderDirectories(member.id);
+                this._renderSkills(member.id);
+                this.loadComments(member.id);
                 this.switchTab(document.querySelector('#member-detail-tabs > a'), 'profile');
                 this._bindEscClose();
             },
