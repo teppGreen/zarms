@@ -8,15 +8,18 @@
             open: function (directoryId) {
                 if (!directoryId) return;
 
-                const directory = (App.state.data.directories || []).find(function (item) { return item.id === directoryId; });
+                const requestId = String(directoryId);
+                const directory = (App.state.data.directories || []).find(function (item) {
+                    return item && item.id !== undefined && item.id !== null && String(item.id) === requestId;
+                });
                 if (!directory) return;
 
-                this.currentId = directoryId;
+                this.currentId = directory.id;
                 this.isSaving = false;
                 this.hasDirtyInput = false;
-                this._populateSelects(directoryId);
+                this._populateSelects(directory.id);
                 this._render(directory);
-                this.loadComments(directoryId);
+                this.loadComments(directory.id);
                 ui('#modal-detail-directory');
                 this._bindEscClose();
             },

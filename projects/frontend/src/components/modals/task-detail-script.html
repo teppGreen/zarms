@@ -1409,14 +1409,14 @@
 
         const members = App.state.data.members || [];
 
-        const html = this.currentLists.map(list => {
+        const html = this.currentLists.map(list,index => {
           const assignee = members.find(m => m.id === list.assign_to);
           const avatarHtml = assignee?.profile_photo_url
             ? `<img src="${assignee.profile_photo_url}" class="responsive" alt="${escapeHtml(assignee.display_name)}">`
             : '<i>person</i>';
 
           return `
-            <div class="list-item row no-margin middle-align small-space background" data-list-id="${list.id}">
+            <div class="list-item row background small-space ${index > 0 ? 'top-margin' : ''}" data-list-id="${list.id}">
               <i class="drag-handle" style="cursor: move;">drag_indicator</i>
               <label class="checkbox">
                 <input type="checkbox" 
