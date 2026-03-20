@@ -6,16 +6,23 @@
             allSkills: [],
             filteredSkills: [],
             multiSelect: false,
-            selectedLevel: 'BEGINNER',
+            selectedLevel: 'INTERMEDIATE',
 
             open: async function (options = {}) {
                 this.callback = options.callback || null;
                 this.multiSelect = options.multiSelect || false;
                 this.selectedIds = options.preSelected || [];
-                this.selectedLevel = options.defaultLevel || 'BEGINNER';
+                this.selectedLevel = options.defaultLevel || 'INTERMEDIATE';
 
+                // key_LABELS.SKILL_LEVELおらオプションを動的に生成
                 const levelSelect = document.getElementById('skill-level-select');
-                if (levelSelect) levelSelect.value = this.selectedLevel;
+                if (levelSelect) {
+                    levelSelect.innerHTML = Object.keys(KEY_LABELS.SKILL_LEVEL).map(function (key) {
+                        const label = KEY_LABELS.SKILL_LEVEL[key];
+                        return '<option value="' + key + '">' + label + '</option>';
+                    }).join('');
+                    levelSelect.value = this.selectedLevel;
+                }
 
                 this.allSkills = App.state.data.skills || [];
                 this.filteredSkills = [];

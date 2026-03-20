@@ -430,7 +430,7 @@
                 App.modals.selectSkills.open({
                     multiSelect: true,
                     preSelected: preSelected,
-                    defaultLevel: 'BEGINNER',
+                    defaultLevel: 'INTERMEDIATE',
                     callback: function (result) {
                         App.modals.memberDetail.applySkillSelection(memberId, result.selectedIds, result.levelKey);
                     }
@@ -442,7 +442,7 @@
                 if (!selectedIds || selectedIds.length === 0) return;
 
                 const self = this;
-                const level = levelKey || 'BEGINNER';
+                const level = levelKey || 'INTERMEDIATE';
 
                 // 一時保存リストに追加
                 selectedIds.forEach(function (skillId) {
@@ -467,7 +467,7 @@
                             member_id: memberId,
                             skill_id: skillId,
                             skill_level_key: level,
-                            remark: null
+                            user_note: null
                         });
                     } else if (existing.skill_level_key !== level) {
                         // レベル更新
@@ -481,7 +481,7 @@
                                 id: existing.id,
                                 skill_id: skillId,
                                 skill_level_key: level,
-                                remark: existing.remark
+                                user_note: existing.user_note || existing.remark || null
                             });
                         }
                     }
@@ -542,7 +542,7 @@
                             id: existing.id,
                             skill_id: skillId,
                             skill_level_key: levelKey,
-                            remark: existing.remark
+                            user_note: existing.user_note || existing.remark || null
                         });
                     }
                 }
@@ -562,7 +562,7 @@
                     return s.skill_id === skillId;
                 });
                 if (pending) {
-                    pending.remark = normalizedRemark;
+                    pending.user_note = normalizedRemark;
                     this.isDirty = true;
                     return;
                 }
@@ -572,23 +572,24 @@
                     return u.skill_id === skillId;
                 });
                 if (updateIndex >= 0) {
-                    this.pendingSkillChanges.toUpdate[updateIndex].remark = normalizedRemark;
+                    this.pendingSkillChanges.toUpdate[updateIndex].user_note = normalizedRemark;
                 } else {
                     const existing = this.originalSkills.find(function (s) {
                         return s.skill_id === skillId;
                     });
-                    if (existing && existing.remark !== normalizedRemark) {
+                    const existingNote = existing ? (existing.user_note || existing.remark || null) : null;
+                    if (existing && existingNote !== normalizedRemark) {
                         this.pendingSkillChanges.toUpdate.push({
                             id: existing.id,
                             skill_id: skillId,
                             skill_level_key: existing.skill_level_key,
-                            remark: normalizedRemark
+                            user_note: normalizedRemark
                         });
                     }
                 }
 
                 this.isDirty = true;
-                showSnackbar('備考を変更しました（保存ボタンで確定）', 'info');
+                showSnackbar('メモを変更しました（保存ボタンで確定）', 'info');
             },
 
             // 保存時に呼ばれる関数: 所属組織の変更をDBに反映
@@ -668,13 +669,13 @@
                         where: { id: ['=', update.id] },
                         set: {
                             skill_level_key: update.skill_level_key,
-                            remark: update.remark
+                            user_note: update.user_note
                         }
                     }, 'スキルを更新');
                     const target = assignments.find(function (a) { return a.id === update.id; });
                     if (target) {
                         target.skill_level_key = update.skill_level_key;
-                        target.remark = update.remark;
+                        target.user_note = update.user_note;
                     }
                 }
             },
@@ -988,7 +989,7 @@
                         });
                         if (update) {
                             sk.skill_level_key = update.skill_level_key;
-                            sk.remark = update.remark;
+                            sk.user_note = update.user_note;
                         }
                         currentSkills.push(sk);
                     }
@@ -1004,12 +1005,8 @@
                     return;
                 }
 
-                const levelLabels = {
-                    BEGINNER: '初級',
-                    INTERMEDIATE: '中級',
-                    ADVANCED: '上級',
-                    EXPERT: 'エキスパート'
-                };
+                // KEY_LABELS.SKILL_LEVELを使用
+                const levelLabels = KEY_LABELS.SKILL_LEVEL;
 
                 const levelOptions = function (current) {
                     return Object.keys(levelLabels).map(function (key) {
@@ -1022,9 +1019,9 @@
                     const skill = skills.find(function (s) { return s.id === sa.skill_id; });
                     const skillName = skill ? skill.title : '（削除済みスキル）';
                     const level = levelLabels[sa.skill_level_key] || sa.skill_level_key || '';
-                    const remark = sa.remark || '';
+                    const note = sa.user_note || sa.remark || '';
                     const levelSelect = '<select class="small" onchange="App.modals.memberDetail.updateSkillLevel(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\', this.value)">' + levelOptions(sa.skill_level_key) + '</select>';
-                    const remarkInput = '<input type="text" placeholder="備考" value="' + escapeHtmlAttribute(remark) + '" onchange="App.modals.memberDetail.updateSkillRemark(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\', this.value)">';
+                    const remarkInput = '<input type="text" placeholder="メモ" value="' + escapeHtmlAttribute(note) + '" onchange="App.modals.memberDetail.updateSkillRemark(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\', this.value)">';
                     const deleteBtn = '<button class="circle small transparent" onclick="App.modals.memberDetail.removeSkillAssignment(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\')"><i>delete</i></button>';
                     return '<div class="row padding small-space">' +
                         '<i>psychology</i>' +

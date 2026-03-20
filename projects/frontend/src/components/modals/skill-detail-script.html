@@ -5,7 +5,6 @@
             currentItem: null,
             originalData: null,
             isDirty: false,
-            quill: null,
 
             open: function (skillId) {
                 if (!skillId) return;
@@ -20,12 +19,7 @@
                 this.currentItem = Object.assign({}, skill);
                 this.originalData = Object.assign({}, skill);
                 this.isDirty = false;
-
-                if (!this.quill) {
-                    this.quill = App.utils.quill.init('#skill-description-editor', {
-                        placeholder: 'スキルの説明を入力...'
-                    });
-                }
+                this._renderLevelOptions();
 
                 ui('#modal-detail-skill', true);
 
@@ -34,6 +28,18 @@
                 this.loadComments(skillId);
                 this._bindDirtyWatchers();
                 this._bindEscClose();
+            },
+
+            _renderLevelOptions: function () {
+                const levelSelect = document.getElementById('skill-detail-level-select');
+                if (!levelSelect) return;
+
+                const fallbackLevel = 'INTERMEDIATE';
+                const currentLevel = levelSelect.value || fallbackLevel;
+                levelSelect.innerHTML = Object.keys(KEY_LABELS.SKILL_LEVEL).map(function (key) {
+                    return '<option value="' + key + '">' + KEY_LABELS.SKILL_LEVEL[key] + '</option>';
+                }).join('');
+                levelSelect.value = KEY_LABELS.SKILL_LEVEL[currentLevel] ? currentLevel : fallbackLevel;
             },
 
             close: function (skipUrlUpdate, closeReason) {
@@ -55,7 +61,7 @@
                 const saveBtn = document.getElementById('skill-detail-save-btn');
                 const title = (document.getElementById('skill-detail-title-input')?.value || '').trim();
                 const typeKey = (document.getElementById('skill-detail-type-input')?.value || '').trim() || null;
-                const description = App.utils.quill.getContent(this.quill) || null;
+                const userNote = (document.getElementById('skill-detail-user-note-input')?.value || '').trim() || null;
                 const remark = (document.getElementById('skill-detail-remark-input')?.value || '').trim() || null;
                 const errorEl = document.getElementById('skill-detail-error');
 
@@ -73,7 +79,7 @@
                 const updates = {
                     title: title,
                     skill_type_key: typeKey,
-                    description: description,
+                    user_note: userNote,
                     remark: remark
                 };
 
@@ -249,9 +255,8 @@
                     }).join('');
                     typeInput.value = skill.skill_type_key || '';
                 }
-                if (this.quill) {
-                    App.utils.quill.setContent(this.quill, skill.description || '');
-                }
+                const userNoteInput = document.getElementById('skill-detail-user-note-input');
+                if (userNoteInput) userNoteInput.value = skill.user_note || skill.description || '';
                 const remarkInput = document.getElementById('skill-detail-remark-input');
                 if (remarkInput) remarkInput.value = skill.remark || '';
 
@@ -298,12 +303,8 @@
                     return;
                 }
 
-                const levelLabels = {
-                    BEGINNER: '初級',
-                    INTERMEDIATE: '中級',
-                    ADVANCED: '上級',
-                    EXPERT: 'エキスパート'
-                };
+                // KEY_LABELS.SKILL_LEVELを使用
+                const levelLabels = KEY_LABELS.SKILL_LEVEL;
 
                 const levelOptions = function (current) {
                     return Object.keys(levelLabels).map(function (key) {
@@ -317,7 +318,7 @@
                     const name = member ? member.display_name || member.name || member.email || '不明' : '不明';
                     const memberId = member ? member.id : '';
                     const assignmentId = sa.id || '';
-                    const remark = sa.remark || '';
+                    const remark = sa.user_note || sa.remark || '';
 
                     const levelSelect = assignmentId
                         ? '<select class="small" onchange="App.modals.skillDetail.updateMemberLevel(\'' + assignmentId + '\', this.value)">' + levelOptions(sa.skill_level_key) + '</select>'
@@ -352,7 +353,7 @@
                 if (!App.modals.selectMembers || !App.modals.selectMembers.open) return;
 
                 const levelSelect = document.getElementById('skill-detail-level-select');
-                const levelKey = levelSelect ? levelSelect.value : 'BEGINNER';
+                const levelKey = levelSelect ? levelSelect.value : 'INTERMEDIATE';
 
                 App.modals.selectMembers.open({
                     multiSelect: true,
@@ -453,21 +454,21 @@
                 if (!target) return;
 
                 const normalizedRemark = (remarkValue || '').trim() || null;
-                const prevRemark = target.remark || null;
+                const prevRemark = target.user_note || target.remark || null;
                 if (normalizedRemark === prevRemark) return;
 
-                target.remark = normalizedRemark;
+                target.user_note = normalizedRemark;
 
                 try {
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
                         where: { id: ['=', assignmentId] },
-                        set: { remark: normalizedRemark }
-                    }, 'メンバースキル備考を更新');
-                    showSnackbar('備考を更新しました', 'success');
+                        set: { user_note: normalizedRemark }
+                    }, 'メンバースキルメモを更新');
+                    showSnackbar('メモを更新しました', 'success');
                 } catch (err) {
-                    console.error('[SkillDetail] 備考更新エラー:', err);
-                    target.remark = prevRemark;
-                    showSnackbar('備考の更新に失敗しました', 'error');
+                    console.error('[SkillDetail] メモ更新エラー:', err);
+                    target.user_note = prevRemark;
+                    showSnackbar('メモの更新に失敗しました', 'error');
                     if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
                         App.utils.modalFlow.refreshMembersDataInBackground(true);
                     } else if (App.pages.members && App.pages.members.loadData) {
@@ -532,6 +533,7 @@
 
                 const titleInput = document.getElementById('skill-detail-title-input');
                 const typeInput = document.getElementById('skill-detail-type-input');
+                const userNoteInput = document.getElementById('skill-detail-user-note-input');
                 const remarkInput = document.getElementById('skill-detail-remark-input');
                 const errorEl = document.getElementById('skill-detail-error');
                 const createdByInput = document.getElementById('skill-detail-created-by-input');
@@ -542,13 +544,13 @@
 
                 if (titleInput) titleInput.value = '';
                 if (typeInput) typeInput.value = '';
+                if (userNoteInput) userNoteInput.value = '';
                 if (remarkInput) remarkInput.value = '';
                 if (createdByInput) createdByInput.value = '';
                 if (createdAtInput) createdAtInput.value = '';
                 if (updatedByInput) updatedByInput.value = '';
                 if (updatedAtInput) updatedAtInput.value = '';
                 if (comments) comments.innerHTML = '';
-                if (this.quill) App.utils.quill.clear(this.quill);
                 if (errorEl) errorEl.style.display = 'none';
             },
 
@@ -557,6 +559,7 @@
                 const watchIds = [
                     'skill-detail-title-input',
                     'skill-detail-type-input',
+                    'skill-detail-user-note-input',
                     'skill-detail-remark-input'
                 ];
                 watchIds.forEach(function (id) {
@@ -566,12 +569,6 @@
                     el.addEventListener('change', function () { self.isDirty = true; });
                     el.dataset.skillDetailDirtyBound = '1';
                 });
-                if (this.quill && this.quill.__skillDetailDirtyBound !== true) {
-                    this.quill.on('text-change', function () {
-                        self.isDirty = true;
-                    });
-                    this.quill.__skillDetailDirtyBound = true;
-                }
             },
 
             _bindEscClose: function () {
