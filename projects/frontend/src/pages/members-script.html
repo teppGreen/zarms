@@ -214,6 +214,22 @@
                 ]
             }
         };
+        const _internalFrameKeys = {
+            __row_key: true,
+            __detail_id: true,
+            _children: true
+        };
+        const _forcedVisibleKeys = ['created_by', 'created_at', 'updated_by', 'updated_at'];
+        const _columnLabelOverrides = {
+            created_by: '作成者ID',
+            created_at: '作成日時',
+            updated_by: '更新者ID',
+            updated_at: '更新日時',
+            _createdByName: '作成者',
+            _updatedByName: '更新者',
+            _createdAtText: '作成日時(表示)',
+            _updatedAtText: '更新日時(表示)'
+        };
 
         App.pages.catalog = {
             loadData: async function (isRefresh) {
@@ -794,6 +810,7 @@
 
             _buildFramePayload: function (tabName, rows, config) {
                 const frameRows = this._buildFrameRows(tabName, rows);
+                const composedColumns = this._composeTabColumns(tabName, config.columns, frameRows);
                 _frameState[tabName].detailMap = this._buildFrameDetailMap(frameRows);
                 return {
                     tabName: tabName,
@@ -801,7 +818,7 @@
                     emptyText: config.emptyText,
                     dataTree: tabName === 'directory',
                     headerFilters: (_headerFilters[tabName] || []).slice(),
-                    columns: this._getTabulatorColumns(config.columns, tabName, frameRows),
+                    columns: this._getTabulatorColumns(composedColumns, tabName, frameRows),
                     sorters: (_sortState[tabName] || []).map(function (sorter) {
                         return { column: sorter.col, dir: sorter.dir };
                     })
@@ -840,8 +857,9 @@
                 let seq = 0;
                 const build = function (row) {
                     seq += 1;
+                    const hydratedRow = App.pages.members._attachAuditHelpers(row);
                     const detailId = App.pages.members._resolveRowDetailId(tabName, row);
-                    const next = Object.assign({}, row, {
+                    const next = Object.assign({}, hydratedRow, {
                         __detail_id: detailId,
                         __row_key: detailId ? (tabName + ':' + detailId) : (tabName + ':row:' + String(seq))
                     });
@@ -851,6 +869,80 @@
                     return next;
                 };
                 return (rows || []).map(build);
+            },
+
+            _attachAuditHelpers: function (row) {
+                if (!row || typeof row !== 'object') return {};
+                const createdBy = row.created_by;
+                const updatedBy = row.updated_by;
+                return Object.assign({}, row, {
+                    _createdByName: this._resolveMemberDisplayName(createdBy),
+                    _updatedByName: this._resolveMemberDisplayName(updatedBy),
+                    _createdAtText: this._formatDateTime(row.created_at),
+                    _updatedAtText: this._formatDateTime(row.updated_at)
+                });
+            },
+
+            _resolveMemberDisplayName: function (memberId) {
+                if (memberId === null || memberId === undefined || memberId === '') return '';
+                const target = String(memberId);
+                const members = (App.state && App.state.data && Array.isArray(App.state.data.members)) ? App.state.data.members : [];
+                const matched = members.find(function (member) {
+                    return String(member && (member.id || member.member_id || '')) === target;
+                });
+                if (!matched) return target;
+                return String(matched.display_name || matched.name || matched.id || target);
+            },
+
+            _composeTabColumns: function (tabName, priorityColumns, frameRows) {
+                const preferred = Array.isArray(priorityColumns) ? priorityColumns.slice() : [];
+                const discoveredKeys = this._collectRowKeysRecursive(frameRows);
+                _forcedVisibleKeys.forEach(function (key) {
+                    discoveredKeys.add(key);
+                });
+                const preferredMap = {};
+                preferred.forEach(function (column) {
+                    const key = column && (column.key || column.field);
+                    if (!key) return;
+                    preferredMap[key] = true;
+                });
+                discoveredKeys.forEach(function (key) {
+                    if (preferredMap[key]) return;
+                    preferred.push({
+                        key: key,
+                        label: App.pages.members._buildColumnLabel(key),
+                        width: 170
+                    });
+                });
+                return preferred;
+            },
+
+            _collectRowKeysRecursive: function (rows) {
+                const keys = new Set();
+                const walk = function (items) {
+                    (items || []).forEach(function (item) {
+                        if (!item || typeof item !== 'object') return;
+                        Object.keys(item).forEach(function (key) {
+                            if (_internalFrameKeys[key]) return;
+                            keys.add(key);
+                        });
+                        if (Array.isArray(item._children) && item._children.length) {
+                            walk(item._children);
+                        }
+                    });
+                };
+                walk(rows || []);
+                return keys;
+            },
+
+            _buildColumnLabel: function (key) {
+                if (_columnLabelOverrides[key]) return _columnLabelOverrides[key];
+                const normalized = String(key || '').trim().replace(/^_+/, '');
+                if (!normalized) return '';
+                return normalized.split('_').filter(Boolean).map(function (token) {
+                    if (token.length <= 3) return token.toUpperCase();
+                    return token.charAt(0).toUpperCase() + token.slice(1);
+                }).join(' ');
             },
 
             _buildHeaderFiltersFromLegacy: function (tabName) {
@@ -1063,15 +1155,20 @@
                     'const FRAME_TOKEN=' + JSON.stringify(token) + ';' +
                     'const TAB_NAME=' + JSON.stringify(tabName) + ';' +
                     'let table=null;let tableBuilt=false;let selectedCell=null;' +
+                    'const HIDDEN_COLUMNS_KEY="zarms.catalog.hiddenColumns."+TAB_NAME;' +
                     'function postMessageToParent(type,payload){window.parent.postMessage({source:"members-tabulator",type:type,tabName:TAB_NAME,token:FRAME_TOKEN,payload:payload||{}},"*");}' +
+                    'function readHiddenColumns(){try{const raw=localStorage.getItem(HIDDEN_COLUMNS_KEY);if(!raw){return [];}const parsed=JSON.parse(raw);if(!Array.isArray(parsed)){return [];}return parsed.filter(function(value){return typeof value==="string"&&value!==""&&value!=="__open_action";});}catch(error){return [];}}' +
+                    'function writeHiddenColumns(fields){try{localStorage.setItem(HIDDEN_COLUMNS_KEY,JSON.stringify(fields||[]));}catch(error){}}' +
+                    'function syncHiddenColumnsFromTable(){if(!table){return;}const hidden=[];(table.getColumns()||[]).forEach(function(column){if(!column||!column.getField||!column.isVisible){return;}const field=column.getField();if(!field||field==="__open_action"){return;}if(!column.isVisible()){hidden.push(field);}});writeHiddenColumns(hidden);}' +
+                    'function createHeaderMenu(){if(!table||!table.getColumns){return [];}return (table.getColumns()||[]).map(function(column){if(!column||!column.getField||!column.getDefinition){return null;}const field=column.getField();if(!field||field==="__open_action"){return null;}const definition=column.getDefinition()||{};const title=definition.title||field;const visible=column.isVisible?column.isVisible():true;return {label:(visible?"✓ ":"□ ")+String(title),action:function(event){if(event&&event.stopPropagation){event.stopPropagation();}if(column.isVisible&&column.isVisible()){column.hide();}else{column.show();}syncHiddenColumnsFromTable();}};}).filter(Boolean);}' +
                     'function createStatusNode(value){const span=document.createElement("span");span.textContent=String(value||"");if(value==="在籍"||value==="有効"){span.style.color="#2d3eff";span.style.fontWeight="600";}else{span.style.opacity="0.6";}return span;}' +
                     'function createOpenButton(cell){const button=document.createElement("button");button.type="button";button.className="members-open-detail-btn";button.textContent="開く";button.addEventListener("mousedown",function(event){event.preventDefault();event.stopPropagation();});button.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();const row=cell&&cell.getRow?cell.getRow():null;const data=row&&row.getData?row.getData():null;const rowKey=data&&data.__row_key!==undefined&&data.__row_key!==null?String(data.__row_key):"";postMessageToParent("' + _frameMessageType.rowClick + '",{rowKey:rowKey});});return button;}' +
                     'function normalizeExternalUrl(value){const raw=value===null||value===undefined?"":String(value).trim();if(!raw){return"";}if(!/^https?:\\/\\//i.test(raw)){return "https:\\/\\/"+raw.replace(/^\\/+/, "");}return raw;}' +
                     'function createMemberNameCell(cell){const wrapper=document.createElement("div");wrapper.className="members-name-cell";const row=cell&&cell.getRow?cell.getRow():null;const data=row&&row.getData?row.getData():{};const cellValue=cell&&cell.getValue?cell.getValue():"";const displayName=cellValue===null||cellValue===undefined?"":String(cellValue);const avatar=document.createElement("i");avatar.className="circle small members-avatar";const photoUrl=data&&data.profile_photo_url?String(data.profile_photo_url).trim():"";if(photoUrl){const img=document.createElement("img");img.className="responsive";img.alt=displayName;img.src=photoUrl;avatar.appendChild(img);}else{avatar.textContent=(displayName||"?").slice(0,1).toUpperCase();}const slackUrl=normalizeExternalUrl(data&&data.slack_profile_url?data.slack_profile_url:"");let nameNode;if(slackUrl){const link=document.createElement("a");link.className="members-name-link";link.href=slackUrl;link.rel="noopener noreferrer";link.target="_blank";link.textContent=displayName;link.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();postMessageToParent("' + _frameMessageType.openExternal + '",{url:slackUrl});});nameNode=link;}else{const span=document.createElement("span");span.className="members-name-label";span.textContent=displayName;nameNode=span;}wrapper.appendChild(avatar);wrapper.appendChild(nameNode);return wrapper;}' +
-                    'function createColumns(columns){return (columns||[]).map(function(column){const definition={title:column.title,field:column.field,headerSort:column.headerSort!==false,headerSortClickElement:"icon",sorter:column.sorter||"string",hozAlign:column.hozAlign||"left",cssClass:column.cssClass||"",variableHeight:column.variableHeight===true,formatter:"plaintext"};if(column.width){definition.width=column.width;}if(column.headerFilterType!==false){if(column.headerFilterType==="list"){definition.headerFilter="list";definition.headerFilterParams={values:Array.isArray(column.headerFilterValues)?column.headerFilterValues:[],clearable:true};}else{definition.headerFilter=column.headerFilterType||"input";}}if(column.formatterKey==="status"){definition.formatter=function(cell){return createStatusNode(cell.getValue());};}if(column.formatterKey==="openAction"){definition.formatter=function(cell){return createOpenButton(cell);};}if(column.formatterKey==="memberNameLink"){definition.formatter=function(cell){return createMemberNameCell(cell);};}return definition;});}' +
+                    'function createColumns(columns,hiddenColumns){const hiddenSet=new Set(Array.isArray(hiddenColumns)?hiddenColumns:[]);return (columns||[]).map(function(column){const definition={title:column.title,field:column.field,headerSort:column.headerSort!==false,headerSortClickElement:"icon",sorter:column.sorter||"string",hozAlign:column.hozAlign||"left",cssClass:column.cssClass||"",variableHeight:column.variableHeight===true,formatter:"plaintext"};if(column.width){definition.width=column.width;}if(column.headerFilterType!==false){if(column.headerFilterType==="list"){definition.headerFilter="list";definition.headerFilterParams={values:Array.isArray(column.headerFilterValues)?column.headerFilterValues:[],clearable:true};}else{definition.headerFilter=column.headerFilterType||"input";}}if(column.formatterKey==="status"){definition.formatter=function(cell){return createStatusNode(cell.getValue());};}if(column.formatterKey==="openAction"){definition.formatter=function(cell){return createOpenButton(cell);};}if(column.formatterKey==="memberNameLink"){definition.formatter=function(cell){return createMemberNameCell(cell);};}if(definition.field!=="__open_action"&&hiddenSet.has(definition.field)){definition.visible=false;}definition.headerMenu=function(){return createHeaderMenu();};return definition;});}' +
                     'function setupCellCopy(){window.addEventListener("keydown",function(event){if(!(event.metaKey||event.ctrlKey)||String(event.key||"").toLowerCase()!=="c"){return;}const hasRangeSelection=!!document.querySelector(".tabulator-range-selected");if(hasRangeSelection&&table&&table.copyToClipboard){event.preventDefault();try{table.copyToClipboard("range",false,{columnHeaders:false,rowGroups:false,columnCalcs:false,formatCells:true});return;}catch(error){}}if(!selectedCell||!selectedCell.getValue){return;}event.preventDefault();const value=selectedCell.getValue();const text=value===null||value===undefined?"":String(value);if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).catch(function(){});}});}' +
                     'function applyHeaderFilters(filters){if(!table){return;}table.clearHeaderFilter();(filters||[]).forEach(function(filter){if(!filter||!filter.field){return;}table.setHeaderFilterValue(filter.field,String(filter.value||""));});}' +
-                    'function renderTable(payload){const root=document.getElementById("members-tabulator-root");if(!root){return;}const rows=Array.isArray(payload.rows)?payload.rows:[];const sorters=Array.isArray(payload.sorters)?payload.sorters:[];const headerFilters=Array.isArray(payload.headerFilters)?payload.headerFilters:[];if(!table){tableBuilt=false;table=new Tabulator(root,{data:rows,columns:createColumns(payload.columns),layout:"fitColumns",height:"100%",placeholder:payload.emptyText||"データがありません",initialSort:sorters,index:"__row_key",dataTree:payload.dataTree===true,dataTreeStartExpanded:false,dataTreeElementColumn:"name",dataTreeChildField:"_children",clipboard:true,clipboardCopyRowRange:"range",clipboardCopyStyled:false,clipboardCopyConfig:{columnHeaders:false,rowGroups:false,columnCalcs:false,formatCells:true},selectableRows:false,selectableRange:1,selectableRangeColumns:true,selectableRangeRows:true});table.on("tableBuilt",function(){tableBuilt=true;});table.on("cellClick",function(event,cell){if(!cell||!cell.getColumn){return;}const field=cell.getColumn().getField();if(field==="__open_action"){return;}if(selectedCell&&selectedCell.getElement){selectedCell.getElement().classList.remove("members-cell-selected");}selectedCell=cell;if(cell.getElement){cell.getElement().classList.add("members-cell-selected");}});table.on("dataSorted",function(sorters){postMessageToParent("' + _frameMessageType.sortChange + '",{sorters:(sorters||[]).map(function(sorter){return {column:sorter.field,dir:sorter.dir};})});});table.on("dataFiltered",function(filters){postMessageToParent("' + _frameMessageType.filterChange + '",{filters:(filters||[]).map(function(filter){return {field:filter.field||"",value:filter.value===null||filter.value===undefined?"":String(filter.value)};})});});setupCellCopy();applyHeaderFilters(headerFilters);return;}table.setData(rows);if(sorters.length){table.setSort(sorters);}else{table.clearSort();}applyHeaderFilters(headerFilters);}' +
+                    'function renderTable(payload){const root=document.getElementById("members-tabulator-root");if(!root){return;}const rows=Array.isArray(payload.rows)?payload.rows:[];const sorters=Array.isArray(payload.sorters)?payload.sorters:[];const headerFilters=Array.isArray(payload.headerFilters)?payload.headerFilters:[];const hiddenColumns=readHiddenColumns();const columns=createColumns(payload.columns,hiddenColumns);if(!table){tableBuilt=false;table=new Tabulator(root,{data:rows,columns:columns,layout:"fitColumns",height:"100%",placeholder:payload.emptyText||"データがありません",initialSort:sorters,index:"__row_key",dataTree:payload.dataTree===true,dataTreeStartExpanded:false,dataTreeElementColumn:"name",dataTreeChildField:"_children",clipboard:true,clipboardCopyRowRange:"range",clipboardCopyStyled:false,clipboardCopyConfig:{columnHeaders:false,rowGroups:false,columnCalcs:false,formatCells:true},selectableRows:false,selectableRange:1,selectableRangeColumns:true,selectableRangeRows:true});table.on("tableBuilt",function(){tableBuilt=true;});table.on("cellClick",function(event,cell){if(!cell||!cell.getColumn){return;}const field=cell.getColumn().getField();if(field==="__open_action"){return;}if(selectedCell&&selectedCell.getElement){selectedCell.getElement().classList.remove("members-cell-selected");}selectedCell=cell;if(cell.getElement){cell.getElement().classList.add("members-cell-selected");}});table.on("dataSorted",function(sorters){postMessageToParent("' + _frameMessageType.sortChange + '",{sorters:(sorters||[]).map(function(sorter){return {column:sorter.field,dir:sorter.dir};})});});table.on("dataFiltered",function(filters){postMessageToParent("' + _frameMessageType.filterChange + '",{filters:(filters||[]).map(function(filter){return {field:filter.field||"",value:filter.value===null||filter.value===undefined?"":String(filter.value)};})});});setupCellCopy();applyHeaderFilters(headerFilters);syncHiddenColumnsFromTable();return;}table.setColumns(columns);table.setData(rows);if(sorters.length){table.setSort(sorters);}else{table.clearSort();}applyHeaderFilters(headerFilters);syncHiddenColumnsFromTable();}' +
                     'window.addEventListener("message",function(event){const data=event.data||{};if(!data||data.source!=="members-host"||data.token!==FRAME_TOKEN){return;}if(data.type==="' + _frameMessageType.render + '"){try{renderTable(data.payload||{});}catch(error){postMessageToParent("' + _frameMessageType.error + '",{message:error&&error.message?error.message:"Tabulator描画に失敗しました"});}}if(data.type==="' + _frameMessageType.resize + '"&&table&&tableBuilt&&document.body&&document.body.offsetWidth>0){table.redraw(true);}});' +
                     'window.addEventListener("load",function(){postMessageToParent("' + _frameMessageType.ready + '",{});});' +
                     '<\/script>' +
