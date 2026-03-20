@@ -10,17 +10,19 @@
 
                 const requestId = String(directoryId);
                 const directory = (App.state.data.directories || []).find(function (item) {
-                    return item && item.id !== undefined && item.id !== null && String(item.id) === requestId;
+                    const value = item ? (item.id || item.directory_id || null) : null;
+                    return value !== undefined && value !== null && String(value) === requestId;
                 });
                 if (!directory) return;
 
-                this.currentId = directory.id;
+                const directoryKey = directory.id || directory.directory_id;
+                this.currentId = directoryKey;
                 this.isSaving = false;
                 this.hasDirtyInput = false;
-                this._populateSelects(directory.id);
+                this._populateSelects(directoryKey);
                 this._render(directory);
-                this.loadComments(directory.id);
-                ui('#modal-detail-directory');
+                this.loadComments(directoryKey);
+                ui('#modal-detail-directory', true);
                 this._bindEscClose();
             },
 
@@ -32,7 +34,7 @@
                     const proceed = confirm(message);
                     if (!proceed) return false;
                 }
-                ui('#modal-detail-directory');
+                closeModal('modal-detail-directory');
                 this.currentId = null;
                 this.isSaving = false;
                 this.hasDirtyInput = false;
@@ -207,15 +209,15 @@
                         hr +
                         '<div class="small-padding">' +
                         '<div class="row tiny-space">' +
-                        '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '<\/a>' +
+                        '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '</a>' +
                         '<div class="max row tiny-space">' +
-                        '<span class="bold small-text">' + escapeHtml(creatorName) + '<\/span>' +
-                        '<span class="small-text secondary-text">' + createdAt + '<\/span>' +
-                        '<\/div>' +
-                        '<\/div>' +
-                        '<div class="tiny-space"><\/div>' +
-                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '<\/p>' +
-                        '<\/div>';
+                        '<span class="bold small-text">' + escapeHtml(creatorName) + '</span>' +
+                        '<span class="small-text secondary-text">' + createdAt + '</span>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="tiny-space"></div>' +
+                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '</p>' +
+                        '</div>';
                 }).join('');
             },
 
@@ -237,15 +239,15 @@
 
                 const newCommentHtml = '<div class="small-padding">' +
                     '<div class="row tiny-space">' +
-                    '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '<\/a>' +
+                    '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '</a>' +
                     '<div class="max row tiny-space">' +
-                    '<span class="bold small-text">' + escapeHtml(creatorName) + '<\/span>' +
-                    '<span class="small-text secondary-text">' + createdAt + '<\/span>' +
-                    '<\/div>' +
-                    '<\/div>' +
-                    '<div class="tiny-space"><\/div>' +
-                    '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '<\/p>' +
-                    '<\/div>';
+                    '<span class="bold small-text">' + escapeHtml(creatorName) + '</span>' +
+                    '<span class="small-text secondary-text">' + createdAt + '</span>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="tiny-space"></div>' +
+                    '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '</p>' +
+                    '</div>';
 
                 if (container.innerHTML.indexOf('コメントはありません') >= 0) {
                     container.innerHTML = newCommentHtml;
@@ -449,23 +451,23 @@
                     const label = member ? (member.display_name || member.name || member.email || '不明') : '不明';
                     const role = assignment.role || '';
                     const openButton = member && member.id
-                        ? '<button class="small border round" onclick="App.modals.directoryDetail.openMemberDetail(\'' + escapeHtmlAttribute(member.id) + '\')">詳細<\/button>'
+                        ? '<button class="small border round" onclick="App.modals.directoryDetail.openMemberDetail(\'' + escapeHtmlAttribute(member.id) + '\')">詳細</button>'
                         : '';
                     const removeButton = assignment.id
-                        ? '<button class="small border round" onclick="App.modals.directoryDetail.deactivateMemberAssignment(\'' + escapeHtmlAttribute(assignment.id) + '\')">解除<\/button>'
+                        ? '<button class="small border round" onclick="App.modals.directoryDetail.deactivateMemberAssignment(\'' + escapeHtmlAttribute(assignment.id) + '\')">解除</button>'
                         : '';
 
                     return '<div class="row middle-align tiny-space padding">' +
-                        '<i>person<\/i>' +
+                        '<i>person</i>' +
                         '<div class="max">' +
-                        '<p class="no-margin small">' + escapeHtml(label) + '<\/p>' +
+                        '<p class="no-margin small">' + escapeHtml(label) + '</p>' +
                         '<div class="field border label small top-margin no-margin">' +
                         '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(role) + '" onchange="App.modals.directoryDetail.updateMemberRole(\'' + escapeHtmlAttribute(assignment.id || '') + '\', this.value)">' +
                         '<label>役割</label>' +
-                        '<\/div>' +
-                        '<\/div>' +
-                        '<div class="row tiny-space">' + openButton + removeButton + '<\/div>' +
-                        '<\/div>';
+                        '</div>' +
+                        '</div>' +
+                        '<div class="row tiny-space">' + openButton + removeButton + '</div>' +
+                        '</div>';
                 }).join('');
 
                 const setValue = function (id, value) {
@@ -690,14 +692,14 @@
             _normalizeSlackUrl: function (value) {
                 const trimmed = String(value || '').trim();
                 if (!trimmed) return '';
-                if (/^https?:\\/\\//i.test(trimmed)) return trimmed;
-                return 'https:\\/\\/' + trimmed.replace(/^\\/+/, '');
+                if (/^https?:\/\//i.test(trimmed)) return trimmed;
+                return 'https:\/\/' + trimmed.replace(/^\/+/, '');
             },
 
             _extractGoogleDriveFolderId: function (value) {
                 const trimmed = String(value || '').trim();
                 if (!trimmed) return '';
-                const folderMatch = trimmed.match(/\\/folders\\/([a-zA-Z0-9_-]{10,})/);
+                const folderMatch = trimmed.match(/\/folders\/([a-zA-Z0-9_-]{10,})/);
                 if (folderMatch && folderMatch[1]) return folderMatch[1];
                 const queryMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
                 if (queryMatch && queryMatch[1]) return queryMatch[1];
