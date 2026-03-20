@@ -18,7 +18,7 @@ erDiagram
         int display_id "ボードID(連番)"
         varchar email "メールアドレス"
         varchar name "ボード名"
-        text description "ボード説明"
+        text user_note "ユーザーメモ"
         boolean is_active "有効"
         text remark "システム備考"
         uuid created_by "作成者"
@@ -40,19 +40,25 @@ erDiagram
         datetime updated_at "最終更新日時"
     }
     directories {
-        uuid id PK "組織ID"
-        int display_id "組織ID(連番)"
-        uuid parent_directory_id "親組織ID"
-        varchar directory_type_key "組織タイプキー"
-        varchar name "組織名: 企画応募フォーム：代表者の所属する団体・コミュニティ名"
-        varchar slack_channel_url "SlackチャンネルURL: 企画応募フォーム: これまでの活動の実態・実績がわかるようなSlackチャンネル"
-        varchar gfolder_id "フォルダID"
-        boolean is_active "有効"
-        text remark "システム備考"
-        uuid created_by "作成者"
-        datetime created_at "作成日時"
-        uuid updated_by "最終更新者"
-        datetime updated_at "最終更新日時"
+        uuid id PK
+        int display_id
+        uuid parent_directory_id
+        varchar directory_type_key
+        varchar name
+        varchar description
+        varchar achievements
+        varchar scale
+        varchar slack_channel_url
+        varchar website_url
+        varchar folder_url
+        varchar document_url
+        varchar logo_image_url
+        boolean is_active
+        varchar remark
+        uuid created_by
+        datetime created_at
+        uuid updated_by
+        datetime updated_at
     }
     apps {
         uuid id PK "アプリID"
@@ -171,7 +177,7 @@ erDiagram
         uuid id PK "アップデートID"
         varchar version "バージョン番号"
         varchar title "アップデートタイトル"
-        text description "アップデート内容"
+        text user_note "ユーザーメモ"
         text remark "システム備考"
         uuid created_by "作成者"
         datetime created_at "作成日時"
@@ -262,7 +268,7 @@ erDiagram
         uuid id PK "スキルID"
         varchar skill_type_key "スキルタイプキー"
         varchar title "タイトル"
-        text description "説明"
+        text user_note "ユーザーメモ"
         text remark "システム備考"
         uuid created_by "作成者"
         datetime created_at "作成日時"
@@ -274,6 +280,7 @@ erDiagram
         uuid member_id "メンバーID"
         uuid skill_id "スキルID"
         varchar skill_level_key "スキルレベルキー(BEGGINER/INTERMEDIATE/ADVANCED)"
+        text user_note "ユーザーメモ"
         text remark
         uuid created_by	
         datetime created_at	
