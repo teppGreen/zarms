@@ -3,6 +3,8 @@
         let _isLoading = false;
         let _currentTab = 'member';
         let _resizeHandlerBound = false;
+        let _tabNavigationBound = false;
+        const _memberTabNames = ['member', 'directory', 'skills', 'plans'];
         const _tableData = {
             member: [],
             directory: [],
@@ -203,6 +205,7 @@
         App.pages.members = {
             loadData: async function (isRefresh) {
                 _isLoading = true;
+                this._ensureTabNavigation();
                 this._showLoading(true, _currentTab);
                 this._updateSummary();
 
@@ -234,57 +237,12 @@
             },
 
             switchTab: function (tabName) {
-                if (tabName !== 'member' && tabName !== 'directory' && tabName !== 'skills' && tabName !== 'plans') {
+                this._ensureTabNavigation();
+                if (_memberTabNames.indexOf(tabName) === -1) {
                     tabName = 'member';
                 }
                 _currentTab = tabName;
-
-                const memberSubtab = document.getElementById('members-subtab-member');
-                const directorySubtab = document.getElementById('members-subtab-directory');
-                const memberBtn = document.getElementById('members-tab-btn-member');
-                const directoryBtn = document.getElementById('members-tab-btn-directory');
-                const skillSubtab = document.getElementById('members-subtab-skills');
-                const skillBtn = document.getElementById('members-tab-btn-skills');
-                const plansSubtab = document.getElementById('members-subtab-plans');
-                const plansBtn = document.getElementById('members-tab-btn-plans');
-
-                if (tabName === 'member') {
-                    memberSubtab.style.display = '';
-                    directorySubtab.style.display = 'none';
-                    if (skillSubtab) skillSubtab.style.display = 'none';
-                    if (plansSubtab) plansSubtab.style.display = 'none';
-                    memberBtn.className = 'active';
-                    directoryBtn.className = '';
-                    if (skillBtn) skillBtn.className = '';
-                    if (plansBtn) plansBtn.className = '';
-                } else if (tabName === 'directory') {
-                    memberSubtab.style.display = 'none';
-                    directorySubtab.style.display = '';
-                    if (skillSubtab) skillSubtab.style.display = 'none';
-                    if (plansSubtab) plansSubtab.style.display = 'none';
-                    memberBtn.className = '';
-                    directoryBtn.className = 'active';
-                    if (skillBtn) skillBtn.className = '';
-                    if (plansBtn) plansBtn.className = '';
-                } else if (tabName === 'skills') {
-                    memberSubtab.style.display = 'none';
-                    directorySubtab.style.display = 'none';
-                    if (skillSubtab) skillSubtab.style.display = '';
-                    if (plansSubtab) plansSubtab.style.display = 'none';
-                    memberBtn.className = '';
-                    directoryBtn.className = '';
-                    if (skillBtn) skillBtn.className = 'active';
-                    if (plansBtn) plansBtn.className = '';
-                } else {
-                    memberSubtab.style.display = 'none';
-                    directorySubtab.style.display = 'none';
-                    if (skillSubtab) skillSubtab.style.display = 'none';
-                    if (plansSubtab) plansSubtab.style.display = '';
-                    memberBtn.className = '';
-                    directoryBtn.className = '';
-                    if (skillBtn) skillBtn.className = '';
-                    if (plansBtn) plansBtn.className = 'active';
-                }
+                this._setActiveTabUi(tabName);
 
                 this._showLoading(_isLoading, _currentTab);
                 if (!_isLoading) {
@@ -294,6 +252,39 @@
                     });
                 }
                 this._updateSummary();
+            },
+
+            _ensureTabNavigation: function () {
+                if (_tabNavigationBound) return;
+                const tabNav = document.getElementById('members-tab-nav');
+                if (!tabNav) return;
+                _tabNavigationBound = true;
+                tabNav.addEventListener('click', function (event) {
+                    const tabButton = event.target.closest('[data-members-tab]');
+                    if (!tabButton || !tabNav.contains(tabButton)) {
+                        return;
+                    }
+                    const nextTab = tabButton.getAttribute('data-members-tab');
+                    if (!nextTab) {
+                        return;
+                    }
+                    App.pages.members.switchTab(nextTab);
+                });
+            },
+
+            _setActiveTabUi: function (activeTab) {
+                _memberTabNames.forEach(function (tabName) {
+                    const button = document.querySelector('#members-tab-nav [data-members-tab="' + tabName + '"]');
+                    if (button) {
+                        button.classList.toggle('active', tabName === activeTab);
+                    }
+
+                    const panel = document.getElementById('members-subtab-' + tabName);
+                    if (panel) {
+                        panel.classList.toggle('active', tabName === activeTab);
+                        panel.style.display = tabName === activeTab ? '' : 'none';
+                    }
+                });
             },
 
             sortTable: function (tabName, colKey) {

@@ -1,30 +1,23 @@
 <div id="tab-members" style="display: none;">
-    <header class="small-margin">
-        <nav class="no-padding no-margin row">
-            <div>
-                <h3 class="bold small no-margin">メンバーカタログ</h3>
-                <p class="small-text no-margin">一覧を確認して、必要な項目を開いて更新できます</p>
-            </div>
-            <div class="max"></div>
-            <nav class="tabbed background small max" id="members-tab-nav" title="表示切替">
-                <a class="active" id="members-tab-btn-member" title="メンバー" onclick="App.pages.members.switchTab('member')">
-                    <i>person</i>
-                    <span class="l">メンバー</span>
-                </a>
-                <a id="members-tab-btn-directory" title="ディレクトリ" onclick="App.pages.members.switchTab('directory')">
-                    <i>account_tree</i>
-                    <span class="l">ディレクトリ</span>
-                </a>
-                <a id="members-tab-btn-skills" title="スキル" onclick="App.pages.members.switchTab('skills')">
-                    <i>psychology</i>
-                    <span class="l">スキル</span>
-                </a>
-                <a id="members-tab-btn-plans" title="企画" onclick="App.pages.members.switchTab('plans')">
-                    <i>store</i>
-                    <span class="l">企画</span>
-                </a>
-            </nav>
-        </nav>
+    <header class="small-margin no-padding">
+        <div class="tabs" id="members-tab-nav" title="表示切替">
+            <a class="active" data-ui="#members-subtab-member" data-members-tab="member" title="メンバー">
+                <i>person</i>
+                <span class="l">人物</span>
+            </a>
+            <a data-ui="#members-subtab-directory" data-members-tab="directory" title="ディレクトリ">
+                <i>account_tree</i>
+                <span class="l">組織</span>
+            </a>
+            <a data-ui="#members-subtab-skills" data-members-tab="skills" title="スキル">
+                <i>psychology</i>
+                <span class="l">技能</span>
+            </a>
+            <a data-ui="#members-subtab-plans" data-members-tab="plans" title="企画">
+                <i>store</i>
+                <span class="l">企画</span>
+            </a>
+        </div>
     </header>
 
     <section class="small-margin">
@@ -61,28 +54,10 @@
                     <span id="members-create-action-label">新規追加</span>
                 </button>
             </div>
-            <div class="row wrap tiny-space top-margin center-align">
-                <button class="chip border" type="button" onclick="App.pages.members.switchTab('member')">
-                    <i>person</i>
-                    <span>メンバーを確認</span>
-                </button>
-                <button class="chip border" type="button" onclick="App.pages.members.switchTab('directory')">
-                    <i>account_tree</i>
-                    <span>組織を確認</span>
-                </button>
-                <button class="chip border" type="button" onclick="App.pages.members.switchTab('skills')">
-                    <i>psychology</i>
-                    <span>スキルを確認</span>
-                </button>
-                <button class="chip border" type="button" onclick="App.pages.members.switchTab('plans')">
-                    <i>store</i>
-                    <span>企画を確認</span>
-                </button>
-            </div>
         </article>
     </section>
 
-    <div id="members-subtab-member" class="small-margin small-round">
+    <div id="members-subtab-member" class="page active small-margin small-round">
         <div>
             <div id="members-table-loading" class="row center-align padding">
                 <progress class="circle small"></progress>
@@ -91,7 +66,7 @@
         </div>
     </div>
 
-    <div id="members-subtab-directory" style="display: none;" class="small-margin small-round">
+    <div id="members-subtab-directory" style="display: none;" class="page small-margin small-round">
         <article class="border small-round surface-container-low small-padding">
             <div class="row wrap small-space center-align">
                 <div class="row tiny-space center-align">
@@ -114,10 +89,6 @@
                     <span id="directory-summary-filters" class="badge">0</span>
                 </div>
                 <div class="max"></div>
-                <button id="directory-clear-filters-btn" class="border" type="button" onclick="App.pages.members.clearDirectoryFilters()" disabled>
-                    <i>filter_alt_off</i>
-                    <span>絞り込みを解除</span>
-                </button>
                 <button id="directory-open-first-btn" class="border" type="button" onclick="App.pages.members.openFirstDirectoryFromVisible()" disabled>
                     <i>open_in_new</i>
                     <span>先頭を開く</span>
@@ -216,7 +187,7 @@
         </div>
     </div>
 
-    <div id="members-subtab-skills" style="display: none;" class="small-margin small-round">
+    <div id="members-subtab-skills" style="display: none;" class="page small-margin small-round">
         <div>
             <div id="skills-table-loading" class="row center-align padding" style="display: none;">
                 <progress class="circle small"></progress>
@@ -225,7 +196,7 @@
         </div>
     </div>
 
-    <div id="members-subtab-plans" style="display: none;" class="small-margin small-round">
+    <div id="members-subtab-plans" style="display: none;" class="page small-margin small-round">
         <div>
             <div id="plans-table-loading" class="row center-align padding" style="display: none;">
                 <progress class="circle small"></progress>
