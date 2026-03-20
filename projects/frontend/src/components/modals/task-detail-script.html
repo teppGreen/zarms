@@ -64,7 +64,7 @@
 
         if (!task) {
           console.error('[TaskDetail] Task not found:', taskId);
-          alert(`開こうとしたタスクが見つかりませんでした。削除されたかIDが間違っている可能性があります。\nタスクID: ${taskId}`);
+          alert('開こうとしたタスクが見つかりませんでした。削除された可能性があります。');
           return;
         }
 
@@ -736,6 +736,32 @@
         }).join('');
 
         container.innerHTML = html;
+      },
+
+      // コメントを即座にUIに追加（Optimistic UI Update）
+      appendCommentToUI: function (comment) {
+        const container = document.getElementById('task-comments-list');
+        if (!container) return;
+
+        const members = App.state.data.members || [];
+        const creator = members.find(m => m.id === comment.created_by);
+        const creatorName = creator ? creator.display_name : '不明';
+        const creatorPhoto = creator ? creator.profile_photo_url : '';
+        const creatorSlackProfileUrl = creator ? creator.slack_profile_url : '#';
+
+        const creatorIcon = creatorPhoto
+          ? `<img src="${creatorPhoto}" alt="${escapeHtml(creatorName)}" class="circle tiny">`
+          : '<i class="tiny">account_circle</i>';
+
+        const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
+
+        const newCommentHtml = `<div class="small-padding"><div class="row tiny-space"><a href="${creatorSlackProfileUrl}" target="_blank">${creatorIcon}</a><div class="max row tiny-space"><span class="bold small-text">${creatorName}</span><span class="small-text secondary-text">${createdAt}</span></div></div><div class="tiny-space"></div><div class=""><p class="small-text no-margin tiny-line">${escapeHtmlWithLineBreaks(comment.content)}</p></div></div>`;
+
+        if (container.innerHTML.indexOf('コメントはありません') >= 0) {
+          container.innerHTML = newCommentHtml;
+        } else {
+          container.innerHTML = newCommentHtml + '<hr class="max small-margin">' + container.innerHTML;
+        }
       },
 
       /**

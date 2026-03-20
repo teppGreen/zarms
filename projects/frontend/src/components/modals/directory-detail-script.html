@@ -216,6 +216,41 @@
                 }).join('');
             },
 
+            // コメントを即座にUIに追加（Optimistic UI Update）
+            appendCommentToUI: function (comment) {
+                const container = document.getElementById('directory-comments-list');
+                if (!container) return;
+
+                const members = App.state.data.members || [];
+                const creator = members.find(function (m) { return m.id === comment.created_by; });
+                const creatorName = creator ? creator.display_name : '不明';
+                const creatorPhoto = creator ? creator.profile_photo_url : '';
+                const creatorSlackProfileUrl = creator ? creator.slack_profile_url : '#';
+                const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
+
+                const creatorIcon = creatorPhoto
+                    ? '<img src="' + creatorPhoto + '" alt="' + escapeHtml(creatorName) + '" class="circle tiny">'
+                    : '<i class="tiny">account_circle</i>';
+
+                const newCommentHtml = '<div class="small-padding">' +
+                    '<div class="row tiny-space">' +
+                    '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '<\/a>' +
+                    '<div class="max row tiny-space">' +
+                    '<span class="bold small-text">' + escapeHtml(creatorName) + '<\/span>' +
+                    '<span class="small-text secondary-text">' + createdAt + '<\/span>' +
+                    '<\/div>' +
+                    '<\/div>' +
+                    '<div class="tiny-space"><\/div>' +
+                    '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '<\/p>' +
+                    '<\/div>';
+
+                if (container.innerHTML.indexOf('コメントはありません') >= 0) {
+                    container.innerHTML = newCommentHtml;
+                } else {
+                    container.innerHTML = newCommentHtml + '<hr class="max small-margin">' + container.innerHTML;
+                }
+            },
+
             openAddMembers: function () {
                 if (!this.currentId) return;
                 if (!App.modals.selectMembers || !App.modals.selectMembers.open) return;
@@ -443,7 +478,7 @@
                 const findDisplayName = function (memberId) {
                     if (!memberId) return '';
                     const member = members.find(function (item) { return item.id === memberId; });
-                    return member ? (member.display_name || member.name || member.email || '') : memberId;
+                    return member ? (member.display_name || member.name || member.email || '') : '不明';
                 };
                 setValue('directory-detail-created-by-input', findDisplayName(directory.created_by));
                 setValue('directory-detail-created-at-input', directory.created_at ? formatDateTimeForDisplay(directory.created_at) : '');
