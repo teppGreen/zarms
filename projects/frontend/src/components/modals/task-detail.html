@@ -6,48 +6,50 @@
 
   <div class="surface-container padding">
     <!-- Header -->
-    <div class="grid small-padding bottom-margin">
-      <div class="s3">
-        <div class="field no-border max suffix no-wrap">
-          <select id="task-board-select">
-            <!-- 動的に生成 -->
-          </select>
-          <i>arrow_drop_down</i>
+    <header class="fixed top-padding">
+      <div class="grid small-padding bottom-margin">
+        <div class="s3">
+          <div class="field no-border max suffix no-wrap">
+            <select id="task-board-select">
+              <!-- 動的に生成 -->
+            </select>
+            <i>arrow_drop_down</i>
+          </div>
+        </div>
+        <div class="s6 field max no-wrap bold">
+          <input type="text" id="task-name-input" placeholder="タスク名">
+        </div>
+
+        <div class="s3">
+          <nav class="row right-align">
+            <button class="circle transparent" id="task-copy-link-btn">
+              <i>share</i>
+              <div class="tooltip bottom">共有</div>
+            </button>
+            <button class="circle transparent" id="task-duplicate-btn">
+              <i>content_copy</i>
+              <div class="tooltip bottom">複製</div>
+            </button>
+            <button class="circle transparent" id="task-delete-btn" onclick="App.modals.taskDetail.deleteTask()">
+              <i>delete</i>
+              <div class="tooltip bottom">削除</div>
+            </button>
+            <button class="circle transparent">
+              <i>info</i>
+              <menu class="left no-padding medium-width">
+                <div class="padding">
+                  <p class="small-text">
+                    タスク詳細画面では、タスクに関する詳細な情報の表示・編集をすることができます。<br>
+                    各担当者が「これはどのようなタスクで、自分は何をするべきなのか」が理解できるよう、各項目に丁寧に情報を記載しましょう。<br>
+                    リスト・関連・コメント機能は、必要に応じて使用してください。
+                  </p>
+                </div>
+              </menu>
+            </button>
+          </nav>
         </div>
       </div>
-      <div class="s6 field max no-wrap bold">
-        <input type="text" id="task-name-input" placeholder="タスク名">
-      </div>
-
-      <div class="s3">
-        <nav class="row right-align">
-          <button class="circle transparent" id="task-copy-link-btn">
-            <i>share</i>
-            <div class="tooltip bottom">共有</div>
-          </button>
-          <button class="circle transparent" id="task-duplicate-btn">
-            <i>content_copy</i>
-            <div class="tooltip bottom">複製</div>
-          </button>
-          <button class="circle transparent" id="task-delete-btn" onclick="App.modals.taskDetail.deleteTask()">
-            <i>delete</i>
-            <div class="tooltip bottom">削除</div>
-          </button>
-          <button class="circle transparent">
-            <i>info</i>
-            <menu class="left no-padding medium-width">
-              <div class="padding">
-                <p class="small-text">
-                  タスク詳細画面では、タスクに関する詳細な情報の表示・編集をすることができます。<br>
-                  各担当者が「これはどのようなタスクで、自分は何をするべきなのか」が理解できるよう、各項目に丁寧に情報を記載しましょう。<br>
-                  リスト・関連・コメント機能は、必要に応じて使用してください。
-                </p>
-              </div>
-            </menu>
-          </button>
-        </nav>
-      </div>
-    </div>
+    </header>
 
     <div class="grid small-padding tiny-space no-margin">
       <!-- Left Column: Status & Avatars -->
@@ -193,12 +195,9 @@
         </nav>
         <div class="page medium-height active" id="task-detail-description">
           <div class="border quill-editor" id="task-description-editor"></div>
-          <!-- ここにQuillエディタが表示される -->
         </div>
         <div class="page medium-height scroll" id="task-detail-list">
-          <div id="task-list-items">
-            <!-- リスト項目がここに動的に生成されます -->
-          </div>
+          <div id="task-list-items"></div>
         </div>
         <div class="page medium-height scroll" id="task-detail-related">
           <!-- 親タスク -->
@@ -240,12 +239,14 @@
     </div>
 
     <!-- Footer -->
-    <nav class="small-padding no-margin">
-      <h5 id="task-display-id" class="font-number"></h5>
-      <div class="max"></div>
-      <button id="task-discard-btn" class="border large round error-text" onclick="App.modals.taskDetail.discard()">変更を破棄</button>
-      <button id="task-primary-action-btn" class="primary large round" onclick="App.modals.taskDetail.onPrimaryAction()">閉じる</button>
-    </nav>
+    <footer class="fixed bottom-padding">
+      <nav class="small-padding no-margin">
+        <h5 id="task-display-id" class="font-number"></h5>
+        <div class="max"></div>
+        <button id="task-discard-btn" class="border large round error-text" onclick="App.modals.taskDetail.discard()">変更を破棄</button>
+        <button id="task-primary-action-btn" class="primary large round" onclick="App.modals.taskDetail.onPrimaryAction()">閉じる</button>
+      </nav>
+    </footer>
   </div>
 </dialog>
 

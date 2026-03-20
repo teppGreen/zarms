@@ -76,10 +76,13 @@
 
             /**
              * タブを切り替える
-             * @param {string} tabName - タブID（例: 'home', 'members', 'board-UUID'）
+             * @param {string} tabName - タブID（例: 'home', 'catalog', 'board-UUID'）
              * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
              */
             switchTab: async function (tabName, skipUrlUpdate = false, forceLoadData = false, skipLoadData = false) {
+                if (tabName === 'members') {
+                    tabName = 'catalog';
+                }
                 console.log(`switchTab called with: ${tabName}, skipUrlUpdate: ${skipUrlUpdate}`);
                 let isBoardTab = tabName.startsWith('board-');
 
