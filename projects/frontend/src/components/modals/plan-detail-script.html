@@ -328,8 +328,8 @@
                 const saveButton = document.getElementById('plan-detail-save-button');
                 if (saveButton) {
                     saveButton.innerHTML = tabName === 'members'
-                        ? '<i>save<\/i><span>関係者の変更を保存</span>'
-                        : '<i>save<\/i><span>変更を保存</span>';
+                        ? '<i>save</i><span>関係者の変更を保存</span>'
+                        : '<i>save</i><span>変更を保存</span>';
                 }
                 this._updateActionButtons();
             },
@@ -413,15 +413,15 @@
                         hr +
                         '<div class="small-padding">' +
                         '<div class="row tiny-space">' +
-                        '<a href="' + App.modals.planDetail._escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '<\/a>' +
+                        '<a href="' + App.modals.planDetail._escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '</a>' +
                         '<div class="max row tiny-space">' +
-                        '<span class="bold small-text">' + App.modals.planDetail._escapeHtml(creatorName) + '<\/span>' +
-                        '<span class="small-text secondary-text">' + createdAt + '<\/span>' +
-                        '<\/div>' +
-                        '<\/div>' +
-                        '<div class="tiny-space"><\/div>' +
-                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '<\/p>' +
-                        '<\/div>';
+                        '<span class="bold small-text">' + App.modals.planDetail._escapeHtml(creatorName) + '</span>' +
+                        '<span class="small-text secondary-text">' + createdAt + '</span>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="tiny-space"></div>' +
+                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '</p>' +
+                        '</div>';
                 }).join('');
             },
 
@@ -591,7 +591,7 @@
                 const statusInput = document.getElementById('plan-detail-status-input');
                 if (statusInput && KEY_LABELS && KEY_LABELS.PLAN_STATUS) {
                     const options = Object.entries(KEY_LABELS.PLAN_STATUS).map(function (entry) {
-                        return '<option value="' + App.modals.planDetail._escapeAttr(entry[0]) + '">' + App.modals.planDetail._escapeHtml(entry[1]) + '<\/option>';
+                        return '<option value="' + App.modals.planDetail._escapeAttr(entry[0]) + '">' + App.modals.planDetail._escapeHtml(entry[1]) + '</option>';
                     }).join('');
                     statusInput.innerHTML = options;
                     statusInput.value = plan.plan_status || 'SUBMITTED';
@@ -1533,8 +1533,8 @@
                     saveButton.disabled = !canSave;
                     const isMembersTab = document.getElementById('plan-detail-tab-members')?.classList.contains('active') === true;
                     const defaultLabel = isMembersTab
-                        ? '<i>save<\/i><span>関係者の変更を保存</span>'
-                        : '<i>save<\/i><span>変更を保存</span>';
+                        ? '<i>save</i><span>関係者の変更を保存</span>'
+                        : '<i>save</i><span>変更を保存</span>';
                     saveButton.innerHTML = defaultLabel;
                     if (this.isDeleting) {
                         saveButton.innerHTML = '<progress class="circle small"></progress><span>削除を実行中...</span>';

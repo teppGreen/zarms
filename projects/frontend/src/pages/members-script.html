@@ -97,10 +97,10 @@
             plans: 'plans-table-frame'
         };
         const _frameState = {
-            member: { ready: false, token: '', pendingPayload: null },
-            directory: { ready: false, token: '', pendingPayload: null },
-            skills: { ready: false, token: '', pendingPayload: null },
-            plans: { ready: false, token: '', pendingPayload: null }
+            member: { ready: false, token: '', pendingPayload: null, detailMap: {} },
+            directory: { ready: false, token: '', pendingPayload: null, detailMap: {} },
+            skills: { ready: false, token: '', pendingPayload: null, detailMap: {} },
+            plans: { ready: false, token: '', pendingPayload: null, detailMap: {} }
         };
         const _frameMessageType = {
             ready: 'members-tabulator-ready',
@@ -559,12 +559,15 @@
 
             _buildMemberRows: function (members, directories, assignments) {
                 return members.map(function (member) {
-                    const rowId = member && member.id ? member.id : (member ? member.member_id : null);
+                    const rowId = member ? (member.id || member.member_id || null) : null;
                     const myAssignments = assignments.filter(function (assignment) {
-                        return assignment.member_id === member.id && assignment.is_active !== false;
+                        return String(assignment.member_id || '') === String(rowId || '') && assignment.is_active !== false;
                     });
                     const names = myAssignments.map(function (assignment) {
-                        const directory = directories.find(function (item) { return item.id === assignment.directory_id; });
+                        const directory = directories.find(function (item) {
+                            const directoryId = item ? (item.id || item.directory_id || '') : '';
+                            return String(directoryId) === String(assignment.directory_id || '');
+                        });
                         return directory ? directory.name : null;
                     }).filter(Boolean);
                     return Object.assign({}, member, {
@@ -591,10 +594,13 @@
                 const rowById = {};
 
                 directories.forEach(function (directory) {
-                    const rowId = directory && directory.id ? directory.id : (directory ? directory.directory_id : null);
-                    const parent = directories.find(function (item) { return item.id === directory.parent_directory_id; });
+                    const rowId = directory ? (directory.id || directory.directory_id || null) : null;
+                    const parent = directories.find(function (item) {
+                        const itemId = item ? (item.id || item.directory_id || '') : '';
+                        return String(itemId) === String(directory.parent_directory_id || '');
+                    });
                     const memberCount = assignments.filter(function (assignment) {
-                        return assignment.directory_id === directory.id && assignment.is_active !== false;
+                        return String(assignment.directory_id || '') === String(rowId || '') && assignment.is_active !== false;
                     }).length;
                     rowById[rowId] = Object.assign({}, directory, {
                         id: rowId,
@@ -727,17 +733,64 @@
             },
 
             _buildFramePayload: function (tabName, rows, config) {
+                const frameRows = this._buildFrameRows(tabName, rows);
+                _frameState[tabName].detailMap = this._buildFrameDetailMap(frameRows);
                 return {
                     tabName: tabName,
-                    rows: rows,
+                    rows: frameRows,
                     emptyText: config.emptyText,
                     dataTree: tabName === 'directory',
                     headerFilters: (_headerFilters[tabName] || []).slice(),
-                    columns: this._getTabulatorColumns(config.columns, tabName, rows),
+                    columns: this._getTabulatorColumns(config.columns, tabName, frameRows),
                     sorters: (_sortState[tabName] || []).map(function (sorter) {
                         return { column: sorter.col, dir: sorter.dir };
                     })
                 };
+            },
+
+            _buildFrameDetailMap: function (rows) {
+                const map = {};
+                const walk = function (items) {
+                    (items || []).forEach(function (item) {
+                        if (!item || typeof item !== 'object') return;
+                        const rowKey = item.__row_key ? String(item.__row_key) : '';
+                        const detailId = item.__detail_id ? String(item.__detail_id) : '';
+                        if (rowKey) {
+                            map[rowKey] = detailId;
+                        }
+                        if (Array.isArray(item._children) && item._children.length) {
+                            walk(item._children);
+                        }
+                    });
+                };
+                walk(rows || []);
+                return map;
+            },
+
+            _resolveRowDetailId: function (tabName, row) {
+                if (!row || typeof row !== 'object') return '';
+                if (tabName === 'member') return String(row.id || row.member_id || '');
+                if (tabName === 'directory') return String(row.id || row.directory_id || '');
+                if (tabName === 'skills') return String(row.id || row.skill_id || '');
+                if (tabName === 'plans') return String(row.id || row.plan_id || '');
+                return String(row.id || '');
+            },
+
+            _buildFrameRows: function (tabName, rows) {
+                let seq = 0;
+                const build = function (row) {
+                    seq += 1;
+                    const detailId = App.pages.members._resolveRowDetailId(tabName, row);
+                    const next = Object.assign({}, row, {
+                        __detail_id: detailId,
+                        __row_key: detailId ? (tabName + ':' + detailId) : (tabName + ':row:' + String(seq))
+                    });
+                    if (Array.isArray(row && row._children)) {
+                        next._children = row._children.map(build);
+                    }
+                    return next;
+                };
+                return (rows || []).map(build);
             },
 
             _buildHeaderFiltersFromLegacy: function (tabName) {
@@ -918,7 +971,7 @@
                     '<head>' +
                     '<meta charset="UTF-8">' +
                     '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
-                    '<link rel="stylesheet" href="https:\/\/unpkg.com\/tabulator-tables@6.3.0\/dist\/css\/tabulator.min.css">' +
+                    '<link rel="stylesheet" href="https://unpkg.com/tabulator-tables@6.3.0/dist/css/tabulator.min.css">' +
                     '<style>' +
                     'html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:"Noto Sans JP",sans-serif;}' +
                     '#members-tabulator-root{width:100%;height:100%;}' +
@@ -945,20 +998,20 @@
                     '</head>' +
                     '<body>' +
                     '<div id="members-tabulator-root"></div>' +
-                    '<script src="https:\/\/unpkg.com\/tabulator-tables@6.3.0\/dist\/js\/tabulator.min.js"><\/script>' +
+                    '<script src="https://unpkg.com/tabulator-tables@6.3.0/dist/js/tabulator.min.js"><\/script>' +
                     '<script>' +
                     'const FRAME_TOKEN=' + JSON.stringify(token) + ';' +
                     'const TAB_NAME=' + JSON.stringify(tabName) + ';' +
                     'let table=null;let tableBuilt=false;let selectedCell=null;' +
                     'function postMessageToParent(type,payload){window.parent.postMessage({source:"members-tabulator",type:type,tabName:TAB_NAME,token:FRAME_TOKEN,payload:payload||{}},"*");}' +
                     'function createStatusNode(value){const span=document.createElement("span");span.textContent=String(value||"");if(value==="在籍"||value==="有効"){span.style.color="#2d3eff";span.style.fontWeight="600";}else{span.style.opacity="0.6";}return span;}' +
-                    'function createOpenButton(cell){const button=document.createElement("button");button.type="button";button.className="members-open-detail-btn";button.textContent="開く";button.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();const row=cell&&cell.getRow?cell.getRow():null;const data=row&&row.getData?row.getData():null;const rawId=data&&data.id!==undefined&&data.id!==null?data.id:(row&&row.getIndex?row.getIndex():"");postMessageToParent("' + _frameMessageType.rowClick + '",{rowId:rawId===undefined||rawId===null?"":String(rawId)});});return button;}' +
+                    'function createOpenButton(cell){const button=document.createElement("button");button.type="button";button.className="members-open-detail-btn";button.textContent="開く";button.addEventListener("mousedown",function(event){event.preventDefault();event.stopPropagation();});button.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();const row=cell&&cell.getRow?cell.getRow():null;const data=row&&row.getData?row.getData():null;const rowKey=data&&data.__row_key!==undefined&&data.__row_key!==null?String(data.__row_key):"";postMessageToParent("' + _frameMessageType.rowClick + '",{rowKey:rowKey});});return button;}' +
                     'function normalizeExternalUrl(value){const raw=value===null||value===undefined?"":String(value).trim();if(!raw){return"";}if(!/^https?:\\/\\//i.test(raw)){return "https:\\/\\/"+raw.replace(/^\\/+/, "");}return raw;}' +
                     'function createMemberNameCell(cell){const wrapper=document.createElement("div");wrapper.className="members-name-cell";const row=cell&&cell.getRow?cell.getRow():null;const data=row&&row.getData?row.getData():{};const cellValue=cell&&cell.getValue?cell.getValue():"";const displayName=cellValue===null||cellValue===undefined?"":String(cellValue);const avatar=document.createElement("i");avatar.className="circle small members-avatar";const photoUrl=data&&data.profile_photo_url?String(data.profile_photo_url).trim():"";if(photoUrl){const img=document.createElement("img");img.className="responsive";img.alt=displayName;img.src=photoUrl;avatar.appendChild(img);}else{avatar.textContent=(displayName||"?").slice(0,1).toUpperCase();}const slackUrl=normalizeExternalUrl(data&&data.slack_profile_url?data.slack_profile_url:"");let nameNode;if(slackUrl){const link=document.createElement("a");link.className="members-name-link";link.href=slackUrl;link.rel="noopener noreferrer";link.target="_blank";link.textContent=displayName;link.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();postMessageToParent("' + _frameMessageType.openExternal + '",{url:slackUrl});});nameNode=link;}else{const span=document.createElement("span");span.className="members-name-label";span.textContent=displayName;nameNode=span;}wrapper.appendChild(avatar);wrapper.appendChild(nameNode);return wrapper;}' +
                     'function createColumns(columns){return (columns||[]).map(function(column){const definition={title:column.title,field:column.field,headerSort:column.headerSort!==false,headerSortClickElement:"icon",sorter:column.sorter||"string",hozAlign:column.hozAlign||"left",cssClass:column.cssClass||"",variableHeight:column.variableHeight===true,formatter:"plaintext"};if(column.width){definition.width=column.width;}if(column.headerFilterType!==false){if(column.headerFilterType==="list"){definition.headerFilter="list";definition.headerFilterParams={values:Array.isArray(column.headerFilterValues)?column.headerFilterValues:[],clearable:true};}else{definition.headerFilter=column.headerFilterType||"input";}}if(column.formatterKey==="status"){definition.formatter=function(cell){return createStatusNode(cell.getValue());};}if(column.formatterKey==="openAction"){definition.formatter=function(cell){return createOpenButton(cell);};}if(column.formatterKey==="memberNameLink"){definition.formatter=function(cell){return createMemberNameCell(cell);};}return definition;});}' +
                     'function setupCellCopy(){window.addEventListener("keydown",function(event){if(!(event.metaKey||event.ctrlKey)||String(event.key||"").toLowerCase()!=="c"){return;}const hasRangeSelection=!!document.querySelector(".tabulator-range-selected");if(hasRangeSelection&&table&&table.copyToClipboard){event.preventDefault();try{table.copyToClipboard("range",false,{columnHeaders:false,rowGroups:false,columnCalcs:false,formatCells:true});return;}catch(error){}}if(!selectedCell||!selectedCell.getValue){return;}event.preventDefault();const value=selectedCell.getValue();const text=value===null||value===undefined?"":String(value);if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).catch(function(){});}});}' +
                     'function applyHeaderFilters(filters){if(!table){return;}table.clearHeaderFilter();(filters||[]).forEach(function(filter){if(!filter||!filter.field){return;}table.setHeaderFilterValue(filter.field,String(filter.value||""));});}' +
-                    'function renderTable(payload){const root=document.getElementById("members-tabulator-root");if(!root){return;}const rows=Array.isArray(payload.rows)?payload.rows:[];const sorters=Array.isArray(payload.sorters)?payload.sorters:[];const headerFilters=Array.isArray(payload.headerFilters)?payload.headerFilters:[];if(!table){tableBuilt=false;table=new Tabulator(root,{data:rows,columns:createColumns(payload.columns),layout:"fitColumns",height:"100%",placeholder:payload.emptyText||"データがありません",initialSort:sorters,index:"id",dataTree:payload.dataTree===true,dataTreeStartExpanded:false,dataTreeElementColumn:"name",dataTreeChildField:"_children",clipboard:true,clipboardCopyRowRange:"range",clipboardCopyStyled:false,clipboardCopyConfig:{columnHeaders:false,rowGroups:false,columnCalcs:false,formatCells:true},selectableRows:false,selectableRange:1,selectableRangeColumns:true,selectableRangeRows:true});table.on("tableBuilt",function(){tableBuilt=true;});table.on("cellClick",function(event,cell){if(!cell||!cell.getColumn){return;}const field=cell.getColumn().getField();if(field==="__open_action"){return;}if(selectedCell&&selectedCell.getElement){selectedCell.getElement().classList.remove("members-cell-selected");}selectedCell=cell;if(cell.getElement){cell.getElement().classList.add("members-cell-selected");}});table.on("dataSorted",function(sorters){postMessageToParent("' + _frameMessageType.sortChange + '",{sorters:(sorters||[]).map(function(sorter){return {column:sorter.field,dir:sorter.dir};})});});table.on("dataFiltered",function(filters){postMessageToParent("' + _frameMessageType.filterChange + '",{filters:(filters||[]).map(function(filter){return {field:filter.field||"",value:filter.value===null||filter.value===undefined?"":String(filter.value)};})});});setupCellCopy();applyHeaderFilters(headerFilters);return;}table.setData(rows);if(sorters.length){table.setSort(sorters);}else{table.clearSort();}applyHeaderFilters(headerFilters);}' +
+                    'function renderTable(payload){const root=document.getElementById("members-tabulator-root");if(!root){return;}const rows=Array.isArray(payload.rows)?payload.rows:[];const sorters=Array.isArray(payload.sorters)?payload.sorters:[];const headerFilters=Array.isArray(payload.headerFilters)?payload.headerFilters:[];if(!table){tableBuilt=false;table=new Tabulator(root,{data:rows,columns:createColumns(payload.columns),layout:"fitColumns",height:"100%",placeholder:payload.emptyText||"データがありません",initialSort:sorters,index:"__row_key",dataTree:payload.dataTree===true,dataTreeStartExpanded:false,dataTreeElementColumn:"name",dataTreeChildField:"_children",clipboard:true,clipboardCopyRowRange:"range",clipboardCopyStyled:false,clipboardCopyConfig:{columnHeaders:false,rowGroups:false,columnCalcs:false,formatCells:true},selectableRows:false,selectableRange:1,selectableRangeColumns:true,selectableRangeRows:true});table.on("tableBuilt",function(){tableBuilt=true;});table.on("cellClick",function(event,cell){if(!cell||!cell.getColumn){return;}const field=cell.getColumn().getField();if(field==="__open_action"){return;}if(selectedCell&&selectedCell.getElement){selectedCell.getElement().classList.remove("members-cell-selected");}selectedCell=cell;if(cell.getElement){cell.getElement().classList.add("members-cell-selected");}});table.on("dataSorted",function(sorters){postMessageToParent("' + _frameMessageType.sortChange + '",{sorters:(sorters||[]).map(function(sorter){return {column:sorter.field,dir:sorter.dir};})});});table.on("dataFiltered",function(filters){postMessageToParent("' + _frameMessageType.filterChange + '",{filters:(filters||[]).map(function(filter){return {field:filter.field||"",value:filter.value===null||filter.value===undefined?"":String(filter.value)};})});});setupCellCopy();applyHeaderFilters(headerFilters);return;}table.setData(rows);if(sorters.length){table.setSort(sorters);}else{table.clearSort();}applyHeaderFilters(headerFilters);}' +
                     'window.addEventListener("message",function(event){const data=event.data||{};if(!data||data.source!=="members-host"||data.token!==FRAME_TOKEN){return;}if(data.type==="' + _frameMessageType.render + '"){try{renderTable(data.payload||{});}catch(error){postMessageToParent("' + _frameMessageType.error + '",{message:error&&error.message?error.message:"Tabulator描画に失敗しました"});}}if(data.type==="' + _frameMessageType.resize + '"&&table&&tableBuilt&&document.body&&document.body.offsetWidth>0){table.redraw(true);}});' +
                     'window.addEventListener("load",function(){postMessageToParent("' + _frameMessageType.ready + '",{});});' +
                     '<\/script>' +
@@ -1527,61 +1580,36 @@
             },
 
             _handleFrameRowClick: function (tabName, payload) {
-                const rowId = payload && payload.rowId ? String(payload.rowId) : '';
+                const rowKey = payload && payload.rowKey ? String(payload.rowKey) : '';
+                const rowId = rowKey && _frameState[tabName] && _frameState[tabName].detailMap
+                    ? String(_frameState[tabName].detailMap[rowKey] || '')
+                    : '';
                 if (!rowId) return;
-                const resolvedId = this._resolveDetailTargetId(tabName, rowId);
-                if (!resolvedId) return;
 
                 if (tabName === 'member') {
                     if (App.modals.memberDetail && App.modals.memberDetail.open) {
-                        App.modals.memberDetail.open(resolvedId);
+                        App.modals.memberDetail.open(rowId);
                     }
                     return;
                 }
 
                 if (tabName === 'directory') {
                     if (App.modals.directoryDetail && App.modals.directoryDetail.open) {
-                        App.modals.directoryDetail.open(resolvedId);
+                        App.modals.directoryDetail.open(rowId);
                     }
                     return;
                 }
 
                 if (tabName === 'plans') {
                     if (App.modals.planDetail && App.modals.planDetail.open) {
-                        App.modals.planDetail.open(resolvedId);
+                        App.modals.planDetail.open(rowId);
                     }
                     return;
                 }
 
                 if (App.modals.skillDetail && App.modals.skillDetail.open) {
-                    App.modals.skillDetail.open(resolvedId);
+                    App.modals.skillDetail.open(rowId);
                 }
-            },
-
-            _resolveDetailTargetId: function (tabName, rowId) {
-                const rowIdText = rowId === null || rowId === undefined ? '' : String(rowId);
-                if (!rowIdText) return '';
-
-                let source = [];
-                if (tabName === 'member') {
-                    source = App.state.data.members || [];
-                } else if (tabName === 'directory') {
-                    source = App.state.data.directories || [];
-                } else if (tabName === 'skills') {
-                    source = App.state.data.skills || [];
-                } else if (tabName === 'plans') {
-                    source = App.state.data.plans || [];
-                }
-
-                const matched = source.find(function (item) {
-                    return item && item.id !== undefined && item.id !== null && String(item.id) === rowIdText;
-                });
-
-                if (matched && matched.id !== undefined && matched.id !== null) {
-                    return matched.id;
-                }
-
-                return rowIdText;
             },
 
             _openExternalFromFrame: function (payload) {

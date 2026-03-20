@@ -17,14 +17,16 @@
 
                 const requestId = String(memberId);
                 const member = (App.state.data.members || []).find(function (m) {
-                    return m && m.id !== undefined && m.id !== null && String(m.id) === requestId;
+                    const value = m ? (m.id || m.member_id || null) : null;
+                    return value !== undefined && value !== null && String(value) === requestId;
                 });
                 if (!member) {
                     console.error('[MemberDetail] Member not found:', memberId);
                     return;
                 }
 
-                this.currentId = member.id;
+                const memberKey = member.id || member.member_id;
+                this.currentId = memberKey;
                 this.currentItem = Object.assign({}, member);
                 this.originalData = Object.assign({}, member);
                 this.isDirty = false;
@@ -37,10 +39,10 @@
                 const assignments = App.state.data.directoryAssignments || [];
                 const skillAssignments = App.state.data.skillAssignments || [];
                 this.originalDirectories = assignments
-                    .filter(function (a) { return String(a.member_id) === String(member.id) && a.is_active !== false; })
+                    .filter(function (a) { return String(a.member_id) === String(memberKey) && a.is_active !== false; })
                     .map(function (a) { return Object.assign({}, a); });
                 this.originalSkills = skillAssignments
-                    .filter(function (a) { return String(a.member_id) === String(member.id); })
+                    .filter(function (a) { return String(a.member_id) === String(memberKey); })
                     .map(function (a) { return Object.assign({}, a); });
 
                 if (!this.quill) {
@@ -52,9 +54,9 @@
                 ui('#modal-detail-member', true);
 
                 this._render(member);
-                this._renderDirectories(member.id);
-                this._renderSkills(member.id);
-                this.loadComments(member.id);
+                this._renderDirectories(memberKey);
+                this._renderSkills(memberKey);
+                this.loadComments(memberKey);
                 this.switchTab(document.querySelector('#member-detail-tabs > a'), 'profile');
                 this._bindEscClose();
             },
@@ -744,15 +746,15 @@
                         hr +
                         '<div class="small-padding">' +
                         '<div class="row tiny-space">' +
-                        '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '<\/a>' +
+                        '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '</a>' +
                         '<div class="max row tiny-space">' +
-                        '<span class="bold small-text">' + escapeHtml(creatorName) + '<\/span>' +
-                        '<span class="small-text secondary-text">' + createdAt + '<\/span>' +
-                        '<\/div>' +
-                        '<\/div>' +
-                        '<div class="tiny-space"><\/div>' +
-                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '<\/p>' +
-                        '<\/div>';
+                        '<span class="bold small-text">' + escapeHtml(creatorName) + '</span>' +
+                        '<span class="small-text secondary-text">' + createdAt + '</span>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="tiny-space"></div>' +
+                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '</p>' +
+                        '</div>';
                 }).join('');
             },
 
@@ -774,15 +776,15 @@
 
                 const newCommentHtml = '<div class="small-padding">' +
                     '<div class="row tiny-space">' +
-                    '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '<\/a>' +
+                    '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '</a>' +
                     '<div class="max row tiny-space">' +
-                    '<span class="bold small-text">' + escapeHtml(creatorName) + '<\/span>' +
-                    '<span class="small-text secondary-text">' + createdAt + '<\/span>' +
-                    '<\/div>' +
-                    '<\/div>' +
-                    '<div class="tiny-space"><\/div>' +
-                    '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '<\/p>' +
-                    '<\/div>';
+                    '<span class="bold small-text">' + escapeHtml(creatorName) + '</span>' +
+                    '<span class="small-text secondary-text">' + createdAt + '</span>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="tiny-space"></div>' +
+                    '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '</p>' +
+                    '</div>';
 
                 // 既存のコメントがある場合は先頭に追加、無い場合は置き換え
                 if (container.innerHTML.indexOf('コメントはありません') >= 0) {
@@ -805,14 +807,14 @@
                 }
 
                 const setVal = function (id, val) {
-                    var el = document.getElementById(id);
+                    const el = document.getElementById(id);
                     if (el) el.value = val || '';
                 };
 
-                var members = App.state.data.members || [];
-                var findDisplayName = function (memberId) {
+                const members = App.state.data.members || [];
+                const findDisplayName = function (memberId) {
                     if (!memberId) return '';
-                    var found = members.find(function (item) { return item.id === memberId; });
+                    const found = members.find(function (item) { return item.id === memberId; });
                     return found ? (found.display_name || found.name || found.email || '') : '不明';
                 };
 
@@ -840,21 +842,21 @@
                     App.utils.quill.setContent(this.quill, member.description || '');
                 }
 
-                var cb = document.getElementById('member-detail-is-active-input');
+                const cb = document.getElementById('member-detail-is-active-input');
                 if (cb) cb.checked = member.is_active !== false;
 
-                var lastUpdatedEl = document.getElementById('member-detail-last-updated');
+                const lastUpdatedEl = document.getElementById('member-detail-last-updated');
                 if (lastUpdatedEl) {
                     if (member.updated_at) {
-                        var updatedByMember = (App.state.data.members || []).find(function (m) { return m.id === member.updated_by; });
-                        var updatedByName = updatedByMember ? updatedByMember.display_name : '';
+                        const updatedByMember = (App.state.data.members || []).find(function (m) { return m.id === member.updated_by; });
+                        const updatedByName = updatedByMember ? updatedByMember.display_name : '';
                         lastUpdatedEl.innerHTML = `<i>update</i><span>${formatDateTimeForDisplay(member.updated_at, 'MM/dd(E) HH:mm') || ''}<span>${updatedByName || ''}</span></span>`;
                     } else {
                         lastUpdatedEl.innerHTML = '';
                     }
                 }
 
-                var errorEl = document.getElementById('member-detail-error');
+                const errorEl = document.getElementById('member-detail-error');
                 if (errorEl) errorEl.style.display = 'none';
 
                 this._setupDirtyWatchers();
@@ -862,8 +864,8 @@
             },
 
             _setupDirtyWatchers: function () {
-                var self = this;
-                var watchIds = [
+                const self = this;
+                const watchIds = [
                     'member-detail-name-input',
                     'member-detail-display-name-input',
                     'member-detail-name-yomi-input',
@@ -882,14 +884,14 @@
                 ];
 
                 watchIds.forEach(function (wid) {
-                    var el = document.getElementById(wid);
+                    const el = document.getElementById(wid);
                     if (!el || el.dataset.memberDetailBound === '1') return;
                     el.addEventListener('input', function () { self.isDirty = true; });
                     el.addEventListener('change', function () { self.isDirty = true; });
                     el.dataset.memberDetailBound = '1';
                 });
 
-                var slackInput = document.getElementById('member-detail-slack-url-input');
+                const slackInput = document.getElementById('member-detail-slack-url-input');
                 if (slackInput && slackInput.dataset.memberDetailSlackTailBound !== '1') {
                     const updateTail = function () {
                         const tailEl = document.getElementById('member-detail-slack-tail-input');
@@ -910,22 +912,22 @@
             },
 
             _renderDirectories: function (memberId) {
-                var container = document.getElementById('member-detail-directories-list');
+                const container = document.getElementById('member-detail-directories-list');
                 if (!container) return;
 
-                var self = this;
-                var directories = App.state.data.directories || [];
+                const self = this;
+                const directories = App.state.data.directories || [];
                 
                 // 現在表示すべき所属組織を計算（一時保存の変更を反映）
-                var currentDirectories = [];
+                const currentDirectories = [];
                 
                 // 既存の所属から開始
                 this.originalDirectories.forEach(function (orig) {
                     // 削除予定リストに無ければ追加
                     if (!self.pendingDirectoryChanges.toRemove.includes(orig.directory_id)) {
-                        var dir = Object.assign({}, orig);
+                        const dir = Object.assign({}, orig);
                         // 更新があれば反映
-                        var update = self.pendingDirectoryChanges.toUpdate.find(function (u) {
+                        const update = self.pendingDirectoryChanges.toUpdate.find(function (u) {
                             return u.directory_id === orig.directory_id;
                         });
                         if (update) {
@@ -946,42 +948,42 @@
                 }
 
                 container.innerHTML = currentDirectories.map(function (a) {
-                    var dir = directories.find(function (d) { return d.id === a.directory_id; });
-                    var dirName = dir ? dir.name : '（削除済み組織）';
-                    var role = a.role || '';
-                    var isActive = a.is_active !== false;
-                    var actionBtn = '<button class="small round border" onclick="App.modals.memberDetail.deactivateDirectoryAssignment(\'' + escapeHtmlAttribute(a.id || '') + '\', \'' + escapeHtmlAttribute(a.directory_id) + '\')">解除<\/button>';
+                    const dir = directories.find(function (d) { return d.id === a.directory_id; });
+                    const dirName = dir ? dir.name : '（削除済み組織）';
+                    const role = a.role || '';
+                    const isActive = a.is_active !== false;
+                    const actionBtn = '<button class="small round border" onclick="App.modals.memberDetail.deactivateDirectoryAssignment(\'' + escapeHtmlAttribute(a.id || '') + '\', \'' + escapeHtmlAttribute(a.directory_id) + '\')">解除</button>';
                     return '<div class="row padding small-space">' +
                         '<i>account_tree</i>' +
                         '<div class="max">' +
-                        '<p class="no-margin bold small">' + escapeHtml(dirName) + '<\/p>' +
+                        '<p class="no-margin bold small">' + escapeHtml(dirName) + '</p>' +
                         '<div class="field border label small top-margin no-margin">' +
                         '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(role) + '" onchange="App.modals.memberDetail.updateDirectoryRole(\'' + escapeHtmlAttribute(a.id || '') + '\', \'' + escapeHtmlAttribute(a.directory_id) + '\', this.value)">' +
                         '<label>役割</label>' +
-                        '<\/div>' +
-                        '<\/div>' +
+                        '</div>' +
+                        '</div>' +
                         (!isActive ? '<span class="chip small border">退任済</span>' : actionBtn) +
-                        '<\/div>';
+                        '</div>';
                 }).join('<hr class="small-margin">');
             },
 
             _renderSkills: function (memberId) {
-                var container = document.getElementById('member-detail-skills-list');
+                const container = document.getElementById('member-detail-skills-list');
                 if (!container) return;
 
-                var self = this;
-                var skills = App.state.data.skills || [];
+                const self = this;
+                const skills = App.state.data.skills || [];
                 
                 // 現在表示すべきスキルを計算（一時保存の変更を反映）
-                var currentSkills = [];
+                const currentSkills = [];
                 
                 // 既存のスキルから開始
                 this.originalSkills.forEach(function (orig) {
                     // 削除予定リストに無ければ追加
                     if (!self.pendingSkillChanges.toRemove.includes(orig.skill_id)) {
-                        var sk = Object.assign({}, orig);
+                        const sk = Object.assign({}, orig);
                         // 更新があれば反映
-                        var update = self.pendingSkillChanges.toUpdate.find(function (u) {
+                        const update = self.pendingSkillChanges.toUpdate.find(function (u) {
                             return u.skill_id === orig.skill_id;
                         });
                         if (update) {
@@ -1002,7 +1004,7 @@
                     return;
                 }
 
-                var levelLabels = {
+                const levelLabels = {
                     BEGINNER: '初級',
                     INTERMEDIATE: '中級',
                     ADVANCED: '上級',
@@ -1012,47 +1014,29 @@
                 const levelOptions = function (current) {
                     return Object.keys(levelLabels).map(function (key) {
                         const selected = current === key ? ' selected' : '';
-                        return '<option value="' + key + '"' + selected + '>' + levelLabels[key] + '<\/option>';
+                        return '<option value="' + key + '"' + selected + '>' + levelLabels[key] + '</option>';
                     }).join('');
                 };
 
                 container.innerHTML = currentSkills.map(function (sa) {
-                    var skill = skills.find(function (s) { return s.id === sa.skill_id; });
-                    var skillName = skill ? skill.title : '（削除済みスキル）';
-                    var level = levelLabels[sa.skill_level_key] || sa.skill_level_key || '';
-                    var remark = sa.remark || '';
-                    var levelSelect = '<select class="small" onchange="App.modals.memberDetail.updateSkillLevel(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\', this.value)">' + levelOptions(sa.skill_level_key) + '<\/select>';
-                    var remarkInput = '<input type="text" placeholder="備考" value="' + escapeHtmlAttribute(remark) + '" onchange="App.modals.memberDetail.updateSkillRemark(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\', this.value)">';
-                    var deleteBtn = '<button class="circle small transparent" onclick="App.modals.memberDetail.removeSkillAssignment(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\')"><i>delete</i><\/button>';
+                    const skill = skills.find(function (s) { return s.id === sa.skill_id; });
+                    const skillName = skill ? skill.title : '（削除済みスキル）';
+                    const level = levelLabels[sa.skill_level_key] || sa.skill_level_key || '';
+                    const remark = sa.remark || '';
+                    const levelSelect = '<select class="small" onchange="App.modals.memberDetail.updateSkillLevel(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\', this.value)">' + levelOptions(sa.skill_level_key) + '</select>';
+                    const remarkInput = '<input type="text" placeholder="備考" value="' + escapeHtmlAttribute(remark) + '" onchange="App.modals.memberDetail.updateSkillRemark(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\', this.value)">';
+                    const deleteBtn = '<button class="circle small transparent" onclick="App.modals.memberDetail.removeSkillAssignment(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\')"><i>delete</i></button>';
                     return '<div class="row padding small-space">' +
                         '<i>psychology</i>' +
                         '<div class="max">' +
-                        '<p class="no-margin bold small">' + escapeHtml(skillName) + '<\/p>' +
+                        '<p class="no-margin bold small">' + escapeHtml(skillName) + '</p>' +
                         '<div class="row small-space top-margin">' +
                         levelSelect +
-                        '<div class="field border small max no-margin">' + remarkInput + '<\/div>' +
-                        '<\/div>' +
-                        '<\/div>' +
+                        '<div class="field border small max no-margin">' + remarkInput + '</div>' +
+                        '</div>' +
+                        '</div>' +
                         deleteBtn +
-                        '<\/div>';
-                }).join('<hr class="small-margin">');
-            },
-                        : '<span class="small-text secondary-text">-<\/span>';
-                    var removeBtn = sa.id
-                        ? '<button class="small round border" onclick="App.modals.memberDetail.removeSkillAssignment(\'' + sa.id + '\')">解除<\/button>'
-                        : '';
-                    return '<div class="row padding small-space">' +
-                        '<i>psychology</i>' +
-                        '<div class="max">' +
-                        '<p class="no-margin bold small">' + escapeHtml(skillName) + '<\/p>' +
-                        (level ? '<p class="no-margin small-text secondary-text">' + escapeHtml(level) + '<\/p>' : '') +
-                        '<div class="field border label small top-margin no-margin">' +
-                        '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(remark) + '" onchange="App.modals.memberDetail.updateSkillRemark(\'' + escapeHtmlAttribute(sa.id || '') + '\', this.value)">' +
-                        '<label>備考</label>' +
-                        '<\/div>' +
-                        '<\/div>' +
-                        '<div class="row tiny-space">' + levelSelect + removeBtn + '<\/div>' +
-                        '<\/div>';
+                        '</div>';
                 }).join('<hr class="small-margin">');
             },
 
@@ -1062,7 +1046,7 @@
                 this.originalData = null;
                 this.isDirty = false;
 
-                var fields = [
+                const fields = [
                     'member-detail-name-input',
                     'member-detail-display-name-input',
                     'member-detail-email-input',
@@ -1084,35 +1068,35 @@
                     'member-detail-updated-at-input'
                 ];
                 fields.forEach(function (id) {
-                    var el = document.getElementById(id);
+                    const el = document.getElementById(id);
                     if (el) el.value = '';
                 });
 
-                var statusChip = document.getElementById('member-detail-status-chip');
+                const statusChip = document.getElementById('member-detail-status-chip');
                 if (statusChip) {
                     statusChip.textContent = '';
                     statusChip.className = 'chip small';
                 }
 
-                var cb = document.getElementById('member-detail-is-active-input');
+                const cb = document.getElementById('member-detail-is-active-input');
                 if (cb) cb.checked = true;
 
-                var comments = document.getElementById('member-comments-list');
+                const comments = document.getElementById('member-comments-list');
                 if (comments) comments.innerHTML = '';
 
                 if (this.quill) {
                     App.utils.quill.clear(this.quill);
                 }
 
-                var profileTabBtn = document.querySelector('#member-detail-tabs > a');
+                const profileTabBtn = document.querySelector('#member-detail-tabs > a');
                 this.switchTab(profileTabBtn, 'profile');
             },
 
             _extractSlackProfileTail: function (value) {
                 if (!value) return '';
-                var normalized = String(value).trim().replace(/\/+$/, '');
+                const normalized = String(value).trim().replace(/\/+$/, '');
                 if (!normalized) return '';
-                var token = normalized.split(/[\/?#]/).filter(Boolean).pop() || '';
+                const token = normalized.split(/[\/?#]/).filter(Boolean).pop() || '';
                 if (token.length <= 11) return token;
                 return token.slice(-11);
             },

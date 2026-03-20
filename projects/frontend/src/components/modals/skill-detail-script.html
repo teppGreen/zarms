@@ -214,15 +214,15 @@
                         hr +
                         '<div class="small-padding">' +
                         '<div class="row tiny-space">' +
-                        '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '<\/a>' +
+                        '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '</a>' +
                         '<div class="max row tiny-space">' +
-                        '<span class="bold small-text">' + escapeHtml(creatorName) + '<\/span>' +
-                        '<span class="small-text secondary-text">' + createdAt + '<\/span>' +
-                        '<\/div>' +
-                        '<\/div>' +
-                        '<div class="tiny-space"><\/div>' +
-                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '<\/p>' +
-                        '<\/div>';
+                        '<span class="bold small-text">' + escapeHtml(creatorName) + '</span>' +
+                        '<span class="small-text secondary-text">' + createdAt + '</span>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="tiny-space"></div>' +
+                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '</p>' +
+                        '</div>';
                 }).join('');
             },
 
@@ -245,7 +245,7 @@
 
                     typeInput.innerHTML = '<option value="">（未設定）</option>' + knownTypes.map(function (key) {
                         const escaped = escapeHtmlAttribute(key);
-                        return '<option value="' + escaped + '">' + escapeHtml(key) + '<\/option>';
+                        return '<option value="' + escaped + '">' + escapeHtml(key) + '</option>';
                     }).join('');
                     typeInput.value = skill.skill_type_key || '';
                 }
@@ -277,7 +277,7 @@
                     if (skill.updated_at) {
                         const updatedByMember = (App.state.data.members || []).find(function (m) { return m.id === skill.updated_by; });
                         const updatedByName = updatedByMember ? updatedByMember.display_name : '';
-                        lastUpdatedEl.innerHTML = '<i>update</i><span>' + formatDateTimeForDisplay(skill.updated_at) + (updatedByName ? '  ' + updatedByName : '') + '<\/span>';
+                        lastUpdatedEl.innerHTML = '<i>update</i><span>' + formatDateTimeForDisplay(skill.updated_at) + (updatedByName ? '  ' + updatedByName : '') + '</span>';
                     } else {
                         lastUpdatedEl.innerHTML = '';
                     }
@@ -308,7 +308,7 @@
                 const levelOptions = function (current) {
                     return Object.keys(levelLabels).map(function (key) {
                         const selected = current === key ? ' selected' : '';
-                        return '<option value="' + key + '"' + selected + '>' + levelLabels[key] + '<\/option>';
+                        return '<option value="' + key + '"' + selected + '>' + levelLabels[key] + '</option>';
                     }).join('');
                 };
 
@@ -320,30 +320,30 @@
                     const remark = sa.remark || '';
 
                     const levelSelect = assignmentId
-                        ? '<select class="small" onchange="App.modals.skillDetail.updateMemberLevel(\'' + assignmentId + '\', this.value)">' + levelOptions(sa.skill_level_key) + '<\/select>'
-                        : '<span class="small-text secondary-text">-<\/span>';
+                        ? '<select class="small" onchange="App.modals.skillDetail.updateMemberLevel(\'' + assignmentId + '\', this.value)">' + levelOptions(sa.skill_level_key) + '</select>'
+                        : '<span class="small-text secondary-text">-</span>';
 
                     const openBtn = memberId
-                        ? '<button class="small round border" onclick="App.modals.skillDetail.openMemberDetail(\'' + memberId + '\')">開く<\/button>'
+                        ? '<button class="small round border" onclick="App.modals.skillDetail.openMemberDetail(\'' + memberId + '\')">開く</button>'
                         : '';
 
                     const removeBtn = assignmentId
-                        ? '<button class="small round border" onclick="App.modals.skillDetail.removeAssignment(\'' + assignmentId + '\')">解除<\/button>'
+                        ? '<button class="small round border" onclick="App.modals.skillDetail.removeAssignment(\'' + assignmentId + '\')">解除</button>'
                         : '';
 
                     return '' +
                         '<div class="row tiny-space padding">' +
-                        '<i>person<\/i>' +
+                        '<i>person</i>' +
                         '<div class="max">' +
-                        '<p class="no-margin bold small">' + escapeHtml(name) + '<\/p>' +
-                        '<div class="row tiny-space">' + levelSelect + '<\/div>' +
+                        '<p class="no-margin bold small">' + escapeHtml(name) + '</p>' +
+                        '<div class="row tiny-space">' + levelSelect + '</div>' +
                         '<div class="field border label small top-margin no-margin">' +
                         '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(remark) + '" onchange="App.modals.skillDetail.updateMemberRemark(\'' + escapeHtmlAttribute(assignmentId) + '\', this.value)">' +
                         '<label>備考</label>' +
-                        '<\/div>' +
-                        '<\/div>' +
-                        '<div class="row tiny-space">' + openBtn + removeBtn + '<\/div>' +
-                        '<\/div>';
+                        '</div>' +
+                        '</div>' +
+                        '<div class="row tiny-space">' + openBtn + removeBtn + '</div>' +
+                        '</div>';
                 }).join('<hr class="small-margin">');
             },
 
