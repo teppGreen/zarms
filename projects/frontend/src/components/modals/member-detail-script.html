@@ -674,34 +674,6 @@
                 }
             },
 
-            removeSkillAssignment: async function (assignmentId) {
-                if (!assignmentId) return;
-                if (!confirm('スキルを解除しますか？')) return;
-
-                const assignments = App.state.data.skillAssignments || [];
-                const targetIndex = assignments.findIndex(function (a) { return a.id === assignmentId; });
-                if (targetIndex === -1) return;
-
-                try {
-                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'remove', {
-                        where: { id: ['=', assignmentId] }
-                    }, 'スキルを解除');
-                    assignments.splice(targetIndex, 1);
-                    showSnackbar('スキルを解除しました', 'success');
-                } catch (err) {
-                    console.error('[MemberDetail] スキル解除エラー:', err);
-                    showSnackbar('解除に失敗しました', 'error');
-                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
-                        App.utils.modalFlow.refreshMembersDataInBackground(true);
-                    }
-                }
-
-                this._renderSkills(this.currentId);
-                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
-                    App.utils.modalFlow.refreshMembersDataInBackground(false);
-                }
-            },
-
             loadComments: function (memberId, skipLoadingCache = false) {
                 const commentsList = document.getElementById('member-comments-list');
                 if (commentsList) {
