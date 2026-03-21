@@ -292,46 +292,15 @@
        * @param {string} taskId - タスクID
        */
       loadComments: function (taskId, skipLoadingCache = false) {
-        const commentsList = document.getElementById('task-comments-list');
-        if (commentsList) {
-          commentsList.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
-        }
-
-        // コメントを非同期で取得
-        const query = {
-          where: {
-            related_table: ["=", "tasks"],
-            related_id: ["=", taskId]
-          },
-          orderBy: {
-            created_at: "desc"
-          }
-        };
-
-        // JOINなしで取得
-        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, skipLoadingCache)
-          .then(results => {
-            // モーダルが閉じられた、または別のタスクが開かれている場合は中断
-            if (this.currentId !== taskId) return;
-
-            const comments = results?.data || results || [];
-            this.renderComments(comments);
-
-            if (results?.isCached) {
-              callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, true)
-                .then(results => {
-                  if (this.currentId !== taskId) return;
-                  const refleshedComments = results?.data || results || [];
-                  this.renderComments(refleshedComments);
-                })
-            }
-          })
-          .catch(error => {
-            console.error('[TaskDetail] Error loading comments:', error);
-            if (this.currentId === taskId && commentsList) {
-              commentsList.innerHTML = '<p class="error-text padding">コメントの読み込みに失敗しました</p>';
-            }
-          });
+        App.utils.commentManager.loadComments({
+          relatedTable: 'tasks',
+          relatedId: taskId,
+          containerId: 'task-comments-list',
+          skipLoadingCache: skipLoadingCache,
+          isCurrent: () => this.currentId === taskId,
+          onRender: (comments) => this.renderComments(comments),
+          logPrefix: 'TaskDetail'
+        });
       },
 
       /**
@@ -880,79 +849,31 @@
        * @param {Array} comments - コメント配列（JOIN済み）
        */
       renderComments: function (comments) {
-        const container = document.getElementById('task-comments-list');
-        if (!container) return;
-
-        let html = '';
-
-        if (!comments || comments.length === 0) {
-          html += '<p>コメントはありません</p>';
-          container.innerHTML = html;
-          return;
-        }
-
-        const members = App.state.data.members || [];
-
-        html += comments.map((comment, index) => {
-          const creator = members.find(m => m.id === comment.created_by);
-          const creatorName = creator ? creator.display_name : (comment.creator_display_name || '不明'); // Fallback if still available somewhere
-          const creatorPhoto = creator ? creator.profile_photo_url : comment.creator_profile_photo_url;
-          const creatorSlackProfileUrl = creator ? creator.slack_profile_url : comment.creator_slack_profile_url;
-
-          const creatorIcon = creatorPhoto
-            ? `<img src="${creatorPhoto}" alt="${escapeHtml(creatorName)}" class="circle tiny">`
-            : '<i class="tiny">account_circle</i>';
-
-          const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
-          const hr = index > 0 ? '<hr class="max small-margin">' : '';
-
-          return `
-            ${hr}
-            <div class="small-padding">
-              <div class="row tiny-space">
-                <a href="${creatorSlackProfileUrl}" target="_blank">
-                ${creatorIcon}
-                </a>
-                <div class="max row tiny-space">
-                  <span class="bold small-text">${creatorName}</span>
-                  <span class="small-text secondary-text">${createdAt}</span>
-                </div>
-              </div>
-              <div class="tiny-space"></div>
-              <div class="">
-                <p class="small-text no-margin tiny-line">${escapeHtmlWithLineBreaks(comment.content)}</p>
-              </div>
-            </div>
-          `;
-        }).join('');
-
-        container.innerHTML = html;
+        App.utils.commentManager.renderComments({
+          containerId: 'task-comments-list',
+          comments: comments,
+          useLegacyCreatorFields: true,
+          escapeText: function (value) {
+            return escapeHtml(value || '');
+          },
+          escapeUrl: function (value) {
+            return value || '#';
+          }
+        });
       },
 
       // コメントを即座にUIに追加（Optimistic UI Update）
       appendCommentToUI: function (comment) {
-        const container = document.getElementById('task-comments-list');
-        if (!container) return;
-
-        const members = App.state.data.members || [];
-        const creator = members.find(m => m.id === comment.created_by);
-        const creatorName = creator ? creator.display_name : '不明';
-        const creatorPhoto = creator ? creator.profile_photo_url : '';
-        const creatorSlackProfileUrl = creator ? creator.slack_profile_url : '#';
-
-        const creatorIcon = creatorPhoto
-          ? `<img src="${creatorPhoto}" alt="${escapeHtml(creatorName)}" class="circle tiny">`
-          : '<i class="tiny">account_circle</i>';
-
-        const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
-
-        const newCommentHtml = `<div class="small-padding"><div class="row tiny-space"><a href="${creatorSlackProfileUrl}" target="_blank">${creatorIcon}</a><div class="max row tiny-space"><span class="bold small-text">${creatorName}</span><span class="small-text secondary-text">${createdAt}</span></div></div><div class="tiny-space"></div><div class=""><p class="small-text no-margin tiny-line">${escapeHtmlWithLineBreaks(comment.content)}</p></div></div>`;
-
-        if (container.innerHTML.indexOf('コメントはありません') >= 0) {
-          container.innerHTML = newCommentHtml;
-        } else {
-          container.innerHTML = newCommentHtml + '<hr class="max small-margin">' + container.innerHTML;
-        }
+        App.utils.commentManager.appendCommentToUI({
+          containerId: 'task-comments-list',
+          comment: comment,
+          escapeText: function (value) {
+            return escapeHtml(value || '');
+          },
+          escapeUrl: function (value) {
+            return value || '#';
+          }
+        });
       },
 
       /**

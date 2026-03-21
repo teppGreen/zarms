@@ -68,7 +68,7 @@
                         : '変更を破棄して閉じますか？';
                     if (!confirm(message)) return false;
                 }
-                appUi('modal-detail-member', false);
+                appUi('#modal-detail-member', false);
                 this._reset();
                 return true;
             },
@@ -77,7 +77,7 @@
                 if (this.isDirty) {
                     if (!confirm('変更を破棄しますか？')) return;
                 }
-                appUi('modal-detail-member', false);
+                appUi('#modal-detail-member', false);
                 this._reset();
             },
 
@@ -185,7 +185,7 @@
 
                 if (!hasChanges && !hasDirectoryChanges && !hasSkillChanges) {
                     this.isDirty = false;
-                    appUi('modal-detail-member', false);
+                    appUi('#modal-detail-member', false);
                     this._reset();
                     return;
                 }
@@ -195,7 +195,7 @@
                 if (memberInState) Object.assign(memberInState, updates);
 
                 this.isDirty = false;
-                appUi('modal-detail-member', false);
+                appUi('#modal-detail-member', false);
                 showSnackbar('変更を保存しています...', 'info', 'top', 0);
 
                 try {
@@ -681,118 +681,42 @@
             },
 
             loadComments: function (memberId, skipLoadingCache = false) {
-                const commentsList = document.getElementById('member-comments-list');
-                if (commentsList) {
-                    commentsList.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
-                }
-
-                const query = {
-                    where: {
-                        related_table: ['=', 'members'],
-                        related_id: ['=', memberId]
-                    },
-                    orderBy: {
-                        created_at: 'desc'
-                    }
-                };
-
-                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, skipLoadingCache)
-                    .then(results => {
-                        if (this.currentId !== memberId) return;
-
-                        const comments = results?.data || results || [];
-                        this.renderComments(comments);
-
-                        if (results?.isCached) {
-                            callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, true)
-                                .then(refreshedResults => {
-                                    if (this.currentId !== memberId) return;
-                                    const refreshedComments = refreshedResults?.data || refreshedResults || [];
-                                    this.renderComments(refreshedComments);
-                                });
-                        }
-                    })
-                    .catch(error => {
-                        console.error('[MemberDetail] コメント読み込みエラー:', error);
-                        if (this.currentId === memberId && commentsList) {
-                            commentsList.innerHTML = '<p class="error-text padding">コメントの読み込みに失敗しました</p>';
-                        }
-                    });
+                App.utils.commentManager.loadComments({
+                    relatedTable: 'members',
+                    relatedId: memberId,
+                    containerId: 'member-comments-list',
+                    skipLoadingCache: skipLoadingCache,
+                    isCurrent: () => this.currentId === memberId,
+                    onRender: (comments) => this.renderComments(comments),
+                    logPrefix: 'MemberDetail'
+                });
             },
 
             renderComments: function (comments) {
-                const container = document.getElementById('member-comments-list');
-                if (!container) return;
-
-                if (!comments || comments.length === 0) {
-                    container.innerHTML = '<p>コメントはありません</p>';
-                    return;
-                }
-
-                const members = App.state.data.members || [];
-
-                container.innerHTML = comments.map(function (comment, index) {
-                    const creator = members.find(function (m) { return m.id === comment.created_by; });
-                    const creatorName = creator ? creator.display_name : '不明';
-                    const creatorPhoto = creator ? creator.profile_photo_url : '';
-                    const creatorSlackProfileUrl = creator ? creator.slack_profile_url : '#';
-                    const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
-                    const hr = index > 0 ? '<hr class="max small-margin">' : '';
-
-                    const creatorIcon = creatorPhoto
-                        ? '<img src="' + creatorPhoto + '" alt="' + escapeHtml(creatorName) + '" class="circle tiny">'
-                        : '<i class="tiny">account_circle</i>';
-
-                    return '' +
-                        hr +
-                        '<div class="small-padding">' +
-                        '<div class="row tiny-space">' +
-                        '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '</a>' +
-                        '<div class="max row tiny-space">' +
-                        '<span class="bold small-text">' + escapeHtml(creatorName) + '</span>' +
-                        '<span class="small-text secondary-text">' + createdAt + '</span>' +
-                        '</div>' +
-                        '</div>' +
-                        '<div class="tiny-space"></div>' +
-                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '</p>' +
-                        '</div>';
-                }).join('');
+                App.utils.commentManager.renderComments({
+                    containerId: 'member-comments-list',
+                    comments: comments,
+                    escapeText: function (value) {
+                        return escapeHtml(value || '');
+                    },
+                    escapeUrl: function (value) {
+                        return escapeHtml(value || '#');
+                    }
+                });
             },
 
             // コメントを即座にUIに追加（Optimistic UI Update）
             appendCommentToUI: function (comment) {
-                const container = document.getElementById('member-comments-list');
-                if (!container) return;
-
-                const members = App.state.data.members || [];
-                const creator = members.find(function (m) { return m.id === comment.created_by; });
-                const creatorName = creator ? creator.display_name : '不明';
-                const creatorPhoto = creator ? creator.profile_photo_url : '';
-                const creatorSlackProfileUrl = creator ? creator.slack_profile_url : '#';
-                const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
-
-                const creatorIcon = creatorPhoto
-                    ? '<img src="' + creatorPhoto + '" alt="' + escapeHtml(creatorName) + '" class="circle tiny">'
-                    : '<i class="tiny">account_circle</i>';
-
-                const newCommentHtml = '<div class="small-padding">' +
-                    '<div class="row tiny-space">' +
-                    '<a href="' + escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '</a>' +
-                    '<div class="max row tiny-space">' +
-                    '<span class="bold small-text">' + escapeHtml(creatorName) + '</span>' +
-                    '<span class="small-text secondary-text">' + createdAt + '</span>' +
-                    '</div>' +
-                    '</div>' +
-                    '<div class="tiny-space"></div>' +
-                    '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '</p>' +
-                    '</div>';
-
-                // 既存のコメントがある場合は先頭に追加、無い場合は置き換え
-                if (container.innerHTML.indexOf('コメントはありません') >= 0) {
-                    container.innerHTML = newCommentHtml;
-                } else {
-                    container.innerHTML = newCommentHtml + '<hr class="max small-margin">' + container.innerHTML;
-                }
+                App.utils.commentManager.appendCommentToUI({
+                    containerId: 'member-comments-list',
+                    comment: comment,
+                    escapeText: function (value) {
+                        return escapeHtml(value || '');
+                    },
+                    escapeUrl: function (value) {
+                        return escapeHtml(value || '#');
+                    }
+                });
             },
 
             _render: function (member) {
