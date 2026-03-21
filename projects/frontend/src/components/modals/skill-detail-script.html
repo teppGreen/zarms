@@ -42,9 +42,12 @@
                 levelSelect.value = KEY_LABELS.SKILL_LEVEL[currentLevel] ? currentLevel : fallbackLevel;
             },
 
-            close: function (skipUrlUpdate, closeReason) {
-                if (this.isDirty) {
-                    const message = closeReason === 'escape'
+            close: function (options = {}) {
+                const skipDirtyCheck = options.skipDirtyCheck === true;
+                const reason = options.reason || 'user';
+
+                if (!skipDirtyCheck && this.isDirty) {
+                    const message = reason === 'escape'
                         ? '未保存の変更があります。変更を破棄して閉じますか？'
                         : '変更を破棄して閉じますか？';
                     const proceed = confirm(message);
@@ -539,7 +542,7 @@
                     if (!event || event.key !== 'Escape') return;
                     event.preventDefault();
                     event.stopPropagation();
-                    self.close(false, 'escape');
+                    self.close({ reason: 'escape' });
                 });
                 dialog.dataset.skillEscBound = '1';
             }

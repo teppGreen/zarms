@@ -3,7 +3,7 @@
         App.modals.directoryDetail = {
             currentId: null,
             isSaving: false,
-            hasDirtyInput: false,
+            isDirty: false,
 
             open: function (directoryId) {
                 if (!directoryId) return;
@@ -18,24 +18,29 @@
                 const directoryKey = directory.id || directory.directory_id;
                 this.currentId = directoryKey;
                 this.isSaving = false;
-                this.hasDirtyInput = false;
+                this.isDirty = false;
                 this._populateSelects(directoryKey);
                 this._render(directory);
                 this.loadComments(directoryKey);
-                appUi('modal-detail-directory', true);
+                appUi('#modal-detail-directory', true);
                 this._bindEscClose();
             },
 
-            close: function (skipUrlUpdate, closeReason) {
-                if (this.hasDirtyInput && !this.isSaving) {
-                    const message = '変更を破棄しますか？'
+            close: function (options = {}) {
+                const skipDirtyCheck = options.skipDirtyCheck === true;
+                const reason = options.reason || 'user';
+
+                if (!skipDirtyCheck && this.isDirty && !this.isSaving) {
+                    const message = reason === 'escape'
+                        ? '未保存の変更があります。変更を破棄して閉じますか？'
+                        : '変更を破棄しますか？';
                     const proceed = confirm(message);
                     if (!proceed) return false;
                 }
-                appUi('modal-detail-directory', false);
+                appUi('#modal-detail-directory', false);
                 this.currentId = null;
                 this.isSaving = false;
-                this.hasDirtyInput = false;
+                this.isDirty = false;
                 return true;
             },
 
@@ -108,7 +113,7 @@
 
                     this._setFooterStatus('保存が完了しました。画面を閉じます。');
                     showSnackbar('ディレクトリを更新しました', 'success');
-                    this.hasDirtyInput = false;
+                    this.isDirty = false;
                     this.close();
                 } catch (err) {
                     console.error('[directoryDetail] save failed', err);
@@ -493,7 +498,7 @@
                     const el = document.getElementById(id);
                     if (!el || el.dataset.directoryDetailBound === '1') return;
                     const handler = function () {
-                        self.hasDirtyInput = true;
+                        self.isDirty = true;
                         self._clearError();
                         self._setFooterStatus('変更があります。保存して反映してください');
                         self._updateValidationHint();
@@ -513,7 +518,7 @@
                         const normalized = self._normalizeSlackUrl(slackInput.value || '');
                         if (slackInput.value !== normalized) {
                             slackInput.value = normalized;
-                            self.hasDirtyInput = true;
+                            self.isDirty = true;
                             self._updateValidationHint();
                             self._updateSaveAvailability();
                             self._setFooterStatus(normalized ? 'Slack URLを自動整形しました。保存して反映してください' : 'Slack URL入力欄を空にしました');
@@ -528,7 +533,7 @@
                         const extracted = self._extractGoogleDriveFolderId(folderInput.value || '');
                         if (extracted && folderInput.value !== extracted) {
                             folderInput.value = extracted;
-                            self.hasDirtyInput = true;
+                            self.isDirty = true;
                             self._updateValidationHint();
                             self._updateSaveAvailability();
                             self._setFooterStatus('Google DriveフォルダIDを自動抽出しました。保存して反映してください');
@@ -556,7 +561,7 @@
                     hint.textContent = '同じ親組織配下に同名の組織があります';
                     return;
                 }
-                hint.textContent = this.hasDirtyInput ? '入力内容は有効です。保存できます' : '変更後に保存を押すと反映されます';
+                hint.textContent = this.isDirty ? '入力内容は有効です。保存できます' : '変更後に保存を押すと反映されます';
             },
 
             _updateSaveAvailability: function () {
@@ -572,7 +577,7 @@
                 const hasInvalidParent = !!(parentId && this.currentId && this._hasParentCycle(parentId, this.currentId));
                 const hasInvalidUrl = !!(slackUrl && !this._isValidSlackChannelUrl(slackUrl));
                 const hasDuplicate = !!(this.currentId && this._hasDuplicateSiblingName(name, parentId, this.currentId));
-                saveBtn.disabled = !this.hasDirtyInput || !name || hasInvalidParent || hasInvalidUrl || hasDuplicate;
+                saveBtn.disabled = !this.isDirty || !name || hasInvalidParent || hasInvalidUrl || hasDuplicate;
             },
 
             normalizeSlackUrl: function () {
@@ -581,7 +586,7 @@
                 if (!input) return;
                 const normalized = this._normalizeSlackUrl(input.value || '');
                 input.value = normalized;
-                this.hasDirtyInput = true;
+                this.isDirty = true;
                 this._clearError();
                 this._updateValidationHint();
                 this._updateSaveAvailability();
@@ -598,7 +603,7 @@
                     return;
                 }
                 input.value = extracted;
-                this.hasDirtyInput = true;
+                this.isDirty = true;
                 this._clearError();
                 this._updateValidationHint();
                 this._updateSaveAvailability();
@@ -660,7 +665,7 @@
                     if (!event || event.key !== 'Escape') return;
                     event.preventDefault();
                     event.stopPropagation();
-                    self.close(false, 'escape');
+                    self.close({ reason: 'escape' });
                 });
                 dialog.dataset.directoryEscBound = '1';
             },
