@@ -184,7 +184,7 @@
                 const updates = {
                     plan_number: (document.getElementById('plan-detail-plan-number-input')?.value || '').trim() || null,
                     zarms_code: (document.getElementById('plan-detail-zarms-code-input')?.value || '').trim() || null,
-                    parent_plan_number: (document.getElementById('plan-detail-parent-plan-number-input')?.value || '').trim() || null,
+                    parent_plan_id: (document.getElementById('plan-detail-parent-plan-id-input')?.value || '').trim() || null,
                     plan_type_sequence_number: (document.getElementById('plan-detail-plan-type-sequence-number-input')?.value || '').trim() || null,
                     name: name,
                     plan_status: (document.getElementById('plan-detail-status-input')?.value || '').trim() || null,
@@ -505,7 +505,7 @@
                 const mappings = [
                     ['plan-detail-plan-number-input', plan.plan_number || ''],
                     ['plan-detail-zarms-code-input', plan.zarms_code || ''],
-                    ['plan-detail-parent-plan-number-input', plan.parent_plan_number || ''],
+                    ['plan-detail-parent-plan-id-input', plan.parent_plan_id || ''],
                     ['plan-detail-plan-type-sequence-number-input', plan.plan_type_sequence_number || ''],
                     ['plan-detail-name-input', plan.name || ''],
                     ['plan-detail-status-input', plan.plan_status || 'SUBMITTED'],
@@ -603,7 +603,7 @@
                     const member = (App.state.data.members || []).find(function (item) {
                         return item.id === assignment.member_id;
                     });
-                    const memberName = member ? (member.display_name || member.name || '名称未設定') : '不明なメンバー';
+                    const memberName = member ? (member.display_name || member.name || '名称未設定') : '不明な人物';
                     const memberEmail = member ? (member.email || '') : '';
                     const role = App.modals.planDetail._escapeAttr(assignment.role || '');
                     const checked = assignment.is_active === false ? '' : 'checked';

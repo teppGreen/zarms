@@ -9,8 +9,6 @@
 
 /**
  * コメント通知用のデータを取得します
- * タスクに加えて、メンバー・組織・スキル・企画に紐づくコメントを集約して返します。
- *
  * @param {string} userId - 現在のユーザーID
  * @param {boolean} forceRefresh - キャッシュを無視して強制再取得するか
  * @returns {Object} { comments: Array, isCached: boolean }
@@ -127,9 +125,9 @@ function getCommentNavData(userId, forceRefresh = false) {
 
         const tableLabelMap = {
             tasks: 'タスク',
-            members: 'メンバー',
+            members: '人物',
             directories: '組織',
-            skills: 'スキル',
+            skills: '技能',
             plans: '企画'
         };
 

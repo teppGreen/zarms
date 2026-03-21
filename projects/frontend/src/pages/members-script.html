@@ -139,15 +139,15 @@
                 { key: 'type', label: '種別', type: 'selectDynamicDirectoryTypes' },
                 { key: 'parent', label: '親組織', type: 'text' },
                 { key: 'status', label: 'ステータス', type: 'select', options: [{ value: '', label: 'すべて' }, { value: '有効', label: '有効' }, { value: '無効', label: '無効' }] },
-                { key: 'memberCountMin', label: 'メンバー数（最小）', type: 'number' },
-                { key: 'memberCountMax', label: 'メンバー数（最大）', type: 'number' }
+                { key: 'memberCountMin', label: '所属者数（最小）', type: 'number' },
+                { key: 'memberCountMax', label: '所属者数（最大）', type: 'number' }
             ],
             skills: [
                 { key: 'title', label: 'タイトル', type: 'text' },
                 { key: 'type', label: '種別', type: 'text' },
                 { key: 'description', label: '説明', type: 'text' },
-                { key: 'memberCountMin', label: 'メンバー数（最小）', type: 'number' },
-                { key: 'memberCountMax', label: 'メンバー数（最大）', type: 'number' }
+                { key: 'memberCountMin', label: '保有者数（最小）', type: 'number' },
+                { key: 'memberCountMax', label: '保有者数（最大）', type: 'number' }
             ],
             plans: [
                 { key: 'planNumber', label: '企画番号', type: 'text' },
@@ -160,7 +160,7 @@
         };
         const _tableConfig = {
             member: {
-                emptyText: 'メンバーが見つかりません。条件を見直すか、絞り込みを解除してください',
+                emptyText: '人物が見つかりません。条件を見直すか、絞り込みを解除してください',
                 columns: [
                     { key: 'display_name', label: '表示名', width: '190px', formatterKey: 'memberNameLink' },
                     { key: 'name', label: '氏名', width: '150px' },
@@ -178,22 +178,22 @@
                 ]
             },
             directory: {
-                emptyText: 'ディレクトリが見つかりません。条件を見直すか、絞り込みを解除してください',
+                emptyText: '組織が見つかりません。条件を見直すか、絞り込みを解除してください',
                 columns: [
                     { key: 'name', label: '組織名', width: '180px' },
                     { key: '_typeText', label: '種別', width: '130px', headerFilter: 'listDirectoryTypes' },
                     { key: '_parentName', label: '親組織', width: '180px' },
-                    { key: '_memberCount', label: 'メンバー数', width: '110px', type: 'number', align: 'right' },
+                    { key: '_memberCount', label: '所属者数', width: '110px', type: 'number', align: 'right' },
                     { key: '_statusText', label: 'ステータス', width: '110px', align: 'center', headerFilter: 'listDirectoryStatus' }
                 ]
             },
             skills: {
-                emptyText: 'スキルが見つかりません。条件を見直すか、絞り込みを解除してください',
+                emptyText: '技能が見つかりません。条件を見直すか、絞り込みを解除してください',
                 columns: [
                     { key: 'title', label: 'タイトル', width: '180px' },
                     { key: 'skill_type_key', label: '種別', width: '140px', headerFilter: 'listDynamicSkillTypes' },
                     { key: 'description', label: '説明', width: '260px', wrap: true },
-                    { key: '_memberCount', label: 'メンバー数', width: '110px', type: 'number', align: 'right' }
+                    { key: '_memberCount', label: '保有者数', width: '110px', type: 'number', align: 'right' }
                 ]
             },
             plans: {
@@ -453,11 +453,11 @@
             },
 
             _getTabLabel: function (tabName) {
-                if (tabName === 'member') return 'メンバー';
-                if (tabName === 'directory') return 'ディレクトリ';
-                if (tabName === 'skills') return 'スキル';
+                if (tabName === 'member') return '人物';
+                if (tabName === 'directory') return '組織';
+                if (tabName === 'skills') return '技能';
                 if (tabName === 'plans') return '企画';
-                return 'メンバー';
+                return '人物';
             },
 
             _showLoading: function (show, tab) {
@@ -1286,21 +1286,10 @@
 
             _updateSummary: function () {
                 const countElement = document.getElementById('members-summary-count');
-                const actionElement = document.getElementById('members-summary-action');
-                const addLabelElement = document.getElementById('members-create-action-label');
                 if (countElement) {
                     const rows = _tableData[_currentTab] || [];
                     const count = this._countRows(rows);
                     countElement.textContent = String(count);
-                }
-                if (actionElement) {
-                    if (_currentTab === 'member') actionElement.textContent = '行の「開く」でメンバー詳細';
-                    else if (_currentTab === 'directory') actionElement.textContent = '行の「開く」でディレクトリ詳細';
-                    else if (_currentTab === 'skills') actionElement.textContent = '行の「開く」でスキル詳細';
-                    else actionElement.textContent = '行の「開く」で企画詳細';
-                }
-                if (addLabelElement) {
-                    addLabelElement.textContent = this._getTabLabel(_currentTab) + 'を追加';
                 }
             },
 
