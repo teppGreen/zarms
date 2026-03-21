@@ -738,7 +738,7 @@
         return;
       }
       const modal = document.getElementById('modal-shortcuts-help');
-      if (modal) appUi('#modal-shortcuts-help', true);
+      if (modal) appUi('modal-shortcuts-help', true);
     };
 
     document.addEventListener('keydown', (e) => {
@@ -1018,7 +1018,7 @@
         return Promise.resolve(modalUtils.getModalElement(modalId));
       }
     }
-
+    
     if (typeof window.ui === 'function') {
       return window.ui(target, forceState);
     }
@@ -1452,7 +1452,7 @@
       if (App.utils.modal && typeof App.utils.modal.close === 'function') {
         App.utils.modal.close(modalId);
       } else if (typeof appUi === 'function') {
-        appUi(`#${modalId}`, false);
+        appUi(modalId, false);
       } else {
         targetModal.classList.remove('active');
         targetModal.removeAttribute('open');
@@ -2232,7 +2232,7 @@
       closeAllModals: async function () {
         const modals = document.querySelectorAll('dialog[open]');
         for (const modal of modals) {
-          await appUi(`#${modal.id}`);
+          await appUi(modal.id, false);
         }
         console.log('[App.test] All modals closed');
       }
