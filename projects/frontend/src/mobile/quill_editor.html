@@ -21,6 +21,47 @@
     App.modals.mobileQuillEditor = {
       quillInstance: null,
       originalContent: '',
+      allowedFormats: ['bold', 'italic', 'underline', 'strike', 'list', 'link'],
+
+      sanitizeContentHtml: function (html) {
+        if (!html) return '';
+        const container = document.createElement('div');
+        container.innerHTML = String(html);
+
+        container.querySelectorAll('*').forEach(function (element) {
+          element.removeAttribute('color');
+          element.removeAttribute('bgcolor');
+
+          if (element.hasAttribute('style')) {
+            const retained = element.getAttribute('style').split(';').map(function (item) {
+              return item.trim();
+            }).filter(function (decl) {
+              if (!decl) return false;
+              const pair = decl.split(':');
+              const prop = (pair[0] || '').trim().toLowerCase();
+              return prop !== 'color' && prop !== 'background' && prop !== 'background-color';
+            });
+            if (retained.length) {
+              element.setAttribute('style', retained.join('; '));
+            } else {
+              element.removeAttribute('style');
+            }
+          }
+
+          if (element.className && typeof element.className === 'string') {
+            const classes = element.className.split(/\s+/).filter(function (className) {
+              return className && !/^ql-(color|bg)-/.test(className);
+            });
+            if (classes.length) {
+              element.className = classes.join(' ');
+            } else {
+              element.removeAttribute('class');
+            }
+          }
+        });
+
+        return container.innerHTML;
+      },
 
       /**
        * Quillエディタモーダルを開く
@@ -61,7 +102,20 @@
         this.quillInstance = new Quill('#mobile-quill-editor', {
           theme: 'bubble',
           placeholder: 'タスクの説明を入力してください...',
+          formats: this.allowedFormats.slice(),
           modules: {
+            clipboard: {
+              matchers: [
+                [Node.ELEMENT_NODE, function (node, delta) {
+                  (delta.ops || []).forEach(function (op) {
+                    if (!op || !op.attributes) return;
+                    delete op.attributes.color;
+                    delete op.attributes.background;
+                  });
+                  return delta;
+                }]
+              ]
+            },
             toolbar: [
               ['bold', 'italic', 'underline', 'strike'],
               [{ 'list': 'ordered' }, { 'list': 'bullet' }],
@@ -72,7 +126,7 @@
 
         // コンテンツを設定
         if (this.originalContent) {
-          this.quillInstance.root.innerHTML = this.originalContent;
+          this.quillInstance.root.innerHTML = this.sanitizeContentHtml(this.originalContent);
         }
 
         console.log('[MobileQuillEditor] Quill initialized');
@@ -88,7 +142,7 @@
         }
 
         // HTMLコンテンツを取得
-        const newContent = this.quillInstance.root.innerHTML;
+        const newContent = this.sanitizeContentHtml(this.quillInstance.root.innerHTML);
 
         // タスク詳細の description を更新
         if (App.modals.mobileTaskDetail.currentTask) {
