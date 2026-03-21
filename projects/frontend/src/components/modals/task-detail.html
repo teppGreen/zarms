@@ -59,12 +59,7 @@
           <div class="s6">
             <div class="prefix field label border small">
               <i id="task-status-icon" class="tiny circle"></i>
-              <select id="task-status-select" class="transparent">
-                <option value="TODO">未着手</option>
-                <option value="IN_PROGRESS">進行中</option>
-                <option value="IN_REVIEW">確認中</option>
-                <option value="DONE">完了</option>
-              </select>
+              <select id="task-status-select" class="transparent"></select>
               <label>ステータス</label>
             </div>
           </div>
@@ -179,16 +174,20 @@
       <div class="s12 m6 small-round background padding">
         <nav class="center-align max tiny-space  bottom-margin">
           <nav class="tabbed small max" id="task-detail-tabs">
-            <a class="active" onclick="App.modals.taskDetail.switchTaskDetailTab(this,'description')">
+            <a data-ui="#task-detail-description">
               <span>説明</span>
             </a>
-            <a onclick="App.modals.taskDetail.switchTaskDetailTab(this,'list')">
+            <a data-ui="#task-detail-list">
               <span>リスト</span>
               <div class="badge l font-number none primary" id="task-list-badge" style="display: none;">0</div>
             </a>
-            <a onclick="App.modals.taskDetail.switchTaskDetailTab(this,'related')">
+            <a data-ui="#task-detail-related">
               <span>関連</span>
               <div class="badge l font-number none primary" id="task-related-badge" style="display: none;">0</div>
+            </a>
+            <a data-ui="#task-detail-history">
+              <span>更新</span>
+              <div class="badge l font-number none secondary" id="task-history-badge" style="display: none;">0</div>
             </a>
           </nav>
 
@@ -223,6 +222,14 @@
             <div id="child-tasks-container">
             </div>
           </fieldset>
+        </div>
+        <div class="page medium-height scroll" id="task-detail-history">
+          <div id="task-history-list">
+            <div class="small-padding center row small-space">
+              <progress class="circle indeterminate small"></progress>
+              <span class="small-text">読み込み中</span>
+            </div>
+          </div>
         </div>
       </div>
 

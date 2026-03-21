@@ -625,7 +625,7 @@ function bulkInsert(userId, sheetName, records) {
         // キャッシュの無効化
         invalidateTableCache(sheetName);
 
-        return { success: true, updatedRange: response.updates.updatedRange };
+        return { success: true, updatedRange: response.updates.updatedRange, data: preparedData };
     } finally {
         lock.releaseLock();
     }
@@ -993,7 +993,7 @@ function handleDatabaseProcess(userId, tableName, operation, dataObject, remark,
 
                 case 'bulkinsert':
                     result = bulkInsert(userId, tableName, dataObject);
-                    createLog(userId, tableName, dataObject, operation, remark);
+                    createBulkInsertLogs(userId, tableName, result?.data, remark);
                     invalidateTableCache(tableName);
                     break;
 
@@ -1248,11 +1248,39 @@ function prepareUpdateData(userId, sheetName, dataObject) {
  */
 function createLog(userId, tableName, dataObject, operation, remark) {
     try {
+        const resolveRecordId = (payload) => {
+            if (!payload) return ``;
+
+            if (Array.isArray(payload)) {
+                if (payload.length === 1 && payload[0] && typeof payload[0].id === 'string') {
+                    return payload[0].id;
+                }
+                return ``;
+            }
+
+            if (typeof payload.id === 'string' && payload.id) {
+                return payload.id;
+            }
+
+            const whereId = payload?.where?.id;
+            if (Array.isArray(whereId) && whereId.length >= 2) {
+                const operator = String(whereId[0] || ``).toLowerCase();
+                const value = whereId[1];
+                if ((operator === '=' || operator === '==') && typeof value === 'string') {
+                    return value;
+                }
+            } else if (typeof whereId === 'string' && whereId) {
+                return whereId;
+            }
+
+            return ``;
+        };
+
         const logData = {
             id: generateUuid(),
             operation_type_key: operation.toUpperCase(),
             table_name: tableName,
-            record_id: dataObject.id || ``,
+            record_id: resolveRecordId(dataObject),
             data: JSON.stringify(dataObject),
             remark: remark || ``,
             created_by: userId,
@@ -1264,6 +1292,23 @@ function createLog(userId, tableName, dataObject, operation, remark) {
         console.error('[createLog] Failed to create log:', error);
         // ログ記録の失敗は主処理には影響させない
     }
+}
+
+/**
+ * 一括挿入のログをレコード単位で作成します
+ * @param {string} userId - ユーザーID
+ * @param {string} tableName - テーブル名
+ * @param {Array<Object>} records - 挿入レコード配列
+ * @param {string|null} remark - 備考
+ */
+function createBulkInsertLogs(userId, tableName, records, remark) {
+    if (!Array.isArray(records) || records.length === 0) {
+        return;
+    }
+
+    records.forEach(record => {
+        createLog(userId, tableName, record, 'insert', remark);
+    });
 }
 
 /**

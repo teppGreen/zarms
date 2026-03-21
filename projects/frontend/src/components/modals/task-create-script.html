@@ -34,7 +34,7 @@
                 if (nameInput) nameInput.value = '';
 
                 // モーダルを表示
-                ui('#modal-new-task', true);
+                appUi('#modal-new-task', true);
 
                 // 通常タブの場合、inputにフォーカス
                 if (tab === 'simple') {
@@ -51,16 +51,16 @@
                 // プレビューモーダルが開いている場合は先に閉じる
                 const previewModal = document.getElementById('modal-new-task-preview');
                 if (previewModal && (previewModal.classList.contains('active') || previewModal.hasAttribute('open'))) {
-                    ui('#modal-new-task-preview', false);
+                    appUi('#modal-new-task-preview', false);
                 }
-                ui('#modal-new-task', false);
+                appUi('#modal-new-task', false);
             },
 
             /**
              * プレビューモーダルを閉じる（modal-new-taskは開いたまま）
              */
             closePreview: function () {
-                ui('#modal-new-task-preview', false);
+                appUi('#modal-new-task-preview', false);
             },
 
             /**
@@ -256,7 +256,7 @@
              * アシスタントのプレビューモーダルを開く
              */
             showAssistantPreview: function () {
-                ui('#modal-new-task-preview', true);
+                appUi('#modal-new-task-preview', true);
             },
 
             /**
@@ -490,6 +490,8 @@
                     return;
                 }
 
+                App.modals.newTask.close();
+
                 try {
                     showSnackbar('タスクを作成中です...');
                     const btn = document.getElementById('new-task-create-btn');
@@ -513,7 +515,6 @@
 
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'bulkinsert', tasksToCreate);
 
-                    App.modals.newTask.close();
                     showSnackbar(`${tasksToCreate.length}件のタスクを作成しました`, 'success');
                     await App.utils.navigation.switchTab('board-' + boardId, false, true);
                 } catch (error) {
