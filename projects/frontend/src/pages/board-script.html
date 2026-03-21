@@ -207,7 +207,7 @@
                             <span>デフォルトのフィルタ</span>
                             <div class="tooltip bottom">自分が担当者のタスクのみ表示</div>
                         </a>
-                        <button class="circle transparent" onclick="if(App.modals.filterTask){ App.modals.filterTask.syncUI(); } ui('#modal-filter-task')">
+                        <button class="circle transparent" onclick="if(App.modals.filterTask){ App.modals.filterTask.syncUI(); } appUi('#modal-filter-task')">
                             <i>filter_list</i>
                             <div class="tooltip bottom">フィルタ</div>
                         </button>
@@ -1488,7 +1488,7 @@
                     <dialog id="modal-board-settings-${boardId}" class="modal medium-width padding">
                         <nav class="small-padding bottom-margin">
                             <h5 class="max bold">ボード設定</h5>
-                            <button class="circle transparent" onclick="ui('#modal-board-settings-${boardId}')">
+                            <button class="circle transparent" onclick="appUi('#modal-board-settings-${boardId}')">
                                 <i>close</i>
                             </button>
                         </nav>
@@ -1503,7 +1503,7 @@
                             </div>
                         </div>
                         <nav class="right-align small-padding">
-                            <button class="border" onclick="ui('#modal-board-settings-${boardId}')">
+                            <button class="border" onclick="appUi('#modal-board-settings-${boardId}')">
                                 <span>キャンセル</span>
                             </button>
                             <button onclick="App.pages.boards.saveBoardSettings('${boardId}')">
@@ -1517,7 +1517,7 @@
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
 
                 // モーダルを開く
-                ui(`#modal-board-settings-${boardId}`);
+                appUi(`#modal-board-settings-${boardId}`);
             },
 
             /**
@@ -1544,7 +1544,7 @@
 
                 // 変更がない場合は閉じるだけ
                 if (oldName === newName && oldDescription === newDescription) {
-                    ui(`#modal-board-settings-${boardId}`);
+                    appUi(`#modal-board-settings-${boardId}`);
                     return;
                 }
 
@@ -1567,7 +1567,7 @@
                 }
 
                 // モーダルを閉じる
-                ui(`#modal-board-settings-${boardId}`);
+                appUi(`#modal-board-settings-${boardId}`);
 
                 try {
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'update', {

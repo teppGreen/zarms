@@ -18,6 +18,8 @@
       addedChildTaskIds: [], // 追加された子タスクIDの配列（変更検知用）
       deletedChildTaskIds: [], // 削除された子タスクIDの配列
       pendingComments: [], // モーダル内で作成された保存待ちコメント
+      currentHistoryLogs: [], // 履歴タブの表示対象ログ
+      historyLoadError: null, // 履歴ロードエラー
 
       applyAssigneeLabels: function () {
         const roleLabels = {
@@ -33,6 +35,23 @@
           if (element) {
             element.textContent = roleLabels[id];
           }
+        });
+      },
+
+      applyStatusSelectOptions: function () {
+        const statusSelect = document.getElementById('task-status-select');
+        if (!statusSelect) return;
+
+        // optionを全削除
+        statusSelect.innerHTML = '';
+
+        // KEY_LABELS.TASK_STATUSからoption要素を生成
+        const statusKeys = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
+        statusKeys.forEach(key => {
+          const option = document.createElement('option');
+          option.value = key;
+          option.textContent = KEY_LABELS.TASK_STATUS[key] || '';
+          statusSelect.appendChild(option);
         });
       },
 
@@ -195,9 +214,10 @@
         this.currentItem = task;
         this.originalData = { ...task }; // 元のデータを保存
         this.applyAssigneeLabels();
+        this.applyStatusSelectOptions();
 
         // モーダルを先に開く（BeerCSSのlabelスタイルが正しく適用されるように）
-        ui('#modal-detail-task', true);
+        appUi('#modal-detail-task', true);
 
         // Quillの初期化（初回のみ）
         if (!this.quill) {
@@ -208,6 +228,7 @@
 
         this.render(task);
         this.bindChangeListeners();
+        this.switchTaskDetailTab(null, 'description');
 
         // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
         if (!skipUrlUpdate && App.utils.url && App.utils.url.updateParams) {
@@ -242,9 +263,20 @@
 
         this.loadLists(taskId);
         this.loadRelatedTasks(taskId);
+        this.loadHistoryLogs(taskId);
 
         // defaultDirtyは互換目的で受け取るが、保存必要判定は常に差分計算を使用する
         this.syncDirtyState('open');
+      },
+
+      switchTaskDetailTab: function (clickedNav, tabId) {
+        ui(`#task-detail-${tabId}`);
+        if (clickedNav) {
+          clickedNav.parentNode.querySelectorAll('a').forEach(a => {
+            a.classList.remove('active');
+          });
+          clickedNav.classList.add('active');
+        }
       },
 
       /**
@@ -783,6 +815,8 @@
         this.addedChildTaskIds = [];
         this.deletedChildTaskIds = [];
         this.pendingComments = [];
+        this.currentHistoryLogs = [];
+        this.historyLoadError = null;
 
         // 入力フィールドをクリア
         const fields = [
@@ -819,12 +853,16 @@
         // コメントリストをクリア
         const commentsList = document.getElementById('task-comments-list');
         if (commentsList) commentsList.innerHTML = '';
+        const historyList = document.getElementById('task-history-list');
+        if (historyList) historyList.innerHTML = '';
 
         const taskDetailTabBadge = document.querySelectorAll(`#task-detail-tabs > a > div.badge`);
         taskDetailTabBadge.forEach(badge => {
           badge.textContent = '0';
           badge.style.display = 'none';
         });
+
+        this.switchTaskDetailTab(null, 'description');
 
         this.updateActionButtons();
       },
@@ -2090,6 +2128,225 @@
         badge.textContent = count;
 
         count > 0 ? badge.style.display = '' : badge.style.display = 'none';
+      },
+
+      /**
+       * 履歴ログを読み込む（常にキャッシュ無効）
+       * @param {string} taskId - タスクID
+       */
+      loadHistoryLogs: function (taskId) {
+        const historyContainer = document.getElementById('task-history-list');
+        if (historyContainer) {
+          historyContainer.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
+        }
+
+        this.historyLoadError = null;
+        this.currentHistoryLogs = [];
+        this.updateHistoryBadge();
+
+        const query = {
+          where: {
+            table_name: ['=', 'tasks'],
+            operation_type_key: ['=', 'UPDATE']
+          },
+          orderBy: {
+            created_at: 'desc'
+          },
+          limit: 300
+        };
+
+        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LOGS, 'select', query, null, true)
+          .then(result => {
+            if (this.currentId !== taskId) return;
+
+            const logs = result?.data || result || [];
+            this.currentHistoryLogs = logs.filter(log => this.isTaskHistoryLog(log, taskId));
+            this.historyLoadError = null;
+            this.renderHistoryLogs();
+            this.updateHistoryBadge();
+          })
+          .catch(error => {
+            if (this.currentId !== taskId) return;
+            this.historyLoadError = error;
+            console.error('[TaskDetail] Error loading history logs:', error);
+            this.renderHistoryLogs();
+            this.updateHistoryBadge();
+          });
+      },
+
+      /**
+       * ログdataのJSONから対象taskIdを推定
+       * @param {Object|string|null} logData - log.data
+       * @returns {string}
+       */
+      extractTaskIdFromLogData: function (logData) {
+        let parsed = logData;
+        if (typeof parsed === 'string') {
+          try {
+            parsed = JSON.parse(parsed);
+          } catch (e) {
+            return '';
+          }
+        }
+
+        if (!parsed) return '';
+
+        if (Array.isArray(parsed)) {
+          if (parsed.length === 1 && parsed[0] && typeof parsed[0].id === 'string') {
+            return parsed[0].id;
+          }
+          return '';
+        }
+
+        if (typeof parsed.id === 'string') {
+          return parsed.id;
+        }
+
+        const whereId = parsed?.where?.id;
+        if (Array.isArray(whereId) && whereId.length >= 2) {
+          const operator = String(whereId[0] || '').toLowerCase();
+          const value = whereId[1];
+          if ((operator === '=' || operator === '==') && typeof value === 'string') {
+            return value;
+          }
+        } else if (typeof whereId === 'string') {
+          return whereId;
+        }
+
+        return '';
+      },
+
+      /**
+       * 対象タスクの履歴ログかどうか判定
+       * @param {Object} log - logsレコード
+       * @param {string} taskId - タスクID
+       * @returns {boolean}
+       */
+      isTaskHistoryLog: function (log, taskId) {
+        if (!log || log.table_name !== 'tasks') return false;
+        if (!taskId) return false;
+
+        if (log.record_id && log.record_id === taskId) {
+          return true;
+        }
+
+        const inferredTaskId = this.extractTaskIdFromLogData(log.data);
+        return inferredTaskId === taskId;
+      },
+
+      /**
+       * 履歴1件の要約文を生成
+       * @param {Object} log - logsレコード
+       * @returns {string}
+       */
+      getHistorySummary: function (log) {
+        const operation = (log?.operation_type_key || '').toUpperCase();
+
+        if (operation === 'INSERT') {
+          return 'タスクを作成';
+        }
+
+        if (operation === 'REMOVE') {
+          return 'タスクを削除';
+        }
+
+        let payload = log?.data;
+        if (typeof payload === 'string') {
+          try {
+            payload = JSON.parse(payload);
+          } catch (e) {
+            payload = null;
+          }
+        }
+
+        if (operation === 'UPDATE') {
+          const updatedFields = Object.keys(payload?.set || {});
+          if (updatedFields.length === 0) return 'タスクを更新';
+
+          const labels = {
+            name: 'タスク名',
+            description: '説明',
+            task_status_key: 'ステータス',
+            priority_key: '優先度',
+            processed_by: '進行者',
+            reviewed_by: '確認者',
+            received_by: '受領者',
+            starts_at: '開始日時',
+            ends_at: '終了日時',
+            board_id: 'ボード'
+          };
+
+          const fieldLabels = updatedFields.map(field => labels[field] || field);
+          return `更新: ${fieldLabels.join(' / ')}`;
+        }
+
+        if (operation === 'BULKINSERT') {
+          return '複数レコードを作成';
+        }
+
+        return '操作を実行';
+      },
+
+      /**
+       * 履歴ログを描画
+       */
+      renderHistoryLogs: function () {
+        const container = document.getElementById('task-history-list');
+        if (!container) return;
+
+        if (this.historyLoadError) {
+          container.innerHTML = '<p class="error-text small-padding">履歴の読み込みに失敗しました</p>';
+          return;
+        }
+
+        if (!this.currentHistoryLogs || this.currentHistoryLogs.length === 0) {
+          container.innerHTML = '<p class="secondary-text small-padding">履歴はありません</p>';
+          return;
+        }
+
+        const members = App.state.data.members || [];
+        container.innerHTML = this.currentHistoryLogs.map((log, index) => {
+          const creator = members.find(member => member.id === log.created_by);
+          const creatorName = creator ? (creator.display_name || creator.name || '不明') : '不明';
+          const createdAt = formatDateTimeForDisplay(log.created_at, 'MM/dd HH:mm');
+          const summary = this.getHistorySummary(log);
+          const operation = (log.operation_type_key || '').toUpperCase();
+
+          const operationLabelMap = {
+            INSERT: '作成',
+            UPDATE: '更新',
+            REMOVE: '削除',
+            BULKINSERT: '一括作成'
+          };
+          const operationLabel = operationLabelMap[operation] || operation;
+
+          const separator = index > 0 ? '<hr class="max small-margin">' : '';
+
+          return `
+            ${separator}
+            <article class="small-padding">
+              <div class="row middle-align tiny-space">
+                <span class="chip small">${escapeHtml(operationLabel)}</span>
+                <div class="max"></div>
+                <span class="small-text secondary-text">${escapeHtml(createdAt)}</span>
+              </div>
+              <p class="small-text no-margin top-margin">${escapeHtml(summary)}</p>
+              <p class="small-text secondary-text no-margin top-margin">実行者: ${escapeHtml(creatorName)}</p>
+            </article>
+          `;
+        }).join('');
+      },
+
+      /**
+       * 履歴タブのバッジを更新
+       */
+      updateHistoryBadge: function () {
+        const badge = document.getElementById('task-history-badge');
+        if (!badge) return;
+
+        const count = (this.currentHistoryLogs || []).length;
+        badge.textContent = count;
+        badge.style.display = count > 0 ? '' : 'none';
       }
     };
   })();
