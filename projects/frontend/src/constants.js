@@ -7,6 +7,7 @@ const scriptProperties = PropertiesService.getScriptProperties();
 const TABLE_NAMES = {
   LOGS: 'logs',
   BOARDS: 'boards',
+  NOTICES: 'notices',
   COMMENTS: 'comments',
   DIRECTORIES: 'directories',
   APPS: 'apps',

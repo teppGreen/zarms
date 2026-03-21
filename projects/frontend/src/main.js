@@ -137,6 +137,24 @@ function _prefetchInitialData(userId, useApiMode = false) {
       forceRefresh: false
     },
     {
+      key: 'notices',
+      tableName: TABLE_NAMES.NOTICES,
+      operation: 'select',
+      dataObject: {
+        orderBy: { starts_at: 'desc' }
+      },
+      forceRefresh: false
+    },
+    {
+      key: 'links',
+      tableName: TABLE_NAMES.LINKS,
+      operation: 'select',
+      dataObject: {
+        orderBy: { label: 'asc' }
+      },
+      forceRefresh: false
+    },
+    {
       key: 'members',
       tableName: TABLE_NAMES.MEMBERS,
       operation: 'select',
@@ -198,6 +216,8 @@ function _prefetchInitialData(userId, useApiMode = false) {
   return {
     boards: (r.boards?.data || r.boards || []),
     apps: (r.apps?.data || r.apps || []),
+    notices: (r.notices?.data || r.notices || []),
+    links: (r.links?.data || r.links || []),
     members: (r.members?.data || r.members || []),
     directories: (r.directories?.data || r.directories || []),
     directoryAssignments: (r.directoryAssignments?.data || r.directoryAssignments || []),

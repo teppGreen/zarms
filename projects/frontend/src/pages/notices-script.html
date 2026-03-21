@@ -1,0 +1,344 @@
+<script>
+    (function () {
+        App.pages.notices = {
+            currentNotices: [],
+            currentLinks: [],
+            isLoading: false,
+            isSaving: false,
+
+            loadData: async function (forceRefresh = false) {
+                this.isLoading = true;
+                this.setLoadingState();
+
+                try {
+                    const [noticesRes, linksRes] = await Promise.all([
+                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.NOTICES, 'select', {
+                            orderBy: { starts_at: 'desc' }
+                        }, null, forceRefresh),
+                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LINKS, 'select', {
+                            orderBy: { label: 'asc' }
+                        }, null, forceRefresh)
+                    ]);
+
+                    const notices = noticesRes?.data || noticesRes || [];
+                    const links = linksRes?.data || linksRes || [];
+
+                    this.currentNotices = this.filterActiveNotices(notices);
+                    this.currentLinks = links;
+                    App.state.data.notices = notices;
+                    App.state.data.links = links;
+
+                    this.renderNotices();
+                    this.renderLinksEditor();
+                } catch (error) {
+                    console.error('[Notices] loadData failed:', error);
+                    this.showError('notices-list', 'お知らせの読み込みに失敗しました');
+                    this.showError('notices-links-editor', 'リンクの読み込みに失敗しました');
+                } finally {
+                    this.isLoading = false;
+                    this.updateActionState();
+                }
+            },
+
+            filterActiveNotices: function (records) {
+                const now = Date.now();
+                return (records || []).filter(function (notice) {
+                    if (!notice || !notice.starts_at || !notice.ends_at) return false;
+                    const startsAt = new Date(notice.starts_at).getTime();
+                    const endsAt = new Date(notice.ends_at).getTime();
+                    if (!Number.isFinite(startsAt) || !Number.isFinite(endsAt)) return false;
+                    return startsAt <= now && now < endsAt;
+                });
+            },
+
+            setLoadingState: function () {
+                const notices = document.getElementById('notices-list');
+                const links = document.getElementById('notices-links-editor');
+                if (notices) {
+                    notices.classList.add('shimmer-loading');
+                    notices.innerHTML = '';
+                }
+                if (links) {
+                    links.classList.add('shimmer-loading');
+                    links.innerHTML = '';
+                }
+                this.updateActionState();
+            },
+
+            showError: function (elementId, message) {
+                const el = document.getElementById(elementId);
+                if (!el) return;
+                el.classList.remove('shimmer-loading');
+                el.innerHTML = '<div class="padding error-text center-align"><i>error</i><p>' + escapeHtml(message) + '</p></div>';
+            },
+
+            updateActionState: function () {
+                const reloadButton = document.getElementById('notices-reload-button');
+                if (reloadButton) reloadButton.disabled = this.isLoading || this.isSaving;
+            },
+
+            renderNotices: function () {
+                const container = document.getElementById('notices-list');
+                if (!container) return;
+                container.classList.remove('shimmer-loading');
+
+                if (!this.currentNotices.length) {
+                    container.innerHTML = '<div class="padding center-align secondary-text">現在表示中のお知らせはありません</div>';
+                    return;
+                }
+
+                const members = App.state.data.members || [];
+                const memberMap = new Map(members.map(function (member) {
+                    return [member.id, member];
+                }));
+
+                const listHtml = this.currentNotices.map(function (notice) {
+                    const member = memberMap.get(notice.created_by);
+                    const displayName = member ? (member.display_name || member.name) : '不明';
+                    const avatar = member && member.profile_photo_url
+                        ? '<i class="small circle"><img src="' + escapeHtml(member.profile_photo_url) + '" class="responsive"></i>'
+                        : '<i class="small">account_circle</i>';
+
+                    const bodyText = App.pages.notices.toPlainText(notice.body || '');
+                    const clippedBody = bodyText.length > 120 ? bodyText.slice(0, 120) + '...' : bodyText;
+                    const category = notice.category ? escapeHtml(notice.category) : '未分類';
+
+                    return '' +
+                        '<li class="row top-margin small-space">' +
+                        '  <article class="border small-round padding">' +
+                        '    <div class="row middle-align tiny-space">' +
+                        '      <span class="chip small border">' + category + '</span>' +
+                        '      <div class="max"></div>' +
+                        '      <span class="small-text secondary-text row tiny-space middle-align">' + avatar + escapeHtml(displayName) + '</span>' +
+                        '    </div>' +
+                        '    <h6 class="small bold top-margin">' + escapeHtml(notice.title || '') + '</h6>' +
+                        '    <p class="small-text no-margin secondary-text">' + escapeHtml(clippedBody) + '</p>' +
+                        '  </article>' +
+                        '</li>';
+                }).join('');
+
+                container.innerHTML = '<ul class="no-margin no-padding">' + listHtml + '</ul>';
+            },
+
+            renderLinksEditor: function () {
+                const container = document.getElementById('notices-links-editor');
+                if (!container) return;
+                container.classList.remove('shimmer-loading');
+
+                const rows = this.currentLinks.map(function (link) {
+                    return App.pages.notices.renderLinkRow(link);
+                }).join('');
+
+                container.innerHTML = '' +
+                    '<div class="column small-space">' +
+                    rows +
+                    App.pages.notices.renderNewLinkForm() +
+                    '</div>';
+            },
+
+            renderLinkRow: function (link) {
+                const canEdit = link.created_by === App.state.userId;
+                const favicon = this.getFaviconUrl(link.url || '');
+                const readonly = canEdit ? '' : 'readonly';
+                const disabled = canEdit ? '' : 'disabled';
+                const escapedId = this.escapeForInline(link.id || '');
+                const escapedUrl = this.escapeForInline(link.url || '');
+                const caption = canEdit
+                    ? '<span class="small-text secondary-text">作成者として編集可能</span>'
+                    : '<span class="small-text secondary-text">作成者のみ編集可能</span>';
+
+                return '' +
+                    '<div class="border round padding">' +
+                    '  <div class="row middle-align tiny-space">' +
+                    '    <img class="square tiny small-round" src="' + favicon + '" alt="favicon">' +
+                    '    <span class="small-text">#' + escapeHtml(link.id || '') + '</span>' +
+                    '    <div class="max"></div>' +
+                    caption +
+                    '  </div>' +
+                    '  <div class="field label border top-margin">' +
+                    '    <input id="link-label-' + escapeHtml(link.id) + '" value="' + escapeHtml(link.label || '') + '" ' + readonly + '>' +
+                    '    <label>ラベル</label>' +
+                    '  </div>' +
+                    '  <div class="field label border top-margin">' +
+                    '    <input id="link-url-' + escapeHtml(link.id) + '" value="' + escapeHtml(link.url || '') + '" ' + readonly + '>' +
+                    '    <label>URL</label>' +
+                    '  </div>' +
+                    '  <div class="field textarea border label top-margin">' +
+                    '    <textarea id="link-remark-' + escapeHtml(link.id) + '" rows="2" ' + readonly + '>' + escapeHtml(link.remark || '') + '</textarea>' +
+                    '    <label>備考</label>' +
+                    '  </div>' +
+                    '  <div class="row tiny-space top-margin">' +
+                        '    <button class="chip" onclick="App.pages.notices.openLink(\'' + escapedUrl + '\')">' +
+                    '      <i>open_in_new</i><span>開く</span>' +
+                    '    </button>' +
+                    '    <div class="max"></div>' +
+                        '    <button class="chip" ' + disabled + ' onclick="App.pages.notices.updateLink(\'' + escapedId + '\')">' +
+                    '      <i>save</i><span>保存</span>' +
+                    '    </button>' +
+                        '    <button class="chip error" ' + disabled + ' onclick="App.pages.notices.removeLink(\'' + escapedId + '\')">' +
+                    '      <i>delete</i><span>削除</span>' +
+                    '    </button>' +
+                    '  </div>' +
+                    '</div>';
+            },
+
+                    escapeForInline: function (value) {
+                    return String(value || '')
+                        .replace(/\\/g, '\\\\')
+                        .replace(/'/g, "\\'");
+                    },
+
+            renderNewLinkForm: function () {
+                return '' +
+                    '<div class="border round padding">' +
+                    '  <h6 class="small bold">リンクを追加</h6>' +
+                    '  <div class="field label border top-margin">' +
+                    '    <input id="new-link-label" placeholder="例: 公式ポータル">' +
+                    '    <label>ラベル</label>' +
+                    '  </div>' +
+                    '  <div class="field label border top-margin">' +
+                    '    <input id="new-link-url" placeholder="https:\/\/example.com">' +
+                    '    <label>URL</label>' +
+                    '  </div>' +
+                    '  <div class="field textarea border label top-margin">' +
+                    '    <textarea id="new-link-remark" rows="2"></textarea>' +
+                    '    <label>備考</label>' +
+                    '  </div>' +
+                    '  <div class="row top-margin">' +
+                    '    <div class="max"></div>' +
+                    '    <button class="chip" onclick="App.pages.notices.createLink()">' +
+                    '      <i>add</i><span>追加</span>' +
+                    '    </button>' +
+                    '  </div>' +
+                    '</div>';
+            },
+
+            createLink: async function () {
+                if (this.isSaving) return;
+
+                const labelInput = document.getElementById('new-link-label');
+                const urlInput = document.getElementById('new-link-url');
+                const remarkInput = document.getElementById('new-link-remark');
+                if (!labelInput || !urlInput) return;
+
+                const label = String(labelInput.value || '').trim();
+                const url = String(urlInput.value || '').trim();
+                const remark = String((remarkInput && remarkInput.value) || '').trim();
+
+                if (!label || !url) {
+                    showSnackbar('ラベルとURLは必須です', 'error');
+                    return;
+                }
+
+                this.isSaving = true;
+                this.updateActionState();
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LINKS, 'insert', {
+                        label: label,
+                        url: url,
+                        remark: remark
+                    }, null, true);
+                    showSnackbar('リンクを追加しました');
+                    await this.loadData(true);
+                } catch (error) {
+                    console.error('[Notices] createLink failed:', error);
+                    showSnackbar('リンク追加に失敗しました', 'error');
+                } finally {
+                    this.isSaving = false;
+                    this.updateActionState();
+                }
+            },
+
+            updateLink: async function (linkId) {
+                if (this.isSaving || !linkId) return;
+                const link = this.currentLinks.find(function (row) { return row.id === linkId; });
+                if (!link || link.created_by !== App.state.userId) {
+                    showSnackbar('作成者のみ編集できます', 'error');
+                    return;
+                }
+
+                const labelInput = document.getElementById('link-label-' + linkId);
+                const urlInput = document.getElementById('link-url-' + linkId);
+                const remarkInput = document.getElementById('link-remark-' + linkId);
+                if (!labelInput || !urlInput || !remarkInput) return;
+
+                const label = String(labelInput.value || '').trim();
+                const url = String(urlInput.value || '').trim();
+                const remark = String(remarkInput.value || '').trim();
+
+                if (!label || !url) {
+                    showSnackbar('ラベルとURLは必須です', 'error');
+                    return;
+                }
+
+                this.isSaving = true;
+                this.updateActionState();
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LINKS, 'update', {
+                        where: { id: ['=', linkId] },
+                        set: {
+                            label: label,
+                            url: url,
+                            remark: remark
+                        }
+                    }, null, true);
+                    showSnackbar('リンクを更新しました');
+                    await this.loadData(true);
+                } catch (error) {
+                    console.error('[Notices] updateLink failed:', error);
+                    showSnackbar('リンク更新に失敗しました', 'error');
+                } finally {
+                    this.isSaving = false;
+                    this.updateActionState();
+                }
+            },
+
+            removeLink: async function (linkId) {
+                if (this.isSaving || !linkId) return;
+                const link = this.currentLinks.find(function (row) { return row.id === linkId; });
+                if (!link || link.created_by !== App.state.userId) {
+                    showSnackbar('作成者のみ削除できます', 'error');
+                    return;
+                }
+
+                const ok = confirm('このリンクを削除しますか？');
+                if (!ok) return;
+
+                this.isSaving = true;
+                this.updateActionState();
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LINKS, 'remove', {
+                        where: { id: ['=', linkId] }
+                    }, null, true);
+                    showSnackbar('リンクを削除しました');
+                    await this.loadData(true);
+                } catch (error) {
+                    console.error('[Notices] removeLink failed:', error);
+                    showSnackbar('リンク削除に失敗しました', 'error');
+                } finally {
+                    this.isSaving = false;
+                    this.updateActionState();
+                }
+            },
+
+            openLink: function (url) {
+                if (!url) return;
+                window.open(url, '_blank', 'noopener,noreferrer');
+            },
+
+            getFaviconUrl: function (url) {
+                const safeUrl = encodeURIComponent(url || '');
+                return 'https:\/\/t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=' + safeUrl + '&size=128';
+            },
+
+            toPlainText: function (html) {
+                const div = document.createElement('div');
+                div.innerHTML = html;
+                return (div.textContent || div.innerText || '').trim();
+            }
+        };
+    })();
+</script>
