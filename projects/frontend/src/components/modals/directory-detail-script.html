@@ -28,13 +28,11 @@
 
             close: function (skipUrlUpdate, closeReason) {
                 if (this.hasDirtyInput && !this.isSaving) {
-                    const message = closeReason === 'escape'
-                        ? '未保存の変更があります。変更を破棄して閉じますか？'
-                        : '未保存の変更があります。閉じてもよろしいですか？';
+                    const message = '変更を破棄しますか？'
                     const proceed = confirm(message);
                     if (!proceed) return false;
                 }
-                closeModal('modal-detail-directory');
+                appUi('modal-detail-directory', false);
                 this.currentId = null;
                 this.isSaving = false;
                 this.hasDirtyInput = false;

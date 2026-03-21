@@ -68,7 +68,7 @@
                         : '変更を破棄して閉じますか？';
                     if (!confirm(message)) return false;
                 }
-                closeModal('modal-detail-member');
+                appUi('modal-detail-member', false);
                 this._reset();
                 return true;
             },
@@ -77,7 +77,7 @@
                 if (this.isDirty) {
                     if (!confirm('変更を破棄しますか？')) return;
                 }
-                closeModal('modal-detail-member');
+                appUi('modal-detail-member', false);
                 this._reset();
             },
 
@@ -185,7 +185,7 @@
 
                 if (!hasChanges && !hasDirectoryChanges && !hasSkillChanges) {
                     this.isDirty = false;
-                    closeModal('modal-detail-member');
+                    appUi('modal-detail-member', false);
                     this._reset();
                     return;
                 }
@@ -195,7 +195,7 @@
                 if (memberInState) Object.assign(memberInState, updates);
 
                 this.isDirty = false;
-                closeModal('modal-detail-member');
+                appUi('modal-detail-member', false);
                 showSnackbar('変更を保存しています...', 'info', 'top', 0);
 
                 try {
