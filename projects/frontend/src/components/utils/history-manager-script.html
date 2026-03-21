@@ -1,0 +1,61 @@
+<script>
+  (function () {
+    if (!App.utils.historyManager) {
+      App.utils.historyManager = {};
+    }
+
+    Object.assign(App.utils.historyManager, {
+      renderState: function (options) {
+        const container = document.getElementById(options.containerId);
+        if (!container) return;
+
+        const state = options.state || 'empty';
+        if (state === 'loading') {
+          container.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
+          return;
+        }
+        if (state === 'error') {
+          const message = options.message || '履歴の読み込みに失敗しました';
+          container.innerHTML = '<p class="error-text small-padding">' + options.escapeText(message) + '</p>';
+          return;
+        }
+
+        const message = options.message || '履歴はありません';
+        container.innerHTML = '<p class="secondary-text small-padding">' + options.escapeText(message) + '</p>';
+      },
+
+      renderEntries: function (options) {
+        const container = document.getElementById(options.containerId);
+        if (!container) return;
+
+        const entries = options.entries || [];
+        const escapeText = options.escapeText;
+        const resolveActorName = options.resolveActorName;
+        const formatDateTime = options.formatDateTime;
+        const buildSummary = options.buildSummary;
+        const operationLabelMap = options.operationLabelMap || {};
+
+        container.innerHTML = entries.map(function (entry, index) {
+          const actorName = resolveActorName(entry);
+          const createdAt = formatDateTime(entry.created_at);
+          const summary = buildSummary(entry);
+          const operation = String(entry.operation_type_key || '').toUpperCase();
+          const operationLabel = operationLabelMap[operation] || operation || '操作';
+          const separator = index > 0 ? '<hr class="max small-margin">' : '';
+
+          return '' +
+            separator +
+            '<article class="small-padding">' +
+            '<div class="row middle-align tiny-space">' +
+            '<span class="chip small">' + escapeText(operationLabel) + '</span>' +
+            '<div class="max"></div>' +
+            '<span class="small-text secondary-text">' + escapeText(createdAt) + '</span>' +
+            '</div>' +
+            '<p class="small-text no-margin top-margin">' + escapeText(summary) + '</p>' +
+            '<p class="small-text secondary-text no-margin top-margin">実行者: ' + escapeText(actorName) + '</p>' +
+            '</article>';
+        }).join('');
+      }
+    });
+  })();
+</script>

@@ -80,6 +80,13 @@ await App.test.closeAllModals();
 - [ ] エラーメッセージが適切に表示される
 - [ ] スナックバーが正しく表示される
 
+### Detailモーダル統一（Phase 2+）
+- [ ] member/planのタブ切替が`data-ui`で動作し、`switchTab`依存がない
+- [ ] member detailの主ボタンが「変更なし=閉じる」「変更あり=変更を保存」に切り替わる
+- [ ] 保存中は主要操作（閉じる/破棄/保存）が無効化される
+- [ ] reset後に初期タブへ戻る（member: profile, plan: description）
+- [ ] 未保存変更ありで閉じる時に確認ダイアログが表示される
+
 ### セキュリティ
 - [ ] XSS攻撃が防がれている（特殊文字入力のテスト）
 - [ ] 危険なURLがブロックされる（javascript:, data:など）
