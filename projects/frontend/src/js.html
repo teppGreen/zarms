@@ -33,6 +33,7 @@
       },
 
       userId: null, // 現在のユーザーのID（uuid）
+      useApiMode: !!templateVariables.useApiMode,
       userProperties: templateVariables.userProperties || {}, // ユーザープロパティ
       previousTab: null,
       isDevelopment: templateVariables.isDevelopment,
@@ -694,7 +695,21 @@
           await App.pages.boardsList.loadData(true);
         }
       }
-      // homeタブなどでは何もしない（必要に応じて追加）
+      if (tabId === 'tab-home') {
+        if (App.pages.home && App.pages.home.loadData) {
+          await App.pages.home.loadData(true);
+        }
+      }
+      if (tabId === 'tab-notices') {
+        if (App.pages.notices && App.pages.notices.loadData) {
+          await App.pages.notices.loadData(true);
+        }
+      }
+      if (tabId === 'tab-insights') {
+        if (App.pages.insights && App.pages.insights.loadData) {
+          await App.pages.insights.loadData(true);
+        }
+      }
 
       // 中止チェック
       if (currentController.aborted) {
@@ -731,6 +746,8 @@
         { keys: 'Alt + 3', action: '予定タブへ移動' },
         { keys: 'Alt + 4', action: 'ボードタブへ移動' },
         { keys: 'Alt + 5', action: 'タスクタブへ移動' },
+        { keys: 'Alt + 6', action: 'お知らせタブへ移動' },
+        { keys: 'Alt + 7', action: '分析タブへ移動' },
         { keys: 'Alt + R', action: '表示中データを再読込' },
         { keys: 'Esc', action: 'モーダルを閉じる' }
       ];
@@ -826,6 +843,18 @@
         return;
       }
 
+      if (e.code === 'Digit6' && App.utils.navigation && App.utils.navigation.switchTab) {
+        e.preventDefault();
+        App.utils.navigation.switchTab('notices');
+        return;
+      }
+
+      if (e.code === 'Digit7' && App.utils.navigation && App.utils.navigation.switchTab) {
+        e.preventDefault();
+        App.utils.navigation.switchTab('insights');
+        return;
+      }
+
       if (e.code === 'KeyR') {
         e.preventDefault();
         refreshData();
@@ -888,10 +917,13 @@
    */
   function callGAS(functionName, ...args) {
     return new Promise((resolve, reject) => {
+      const useApiMode = !!(App.state && App.state.useApiMode);
+      const callArgs = [...args, useApiMode];
+
       // 最後の呼び出しを記録
       App.utils.gas.lastInvocation = {
         functionName: functionName,
-        args: args,
+        args: callArgs,
         timestamp: new Date().toISOString()
       };
       google.script.run
@@ -901,7 +933,7 @@
         .withFailureHandler(function (error) {
           reject(error);
         })
-      [functionName](...args);
+      [functionName](...callArgs);
     });
   }
 

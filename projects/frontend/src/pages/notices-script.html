@@ -5,8 +5,11 @@
             currentLinks: [],
             isLoading: false,
             isSaving: false,
+            pendingOpenNoticeId: null,
+            modalHandlersBound: false,
 
             loadData: async function (forceRefresh = false) {
+                this.ensureModalHandlers();
                 this.isLoading = true;
                 this.setLoadingState();
 
@@ -30,6 +33,7 @@
 
                     this.renderNotices();
                     this.renderLinksEditor();
+                    this.tryOpenPendingNotice();
                 } catch (error) {
                     console.error('[Notices] loadData failed:', error);
                     this.showError('notices-list', 'お知らせの読み込みに失敗しました');
@@ -102,9 +106,10 @@
                     const bodyText = App.pages.notices.toPlainText(notice.body || '');
                     const clippedBody = bodyText.length > 120 ? bodyText.slice(0, 120) + '...' : bodyText;
                     const category = notice.category ? escapeHtml(notice.category) : '未分類';
+                    const escapedId = App.pages.notices.escapeForInline(notice.id || '');
 
                     return '' +
-                        '<li class="row top-margin small-space">' +
+                        '<li class="row top-margin small-space" style="cursor: pointer;" onclick="App.pages.notices.openNoticeDetailById(\'' + escapedId + '\')">' +
                         '  <article class="border small-round padding">' +
                         '    <div class="row middle-align tiny-space">' +
                         '      <span class="chip small border">' + category + '</span>' +
@@ -327,6 +332,79 @@
             openLink: function (url) {
                 if (!url) return;
                 window.open(url, '_blank', 'noopener,noreferrer');
+            },
+
+            openFromHome: async function (noticeId) {
+                if (!noticeId) return;
+                this.pendingOpenNoticeId = noticeId;
+                await App.utils.navigation.switchTab('notices');
+                this.tryOpenPendingNotice();
+            },
+
+            tryOpenPendingNotice: function () {
+                if (!this.pendingOpenNoticeId) return;
+                const noticeId = this.pendingOpenNoticeId;
+                const opened = this.openNoticeDetailById(noticeId);
+                if (opened) {
+                    this.pendingOpenNoticeId = null;
+                }
+            },
+
+            openNoticeDetailById: function (noticeId) {
+                if (!noticeId) return false;
+
+                const allNotices = App.state.data.notices || [];
+                const target = allNotices.find(function (notice) {
+                    return notice && notice.id === noticeId;
+                });
+                if (!target) return false;
+
+                const members = App.state.data.members || [];
+                const member = members.find(function (m) {
+                    return m && m.id === target.created_by;
+                });
+                const author = member ? (member.display_name || member.name) : '不明';
+
+                const titleEl = document.getElementById('notice-detail-title');
+                const periodEl = document.getElementById('notice-detail-period');
+                const authorEl = document.getElementById('notice-detail-author');
+                const bodyEl = document.getElementById('notice-detail-body');
+                const modal = document.getElementById('modal-notice-detail');
+                if (!titleEl || !periodEl || !authorEl || !bodyEl || !modal) return false;
+
+                titleEl.textContent = target.title || '';
+                periodEl.textContent = this.formatNoticePeriod(target.starts_at, target.ends_at);
+                authorEl.textContent = author;
+                bodyEl.innerHTML = target.body || '<p class="secondary-text">本文がありません</p>';
+
+                appUi('#modal-notice-detail', true);
+                return true;
+            },
+
+            closeNoticeDetail: function () {
+                appUi('#modal-notice-detail', false);
+            },
+
+            ensureModalHandlers: function () {
+                if (this.modalHandlersBound) return;
+
+                const modal = document.getElementById('modal-notice-detail');
+                if (!modal) return;
+
+                // ネイティブEsc(close/cancel)ではoverlay同期が崩れる場合があるため、
+                // cancelを捕捉して共通クローズ導線に統一する。
+                modal.addEventListener('cancel', (event) => {
+                    event.preventDefault();
+                    this.closeNoticeDetail();
+                });
+
+                this.modalHandlersBound = true;
+            },
+
+            formatNoticePeriod: function (startsAt, endsAt) {
+                const starts = startsAt ? formatDateTimeForDisplay(new Date(startsAt), 'yyyy/MM/dd(E) HH:mm') : '-';
+                const ends = endsAt ? formatDateTimeForDisplay(new Date(endsAt), 'yyyy/MM/dd(E) HH:mm') : '-';
+                return starts + ' - ' + ends;
             },
 
             getFaviconUrl: function (url) {

@@ -9,8 +9,11 @@
         App.pages.home = {
             // データのキャッシュ
             cachedTasks: [],
+            cachedNotices: [],
             cachedLogs: [],
-            cachedBoardTasks: [],
+            cachedRelatedLogs: [],
+            historyVisibleCount: 10,
+            isLoadingMoreHistory: false,
 
             loadData: async function (isRefresh = false) {
                 console.log('[Home] Loading data... isRefresh:', isRefresh);
@@ -37,40 +40,45 @@
                     const tasksQuery = {
                         where: { task_status_key: ['!=', 'DONE'] }
                     };
+                    const noticesQuery = {
+                        orderBy: { starts_at: 'desc' }
+                    };
                     const logsQuery = {
                         where: {
-                            table_name: ['=', 'tasks'],
-                            operation_type_key: ['!=', 'REMOVE'],
-                            created_at: ['>', isoDate],
-                            created_by: ['!=', 'system']
-                        }
-                    };
-                    const boardTasksQuery = {
-                        where: { updated_at: ['>', isoDate] },
-                        columns: ['board_id', 'updated_at']
+                            created_at: ['>', isoDate]
+                        },
+                        orderBy: { created_at: 'desc' },
+                        limit: 100
                     };
 
-                    // 一括取得
-                    const [tasksRes, logsRes, boardTasksRes] = await Promise.all([
+                    const [tasksResult, noticesResult, logsResult] = await Promise.allSettled([
                         callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', tasksQuery, null, isRefresh),
-                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LOGS, 'select', logsQuery, null, isRefresh),
-                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', boardTasksQuery, null, isRefresh)
+                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.NOTICES, 'select', noticesQuery, null, isRefresh),
+                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LOGS, 'select', logsQuery, null, isRefresh)
                     ]);
 
-                    // データ展開
-                    const tasks = tasksRes?.data || tasksRes || [];
-                    const logs = logsRes?.data || logsRes || [];
-                    const boardTasks = boardTasksRes?.data || boardTasksRes || [];
+                    const asArray = (result, fallback) => {
+                        if (!result || result.status !== 'fulfilled') return fallback || [];
+                        const value = result.value;
+                        return value?.data || value || fallback || [];
+                    };
+
+                    // データ展開（失敗時はキャッシュを利用）
+                    const tasks = asArray(tasksResult, this.cachedTasks);
+                    const notices = asArray(noticesResult, this.cachedNotices);
+                    const logs = asArray(logsResult, this.cachedLogs);
 
                     // キャッシュ更新
                     this.cachedTasks = tasks;
+                    this.cachedNotices = notices;
                     this.cachedLogs = logs;
-                    this.cachedBoardTasks = boardTasks;
+                    this.cachedRelatedLogs = this.filterRelatedLogs(logs);
+                    this.historyVisibleCount = 10;
 
                     // 描画
                     this.renderNextTasks(tasks);
-                    this.renderMemberRanking(logs);
-                    this.renderBoardRanking(boardTasks);
+                    this.renderNoticesForHome(notices);
+                    this.renderRelatedHistoryForHome();
 
                     // 描画後にパネルの高さを調整
                     this.applyPanelHeights();
@@ -79,7 +87,12 @@
                     this.updateHeader();
 
                     // キャッシュヒット時の再取得（バックグラウンド）
-                    if (!isRefresh && (tasksRes?.isCached || logsRes?.isCached || boardTasksRes?.isCached)) {
+                    const hasCachedResult =
+                        (tasksResult.status === 'fulfilled' && tasksResult.value?.isCached) ||
+                        (noticesResult.status === 'fulfilled' && noticesResult.value?.isCached) ||
+                        (logsResult.status === 'fulfilled' && logsResult.value?.isCached);
+
+                    if (!isRefresh && hasCachedResult) {
                         console.log('[Home] Cached data detected. Refreshing in background...');
                         setTimeout(() => {
                             this.loadData(true);
@@ -90,8 +103,8 @@
                     console.error('[Home] Error loading data:', error);
                     // エラー表示
                     this.showError('home-next-tasks', 'データの読み込みに失敗しました');
-                    this.showError('home-member-ranking', 'データの読み込みに失敗しました');
-                    this.showError('home-board-ranking', 'データの読み込みに失敗しました');
+                    this.showError('home-notices', 'データの読み込みに失敗しました');
+                    this.showError('home-related-history', 'データの読み込みに失敗しました');
                 }
             },
 
@@ -135,29 +148,32 @@
                         </div>
 
                         <!-- 3. メンバーランキング (Member Ranking) -->
-                        <div class="s12 m3 l3 small-margin">
+                            <div class="s12 m3 l3 small-margin">
                            <article class="padding">
                                 <nav class="">
-                                    <h6 class="small bold">人物ランキング</h6>
+                                        <h6 class="small bold">お知らせ</h6>
                                     <div class="max"></div>
-                                    <button class="chip" disabled>直近7日間</button>
+                                        <button class="chip" onclick="App.utils.navigation.switchTab('notices')">
+                                            <i>chevron_right</i>
+                                            <span>一覧</span>
+                                        </button>
                                 </nav>
-                                <span class="small-text secondary-text">期間内のタスクの作成・更新数</span>
-                                <div id="home-member-ranking" class="shimmer-loading scroll top-margin ">
+                                    <span class="small-text secondary-text">現在掲示中のお知らせ</span>
+                                    <div id="home-notices" class="shimmer-loading scroll top-margin ">
                                 </div>
                             </article>
                         </div>
 
-                        <!-- 4. ボードランキング (Board Ranking) -->
+                            <!-- 4. 更新履歴 (Related History) -->
                         <div class="s12 m3 l3 small-margin">
                            <article class="padding">
                                 <nav class="">
-                                    <h6 class="small bold">ボードランキング</h6>
+                                        <h6 class="small bold">更新履歴</h6>
                                     <div class="max"></div>
-                                    <button class="chip" disabled>直近7日間</button>
+                                        <button class="chip" disabled>10件ずつ</button>
                                 </nav>
-                                <span class="small-text secondary-text">期間内に作成・更新されたタスク数</span>
-                                <div id="home-board-ranking" class="shimmer-loading scroll top-margin ">
+                                    <span class="small-text secondary-text">自分に関連する更新のみ表示</span>
+                                    <div id="home-related-history" class="shimmer-loading scroll top-margin ">
                                 </div>
                             </article>
                         </div>
@@ -404,143 +420,188 @@
             // ---------------------------------------------------------
 
 
-            renderMemberRanking: function (logs) {
-                const container = document.getElementById('home-member-ranking');
+            renderNoticesForHome: function (notices) {
+                const container = document.getElementById('home-notices');
                 if (!container) return;
                 container.classList.remove('shimmer-loading');
 
-                // tasklogsからcreated_byを集計（簡易的）
-                const counts = {};
-                logs.forEach(log => {
-                    const userId = log.created_by;
-                    if (userId) {
-                        counts[userId] = (counts[userId] || 0) + 1;
-                    }
-                });
+                const activeNotices = this.filterActiveNotices(notices).slice(0, 5);
+                const members = App.state.data.members || [];
+                const memberMap = new Map(members.map(m => [m.id, m]));
 
-                const ranking = Object.keys(counts).map(userId => {
-                    return { userId: userId, count: counts[userId] };
-                }).sort((a, b) => b.count - a.count);
-
-                let html = `
-                    <table class="border small-text">
-                      <thead class="fixed surface-container-low">
-                        <tr>
-                           <th class="center-align" style="width: 0; white-space: nowrap;">順位</th>
-                           <th class="left-align">表示名</th>
-                           <th class="right-align" style="width: 0; white-space: nowrap;">件数</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                `;
-
-                if (ranking.length === 0) {
-                    html += `<tr><td colspan="3" class="center-align secondary-text">データがありません</td></tr>`;
-                } else {
-                    const members = App.state.data.members || [];
-                    const getMember = (id) => members.find(m => m.id === id);
-
-                    let currentRank = 1;
-                    ranking.forEach((item, index) => {
-                        const member = getMember(item.userId);
-                        const name = member ? member.display_name : '不明';
-                        const photo = member ? member.profile_photo_url : null;
-
-                        // 同率順位の対応: 前の項目と件数を比較
-                        if (index > 0 && ranking[index - 1].count !== item.count) {
-                            currentRank = index + 1;
-                        }
-                        const rank = currentRank;
-
-                        // 現在のユーザーの行にfillクラスを追加
-                        const isCurrentUser = item.userId === App.state.userId;
-                        const rowClass = isCurrentUser ? 'fill' : '';
-
-                        let rankBadge = `<span>${rank}</span>`;
-
-                        const avatarHtml = photo
-                            ? `<i class="small circle"><img src="${photo}" class="responsive"></i>`
-                            : `<i class="small">account_circle</i>`;
-
-                        html += `
-                            <tr class="${rowClass}" style="cursor: pointer;" onclick="App.pages.home.openMyBoardForMember('${item.userId}')">
-                                <td class="center-align font-number">${rankBadge}</td>
-                                <td>
-                                    <div class="row left-align tiny-space">
-                                        ${avatarHtml}${escapeHtml(name)}
-                                    </div>
-                                </td>
-                                <td class="right-align font-number">${item.count}</td>
-                            </tr>
-                        `;
-                    });
+                if (activeNotices.length === 0) {
+                    container.innerHTML = '<div class="padding center-align secondary-text">掲示中のお知らせはありません</div>';
+                    return;
                 }
-                html += `</tbody></table>`;
-                container.innerHTML = html;
+
+                const html = activeNotices.map((notice) => {
+                    const member = memberMap.get(notice.created_by);
+                    const author = member ? (member.display_name || member.name) : '不明';
+                    const icon = member && member.profile_photo_url
+                        ? `<i class="small circle"><img src="${escapeHtml(member.profile_photo_url)}" class="responsive"></i>`
+                        : '<i class="small">account_circle</i>';
+                    const body = this.toPlainText(notice.body || '');
+                    const clipped = body.length > 90 ? body.slice(0, 90) + '...' : body;
+                    const category = notice.category ? escapeHtml(notice.category) : '未分類';
+                    const noticeId = String(notice.id || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+                    return `
+                        <li class="small-margin" style="cursor: pointer;" onclick="App.pages.notices.openFromHome('${noticeId}')">
+                            <article class="border small-round padding">
+                                <div class="row tiny-space middle-align">
+                                    <span class="chip small border">${category}</span>
+                                    <div class="max"></div>
+                                    <span class="row tiny-space middle-align small-text secondary-text">${icon}${escapeHtml(author)}</span>
+                                </div>
+                                <h6 class="small bold top-margin">${escapeHtml(notice.title || '')}</h6>
+                                <p class="small-text secondary-text no-margin">${escapeHtml(clipped)}</p>
+                            </article>
+                        </li>
+                    `;
+                }).join('');
+
+                container.innerHTML = `<ul class="no-margin no-padding">${html}</ul>`;
+            },
+
+            filterActiveNotices: function (notices) {
+                const now = Date.now();
+                return (notices || []).filter((notice) => {
+                    if (!notice || !notice.starts_at || !notice.ends_at) return false;
+                    const startsAt = new Date(notice.starts_at).getTime();
+                    const endsAt = new Date(notice.ends_at).getTime();
+                    if (!Number.isFinite(startsAt) || !Number.isFinite(endsAt)) return false;
+                    return startsAt <= now && now < endsAt;
+                });
             },
 
             // ---------------------------------------------------------
-            // 4. ボードランキング (Board Ranking)
+            // 4. 更新履歴 (Related History)
             // ---------------------------------------------------------
 
+            filterRelatedLogs: function (logs) {
+                return (logs || []).filter((log) => this.isLogRelatedToCurrentUser(log));
+            },
 
-            renderBoardRanking: function (tasks) {
-                const container = document.getElementById('home-board-ranking');
+            isLogRelatedToCurrentUser: function (log) {
+                if (!log || !log.data) return false;
+
+                const userId = App.state.userId;
+                if (!userId) return false;
+
+                let parsed;
+                try {
+                    parsed = typeof log.data === 'string' ? JSON.parse(log.data) : log.data;
+                } catch (error) {
+                    return false;
+                }
+
+                const memberIds = new Set();
+                this.collectMemberIds(parsed, memberIds);
+                return memberIds.has(userId);
+            },
+
+            collectMemberIds: function (value, out) {
+                if (!value || !out) return;
+
+                if (Array.isArray(value)) {
+                    value.forEach((item) => this.collectMemberIds(item, out));
+                    return;
+                }
+
+                if (typeof value !== 'object') return;
+
+                Object.keys(value).forEach((key) => {
+                    const current = value[key];
+                    const lowerKey = String(key || '').toLowerCase();
+                    const isMemberKey =
+                        lowerKey === 'member_id' ||
+                        lowerKey.endsWith('_member_id') ||
+                        lowerKey.endsWith('_by') ||
+                        lowerKey === 'assign_to' ||
+                        lowerKey === 'mentioned_to' ||
+                        lowerKey === 'applied_by';
+
+                    if (isMemberKey && typeof current === 'string' && current) {
+                        out.add(current);
+                    }
+
+                    this.collectMemberIds(current, out);
+                });
+            },
+
+            renderRelatedHistoryForHome: function () {
+                const container = document.getElementById('home-related-history');
                 if (!container) return;
                 container.classList.remove('shimmer-loading');
 
-                const counts = {};
-                tasks.forEach(t => {
-                    // my-board と空欄を除外
-                    if (t.board_id && t.board_id !== 'null' && t.board_id !== 'my-board' && t.board_id !== '') {
-                        counts[t.board_id] = (counts[t.board_id] || 0) + 1;
-                    }
-                });
+                const logs = this.cachedRelatedLogs || [];
+                const visible = logs.slice(0, this.historyVisibleCount);
 
-                const ranking = Object.keys(counts).map(boardId => {
-                    return { boardId: boardId, count: counts[boardId] };
-                }).sort((a, b) => b.count - a.count);
-
-                let html = `
-                    <table class="border small-text">
-                      <thead class="fixed surface-container-low">
-                        <tr>
-                           <th class="center-align" style="width: 0; white-space: nowrap;">順位</th>
-                           <th class="left-align">ボード名</th>
-                           <th class="right-align" style="width: 0; white-space: nowrap;">件数</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                `;
-
-                if (ranking.length === 0) {
-                    html += `<tr><td colspan="3" class="center-align secondary-text">データがありません</td></tr>`;
-                } else {
-                    const boards = App.state.data.boards || [];
-                    const getBoard = (id) => boards.find(b => b.id === id);
-
-                    let currentRank = 1;
-                    ranking.forEach((item, index) => {
-                        const board = getBoard(item.boardId);
-                        const name = board ? board.name : '不明';
-
-                        // 同率順位の対応: 前の項目と件数を比較
-                        if (index > 0 && ranking[index - 1].count !== item.count) {
-                            currentRank = index + 1;
-                        }
-                        const rank = currentRank;
-
-                        html += `
-                            <tr style="cursor: pointer;" onclick="App.utils.navigation.switchTab('board-${item.boardId}')">
-                                <td class="center-align font-number">${rank}</td>
-                                <td class="left-align">${escapeHtml(name)}</td>
-                                <td class="right-align font-number">${item.count}</td>
-                            </tr>
-                        `;
-                    });
+                if (visible.length === 0) {
+                    container.innerHTML = '<div class="padding center-align secondary-text">関連する更新履歴はありません</div>';
+                    return;
                 }
-                html += `</tbody></table>`;
-                container.innerHTML = html;
+
+                const listHtml = visible.map((log) => {
+                    const tableName = escapeHtml(log.table_name || 'unknown');
+                    const timestamp = log.created_at ? formatDateTimeForDisplay(new Date(log.created_at), 'MM/dd HH:mm') : '-';
+                    const summary = this.getLogSummary(log);
+                    return `
+                        <li class="small-margin">
+                            <article class="border small-round padding">
+                                <div class="row tiny-space middle-align">
+                                    <span class="chip small border">${tableName}</span>
+                                    <div class="max"></div>
+                                    <span class="small-text secondary-text">${timestamp}</span>
+                                </div>
+                                <p class="small-text no-margin top-margin">${escapeHtml(summary)}</p>
+                            </article>
+                        </li>
+                    `;
+                }).join('');
+
+                const hasMore = logs.length > visible.length;
+                const moreButton = hasMore
+                    ? `<div class="center-align top-margin"><button class="chip" ${this.isLoadingMoreHistory ? 'disabled' : ''} onclick="App.pages.home.loadMoreRelatedHistory()"><i>expand_more</i><span>もっと見る</span></button></div>`
+                    : '';
+
+                container.innerHTML = `<ul class="no-margin no-padding">${listHtml}</ul>${moreButton}`;
+            },
+
+            loadMoreRelatedHistory: function () {
+                if (this.isLoadingMoreHistory) return;
+                this.isLoadingMoreHistory = true;
+                this.historyVisibleCount += 10;
+                this.renderRelatedHistoryForHome();
+                this.isLoadingMoreHistory = false;
+            },
+
+            getLogSummary: function (log) {
+                const op = String(log.operation_type_key || '').toUpperCase();
+                if (op === 'INSERT') return 'レコードが作成されました';
+                if (op === 'REMOVE') return 'レコードが削除されました';
+
+                let parsed;
+                try {
+                    parsed = typeof log.data === 'string' ? JSON.parse(log.data) : log.data;
+                } catch (error) {
+                    return '更新されました';
+                }
+
+                if (op === 'UPDATE' && parsed && parsed.set && typeof parsed.set === 'object') {
+                    const keys = Object.keys(parsed.set).filter((key) => key !== 'updated_at' && key !== 'updated_by');
+                    if (keys.length > 0) {
+                        return `更新: ${keys.slice(0, 3).join(', ')}${keys.length > 3 ? '...' : ''}`;
+                    }
+                }
+
+                return '更新されました';
+            },
+
+            toPlainText: function (html) {
+                const div = document.createElement('div');
+                div.innerHTML = html;
+                return (div.textContent || div.innerText || '').trim();
             },
 
             showError: function (elementId, message) {
@@ -552,7 +613,7 @@
             },
 
             applyPanelHeights: function () {
-                const panelIds = ['home-next-tasks', 'home-member-ranking', 'home-board-ranking'];
+                const panelIds = ['home-next-tasks', 'home-notices', 'home-related-history'];
                 try {
                     const main = document.querySelector('main');
                     if (!main) return;

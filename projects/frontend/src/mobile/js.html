@@ -22,6 +22,7 @@
       },
 
       userId: null,
+      useApiMode: !!templateVariables.useApiMode,
       userProperties: templateVariables.userProperties || {},
       isDevelopment: templateVariables.isDevelopment,
 
@@ -146,10 +147,11 @@
    */
   async function callGAS(functionName, ...args) {
     return new Promise((resolve, reject) => {
+      const useApiMode = !!(App.state && App.state.useApiMode);
       google.script.run
         .withSuccessHandler(resolve)
         .withFailureHandler(reject)
-      [functionName](...args);
+      [functionName](...args, useApiMode);
     });
   }
 

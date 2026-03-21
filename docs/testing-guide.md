@@ -80,6 +80,18 @@ await App.test.closeAllModals();
 - [ ] エラーメッセージが適切に表示される
 - [ ] スナックバーが正しく表示される
 
+### Home/Notices/Insights 追加機能の重点確認
+- [ ] homeで「お知らせ」「更新履歴」が表示され、旧ランキング表示が出ない
+- [ ] homeのお知らせクリックで notices タブへ遷移し、対象のお知らせ詳細モーダルが開く
+- [ ] notices詳細モーダルをEscで閉じた後、画面全体がクリック可能なまま維持される
+- [ ] noticesタブの資料リンクはcreated_by本人のみ編集/削除できる（他ユーザーはreadonly）
+- [ ] insightsタブで曜日別グラフが表示される（データなし時は空表示、失敗時はエラー表示）
+- [ ] 自動更新（またはAlt+R）で tab-home/tab-notices/tab-insights それぞれの loadData が再実行される
+
+### ショートカット回帰確認
+- [ ] Alt+6 で notices タブへ遷移する
+- [ ] Alt+7 で insights タブへ遷移する
+
 ### Detailモーダル統一（Phase 2+）
 - [ ] member/planのタブ切替が`data-ui`で動作し、`switchTab`依存がない
 - [ ] member detailの主ボタンが「変更なし=閉じる」「変更あり=変更を保存」に切り替わる

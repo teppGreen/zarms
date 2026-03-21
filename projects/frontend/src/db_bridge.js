@@ -14,44 +14,22 @@
 // ライブラリブリッジ（通常モード & APIモード・自動フォールバック）
 // ============================================
 
-let _isApiModeInternal = false;
-
-/**
- * 明示的にAPIモードを設定します
- * @param {boolean} enabled
- */
-function setApiMode(enabled) {
-  _isApiModeInternal = enabled;
-}
-
-function handleDatabaseProcess(userId, tableName, operation, dataObject, logRemark, forceRefresh = false) {
-  if (_isApiModeInternal) {
+function handleDatabaseProcess(userId, tableName, operation, dataObject, logRemark, forceRefresh = false, useApiMode = false) {
+  if (useApiMode) {
     return handleDatabaseProcessViaApi(tableName, operation, dataObject, forceRefresh);
   }
-  try {
-    return ZARMS_DB.handleDatabaseProcess(userId, tableName, operation, dataObject, logRemark, forceRefresh);
-  } catch (e) {
-    console.warn(`[handleDatabaseProcess] Direct access failed for ${tableName}, falling back to API mode:`, e.message);
-    _isApiModeInternal = true; // 以降のリクエストもAPIモードにする
-    return handleDatabaseProcessViaApi(tableName, operation, dataObject, forceRefresh);
-  }
+  return ZARMS_DB.handleDatabaseProcess(userId, tableName, operation, dataObject, logRemark, forceRefresh);
 }
 
-function handleBatchDatabaseProcess(userId, queries) {
-  if (_isApiModeInternal) {
+function handleBatchDatabaseProcess(userId, queries, useApiMode = false) {
+  if (useApiMode) {
     return handleBatchDatabaseProcessViaApi(queries);
   }
-  try {
-    return ZARMS_DB.handleBatchDatabaseProcess(userId, queries);
-  } catch (e) {
-    console.warn('[handleBatchDatabaseProcess] Direct access failed, falling back to API mode:', e.message);
-    _isApiModeInternal = true;
-    return handleBatchDatabaseProcessViaApi(queries);
-  }
+  return ZARMS_DB.handleBatchDatabaseProcess(userId, queries);
 }
 
-function getMemberByEmail(email) {
-  if (_isApiModeInternal) {
+function getMemberByEmail(email, useApiMode = false) {
+  if (useApiMode) {
     const data = callDatabaseApi(TABLE_NAMES.MEMBERS, 'select', { where: { email: ["=", email] } });
     return data && data.length > 0 ? data[0] : null;
   }
@@ -61,46 +39,28 @@ function getMemberByEmail(email) {
     if (e.message && e.message.includes('not found')) {
       return null;
     }
-    console.warn('[getMemberByEmail] Direct access failed, falling back to API mode:', e.message);
-    _isApiModeInternal = true;
-    const data = callDatabaseApi(TABLE_NAMES.MEMBERS, 'select', { where: { email: ["=", email] } });
-    return data && data.length > 0 ? data[0] : null;
+    throw e;
   }
 }
 
-function findUserBySlackUrl(slackProfileUrl) {
-  if (_isApiModeInternal) {
+function findUserBySlackUrl(slackProfileUrl, useApiMode = false) {
+  if (useApiMode) {
     const data = callDatabaseApi(TABLE_NAMES.MEMBERS, 'select', { where: { slack_profile_url: ["=", slackProfileUrl] } });
     return data && data.length > 0 ? data[0] : null;
   }
-  try {
-    return ZARMS_DB.findUserBySlackUrl(slackProfileUrl);
-  } catch (e) {
-    _isApiModeInternal = true;
-    const data = callDatabaseApi(TABLE_NAMES.MEMBERS, 'select', { where: { slack_profile_url: ["=", slackProfileUrl] } });
-    return data && data.length > 0 ? data[0] : null;
-  }
+  return ZARMS_DB.findUserBySlackUrl(slackProfileUrl);
 }
 
-function registerUserEmail(userId) {
+function registerUserEmail(userId, useApiMode = false) {
   // email登録は Session.getActiveUser().getEmail() を使うため API側でも実装可能
-  if (_isApiModeInternal) {
+  if (useApiMode) {
     const email = Session.getActiveUser().getEmail();
     return callDatabaseApi(TABLE_NAMES.MEMBERS, 'update', {
       set: { email: email },
       where: { id: ["=", userId], email: ["=", null] }
     });
   }
-  try {
-    return ZARMS_DB.registerUserEmail(userId);
-  } catch (e) {
-    _isApiModeInternal = true;
-    const email = Session.getActiveUser().getEmail();
-    return callDatabaseApi(TABLE_NAMES.MEMBERS, 'update', {
-      set: { email: email },
-      where: { id: ["=", userId], email: ["=", null] }
-    });
-  }
+  return ZARMS_DB.registerUserEmail(userId);
 }
 
 function getSpreadsheet(...args) {
@@ -108,13 +68,17 @@ function getSpreadsheet(...args) {
 }
 
 function getCommentNavData(...args) {
-  if (_isApiModeInternal) return { comments: [], unreadCount: 0 }; // APIモードでは未実装または制限付き
-  return ZARMS_DB.getCommentNavData(...args);
+  const useApiMode = args.length > 0 ? Boolean(args[args.length - 1]) : false;
+  const cleanArgs = args.slice(0, Math.max(0, args.length - 1));
+  if (useApiMode) return { comments: [], unreadCount: 0 }; // APIモードでは未実装または制限付き
+  return ZARMS_DB.getCommentNavData(...cleanArgs);
 }
 
 function getMyBoardTasks(...args) {
-  if (_isApiModeInternal) return [];
-  return ZARMS_DB.getMyBoardTasks(...args);
+  const useApiMode = args.length > 0 ? Boolean(args[args.length - 1]) : false;
+  const cleanArgs = args.slice(0, Math.max(0, args.length - 1));
+  if (useApiMode) return [];
+  return ZARMS_DB.getMyBoardTasks(...cleanArgs);
 }
 
 // 必要に応じて他の外部公開関数を追加してください
