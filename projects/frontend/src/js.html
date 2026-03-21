@@ -708,12 +708,13 @@
         { keys: 'Alt + T', action: '新規タスクを開く' },
         { keys: 'Alt + B', action: '新規ボードを作成' },
         { keys: 'Alt + H', action: 'ショートカット一覧を開く' },
-        { keys: 'Alt + M', action: '一覧タブへ移動' },
         { keys: 'Alt + 1', action: 'ホームタブへ移動' },
-        { keys: 'Alt + 2', action: 'ボードタブへ移動' },
-        { keys: 'Alt + 3', action: 'カレンダータブへ移動' },
-        { keys: 'Alt + R', action: '表示中データを再読み込み' },
-        { keys: 'Esc', action: '最前面モーダルを閉じる（詳細系は保存確認）' }
+        { keys: 'Alt + 2', action: '一覧タブへ移動' },
+        { keys: 'Alt + 3', action: '予定タブへ移動' },
+        { keys: 'Alt + 4', action: 'ボードタブへ移動' },
+        { keys: 'Alt + 5', action: 'タスクタブへ移動' },
+        { keys: 'Alt + R', action: '表示中データを再読込' },
+        { keys: 'Esc', action: 'モーダルを閉じる' }
       ];
     };
 
@@ -777,7 +778,7 @@
         return;
       }
 
-      if (e.code === 'KeyM' && App.utils.navigation && App.utils.navigation.switchTab) {
+      if (e.code === 'Digit2' && App.utils.navigation && App.utils.navigation.switchTab) {
         e.preventDefault();
         App.utils.navigation.switchTab('catalog');
         return;
@@ -789,7 +790,7 @@
         return;
       }
 
-      if (e.code === 'Digit2' && App.utils.navigation && App.utils.navigation.switchTab) {
+      if (e.code === 'Digit4' && App.utils.navigation && App.utils.navigation.switchTab) {
         e.preventDefault();
         App.utils.navigation.switchTab('boards');
         return;
@@ -798,6 +799,12 @@
       if (e.code === 'Digit3' && App.utils.navigation && App.utils.navigation.switchTab) {
         e.preventDefault();
         App.utils.navigation.switchTab('calendar');
+        return;
+      }
+
+      if (e.code === 'Digit5' && App.utils.navigation && App.utils.navigation.switchTab) {
+        e.preventDefault();
+        App.utils.navigation.switchTab('board-my-board');
         return;
       }
 
@@ -2253,6 +2260,13 @@
     // 登録済みフラグ（1回のみ登録）
     _registered: false,
 
+    // 色指定を許可しない共通フォーマット
+    _defaultFormats: [
+      'bold', 'italic', 'underline', 'strike',
+      'list', 'link',
+      'softbreak'
+    ],
+
     /**
      * カスタムBlotを登録（アプリ起動時に1回だけ呼ぶ）
      */
@@ -2289,14 +2303,31 @@
       ];
 
       // デフォルトプレースホルダー
-      const defaultPlaceholder = 'テキストを入力...\nShift+Enterで改行、Enterで段落区切り';
+      const defaultPlaceholder = 'テキストを入力...\nShift+Enterで改行 / Enterで段落区切り';
+      const allowedFormats = Array.isArray(options.formats) && options.formats.length
+        ? options.formats
+        : this._defaultFormats.slice();
+      const clipboardMatchers = [
+        [Node.ELEMENT_NODE, function (node, delta) {
+          (delta.ops || []).forEach(function (op) {
+            if (!op || !op.attributes) return;
+            delete op.attributes.color;
+            delete op.attributes.background;
+          });
+          return delta;
+        }]
+      ];
 
       // Quillインスタンスを作成
       const quill = new Quill(selector, {
         theme: 'bubble',
         placeholder: options.placeholder || defaultPlaceholder,
+        formats: allowedFormats,
         modules: {
           toolbar: options.toolbar || defaultToolbar,
+          clipboard: {
+            matchers: clipboardMatchers
+          },
           keyboard: {
             bindings: {
               // Shift+Enterでbrタグを挿入
@@ -2465,7 +2496,7 @@
     getContent: function (quill) {
       if (!quill) return '';
       const text = quill.getText().trim();
-      const html = quill.root.innerHTML;
+      const html = this._sanitizeHtml(quill.root.innerHTML);
       // 実質的なテキストがなく、かつ画像等もない場合は空文字を返す
       if (text === '' && !quill.root.querySelector('img, iframe, video')) {
         return '';
@@ -2481,10 +2512,55 @@
     setContent: function (quill, html) {
       if (!quill) return;
       if (html) {
-        quill.root.innerHTML = html;
+        quill.root.innerHTML = this._sanitizeHtml(html);
       } else {
         quill.root.innerHTML = '';
       }
+    },
+
+    /**
+     * HTMLから色指定関連を除去
+     * @param {string} html - 元HTML
+     * @returns {string} 色指定除去後HTML
+     */
+    _sanitizeHtml: function (html) {
+      if (!html) return '';
+      const container = document.createElement('div');
+      container.innerHTML = String(html);
+
+      container.querySelectorAll('*').forEach(function (element) {
+        element.removeAttribute('color');
+        element.removeAttribute('bgcolor');
+
+        if (element.hasAttribute('style')) {
+          const retained = element.getAttribute('style').split(';').map(function (item) {
+            return item.trim();
+          }).filter(function (decl) {
+            if (!decl) return false;
+            const pair = decl.split(':');
+            const prop = (pair[0] || '').trim().toLowerCase();
+            return prop !== 'color' && prop !== 'background' && prop !== 'background-color';
+          });
+          if (retained.length) {
+            element.setAttribute('style', retained.join('; '));
+          } else {
+            element.removeAttribute('style');
+          }
+        }
+
+        if (element.className && typeof element.className === 'string') {
+          const classes = element.className.split(/\s+/).filter(function (className) {
+            return className && !/^ql-(color|bg)-/.test(className);
+          });
+          if (classes.length) {
+            element.className = classes.join(' ');
+          } else {
+            element.removeAttribute('class');
+          }
+        }
+      });
+
+      return container.innerHTML;
     },
 
     /**
