@@ -73,7 +73,7 @@
                 if (!skipDirtyCheck && this.isDirty) {
                     if (!confirm('変更を破棄して閉じますか？')) return;
                 }
-                appUi('modal-detail-plan', false);
+                appUi('#modal-detail-plan', false);
                 this._reset();
             },
 
@@ -83,7 +83,7 @@
                     return;
                 }
                 if (this.isDirty && !confirm('変更を破棄しますか？')) return;
-                appUi('modal-detail-plan', false);
+                appUi('#modal-detail-plan', false);
                 this._reset();
             },
 
@@ -236,7 +236,7 @@
                         }, '企画を削除');
 
                         await this._refreshPlansData(true);
-                        appUi('modal-detail-plan', false);
+                        appUi('#modal-detail-plan', false);
                         this._reset();
                         showSnackbar('企画を削除しました', 'success');
                     } catch (error) {
@@ -347,82 +347,42 @@
             },
 
             loadComments: function (planId, skipLoadingCache = false) {
-                const commentsList = document.getElementById('plan-comments-list');
-                if (commentsList) {
-                    commentsList.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
-                }
-
-                const query = {
-                    where: {
-                        related_table: ['=', 'plans'],
-                        related_id: ['=', planId]
-                    },
-                    orderBy: {
-                        created_at: 'desc'
-                    }
-                };
-
-                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, skipLoadingCache)
-                    .then(results => {
-                        if (this.currentId !== planId) return;
-
-                        const comments = results?.data || results || [];
-                        this.renderComments(comments);
-
-                        if (results?.isCached) {
-                            callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, true)
-                                .then(refreshedResults => {
-                                    if (this.currentId !== planId) return;
-                                    const refreshedComments = refreshedResults?.data || refreshedResults || [];
-                                    this.renderComments(refreshedComments);
-                                });
-                        }
-                    })
-                    .catch(error => {
-                        console.error('[PlanDetail] コメント読み込みエラー:', error);
-                        if (this.currentId === planId && commentsList) {
-                            commentsList.innerHTML = '<p class="error-text padding">コメントの読み込みに失敗しました</p>';
-                        }
-                    });
+                App.utils.commentManager.loadComments({
+                    relatedTable: 'plans',
+                    relatedId: planId,
+                    containerId: 'plan-comments-list',
+                    skipLoadingCache: skipLoadingCache,
+                    isCurrent: () => this.currentId === planId,
+                    onRender: (comments) => this.renderComments(comments),
+                    logPrefix: 'PlanDetail'
+                });
             },
 
             renderComments: function (comments) {
-                const container = document.getElementById('plan-comments-list');
-                if (!container) return;
+                App.utils.commentManager.renderComments({
+                    containerId: 'plan-comments-list',
+                    comments: comments,
+                    escapeText: function (value) {
+                        return App.modals.planDetail._escapeHtml(value || '');
+                    },
+                    escapeUrl: function (value) {
+                        return App.modals.planDetail._escapeHtml(value || '#');
+                    }
+                });
+            },
 
-                if (!comments || comments.length === 0) {
-                    container.innerHTML = '<p>コメントはありません</p>';
-                    return;
-                }
-
-                const members = App.state.data.members || [];
-
-                container.innerHTML = comments.map(function (comment, index) {
-                    const creator = members.find(function (m) { return m.id === comment.created_by; });
-                    const creatorName = creator ? creator.display_name : '不明';
-                    const creatorPhoto = creator ? creator.profile_photo_url : '';
-                    const creatorSlackProfileUrl = creator ? creator.slack_profile_url : '#';
-                    const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
-                    const hr = index > 0 ? '<hr class="max small-margin">' : '';
-
-                    const creatorIcon = creatorPhoto
-                        ? '<img src="' + creatorPhoto + '" alt="' + App.modals.planDetail._escapeHtml(creatorName) + '" class="circle tiny">'
-                        : '<i class="tiny">account_circle</i>';
-
-                    return '' +
-                        hr +
-                        '<div class="small-padding">' +
-                        '<div class="row tiny-space">' +
-                        '<a href="' + App.modals.planDetail._escapeHtml(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '</a>' +
-                        '<div class="max row tiny-space">' +
-                        '<span class="bold small-text">' + App.modals.planDetail._escapeHtml(creatorName) + '</span>' +
-                        '<span class="small-text secondary-text">' + createdAt + '</span>' +
-                        '</div>' +
-                        '</div>' +
-                        '<div class="tiny-space"></div>' +
-                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '</p>' +
-                        '</div>';
-                }).join('');
+            // コメントを即座にUIに追加（Optimistic UI Update）
+            appendCommentToUI: function (comment) {
+                App.utils.commentManager.appendCommentToUI({
+                    containerId: 'plan-comments-list',
+                    comment: comment,
+                    escapeText: function (value) {
+                        return App.modals.planDetail._escapeHtml(value || '');
+                    },
+                    escapeUrl: function (value) {
+                        return App.modals.planDetail._escapeHtml(value || '#');
+                    }
+                });
             },
 
             _saveAssignments: async function () {
