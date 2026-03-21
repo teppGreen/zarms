@@ -46,15 +46,6 @@
 5. 新規 skill 追加時は、対応する仕様ドキュメントが `docs` に存在することを確認する。
 6. 運用上は `.github/skills/` のみを更新し、skills は単一配置で運用する。
 
-## 現在の推奨マッピング
-
-- `.github/skills/gas-html-service-practices`  
-  → `docs/api-reference.md`, `docs/testing-guide.md`
-- `.github/skills/ui-styling-gas`  
-  → `docs/beercss-tabulator-reference.md`, `docs/references/beercss-llms.md`
-- `.github/skills/members-tabulator-iframe`  
-  → `docs/beercss-tabulator-reference.md`, 対象ページの実装ファイル
-
 ## 外部参照の扱い
 
 - 外部の長文ガイドは可能な限り `docs/references/` に固定配置する。

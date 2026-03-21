@@ -1488,7 +1488,7 @@
                     <dialog id="modal-board-settings-${boardId}" class="modal medium-width padding">
                         <nav class="small-padding bottom-margin">
                             <h5 class="max bold">ボード設定</h5>
-                            <button class="circle transparent" onclick="appUi('#modal-board-settings-${boardId}')">
+                            <button class="circle transparent" onclick="appUi('#modal-board-settings-${boardId},false')">
                                 <i>close</i>
                             </button>
                         </nav>
@@ -1517,7 +1517,7 @@
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
 
                 // モーダルを開く
-                appUi(`#modal-board-settings-${boardId}`);
+                appUi(`#modal-board-settings-${boardId}`,true);
             },
 
             /**
@@ -1544,7 +1544,7 @@
 
                 // 変更がない場合は閉じるだけ
                 if (oldName === newName && oldDescription === newDescription) {
-                    appUi(`#modal-board-settings-${boardId}`);
+                    appUi(`#modal-board-settings-${boardId}`,false);
                     return;
                 }
 
@@ -1567,7 +1567,7 @@
                 }
 
                 // モーダルを閉じる
-                appUi(`#modal-board-settings-${boardId}`);
+                appUi(`#modal-board-settings-${boardId}`,false);
 
                 try {
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'update', {

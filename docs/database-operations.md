@@ -140,7 +140,6 @@ const result = remove('temporary_records', {
     }
 });
 ```
-※物理削除ではなく論理削除を採用する場合は、 `update`関数を用いて特定のフラグ（例: `is_deleted`）を変更することを推奨します。
 
 ---
 
