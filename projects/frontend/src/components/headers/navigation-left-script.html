@@ -4,6 +4,38 @@
             leftNavPreferredSize: 'min',
             leftNavIsHovering: false,
 
+            applyTabHeightImmediately: function (tabName, boardId = null) {
+                const run = () => {
+                    try {
+                        if (tabName === 'home' && App.pages.home && typeof App.pages.home.applyLayoutHeight === 'function') {
+                            App.pages.home.applyLayoutHeight();
+                            return;
+                        }
+
+                        const isBoardTab = typeof tabName === 'string' && tabName.startsWith('board-');
+                        if (isBoardTab && App.pages.boards && typeof App.pages.boards.applyCurrentLayoutHeight === 'function') {
+                            const targetBoardId = boardId || tabName.replace('board-', '');
+                            App.pages.boards.applyCurrentLayoutHeight(targetBoardId);
+                            return;
+                        }
+
+                        if (tabName === 'catalog' && App.pages.members && typeof App.pages.members.applyCurrentLayoutHeight === 'function') {
+                            App.pages.members.applyCurrentLayoutHeight();
+                            return;
+                        }
+
+                        if (tabName === 'boards' && App.pages.boardsList && typeof App.pages.boardsList.applyCurrentLayoutHeight === 'function') {
+                            App.pages.boardsList.applyCurrentLayoutHeight();
+                        }
+                    } catch (error) {
+                        console.warn('[navigation] applyTabHeightImmediately failed:', error);
+                    }
+                };
+
+                run();
+                requestAnimationFrame(run);
+            },
+
             applyLeftNavSize: function (size) {
                 const leftNav = document.getElementById('left-nav');
                 if (!leftNav) return;
@@ -141,6 +173,7 @@
                         const targetBoardPage = document.getElementById(targetBoardPageId);
                         if (targetBoardPage) {
                             targetBoardPage.style.display = 'block';
+                            this.applyTabHeightImmediately(tabName, boardId);
                             if (!skipLoadData && App.pages.boards && App.pages.boards.loadData) {
                                 // 既に描画済み（キャンバスにコンテンツがある）場合はtrueを渡してローディング表示をスキップ
                                 const viewMode = (App.pages.boards && App.pages.boards.viewMode) ? App.pages.boards.viewMode : 'kanban';
@@ -165,6 +198,7 @@
 
                     if (targetPage) {
                         targetPage.style.display = 'block';
+                        this.applyTabHeightImmediately(tabName);
 
                         let isBackground = false;
                         if (tabName === 'home') {

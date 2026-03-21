@@ -16,6 +16,24 @@
         });
 
         App.utils.header = {
+            isSafeExternalUrl: function (url) {
+                try {
+                    if (!url) return false;
+                    const parsed = new URL(url, window.location.origin);
+                    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+                } catch (error) {
+                    return false;
+                }
+            },
+
+            openExternalUrl: function (url) {
+                if (!this.isSafeExternalUrl(url)) {
+                    showSnackbar('不正なURLのため開けませんでした', 'error');
+                    return;
+                }
+                window.open(url, '_blank', 'noopener,noreferrer');
+            },
+
             shortcuts: {
                 open: function () {
                     const dialog = document.getElementById('modal-shortcuts-help');
@@ -70,17 +88,29 @@
 
                 // リンクボタンを生成
                 const appsHtml = apps.map(app => {
+                    const appUrl = String(app.url || '');
+                    const encodedUrl = encodeURIComponent(appUrl);
+                    const safeName = escapeHtml(app.name || '');
+                    const safeAttrUrl = escapeHtml(appUrl);
 
                     return `
-                        <article class="background no-elevate small-round small-margin row" onclick="window.open('${app.url}', '_blank', 'noopener noreferrer')">
-                            <img class="square tiny small-round" src="https:\/\/t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${app.url}&size=128"
-                                alt="${app.name}">
-                            <span class="no-wrap">${app.name}</span>
+                        <article class="background no-elevate small-round small-margin row" data-app-url="${safeAttrUrl}" style="cursor: pointer;">
+                            <img class="square tiny small-round" src="https:\/\/t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodedUrl}&size=128"
+                                alt="${safeName}">
+                            <span class="no-wrap">${safeName}</span>
                         </article>
                     `;
                 }).join('');
 
                 appsGrid.innerHTML = appsHtml;
+
+                const appItems = appsGrid.querySelectorAll('[data-app-url]');
+                appItems.forEach((el) => {
+                    el.addEventListener('click', () => {
+                        const url = el.getAttribute('data-app-url') || '';
+                        App.utils.header.openExternalUrl(url);
+                    });
+                });
             },
 
             /**
