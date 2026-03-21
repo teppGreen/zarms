@@ -174,7 +174,15 @@
       },
 
       onPrimaryAction: function () {
-        this.requestClose('primary-action');
+        this.syncDirtyState('onPrimaryAction');
+
+        // 「変更を保存」ボタン押下時は確認ダイアログを表示せず、そのまま保存する
+        if (this.hasUnsavedChanges()) {
+          this.save();
+          return;
+        }
+
+        this.close(false, true);
       },
 
       open: async function (taskId, skipUrlUpdate = false, defaultDirty = false) {
@@ -415,7 +423,7 @@
           return true;
         }
 
-        closeModal('modal-detail-task');
+        appUi('#modal-detail-task', false);
         this.reset();
 
         // URLパラメータからモーダル関連のパラメータを削除（skipUrlUpdateがfalseの場合のみ）
@@ -446,7 +454,7 @@
           }
         }
 
-        closeModal('modal-detail-task');
+        appUi('#modal-detail-task', false);
         this.reset();
 
         // URLパラメータを更新
@@ -654,7 +662,7 @@
         // 変更フラグをクリアしてモーダルを閉じる
         this.isDirty = false;
         this.updateActionButtons();
-        closeModal('modal-detail-task');
+        appUi('#modal-detail-task', false);
 
         // URLパラメータを更新
         if (App.utils.url && App.utils.url.updateParams) {
@@ -2147,20 +2155,17 @@
         const query = {
           where: {
             table_name: ['=', 'tasks'],
-            operation_type_key: ['=', 'UPDATE']
+            record_id: ['=', taskId]
           },
           orderBy: {
             created_at: 'desc'
-          },
-          limit: 300
+          }
         };
 
         callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LOGS, 'select', query, null, true)
           .then(result => {
             if (this.currentId !== taskId) return;
-
-            const logs = result?.data || result || [];
-            this.currentHistoryLogs = logs.filter(log => this.isTaskHistoryLog(log, taskId));
+            this.currentHistoryLogs = result?.data || result || [];
             this.historyLoadError = null;
             this.renderHistoryLogs();
             this.updateHistoryBadge();
@@ -2172,66 +2177,6 @@
             this.renderHistoryLogs();
             this.updateHistoryBadge();
           });
-      },
-
-      /**
-       * ログdataのJSONから対象taskIdを推定
-       * @param {Object|string|null} logData - log.data
-       * @returns {string}
-       */
-      extractTaskIdFromLogData: function (logData) {
-        let parsed = logData;
-        if (typeof parsed === 'string') {
-          try {
-            parsed = JSON.parse(parsed);
-          } catch (e) {
-            return '';
-          }
-        }
-
-        if (!parsed) return '';
-
-        if (Array.isArray(parsed)) {
-          if (parsed.length === 1 && parsed[0] && typeof parsed[0].id === 'string') {
-            return parsed[0].id;
-          }
-          return '';
-        }
-
-        if (typeof parsed.id === 'string') {
-          return parsed.id;
-        }
-
-        const whereId = parsed?.where?.id;
-        if (Array.isArray(whereId) && whereId.length >= 2) {
-          const operator = String(whereId[0] || '').toLowerCase();
-          const value = whereId[1];
-          if ((operator === '=' || operator === '==') && typeof value === 'string') {
-            return value;
-          }
-        } else if (typeof whereId === 'string') {
-          return whereId;
-        }
-
-        return '';
-      },
-
-      /**
-       * 対象タスクの履歴ログかどうか判定
-       * @param {Object} log - logsレコード
-       * @param {string} taskId - タスクID
-       * @returns {boolean}
-       */
-      isTaskHistoryLog: function (log, taskId) {
-        if (!log || log.table_name !== 'tasks') return false;
-        if (!taskId) return false;
-
-        if (log.record_id && log.record_id === taskId) {
-          return true;
-        }
-
-        const inferredTaskId = this.extractTaskIdFromLogData(log.data);
-        return inferredTaskId === taskId;
       },
 
       /**

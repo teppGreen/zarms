@@ -73,7 +73,7 @@
                 if (!skipDirtyCheck && this.isDirty) {
                     if (!confirm('変更を破棄して閉じますか？')) return;
                 }
-                closeModal('modal-detail-plan');
+                appUi('modal-detail-plan', false);
                 this._reset();
             },
 
@@ -83,7 +83,7 @@
                     return;
                 }
                 if (this.isDirty && !confirm('変更を破棄しますか？')) return;
-                closeModal('modal-detail-plan');
+                appUi('modal-detail-plan', false);
                 this._reset();
             },
 
@@ -236,7 +236,7 @@
                         }, '企画を削除');
 
                         await this._refreshPlansData(true);
-                        closeModal('modal-detail-plan');
+                        appUi('modal-detail-plan', false);
                         this._reset();
                         showSnackbar('企画を削除しました', 'success');
                     } catch (error) {
