@@ -8,6 +8,7 @@ const SPREADSHEET_ID = scriptProperties.getProperty('SPREADSHEET_ID');
 const TABLE_NAMES = {
   LOGS: 'logs',
   BOARDS: 'boards',
+  NOTICES: 'notices',
   COMMENTS: 'comments',
   DIRECTORIES: 'directories',
   APPS: 'apps',
@@ -38,6 +39,7 @@ const TABLE_NAMES = {
 const TABLE_HEADERS = {
   LOGS: ['id', 'operation_type_key', 'table_name', 'record_id', 'data', 'remark', 'created_by', 'created_at'],
   BOARDS: ['id', 'display_id', 'email', 'name', 'user_note', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
+  NOTICES: ['id', 'title', 'category', 'body', 'starts_at', 'ends_at', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   COMMENTS: ['id', 'display_id', 'content', 'mentioned_to', 'related_table', 'related_id', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   DIRECTORIES: ['id', 'display_id', 'parent_directory_id', 'directory_type_key', 'name', 'description', 'achievements', 'scale', 'slack_channel_url', 'website_url', 'folder_url', 'document_url', 'logo_image_url', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   APPS: ['id', 'name', 'url', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
@@ -48,7 +50,7 @@ const TABLE_HEADERS = {
   SKILL_ASSIGNMENTS: ['id', 'member_id', 'skill_id', 'skill_level_key', 'user_note', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   TASKS: ['id', 'display_id', 'parent_task_id', 'board_id', 'name', 'description', 'starts_at', 'ends_at', 'task_status_key', 'priority_key', 'processed_by', 'reviewed_by', 'received_by', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   LISTS: ['id', 'index', 'task_id', 'is_done', 'name', 'assign_to', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
-  LINKS: ['id', 'index', 'task_id', 'label', 'url', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
+  LINKS: ['id', 'label', 'url', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   FILES: ['id', 'index', 'task_id', 'gfile_id', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   SYSTEM_UPDATES: ['id', 'version', 'title', 'user_note', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   QUESTIONS: ['id', 'question_number', 'created_at', 'question_category', 'question_content', 'remark', 'created_by', 'updated_by', 'updated_at'],
