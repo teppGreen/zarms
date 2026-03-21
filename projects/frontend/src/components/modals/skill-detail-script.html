@@ -77,7 +77,7 @@
                 }
                 if (errorEl) errorEl.style.display = 'none';
                 if (saveBtn) saveBtn.disabled = true;
-                showSnackbar('スキルを保存しています...', 'info', 'top', 0);
+                showSnackbar('技能を保存しています...', 'info', 'top', 0);
 
                 const updates = {
                     title: title,
@@ -102,7 +102,7 @@
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILLS, 'update', {
                         where: { id: ['=', this.currentId] },
                         set: updates
-                    }, 'スキルを更新');
+                    }, '技能を更新');
 
                     const target = (App.state.data.skills || []).find(function (item) {
                         return item.id === App.modals.skillDetail.currentId;
@@ -111,7 +111,7 @@
                         Object.assign(target, updates);
                     }
 
-                    showSnackbar('スキルを更新しました', 'success');
+                    showSnackbar('技能を更新しました', 'success');
                     if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
                         App.utils.modalFlow.refreshMembersDataInBackground(true);
                     } else if (App.pages.members && App.pages.members.loadData) {
@@ -129,7 +129,7 @@
                     }
                 } catch (err) {
                     console.error('[SkillDetail] save failed:', err);
-                    showSnackbar('スキルの更新に失敗しました', 'error');
+                    showSnackbar('技能の更新に失敗しました', 'error');
                     if (errorEl) {
                         errorEl.textContent = '更新に失敗しました';
                         errorEl.style.display = '';
@@ -262,7 +262,7 @@
                 const members = App.state.data.members || [];
 
                 if (assignments.length === 0) {
-                    container.innerHTML = '<p class="secondary-text padding">登録メンバーはありません</p>';
+                    container.innerHTML = '<p class="secondary-text padding">この技能を保有している人物はいません</p>';
                     return;
                 }
 
@@ -333,8 +333,6 @@
                 const skillId = this.currentId;
                 const assignments = App.state.data.skillAssignments || [];
 
-                showSnackbar('スキルを登録しています...', 'info', 'top', 0);
-
                 try {
                     for (let i = 0; i < memberIds.length; i++) {
                         const memberId = memberIds[i];
@@ -345,7 +343,7 @@
                                 await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
                                     where: { id: ['=', existing.id] },
                                     set: { skill_level_key: levelKey }
-                                }, 'スキルレベルを更新');
+                                }, '技能レベルを更新');
                                 existing.skill_level_key = levelKey;
                             }
                             continue;
@@ -357,17 +355,15 @@
                             skill_level_key: levelKey
                         };
 
-                        const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'insert', record, 'スキルを追加');
+                        const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'insert', record, '技能を追加');
                         if (inserted && inserted.data && inserted.data.id) {
                             record.id = inserted.data.id;
                         }
                         assignments.push(record);
                     }
-
-                    showSnackbar('スキルを登録しました', 'success');
                 } catch (err) {
                     console.error('[SkillDetail] 追加エラー:', err);
-                    showSnackbar('スキルの登録に失敗しました', 'error');
+                    showSnackbar('技能の登録に失敗しました', 'error');
                     if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
                         App.utils.modalFlow.refreshMembersDataInBackground(true);
                     } else if (App.pages.members && App.pages.members.loadData) {
@@ -394,10 +390,9 @@
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
                         where: { id: ['=', assignmentId] },
                         set: { skill_level_key: levelKey }
-                    }, 'スキルレベルを更新');
+                    }, '技能レベルを更新');
 
                     target.skill_level_key = levelKey;
-                    showSnackbar('スキルレベルを更新しました', 'success');
                 } catch (err) {
                     console.error('[SkillDetail] 更新エラー:', err);
                     showSnackbar('更新に失敗しました', 'error');
@@ -426,8 +421,7 @@
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
                         where: { id: ['=', assignmentId] },
                         set: { user_note: normalizedRemark }
-                    }, 'メンバースキルメモを更新');
-                    showSnackbar('メモを更新しました', 'success');
+                    }, '人物・技能メモを更新');
                 } catch (err) {
                     console.error('[SkillDetail] メモ更新エラー:', err);
                     target.user_note = prevRemark;
@@ -444,7 +438,6 @@
 
             removeAssignment: async function (assignmentId) {
                 if (!assignmentId) return;
-                if (!confirm('このスキル割り当てを解除しますか？')) return;
 
                 const assignments = App.state.data.skillAssignments || [];
                 const targetIndex = assignments.findIndex(function (sa) { return sa.id === assignmentId; });
@@ -453,10 +446,8 @@
                 try {
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'remove', {
                         where: { id: ['=', assignmentId] }
-                    }, 'スキル割り当てを解除');
-
+                    }, '技能割り当てを解除');
                     assignments.splice(targetIndex, 1);
-                    showSnackbar('スキル割り当てを解除しました', 'success');
                 } catch (err) {
                     console.error('[SkillDetail] 解除エラー:', err);
                     showSnackbar('解除に失敗しました', 'error');

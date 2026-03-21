@@ -8,7 +8,6 @@
             isSaving: false,
             isDirty: false,
             quill: null,
-            // 一時保存用: 所属組織とスキルの変更を保存するまで保持
             pendingDirectoryChanges: { toAdd: [], toRemove: [], toUpdate: [] },
             pendingSkillChanges: { toAdd: [], toRemove: [], toUpdate: [] },
             originalDirectories: [],
@@ -39,7 +38,7 @@
                 this.pendingDirectoryChanges = { toAdd: [], toRemove: [], toUpdate: [] };
                 this.pendingSkillChanges = { toAdd: [], toRemove: [], toUpdate: [] };
                 
-                // 現在の所属・スキルを取得して保持
+                // 現在の所属・技能を取得して保持
                 const assignments = App.state.data.directoryAssignments || [];
                 const skillAssignments = App.state.data.skillAssignments || [];
                 this.originalDirectories = assignments
@@ -203,7 +202,7 @@
                     }
                 }
 
-                // 所属組織・スキルの変更があるかチェック
+                // 所属組織・技能の変更があるかチェック
                 const hasDirectoryChanges = this.pendingDirectoryChanges.toAdd.length > 0 ||
                     this.pendingDirectoryChanges.toRemove.length > 0 ||
                     this.pendingDirectoryChanges.toUpdate.length > 0;
@@ -230,7 +229,7 @@
                         await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'update', {
                             where: { id: ['=', id] },
                             set: updates
-                        }, 'メンバーを更新');
+                        }, '人物情報を更新');
                     }
 
                     // 所属組織の変更を保存
@@ -517,7 +516,7 @@
                         return id !== skillId;
                     });
 
-                    // 既存のスキルかチェック
+                    // 既存の技能かチェック
                     const existing = self.originalSkills.find(function (s) {
                         return s.skill_id === skillId;
                     });
@@ -550,12 +549,11 @@
 
                 this._setDirty(true);
                 this._renderSkills(memberId);
-                showSnackbar('スキルを追加しました（保存ボタンで確定）', 'info');
             },
 
             removeSkillAssignment: function (assignmentId, skillId) {
                 if (!skillId) return;
-                if (!confirm('スキルを削除しますか？')) return;
+                if (!confirm('技能を削除しますか？')) return;
 
                 // 追加予定リストから削除
                 this.pendingSkillChanges.toAdd = this.pendingSkillChanges.toAdd.filter(function (s) {
@@ -572,7 +570,6 @@
 
                 this._setDirty(true);
                 this._renderSkills(this.currentId);
-                showSnackbar('スキルを削除しました（保存ボタンで確定）', 'info');
             },
 
             updateSkillLevel: function (assignmentId, skillId, levelKey) {
@@ -610,7 +607,6 @@
 
                 this._setDirty(true);
                 this._renderSkills(this.currentId);
-                showSnackbar('スキルレベルを変更しました（保存ボタンで確定）', 'info');
             },
 
             updateSkillRemark: function (assignmentId, skillId, remarkValue) {
@@ -694,7 +690,6 @@
                 }
             },
 
-            // 保存時に呼ばれる関数: スキルの変更をDBに反映
             _saveSkillChanges: async function (memberId) {
                 const assignments = App.state.data.skillAssignments || [];
 
@@ -716,7 +711,7 @@
                 // 追加
                 for (let i = 0; i < this.pendingSkillChanges.toAdd.length; i++) {
                     const record = this.pendingSkillChanges.toAdd[i];
-                    const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'insert', record, 'スキルを追加');
+                    const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'insert', record, '技能を追加');
                     if (inserted && inserted.data && inserted.data.id) {
                         record.id = inserted.data.id;
                         assignments.push(record);
@@ -986,7 +981,7 @@
                 });
 
                 if (currentSkills.length === 0) {
-                    container.innerHTML = '<p class="secondary-text padding">スキル情報はありません</p>';
+                    container.innerHTML = '<p class="secondary-text padding">技能情報はありません</p>';
                     return;
                 }
 
@@ -1002,7 +997,7 @@
 
                 container.innerHTML = currentSkills.map(function (sa) {
                     const skill = skills.find(function (s) { return s.id === sa.skill_id; });
-                    const skillName = skill ? skill.title : '（削除済みスキル）';
+                    const skillName = skill ? skill.title : '（削除済み技能）';
                     const level = levelLabels[sa.skill_level_key] || sa.skill_level_key || '';
                     const note = sa.user_note || sa.remark || '';
                     const levelSelect = '<select class="small" onchange="App.modals.memberDetail.updateSkillLevel(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\', this.value)">' + levelOptions(sa.skill_level_key) + '</select>';

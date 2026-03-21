@@ -207,7 +207,7 @@
                 if (!selectedIds || selectedIds.length === 0) return;
 
                 const assignments = App.state.data.directoryAssignments || [];
-                showSnackbar('所属メンバーを更新しています...', 'info', 'top', 0);
+                showSnackbar('所属人物を更新しています...', 'info', 'top', 0);
 
                 try {
                     for (let i = 0; i < selectedIds.length; i++) {
@@ -221,7 +221,7 @@
                                 await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
                                     where: { id: ['=', existing.id] },
                                     set: { is_active: true }
-                                }, '所属メンバーを更新');
+                                }, '所属人物を更新');
                                 existing.is_active = true;
                             }
                             continue;
@@ -233,17 +233,17 @@
                             is_active: true
                         };
 
-                        const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'insert', record, '所属メンバーを追加');
+                        const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'insert', record, '所属人物を追加');
                         if (inserted && inserted.data && inserted.data.id) {
                             record.id = inserted.data.id;
                         }
                         assignments.push(record);
                     }
 
-                    showSnackbar('所属メンバーを更新しました', 'success');
+                    showSnackbar('所属人物を更新しました', 'success');
                 } catch (err) {
                     console.error('[directoryDetail] applyMembersSelection failed', err);
-                    showSnackbar('所属メンバーの更新に失敗しました', 'error');
+                    showSnackbar('所属人物の更新に失敗しました', 'error');
                     if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
                         App.utils.modalFlow.refreshMembersDataInBackground(true);
                     } else if (App.pages.members && App.pages.members.loadData) {
@@ -264,7 +264,7 @@
 
             deactivateMemberAssignment: async function (assignmentId) {
                 if (!assignmentId) return;
-                if (!confirm('所属メンバーを解除しますか？')) return;
+                if (!confirm('所属人物を解除しますか？')) return;
 
                 const assignments = App.state.data.directoryAssignments || [];
                 const target = assignments.find(function (a) { return a.id === assignmentId; });
@@ -274,12 +274,12 @@
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
                         where: { id: ['=', assignmentId] },
                         set: { is_active: false }
-                    }, '所属メンバーを解除');
+                    }, '所属人物を解除');
                     target.is_active = false;
-                    showSnackbar('所属メンバーを解除しました', 'success');
+                    showSnackbar('所属人物を解除しました', 'success');
                 } catch (err) {
                     console.error('[directoryDetail] deactivateMemberAssignment failed', err);
-                    showSnackbar('所属メンバーの解除に失敗しました', 'error');
+                    showSnackbar('所属人物の解除に失敗しました', 'error');
                     if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
                         App.utils.modalFlow.refreshMembersDataInBackground(true);
                     } else if (App.pages.members && App.pages.members.loadData) {
@@ -322,7 +322,7 @@
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
                         where: { id: ['=', assignmentId] },
                         set: { role: normalizedRole }
-                    }, '所属メンバーの役割を更新');
+                    }, '所属人物の役割を更新');
                     showSnackbar('役割を更新しました', 'success');
                 } catch (err) {
                     console.error('[directoryDetail] updateMemberRole failed', err);
@@ -425,9 +425,9 @@
                 const activeInput = document.getElementById('directory-detail-is-active-input');
                 if (activeInput) activeInput.checked = directory.is_active !== false;
                 const memberCountEl = document.getElementById('directory-detail-member-count');
-                if (memberCountEl) memberCountEl.textContent = '所属メンバー数 ' + String(assignments.length);
+                if (memberCountEl) memberCountEl.textContent = '所属人数 ' + String(assignments.length);
                 const membersEl = document.getElementById('directory-detail-members');
-                if (membersEl) membersEl.innerHTML = chips || '<p class="small-text secondary-text">所属メンバーはありません</p>';
+                if (membersEl) membersEl.innerHTML = chips || '<p class="small-text secondary-text">所属人物はありません</p>';
                 const errorEl = document.getElementById('directory-detail-error');
                 if (errorEl) errorEl.style.display = 'none';
                 this._setSaveState(false);
