@@ -2,7 +2,8 @@
     (function () {
         App.pages.insights = {
             isLoading: false,
-            logs: [],
+            taskLogs: [],
+            taskMetaMap: new Map(),
 
             loadData: async function (forceRefresh = false) {
                 this.isLoading = true;
@@ -12,20 +13,36 @@
                     const start = new Date();
                     start.setDate(start.getDate() - 30);
 
-                    const logsRes = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LOGS, 'select', {
-                        where: {
-                            created_at: ['>', start.toISOString()]
-                        },
-                        orderBy: { created_at: 'desc' },
-                        limit: 500
-                    }, null, forceRefresh);
+                    const [logsRes, tasksRes] = await Promise.allSettled([
+                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LOGS, 'select', {
+                            where: {
+                                created_at: ['>', start.toISOString()]
+                            },
+                            orderBy: { created_at: 'desc' },
+                            limit: 2000
+                        }, null, forceRefresh),
+                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
+                            columns: ['id', 'display_id', 'name', 'board_id']
+                        }, null, forceRefresh)
+                    ]);
 
-                    const logs = logsRes?.data || logsRes || [];
-                    this.logs = this.filterRelatedLogs(logs);
-                    this.renderWeekdayChart();
+                    const unwrapArray = (result) => {
+                        if (!result || result.status !== 'fulfilled') return [];
+                        const value = result.value;
+                        return value?.data || value || [];
+                    };
+
+                    const logs = unwrapArray(logsRes);
+                    const tasks = unwrapArray(tasksRes);
+
+                    this.taskLogs = this.filterTaskLogs(logs);
+                    this.taskMetaMap = this.buildTaskMetaMap(tasks);
+                    this.renderCharts();
                 } catch (error) {
                     console.error('[Insights] loadData failed:', error);
                     this.showError('insights-weekday-chart', '分析データの読み込みに失敗しました');
+                    this.showError('insights-task-ranking-chart', '分析データの読み込みに失敗しました');
+                    this.showError('insights-board-ranking-chart', '分析データの読み込みに失敗しました');
                 } finally {
                     this.isLoading = false;
                     this.updateActionState();
@@ -33,11 +50,12 @@
             },
 
             setLoadingState: function () {
-                const chartContainer = document.getElementById('insights-weekday-chart');
-                if (chartContainer) {
+                ['insights-weekday-chart', 'insights-task-ranking-chart', 'insights-board-ranking-chart'].forEach((id) => {
+                    const chartContainer = document.getElementById(id);
+                    if (!chartContainer) return;
                     chartContainer.classList.add('shimmer-loading');
                     chartContainer.innerHTML = '';
-                }
+                });
                 this.updateActionState();
             },
 
@@ -53,23 +71,42 @@
                 el.innerHTML = '<div class="padding error-text center-align"><i>error</i><p>' + escapeHtml(message) + '</p></div>';
             },
 
+            showEmpty: function (elementId, message) {
+                const el = document.getElementById(elementId);
+                if (!el) return;
+                el.classList.remove('shimmer-loading');
+                el.innerHTML = '<div class="padding secondary-text center-align"><i>info</i><p>' + escapeHtml(message) + '</p></div>';
+            },
+
+            renderCharts: function () {
+                if (!(window.google && google.charts && google.visualization)) {
+                    this.renderTaskRankingChart();
+                    this.renderBoardRankingChart();
+
+                    if (window.google && google.charts && typeof google.charts.setOnLoadCallback === 'function') {
+                        google.charts.setOnLoadCallback(() => {
+                            this.renderWeekdayChart();
+                        });
+                    } else {
+                        this.showError('insights-weekday-chart', '曜日別グラフのライブラリ読み込みに失敗しました');
+                    }
+                    return;
+                }
+
+                this.renderWeekdayChart();
+                this.renderTaskRankingChart();
+                this.renderBoardRankingChart();
+            },
+
             renderWeekdayChart: function () {
                 const container = document.getElementById('insights-weekday-chart');
                 if (!container) return;
                 container.classList.remove('shimmer-loading');
 
-                if (!(window.google && google.charts && google.visualization)) {
-                    container.classList.add('shimmer-loading');
-                    google.charts.setOnLoadCallback(() => {
-                        this.renderWeekdayChart();
-                    });
-                    return;
-                }
-
                 const weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'];
                 const counts = [0, 0, 0, 0, 0, 0, 0];
 
-                this.logs.forEach(function (log) {
+                this.taskLogs.forEach(function (log) {
                     const time = log && log.created_at ? new Date(log.created_at) : null;
                     if (!time || Number.isNaN(time.getTime())) return;
                     counts[time.getDay()] += 1;
@@ -94,55 +131,180 @@
                 chart.draw(dataTable, options);
             },
 
-            filterRelatedLogs: function (logs) {
-                return (logs || []).filter((log) => this.isLogRelatedToCurrentUser(log));
-            },
+            renderTaskRankingChart: function () {
+                const container = document.getElementById('insights-task-ranking-chart');
+                if (!container) return;
+                container.classList.remove('shimmer-loading');
 
-            isLogRelatedToCurrentUser: function (log) {
-                if (!log || !log.data) return false;
+                const counts = new Map();
+                this.taskLogs.forEach((log) => {
+                    const taskId = this.extractTaskIdFromLog(log);
+                    if (!taskId) return;
+                    counts.set(taskId, (counts.get(taskId) || 0) + 1);
+                });
 
-                const userId = App.state.userId;
-                if (!userId) return false;
+                const ranking = Array.from(counts.entries())
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10)
+                    .map(([taskId, count]) => ({ taskId: taskId, count: count }));
 
-                let parsed;
-                try {
-                    parsed = typeof log.data === 'string' ? JSON.parse(log.data) : log.data;
-                } catch (error) {
-                    return false;
-                }
-
-                const memberIds = new Set();
-                this.collectMemberIds(parsed, memberIds);
-                return memberIds.has(userId);
-            },
-
-            collectMemberIds: function (value, out) {
-                if (!value || !out) return;
-
-                if (Array.isArray(value)) {
-                    value.forEach((item) => this.collectMemberIds(item, out));
+                if (ranking.length === 0) {
+                    this.showEmpty('insights-task-ranking-chart', '集計対象のタスク更新ログがありません');
                     return;
                 }
 
-                if (typeof value !== 'object') return;
+                let html = `
+                    <table class="border small-text">
+                      <thead class="fixed surface-container-low">
+                        <tr>
+                           <th class="center-align" style="width: 0; white-space: nowrap;">順位</th>
+                           <th class="left-align">タスク名</th>
+                           <th class="right-align" style="width: 0; white-space: nowrap;">件数</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                `;
 
-                Object.keys(value).forEach((key) => {
-                    const current = value[key];
-                    const lowerKey = String(key || '').toLowerCase();
-                    const isMemberKey =
-                        lowerKey === 'member_id' ||
-                        lowerKey.endsWith('_member_id') ||
-                        lowerKey.endsWith('_by') ||
-                        lowerKey === 'assign_to' ||
-                        lowerKey === 'mentioned_to' ||
-                        lowerKey === 'applied_by';
+                let currentRank = 1;
+                ranking.forEach((item, index) => {
+                    const taskMeta = this.taskMetaMap.get(item.taskId) || {};
+                    const prefix = taskMeta.display_id ? ('#' + taskMeta.display_id + ' ') : '';
+                    const taskName = (prefix + (taskMeta.name || '不明なタスク')).trim();
 
-                    if (isMemberKey && typeof current === 'string' && current) {
-                        out.add(current);
+                    if (index > 0 && ranking[index - 1].count !== item.count) {
+                        currentRank = index + 1;
                     }
 
-                    this.collectMemberIds(current, out);
+                    html += `
+                        <tr>
+                            <td class="center-align font-number">${currentRank}</td>
+                            <td class="left-align">${escapeHtml(taskName)}</td>
+                            <td class="right-align font-number">${item.count}</td>
+                        </tr>
+                    `;
                 });
+
+                html += `</tbody></table>`;
+                container.innerHTML = html;
+            },
+
+            renderBoardRankingChart: function () {
+                const container = document.getElementById('insights-board-ranking-chart');
+                if (!container) return;
+                container.classList.remove('shimmer-loading');
+
+                const counts = new Map();
+                this.taskLogs.forEach((log) => {
+                    const boardId = this.extractBoardIdFromLog(log);
+                    if (!boardId) return;
+                    counts.set(boardId, (counts.get(boardId) || 0) + 1);
+                });
+
+                const boardNameMap = new Map((App.state.data.boards || []).map((board) => [board.id, board.name || '無名のボード']));
+
+                const ranking = Array.from(counts.entries())
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10)
+                    .map(([boardId, count]) => ({
+                        boardId: boardId,
+                        count: count,
+                        name: boardNameMap.get(boardId) || ('不明なボード (' + boardId + ')')
+                    }));
+
+                if (ranking.length === 0) {
+                    this.showEmpty('insights-board-ranking-chart', '集計対象のボード更新ログがありません');
+                    return;
+                }
+
+                let html = `
+                    <table class="border small-text">
+                      <thead class="fixed surface-container-low">
+                        <tr>
+                           <th class="center-align" style="width: 0; white-space: nowrap;">順位</th>
+                           <th class="left-align">ボード名</th>
+                           <th class="right-align" style="width: 0; white-space: nowrap;">件数</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                `;
+
+                let currentRank = 1;
+                ranking.forEach((item, index) => {
+                    if (index > 0 && ranking[index - 1].count !== item.count) {
+                        currentRank = index + 1;
+                    }
+
+                    html += `
+                        <tr style="cursor: pointer;" onclick="App.utils.navigation.switchTab('board-${item.boardId}')">
+                            <td class="center-align font-number">${currentRank}</td>
+                            <td class="left-align">${escapeHtml(item.name)}</td>
+                            <td class="right-align font-number">${item.count}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `</tbody></table>`;
+                container.innerHTML = html;
+            },
+
+            filterTaskLogs: function (logs) {
+                return (logs || []).filter((log) => log && log.table_name === TABLE_NAMES.TASKS);
+            },
+
+            buildTaskMetaMap: function (tasks) {
+                return new Map((tasks || []).map((task) => {
+                    return [task.id, {
+                        id: task.id,
+                        display_id: task.display_id,
+                        name: task.name,
+                        board_id: task.board_id
+                    }];
+                }));
+            },
+
+            extractTaskIdFromLog: function (log) {
+                if (!log) return '';
+                if (typeof log.record_id === 'string' && log.record_id) return log.record_id;
+
+                const data = this.parseLogData(log);
+                if (!data || typeof data !== 'object') return '';
+
+                if (typeof data.id === 'string' && data.id) return data.id;
+
+                const whereId = data.where && data.where.id;
+                if (Array.isArray(whereId) && whereId.length >= 2) {
+                    const operator = String(whereId[0] || '').toLowerCase();
+                    if ((operator === '=' || operator === '==') && typeof whereId[1] === 'string') {
+                        return whereId[1];
+                    }
+                }
+
+                return '';
+            },
+
+            extractBoardIdFromLog: function (log) {
+                const data = this.parseLogData(log);
+
+                if (data && typeof data === 'object') {
+                    if (typeof data.board_id === 'string' && data.board_id) return data.board_id;
+                    if (data.set && typeof data.set.board_id === 'string' && data.set.board_id) return data.set.board_id;
+                }
+
+                const taskId = this.extractTaskIdFromLog(log);
+                if (!taskId) return '';
+
+                const taskMeta = this.taskMetaMap.get(taskId);
+                if (!taskMeta || typeof taskMeta.board_id !== 'string') return '';
+                return taskMeta.board_id;
+            },
+
+            parseLogData: function (log) {
+                if (!log || !log.data) return null;
+                try {
+                    return typeof log.data === 'string' ? JSON.parse(log.data) : log.data;
+                } catch (error) {
+                    return null;
+                }
             }
         };
 

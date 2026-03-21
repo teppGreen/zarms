@@ -4,12 +4,15 @@
             clickHandler: null,
             contextMenuHandler: null,
             boardTaskStats: {},
+            isResizeHandlerBound: false,
+            resizeRafId: null,
             sortState: [
                 { col: 'board_state', dir: 'desc' },
                 { col: 'name', dir: 'desc' }
             ],
 
             loadData: async function (isRefresh = false) {
+                this.setupResizeHandler();
                 if (!isRefresh) {
                     this.renderTable(true);
                 }
@@ -236,6 +239,49 @@
                 });
 
                 this.bindEvents(container);
+                requestAnimationFrame(() => this.applyCurrentLayoutHeight());
+            },
+
+            applyCurrentLayoutHeight: function () {
+                const container = document.getElementById('boards-list-canvas');
+                if (!container) return;
+                const scrollDiv = container.querySelector('.list-table-scroll');
+                if (!scrollDiv) return;
+
+                try {
+                    const mainElement = document.querySelector('main');
+                    if (!mainElement) return;
+
+                    const rect = scrollDiv.getBoundingClientRect();
+                    if (rect.top <= 0) return;
+
+                    const windowHeight = window.innerHeight;
+                    const mainStyle = window.getComputedStyle(mainElement);
+                    const marginBottom = parseFloat(mainStyle.marginBottom) || 0;
+                    const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
+                    const offsetBottom = marginBottom + paddingBottom + 32;
+                    const newHeight = windowHeight - rect.top - offsetBottom;
+
+                    if (newHeight > 0) {
+                        scrollDiv.style.height = `${newHeight}px`;
+                    }
+                } catch (error) {
+                    console.error('[boardsList] applyCurrentLayoutHeight failed:', error);
+                }
+            },
+
+            setupResizeHandler: function () {
+                if (this.isResizeHandlerBound) return;
+                this.isResizeHandlerBound = true;
+
+                window.addEventListener('resize', () => {
+                    const tab = document.getElementById('tab-boards');
+                    if (!tab || tab.style.display === 'none') return;
+                    if (this.resizeRafId) cancelAnimationFrame(this.resizeRafId);
+                    this.resizeRafId = requestAnimationFrame(() => {
+                        this.applyCurrentLayoutHeight();
+                    });
+                });
             },
 
             closeAllMenus: function () {

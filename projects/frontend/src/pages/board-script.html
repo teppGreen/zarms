@@ -796,6 +796,16 @@
                 }
             },
 
+            applyCurrentLayoutHeight: function (boardId) {
+                const targetBoardId = boardId || this.currentBoardId;
+                if (!targetBoardId) return;
+                if (this.viewMode === 'list') {
+                    this.applyListHeight(targetBoardId);
+                    return;
+                }
+                this.applyColumnHeights(targetBoardId);
+            },
+
             /**
              * SortableJSを初期化
              */
