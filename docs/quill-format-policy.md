@@ -29,12 +29,9 @@ ZARMSで利用しているQuillエディタについて、表示崩れや読み�
 
 Quill 2では、カスタムCSSより前に以下の標準機能で制御できる。
 
-- `formats` オプション
-  - 許可するフォーマットを配列で明示可能
-  - `color` と `background` を含めなければ、色系フォーマットは編集内容として許可しない
 - `modules.clipboard.matchers`
   - クリップボード取り込み時にDeltaを加工可能
-  - `attributes.color` と `attributes.background` を削除できる
+  - `attributes.color` / `attributes.background` / `attributes.font` を削除できる
 
 参考:
 - https://quilljs.com/docs/configuration/
@@ -45,28 +42,17 @@ Quill 2では、カスタムCSSより前に以下の標準機能で制御でき�
 
 ### 1. 優先方針
 
-1. Quill標準設定（`formats` / `clipboard.matchers`）で色指定を無効化する
+1. Quill標準設定（`clipboard.matchers`）で色・フォント指定を無効化する
 2. それでも残る既存HTML由来の色属性は、保存時・表示時のサニタイズで除去する
 3. カスタムスタイル（CSS上書き）では解決しない
+4. `h1` / `h2` などの見出しタグは保持し、DB保存済みHTMLは可能な限りそのまま表示する
 
-### 2. 許可フォーマット
+### 2. フォーマット指定方針
 
-デスクトップ共通 (`App.utils.quill`):
-- `bold`
-- `italic`
-- `underline`
-- `strike`
-- `list`
-- `link`
-- `softbreak`（独自BR Blot）
-
-モバイル:
-- `bold`
-- `italic`
-- `underline`
-- `strike`
-- `list`
-- `link`
+- `formats` の許可リストは使用しない
+- 理由:
+  - 許可リスト方式だと `h1` / `h2` など既存タグが欠落する可能性がある
+  - 今回の要件は「色とフォントのみ除外」であり、それ以外は保持するため
 
 ### 3. 出力HTMLで想定される主なタグ
 
@@ -83,28 +69,30 @@ Quillのフォーマット解釈により、主に以下が生成対象になる
 - 実際の出力はQuillの内部正規化で変換されるため、貼り付け元HTMLと完全一致はしない。
 - 画像・動画などの埋め込みは、現行ツールバー導線では想定しない。
 
-### 4. 色指定の除去対象
+### 4. 色・フォント指定の除去対象
 
 以下を除去対象とする。
 
 - Delta属性: `color`, `background`
-- HTML属性: `color`, `bgcolor`
-- インラインスタイル: `color`, `background`, `background-color`
-- Quill色クラス: `ql-color-*`, `ql-bg-*`
+- Delta属性: `font`
+- HTML属性: `color`, `bgcolor`, `face`
+- インラインスタイル: `color`, `background`, `background-color`, `font`, `font-family`
+- Quill色/フォントクラス: `ql-color-*`, `ql-bg-*`, `ql-font-*`
 
 ## 実装反映方針
 
 - デスクトップ共通モジュール `App.utils.quill`
-  - `formats` を明示
-  - `clipboard.matchers` で色属性削除
-  - `getContent` / `setContent` で色指定除去サニタイズを実施
+  - `clipboard.matchers` で色・フォント属性削除
+  - `getContent` / `setContent` で色・フォント指定除去サニタイズを実施
 - モバイル `mobile/quill_editor.html`
-  - 同等の `formats` / `clipboard.matchers` を適用
-  - 保存時・初期表示時に色指定除去サニタイズを実施
+  - 同等の `clipboard.matchers` を適用
+  - 保存時・初期表示時に色・フォント指定除去サニタイズを実施
 
 ## テスト観点（抜粋）
 
 - 赤文字や背景色付きテキストを貼り付けても、通常文字色として保存される
-- 既存データに `style="color:red"` が含まれていても、エディタ表示時に色が消える
+- `font-family` 指定付きテキストを貼り付けても、フォント指定なしで保存される
+- 既存データに `style="color:red; font-family: serif;"` が含まれていても、エディタ表示時に色・フォント指定が消える
+- 既存データに `h1` / `h2` が含まれている場合、見出し構造は維持される
 - `bold` / `list` / `link` など非色情報は維持される
 - モバイルとデスクトップで挙動差がない
