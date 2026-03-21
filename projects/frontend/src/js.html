@@ -1443,7 +1443,10 @@
 
         // close メソッドがある場合はそれを使う
         if (typeof handler.close === 'function') {
-          const result = handler.close(skipUrlUpdate, reason);
+          const result = handler.close({
+            skipUrlUpdate: skipUrlUpdate,
+            reason: reason
+          });
           return result !== false; // falseが返された場合のみfalse扱い
         }
       }

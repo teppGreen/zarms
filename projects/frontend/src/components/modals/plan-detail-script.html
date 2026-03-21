@@ -65,13 +65,19 @@
                 this._syncLatest(planId);
             },
 
-            close: function (skipDirtyCheck) {
+            close: function (options = {}) {
+                const skipDirtyCheck = options.skipDirtyCheck === true;
+                const reason = options.reason || 'user';
+
                 if (this.isSaving || this.isDeleting) {
                     showSnackbar('保存処理中は閉じられません', 'info');
                     return;
                 }
                 if (!skipDirtyCheck && this.isDirty) {
-                    if (!confirm('変更を破棄して閉じますか？')) return;
+                    const message = reason === 'escape'
+                        ? '未保存の変更があります。変更を破棄して閉じますか？'
+                        : '変更を破棄して閉じますか？';
+                    if (!confirm(message)) return;
                 }
                 appUi('#modal-detail-plan', false);
                 this._reset();
