@@ -2260,13 +2260,6 @@
     // 登録済みフラグ（1回のみ登録）
     _registered: false,
 
-    // 色指定を許可しない共通フォーマット
-    _defaultFormats: [
-      'bold', 'italic', 'underline', 'strike',
-      'list', 'link',
-      'softbreak'
-    ],
-
     /**
      * カスタムBlotを登録（アプリ起動時に1回だけ呼ぶ）
      */
@@ -2304,15 +2297,13 @@
 
       // デフォルトプレースホルダー
       const defaultPlaceholder = 'テキストを入力...\nShift+Enterで改行 / Enterで段落区切り';
-      const allowedFormats = Array.isArray(options.formats) && options.formats.length
-        ? options.formats
-        : this._defaultFormats.slice();
       const clipboardMatchers = [
         [Node.ELEMENT_NODE, function (node, delta) {
           (delta.ops || []).forEach(function (op) {
             if (!op || !op.attributes) return;
             delete op.attributes.color;
             delete op.attributes.background;
+            delete op.attributes.font;
           });
           return delta;
         }]
@@ -2322,7 +2313,6 @@
       const quill = new Quill(selector, {
         theme: 'bubble',
         placeholder: options.placeholder || defaultPlaceholder,
-        formats: allowedFormats,
         modules: {
           toolbar: options.toolbar || defaultToolbar,
           clipboard: {
@@ -2531,6 +2521,7 @@
       container.querySelectorAll('*').forEach(function (element) {
         element.removeAttribute('color');
         element.removeAttribute('bgcolor');
+        element.removeAttribute('face');
 
         if (element.hasAttribute('style')) {
           const retained = element.getAttribute('style').split(';').map(function (item) {
@@ -2539,7 +2530,7 @@
             if (!decl) return false;
             const pair = decl.split(':');
             const prop = (pair[0] || '').trim().toLowerCase();
-            return prop !== 'color' && prop !== 'background' && prop !== 'background-color';
+            return prop !== 'color' && prop !== 'background' && prop !== 'background-color' && prop !== 'font' && prop !== 'font-family';
           });
           if (retained.length) {
             element.setAttribute('style', retained.join('; '));
@@ -2550,7 +2541,7 @@
 
         if (element.className && typeof element.className === 'string') {
           const classes = element.className.split(/\s+/).filter(function (className) {
-            return className && !/^ql-(color|bg)-/.test(className);
+            return className && !/^ql-(color|bg|font)-/.test(className);
           });
           if (classes.length) {
             element.className = classes.join(' ');
