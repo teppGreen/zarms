@@ -1,0 +1,151 @@
+<script>
+    (function () {
+        App.pages.insights = {
+            isLoading: false,
+            logs: [],
+
+            loadData: async function (forceRefresh = false) {
+                this.isLoading = true;
+                this.setLoadingState();
+
+                try {
+                    const start = new Date();
+                    start.setDate(start.getDate() - 30);
+
+                    const logsRes = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LOGS, 'select', {
+                        where: {
+                            created_at: ['>', start.toISOString()]
+                        },
+                        orderBy: { created_at: 'desc' },
+                        limit: 500
+                    }, null, forceRefresh);
+
+                    const logs = logsRes?.data || logsRes || [];
+                    this.logs = this.filterRelatedLogs(logs);
+                    this.renderWeekdayChart();
+                } catch (error) {
+                    console.error('[Insights] loadData failed:', error);
+                    this.showError('insights-weekday-chart', '分析データの読み込みに失敗しました');
+                } finally {
+                    this.isLoading = false;
+                    this.updateActionState();
+                }
+            },
+
+            setLoadingState: function () {
+                const chartContainer = document.getElementById('insights-weekday-chart');
+                if (chartContainer) {
+                    chartContainer.classList.add('shimmer-loading');
+                    chartContainer.innerHTML = '';
+                }
+                this.updateActionState();
+            },
+
+            updateActionState: function () {
+                const reloadButton = document.getElementById('insights-reload-button');
+                if (reloadButton) reloadButton.disabled = this.isLoading;
+            },
+
+            showError: function (elementId, message) {
+                const el = document.getElementById(elementId);
+                if (!el) return;
+                el.classList.remove('shimmer-loading');
+                el.innerHTML = '<div class="padding error-text center-align"><i>error</i><p>' + escapeHtml(message) + '</p></div>';
+            },
+
+            renderWeekdayChart: function () {
+                const container = document.getElementById('insights-weekday-chart');
+                if (!container) return;
+                container.classList.remove('shimmer-loading');
+
+                if (!(window.google && google.charts && google.visualization)) {
+                    container.classList.add('shimmer-loading');
+                    google.charts.setOnLoadCallback(() => {
+                        this.renderWeekdayChart();
+                    });
+                    return;
+                }
+
+                const weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'];
+                const counts = [0, 0, 0, 0, 0, 0, 0];
+
+                this.logs.forEach(function (log) {
+                    const time = log && log.created_at ? new Date(log.created_at) : null;
+                    if (!time || Number.isNaN(time.getTime())) return;
+                    counts[time.getDay()] += 1;
+                });
+
+                const dataTable = new google.visualization.DataTable();
+                dataTable.addColumn('string', '曜日');
+                dataTable.addColumn('number', '件数');
+                dataTable.addRows(weekdayLabels.map(function (label, index) {
+                    return [label, counts[index]];
+                }));
+
+                const options = {
+                    legend: { position: 'none' },
+                    chartArea: { left: 48, top: 20, width: '88%', height: '72%' },
+                    hAxis: { slantedText: false },
+                    vAxis: { minValue: 0 },
+                    colors: ['#2196f3']
+                };
+
+                const chart = new google.visualization.ColumnChart(container);
+                chart.draw(dataTable, options);
+            },
+
+            filterRelatedLogs: function (logs) {
+                return (logs || []).filter((log) => this.isLogRelatedToCurrentUser(log));
+            },
+
+            isLogRelatedToCurrentUser: function (log) {
+                if (!log || !log.data) return false;
+
+                const userId = App.state.userId;
+                if (!userId) return false;
+
+                let parsed;
+                try {
+                    parsed = typeof log.data === 'string' ? JSON.parse(log.data) : log.data;
+                } catch (error) {
+                    return false;
+                }
+
+                const memberIds = new Set();
+                this.collectMemberIds(parsed, memberIds);
+                return memberIds.has(userId);
+            },
+
+            collectMemberIds: function (value, out) {
+                if (!value || !out) return;
+
+                if (Array.isArray(value)) {
+                    value.forEach((item) => this.collectMemberIds(item, out));
+                    return;
+                }
+
+                if (typeof value !== 'object') return;
+
+                Object.keys(value).forEach((key) => {
+                    const current = value[key];
+                    const lowerKey = String(key || '').toLowerCase();
+                    const isMemberKey =
+                        lowerKey === 'member_id' ||
+                        lowerKey.endsWith('_member_id') ||
+                        lowerKey.endsWith('_by') ||
+                        lowerKey === 'assign_to' ||
+                        lowerKey === 'mentioned_to' ||
+                        lowerKey === 'applied_by';
+
+                    if (isMemberKey && typeof current === 'string' && current) {
+                        out.add(current);
+                    }
+
+                    this.collectMemberIds(current, out);
+                });
+            }
+        };
+
+        google.charts.load('current', { packages: ['corechart'] });
+    })();
+</script>

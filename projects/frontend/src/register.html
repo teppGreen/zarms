@@ -258,6 +258,7 @@
         const ERROR_HELPER_TEXT = `URLの形式が間違っています。`;
 
         let foundUser = null;
+        let useApiMode = false;
         let hasAgreed = false;
         let agreementNextAction = null;
         setupElements();
@@ -472,6 +473,7 @@
                     }
 
                     if (result.status === 'ok') {
+                        useApiMode = !!result.useApiMode;
                         // 通常モード: ライブラリ経由でアプリHTMLを取得済み
                         if (result.appHtml) {
                             document.open();
@@ -565,7 +567,7 @@
                     alert('エラーが発生しました: ' + error.message);
                     showInputStep();
                 })
-                .findUserBySlackUrl(slackProfileUrl);
+                .findUserBySlackUrl(slackProfileUrl, useApiMode);
         }
 
         function displayUserInfo(user) {
@@ -605,7 +607,7 @@
                     displayUserInfo(foundUser);
                     document.getElementById('confirm-nav').style.display = '';
                 })
-                .registerUserEmail(foundUser.id);
+                .registerUserEmail(foundUser.id, useApiMode);
         }
     </script>
 </body>

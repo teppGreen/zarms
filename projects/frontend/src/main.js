@@ -90,12 +90,11 @@ function getInitialAppData(email, urlParams, isMobile = false) {
   } catch (e) {
     console.warn('Direct spreadsheet access failed, switching to API mode:', e.message);
     useApiMode = true;
-    setApiMode(true); // db_bridge.js 内のモードを切り替え
   }
 
   try {
     // 2. メールアドレスからメンバー情報を取得（APIモードなら db_bridge が自動で API を呼ぶ）
-    const activeUser = getMemberByEmail(email);
+    const activeUser = getMemberByEmail(email, useApiMode);
 
     if (!activeUser) {
       throw new Error('User info not found');
