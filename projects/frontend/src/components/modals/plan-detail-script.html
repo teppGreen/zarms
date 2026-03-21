@@ -58,7 +58,8 @@
                 this._render();
                 this._bindChangeListeners();
                 this.loadComments(planId);
-                this.switchTab(document.querySelector('#plan-detail-tabs > a'), 'description');
+                appUi('#plan-detail-tab-description');
+                this._bindTabStateSync();
                 this._setErrorMessage('', 'error');
                 this._setOperationState('idle');
 
@@ -318,26 +319,17 @@
                 this._setOperationState('delete_reserved');
             },
 
-            switchTab: function (el, tabName) {
+            _bindTabStateSync: function () {
                 const tabs = document.querySelectorAll('#plan-detail-tabs > a');
-                tabs.forEach(function (a) { a.className = ''; });
-                if (el) el.className = 'active';
-
-                const descriptionTab = document.getElementById('plan-detail-tab-description');
-                const metaTab = document.getElementById('plan-detail-tab-meta');
-                const membersTab = document.getElementById('plan-detail-tab-members');
-
-                if (descriptionTab) descriptionTab.className = tabName === 'description' ? 'page medium-height active' : 'page medium-height';
-                if (metaTab) metaTab.className = tabName === 'meta' ? 'page medium-height active scroll' : 'page medium-height scroll';
-                if (membersTab) membersTab.className = tabName === 'members' ? 'page medium-height active scroll' : 'page medium-height scroll';
-
-                const saveButton = document.getElementById('plan-detail-save-button');
-                if (saveButton) {
-                    saveButton.innerHTML = tabName === 'members'
-                        ? '<i>save</i><span>関係者の変更を保存</span>'
-                        : '<i>save</i><span>変更を保存</span>';
-                }
-                this._updateActionButtons();
+                tabs.forEach(function (tab) {
+                    if (!tab || tab.dataset.planDetailTabBound === '1') return;
+                    tab.addEventListener('click', function () {
+                        setTimeout(function () {
+                            App.modals.planDetail._updateActionButtons();
+                        }, 0);
+                    });
+                    tab.dataset.planDetailTabBound = '1';
+                });
             },
 
             openNewComment: function () {
@@ -737,6 +729,8 @@
                 if (this.quill) {
                     App.utils.quill.clear(this.quill);
                 }
+
+                appUi('#plan-detail-tab-description');
 
                 const comments = document.getElementById('plan-comments-list');
                 if (comments) comments.innerHTML = '';

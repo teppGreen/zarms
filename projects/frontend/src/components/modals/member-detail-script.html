@@ -4,6 +4,8 @@
             currentId: null,
             currentItem: null,
             originalData: null,
+            isLoading: false,
+            isSaving: false,
             isDirty: false,
             quill: null,
             // 一時保存用: 所属組織とスキルの変更を保存するまで保持
@@ -29,7 +31,9 @@
                 this.currentId = memberKey;
                 this.currentItem = Object.assign({}, member);
                 this.originalData = Object.assign({}, member);
-                this.isDirty = false;
+                this.isLoading = true;
+                this.isSaving = false;
+                this._setDirty(false);
 
                 // 一時保存用データをリセット
                 this.pendingDirectoryChanges = { toAdd: [], toRemove: [], toUpdate: [] };
@@ -57,13 +61,21 @@
                 this._renderDirectories(memberKey);
                 this._renderSkills(memberKey);
                 this.loadComments(memberKey);
-                this.switchTab(document.querySelector('#member-detail-tabs > a'), 'profile');
+                appUi('#member-detail-tab-profile');
+                this._bindTabStateSync();
                 this._bindEscClose();
+                this.isLoading = false;
+                this._updateActionButtons();
             },
 
             close: function (options = {}) {
                 const skipDirtyCheck = options.skipDirtyCheck === true;
                 const reason = options.reason || 'user';
+
+                if (this.isSaving) {
+                    showSnackbar('保存処理中は閉じられません', 'info');
+                    return false;
+                }
 
                 if (!skipDirtyCheck && this.isDirty) {
                     const message = reason === 'escape'
@@ -77,6 +89,7 @@
             },
 
             discard: function () {
+                if (this.isSaving) return;
                 if (this.isDirty) {
                     if (!confirm('変更を破棄しますか？')) return;
                 }
@@ -84,9 +97,21 @@
                 this._reset();
             },
 
+            onPrimaryAction: function () {
+                if (this.isSaving) return;
+                if (this.isDirty) {
+                    this.save();
+                    return;
+                }
+                this.close({ skipDirtyCheck: true, reason: 'primary' });
+            },
+
             save: async function () {
                 const id = this.currentId;
-                if (!id) return;
+                if (!id || this.isSaving) return;
+
+                this.isSaving = true;
+                this._updateActionButtons();
 
                 const errorEl = document.getElementById('member-detail-error');
                 const newName = (document.getElementById('member-detail-name-input')?.value || '').trim();
@@ -187,9 +212,8 @@
                     this.pendingSkillChanges.toUpdate.length > 0;
 
                 if (!hasChanges && !hasDirectoryChanges && !hasSkillChanges) {
-                    this.isDirty = false;
-                    appUi('#modal-detail-member', false);
-                    this._reset();
+                    this._setDirty(false);
+                    this.close({ skipDirtyCheck: true, reason: 'save-no-change' });
                     return;
                 }
 
@@ -197,8 +221,7 @@
                 const memberInState = (App.state.data.members || []).find(function (m) { return m.id === id; });
                 if (memberInState) Object.assign(memberInState, updates);
 
-                this.isDirty = false;
-                appUi('#modal-detail-member', false);
+                this._setDirty(false);
                 showSnackbar('変更を保存しています...', 'info', 'top', 0);
 
                 try {
@@ -224,10 +247,15 @@
                     if (App.pages.members && App.pages.members.loadData) {
                         App.pages.members.loadData(true);
                     }
+                    appUi('#modal-detail-member', false);
                 } catch (err) {
                     console.error('[MemberDetail] 保存エラー:', err);
                     if (memberInState) Object.assign(memberInState, orig);
+                    this._setDirty(true);
                     showSnackbar('保存に失敗しました', 'error');
+                } finally {
+                    this.isSaving = false;
+                    this._updateActionButtons();
                 }
 
                 this._reset();
@@ -277,18 +305,48 @@
                 return Promise.reject(new Error('Clipboard API is not available'));
             },
 
-            switchTab: function (el, tabName) {
+            _setDirty: function (nextValue) {
+                this.isDirty = nextValue === true;
+                this._updateActionButtons();
+            },
+
+            _updateActionButtons: function () {
+                const primaryButton = document.getElementById('member-detail-primary-button');
+                const discardButton = document.getElementById('member-detail-discard-button');
+                const closeButton = document.querySelector('#modal-detail-member button[title="閉じる"]');
+
+                const processing = this.isSaving === true || this.isLoading === true;
+                const hasChanges = this.isDirty === true;
+
+                if (primaryButton) {
+                    primaryButton.disabled = processing;
+                    if (this.isSaving) {
+                        primaryButton.innerHTML = '<progress class="circle small"></progress><span>保存中...</span>';
+                    } else if (hasChanges) {
+                        primaryButton.innerHTML = '<i>save</i><span>変更を保存</span>';
+                    } else {
+                        primaryButton.innerHTML = '<i>close</i><span>閉じる</span>';
+                    }
+                }
+                if (discardButton) {
+                    discardButton.disabled = processing || !hasChanges;
+                }
+                if (closeButton) {
+                    closeButton.disabled = processing;
+                }
+            },
+
+            _bindTabStateSync: function () {
                 const tabs = document.querySelectorAll('#member-detail-tabs > a');
-                tabs.forEach(function (a) { a.className = ''; });
-                if (el) el.className = 'active';
-
-                const profileTab = document.getElementById('member-detail-tab-profile');
-                const directoriesTab = document.getElementById('member-detail-tab-directories');
-                const skillsTab = document.getElementById('member-detail-tab-skills');
-
-                if (profileTab) profileTab.className = tabName === 'profile' ? 'page medium-height active' : 'page medium-height';
-                if (directoriesTab) directoriesTab.className = tabName === 'directories' ? 'page medium-height active scroll' : 'page medium-height scroll';
-                if (skillsTab) skillsTab.className = tabName === 'skills' ? 'page medium-height active scroll' : 'page medium-height scroll';
+                tabs.forEach(function (tab) {
+                    if (!tab || tab.dataset.memberDetailTabBound === '1') return;
+                    tab.addEventListener('click', function () {
+                        setTimeout(function () {
+                            App.modals.memberDetail._updateActionButtons();
+                        }, 0);
+                    });
+                    tab.dataset.memberDetailTabBound = '1';
+                });
             },
 
             openNewComment: function () {
@@ -356,7 +414,7 @@
                     }
                 });
 
-                this.isDirty = true;
+                this._setDirty(true);
                 this._renderDirectories(memberId);
                 showSnackbar('所属組織を追加しました（保存ボタンで確定）', 'info');
             },
@@ -378,7 +436,7 @@
                     this.pendingDirectoryChanges.toRemove.push(directoryId);
                 }
 
-                this.isDirty = true;
+                this._setDirty(true);
                 this._renderDirectories(this.currentId);
                 showSnackbar('所属組織を解除しました（保存ボタンで確定）', 'info');
             },
@@ -394,7 +452,7 @@
                 });
                 if (pending) {
                     pending.role = normalizedRole;
-                    this.isDirty = true;
+                    this._setDirty(true);
                     return;
                 }
 
@@ -417,7 +475,7 @@
                     }
                 }
 
-                this.isDirty = true;
+                this._setDirty(true);
                 showSnackbar('役割を変更しました（保存ボタンで確定）', 'info');
             },
 
@@ -490,7 +548,7 @@
                     }
                 });
 
-                this.isDirty = true;
+                this._setDirty(true);
                 this._renderSkills(memberId);
                 showSnackbar('スキルを追加しました（保存ボタンで確定）', 'info');
             },
@@ -512,7 +570,7 @@
                     this.pendingSkillChanges.toRemove.push(skillId);
                 }
 
-                this.isDirty = true;
+                this._setDirty(true);
                 this._renderSkills(this.currentId);
                 showSnackbar('スキルを削除しました（保存ボタンで確定）', 'info');
             },
@@ -526,7 +584,7 @@
                 });
                 if (pending) {
                     pending.skill_level_key = levelKey;
-                    this.isDirty = true;
+                    this._setDirty(true);
                     return;
                 }
 
@@ -550,7 +608,7 @@
                     }
                 }
 
-                this.isDirty = true;
+                this._setDirty(true);
                 this._renderSkills(this.currentId);
                 showSnackbar('スキルレベルを変更しました（保存ボタンで確定）', 'info');
             },
@@ -566,7 +624,7 @@
                 });
                 if (pending) {
                     pending.user_note = normalizedRemark;
-                    this.isDirty = true;
+                    this._setDirty(true);
                     return;
                 }
 
@@ -591,7 +649,7 @@
                     }
                 }
 
-                this.isDirty = true;
+                this._setDirty(true);
                 showSnackbar('メモを変更しました（保存ボタンで確定）', 'info');
             },
 
@@ -788,7 +846,7 @@
                 if (errorEl) errorEl.style.display = 'none';
 
                 this._setupDirtyWatchers();
-                this.isDirty = false;
+                this._setDirty(false);
             },
 
             _setupDirtyWatchers: function () {
@@ -814,8 +872,8 @@
                 watchIds.forEach(function (wid) {
                     const el = document.getElementById(wid);
                     if (!el || el.dataset.memberDetailBound === '1') return;
-                    el.addEventListener('input', function () { self.isDirty = true; });
-                    el.addEventListener('change', function () { self.isDirty = true; });
+                    el.addEventListener('input', function () { self._setDirty(true); });
+                    el.addEventListener('change', function () { self._setDirty(true); });
                     el.dataset.memberDetailBound = '1';
                 });
 
@@ -833,7 +891,7 @@
 
                 if (this.quill && this.quill.__memberDetailDirtyBound !== true) {
                     this.quill.on('text-change', function () {
-                        self.isDirty = true;
+                        self._setDirty(true);
                     });
                     this.quill.__memberDetailDirtyBound = true;
                 }
@@ -968,7 +1026,9 @@
                 this.currentId = null;
                 this.currentItem = null;
                 this.originalData = null;
-                this.isDirty = false;
+                this.isLoading = false;
+                this.isSaving = false;
+                this._setDirty(false);
 
                 const fields = [
                     'member-detail-name-input',
@@ -1012,8 +1072,7 @@
                     App.utils.quill.clear(this.quill);
                 }
 
-                const profileTabBtn = document.querySelector('#member-detail-tabs > a');
-                this.switchTab(profileTabBtn, 'profile');
+                appUi('#member-detail-tab-profile');
             },
 
             _extractSlackProfileTail: function (value) {
