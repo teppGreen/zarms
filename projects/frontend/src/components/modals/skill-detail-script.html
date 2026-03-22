@@ -6,7 +6,7 @@
             originalData: null,
             isDirty: false,
 
-            open: function (skillId) {
+            open: function (skillId, skipUrlUpdate = false) {
                 if (!skillId) return;
 
                 const skill = (App.state.data.skills || []).find(function (s) { return s.id === skillId; });
@@ -26,6 +26,7 @@
                 this._render(skill);
                 this._renderMembers(skillId);
                 this.loadComments(skillId);
+                this._updateUrlOnOpen(skillId, skipUrlUpdate);
                 this._bindDirtyWatchers();
                 this._bindEscClose();
             },
@@ -44,6 +45,7 @@
 
             close: function (options = {}) {
                 const skipDirtyCheck = options.skipDirtyCheck === true;
+                const skipUrlUpdate = options.skipUrlUpdate === true;
                 const reason = options.reason || 'user';
 
                 if (!skipDirtyCheck && this.isDirty) {
@@ -54,6 +56,7 @@
                     if (!proceed) return false;
                 }
                 appUi('#modal-detail-skill', false);
+                this._updateUrlOnClose(skipUrlUpdate);
                 this._reset();
                 return true;
             },
@@ -523,6 +526,34 @@
                     el.addEventListener('change', function () { self.isDirty = true; });
                     el.dataset.skillDetailDirtyBound = '1';
                 });
+            },
+
+            _buildBaseUrlParams: function () {
+                const currentParams = App.utils.url.getParams();
+                const nextParams = {
+                    tab: currentParams.tab || 'home'
+                };
+                if (nextParams.tab === 'board' && currentParams.board_id) {
+                    nextParams.board_id = currentParams.board_id;
+                }
+                if (nextParams.tab === 'catalog' && currentParams.table) {
+                    nextParams.table = currentParams.table;
+                }
+                return nextParams;
+            },
+
+            _updateUrlOnOpen: function (skillId, skipUrlUpdate) {
+                if (skipUrlUpdate || !skillId || !App.utils.url || !App.utils.url.updateParams) return;
+                const nextParams = this._buildBaseUrlParams();
+                nextParams.modal = 'skill-detail';
+                nextParams.skill_id = skillId;
+                App.utils.url.updateParams(nextParams, false);
+            },
+
+            _updateUrlOnClose: function (skipUrlUpdate) {
+                if (skipUrlUpdate || !App.utils.url || !App.utils.url.updateParams) return;
+                const nextParams = this._buildBaseUrlParams();
+                App.utils.url.updateParams(nextParams, false);
             },
 
             _bindEscClose: function () {

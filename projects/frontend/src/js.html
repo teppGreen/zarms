@@ -192,8 +192,28 @@
   function openModalFromParams(params) {
     console.log('[openModalFromParams] Opening modal from params:', params);
 
+    const modalParam = String(params.modal || '').trim();
+    const normalizedModal = (function (value) {
+      const aliases = {
+        'task-detail': 'task-detail',
+        'member-detail': 'member-detail',
+        'modal-member-detail': 'member-detail',
+        'modal-detail-member': 'member-detail',
+        'directory-detail': 'directory-detail',
+        'modal-directory-detail': 'directory-detail',
+        'modal-detail-directory': 'directory-detail',
+        'skill-detail': 'skill-detail',
+        'modal-skill-detail': 'skill-detail',
+        'modal-detail-skill': 'skill-detail',
+        'plan-detail': 'plan-detail',
+        'modal-plan-detail': 'plan-detail',
+        'modal-detail-plan': 'plan-detail'
+      };
+      return aliases[value] || '';
+    })(modalParam);
+
     // タスク詳細モーダル
-    if (params.modal === 'task-detail' && params.task_id) {
+    if (normalizedModal === 'task-detail' && params.task_id) {
       // マイボードの場合（board_id='my-board'）、またはボードIDが指定されていない場合は
       // マイボードとして扱い、フィルタリングして表示
       if (!params.board_id || params.board_id === 'my-board') {
@@ -225,6 +245,38 @@
       } else {
         // 万が一関数がない場合はフォールバック
         App.modals.taskDetail.open(params.task_id, true);
+      }
+      return;
+    }
+
+    // 人物詳細モーダル
+    if (normalizedModal === 'member-detail' && params.member_id) {
+      if (App.modals.memberDetail && typeof App.modals.memberDetail.open === 'function') {
+        App.modals.memberDetail.open(params.member_id, true);
+      }
+      return;
+    }
+
+    // 組織詳細モーダル
+    if (normalizedModal === 'directory-detail' && params.directory_id) {
+      if (App.modals.directoryDetail && typeof App.modals.directoryDetail.open === 'function') {
+        App.modals.directoryDetail.open(params.directory_id, true);
+      }
+      return;
+    }
+
+    // 技能詳細モーダル
+    if (normalizedModal === 'skill-detail' && params.skill_id) {
+      if (App.modals.skillDetail && typeof App.modals.skillDetail.open === 'function') {
+        App.modals.skillDetail.open(params.skill_id, true);
+      }
+      return;
+    }
+
+    // 企画詳細モーダル
+    if (normalizedModal === 'plan-detail' && params.plan_id) {
+      if (App.modals.planDetail && typeof App.modals.planDetail.open === 'function') {
+        App.modals.planDetail.open(params.plan_id, true);
       }
     }
   }
