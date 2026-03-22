@@ -84,9 +84,16 @@ await App.test.closeAllModals();
 - [ ] homeで「お知らせ」「更新履歴」が表示され、旧ランキング表示が出ない
 - [ ] homeのお知らせクリックで notices タブへ遷移し、対象のお知らせ詳細モーダルが開く
 - [ ] notices詳細モーダルをEscで閉じた後、画面全体がクリック可能なまま維持される
+- [ ] navigation-top の新規作成メニューから「新しいお知らせ」モーダルを開ける
+- [ ] 新しいお知らせの作成時、タイトル/本文/掲示期間の必須チェックが動作する
+- [ ] noticesタブ再訪時、既存表示が一度消えずに背景更新される
 - [ ] noticesタブの資料リンクはcreated_by本人のみ編集/削除できる（他ユーザーはreadonly）
 - [ ] insightsタブで曜日別グラフが表示される（データなし時は空表示、失敗時はエラー表示）
 - [ ] 自動更新（またはAlt+R）で tab-home/tab-notices/tab-insights それぞれの loadData が再実行される
+
+### タブ追加時の共通確認
+- [ ] 新規タブの主要描画領域に `data-tab-render-root` を付与している
+- [ ] `data-tab-render-root` または `hasRenderedContent()` により、タブ再訪時の白画面フリッカーが発生しない
 
 ### ショートカット回帰確認
 - [ ] Alt+6 で notices タブへ遷移する

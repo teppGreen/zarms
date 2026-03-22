@@ -559,12 +559,18 @@
                     { key: 'updated_at', label: '最終更新' }
                 ];
 
-                // 現在のソート状態を取得（初期値は開始日時 asc, 終了日時 asc）
+                // 現在のソート状態を取得
                 if (!this.listSortState[boardId]) {
-                    this.listSortState[boardId] = [
-                        { col: 'starts_at', dir: 'asc' },
-                        { col: 'ends_at', dir: 'asc' }
-                    ];
+                    this.listSortState[boardId] = boardId === 'my-board'
+                        ? [
+                            { col: '_done_last', dir: 'asc' },
+                            { col: 'starts_at', dir: 'asc' },
+                            { col: 'ends_at', dir: 'asc' }
+                        ]
+                        : [
+                            { col: 'starts_at', dir: 'asc' },
+                            { col: 'ends_at', dir: 'asc' }
+                        ];
                 }
                 const sortCriteria = this.listSortState[boardId];
 
@@ -579,6 +585,16 @@
                     sortedTasks.sort((a, b) => {
                         for (const crit of sortCriteria) {
                             if (crit.col === '_members') continue;
+
+                            if (crit.col === '_done_last') {
+                                const aIsDone = a.task_status_key === 'DONE' ? 1 : 0;
+                                const bIsDone = b.task_status_key === 'DONE' ? 1 : 0;
+                                const comparison = aIsDone - bIsDone;
+                                if (comparison !== 0) {
+                                    return crit.dir === 'desc' ? -comparison : comparison;
+                                }
+                                continue;
+                            }
 
                             let va = a[crit.col];
                             let vb = b[crit.col];
@@ -675,7 +691,7 @@
                         const now = new Date();
                         const isStartsAtOverdue = task.starts_at && new Date(task.starts_at) < now;
                         const isEndsAtOverdue = task.ends_at && new Date(task.ends_at) < now;
-                        const rowClass = isEndsAtOverdue ? ' class="error-container"' : '';
+                        const rowClass = (isEndsAtOverdue && task.task_status_key !== 'DONE') ? ' class="error-container"' : '';
                         const startsAtClass = isStartsAtOverdue ? ' class="font-number error-text"' : ' class="font-number"';
                         const endsAtClass = isEndsAtOverdue ? ' class="font-number error-text"' : ' class="font-number"';
 
@@ -754,10 +770,16 @@
              */
             sortList: function (boardId, colKey) {
                 if (!this.listSortState[boardId]) {
-                    this.listSortState[boardId] = [
-                        { col: 'starts_at', dir: 'asc' },
-                        { col: 'ends_at', dir: 'asc' }
-                    ];
+                    this.listSortState[boardId] = boardId === 'my-board'
+                        ? [
+                            { col: '_done_last', dir: 'asc' },
+                            { col: 'starts_at', dir: 'asc' },
+                            { col: 'ends_at', dir: 'asc' }
+                        ]
+                        : [
+                            { col: 'starts_at', dir: 'asc' },
+                            { col: 'ends_at', dir: 'asc' }
+                        ];
                 }
                 const criteria = this.listSortState[boardId];
                 const primary = criteria[0];

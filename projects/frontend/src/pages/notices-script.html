@@ -8,10 +8,24 @@
             pendingOpenNoticeId: null,
             modalHandlersBound: false,
 
+            hasRenderedContent: function () {
+                const notices = document.getElementById('notices-list');
+                const links = document.getElementById('notices-links-editor');
+                const hasNotices = !!(notices && String(notices.innerHTML || '').trim());
+                const hasLinks = !!(links && String(links.innerHTML || '').trim());
+                return hasNotices || hasLinks;
+            },
+
             loadData: async function (forceRefresh = false) {
                 this.ensureModalHandlers();
+
+                const shouldKeepVisible = !!(forceRefresh && this.hasRenderedContent());
                 this.isLoading = true;
-                this.setLoadingState();
+                if (shouldKeepVisible) {
+                    this.setBackgroundLoadingState();
+                } else {
+                    this.setLoadingState();
+                }
 
                 try {
                     const [noticesRes, linksRes] = await Promise.all([
@@ -36,8 +50,12 @@
                     this.tryOpenPendingNotice();
                 } catch (error) {
                     console.error('[Notices] loadData failed:', error);
-                    this.showError('notices-list', 'お知らせの読み込みに失敗しました');
-                    this.showError('notices-links-editor', 'リンクの読み込みに失敗しました');
+                    if (shouldKeepVisible) {
+                        showSnackbar('お知らせの更新に失敗しました', 'error');
+                    } else {
+                        this.showError('notices-list', 'お知らせの読み込みに失敗しました');
+                        this.showError('notices-links-editor', 'リンクの読み込みに失敗しました');
+                    }
                 } finally {
                     this.isLoading = false;
                     this.updateActionState();
@@ -66,6 +84,10 @@
                     links.classList.add('shimmer-loading');
                     links.innerHTML = '';
                 }
+                this.updateActionState();
+            },
+
+            setBackgroundLoadingState: function () {
                 this.updateActionState();
             },
 
@@ -187,11 +209,11 @@
                     '</div>';
             },
 
-                    escapeForInline: function (value) {
-                    return String(value || '')
-                        .replace(/\\/g, '\\\\')
-                        .replace(/'/g, "\\'");
-                    },
+            escapeForInline: function (value) {
+                return String(value || '')
+                    .replace(/\\/g, '\\\\')
+                    .replace(/'/g, "\\'");
+            },
 
             renderNewLinkForm: function () {
                 return '' +
@@ -416,6 +438,123 @@
                 const div = document.createElement('div');
                 div.innerHTML = html;
                 return (div.textContent || div.innerText || '').trim();
+            },
+
+            normalizeNoticeBodyHtml: function (bodyText) {
+                return escapeHtml(bodyText || '').replace(/\n/g, '<br>');
+            }
+        };
+
+        App.modals.newNotice = {
+            open: function () {
+                this.reset();
+                appUi('modal-new-notice', true);
+
+                setTimeout(function () {
+                    const titleInput = document.getElementById('new-notice-title');
+                    if (titleInput) titleInput.focus();
+                }, 150);
+            },
+
+            close: function () {
+                appUi('modal-new-notice', false);
+                this.setSavingState(false);
+            },
+
+            reset: function () {
+                const titleInput = document.getElementById('new-notice-title');
+                const categoryInput = document.getElementById('new-notice-category');
+                const startsAtInput = document.getElementById('new-notice-starts-at');
+                const endsAtInput = document.getElementById('new-notice-ends-at');
+                const bodyInput = document.getElementById('new-notice-body');
+                const statusLabel = document.getElementById('new-notice-status');
+
+                if (titleInput) titleInput.value = '';
+                if (categoryInput) categoryInput.value = '';
+                if (bodyInput) bodyInput.value = '';
+
+                const now = new Date();
+                const startsAt = formatDateTimeForInput(now);
+                const endsAtDate = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000));
+                const endsAt = formatDateTimeForInput(endsAtDate);
+
+                if (startsAtInput) startsAtInput.value = startsAt;
+                if (endsAtInput) endsAtInput.value = endsAt;
+                if (statusLabel) statusLabel.textContent = '';
+
+                this.setSavingState(false);
+            },
+
+            setSavingState: function (isSaving) {
+                const saveButton = document.getElementById('new-notice-save-button');
+                const statusLabel = document.getElementById('new-notice-status');
+                if (saveButton) saveButton.disabled = isSaving;
+                if (statusLabel) {
+                    statusLabel.textContent = isSaving ? '保存中です...' : '';
+                }
+                App.pages.notices.isSaving = isSaving;
+                App.pages.notices.updateActionState();
+            },
+
+            save: async function () {
+                const titleInput = document.getElementById('new-notice-title');
+                const categoryInput = document.getElementById('new-notice-category');
+                const startsAtInput = document.getElementById('new-notice-starts-at');
+                const endsAtInput = document.getElementById('new-notice-ends-at');
+                const bodyInput = document.getElementById('new-notice-body');
+
+                if (!titleInput || !startsAtInput || !endsAtInput || !bodyInput) return;
+
+                const title = String(titleInput.value || '').trim();
+                const category = String((categoryInput && categoryInput.value) || '').trim();
+                const startsAtRaw = String(startsAtInput.value || '').trim();
+                const endsAtRaw = String(endsAtInput.value || '').trim();
+                const bodyText = String(bodyInput.value || '').trim();
+
+                if (!title) {
+                    showSnackbar('タイトルは必須です', 'error');
+                    return;
+                }
+                if (!startsAtRaw || !endsAtRaw) {
+                    showSnackbar('掲示期間を入力してください', 'error');
+                    return;
+                }
+                if (!bodyText) {
+                    showSnackbar('本文は必須です', 'error');
+                    return;
+                }
+
+                const startsAtDate = new Date(startsAtRaw);
+                const endsAtDate = new Date(endsAtRaw);
+                if (!Number.isFinite(startsAtDate.getTime()) || !Number.isFinite(endsAtDate.getTime())) {
+                    showSnackbar('掲示期間の形式が不正です', 'error');
+                    return;
+                }
+                if (startsAtDate.getTime() >= endsAtDate.getTime()) {
+                    showSnackbar('掲示終了は開始より後にしてください', 'error');
+                    return;
+                }
+
+                this.setSavingState(true);
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.NOTICES, 'insert', {
+                        title: title,
+                        category: category,
+                        body: App.pages.notices.normalizeNoticeBodyHtml(bodyText),
+                        starts_at: startsAtDate.toISOString(),
+                        ends_at: endsAtDate.toISOString()
+                    }, null, true);
+
+                    this.close();
+                    showSnackbar('お知らせを作成しました');
+                    await App.pages.notices.loadData(true);
+                } catch (error) {
+                    console.error('[NewNotice] save failed:', error);
+                    showSnackbar('お知らせの作成に失敗しました', 'error');
+                } finally {
+                    this.setSavingState(false);
+                }
             }
         };
     })();

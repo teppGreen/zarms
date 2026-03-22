@@ -106,6 +106,32 @@
                 }
             },
 
+            hasRenderedChildren: function (element) {
+                if (!element) return false;
+                if (element.children && element.children.length > 0) return true;
+                return !!String(element.innerHTML || '').trim();
+            },
+
+            shouldUseBackgroundLoad: function (tabName, forceLoadData = false) {
+                if (forceLoadData) return false;
+
+                const page = App.pages[tabName];
+                if (page && typeof page.hasRenderedContent === 'function') {
+                    try {
+                        return !!page.hasRenderedContent();
+                    } catch (error) {
+                        console.warn('[navigation] hasRenderedContent check failed:', error);
+                    }
+                }
+
+                const tabRoot = document.getElementById('tab-' + tabName);
+                if (!tabRoot) return false;
+
+                const probes = tabRoot.querySelectorAll('[data-tab-render-root]');
+                if (!probes.length) return false;
+                return Array.from(probes).some((probe) => this.hasRenderedChildren(probe));
+            },
+
             /**
              * タブを切り替える
              * @param {string} tabName - タブID（例: 'home', 'catalog', 'board-UUID'）
@@ -200,14 +226,7 @@
                         targetPage.style.display = 'block';
                         this.applyTabHeightImmediately(tabName);
 
-                        let isBackground = false;
-                        if (tabName === 'home') {
-                            const homeContent = document.getElementById('home-content');
-                            // コンテンツが既に描画されているかチェック
-                            if (homeContent && homeContent.children.length > 0) {
-                                isBackground = true;
-                            }
-                        }
+                        const isBackground = this.shouldUseBackgroundLoad(tabName, forceLoadData);
 
                         await this.loadTabData(tabName, isBackground);
                     } else {
