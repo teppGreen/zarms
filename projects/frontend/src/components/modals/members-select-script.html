@@ -8,6 +8,9 @@
             filteredMembers: [],
             multiSelect: false,
             showApplyAll: false,
+            includeSelectionMeta: false,
+            roleOptions: [],
+            selectedMetaById: {},
 
             open: async function (options = {}) {
                 this.callback = options.callback || null;
@@ -15,6 +18,9 @@
                 this.multiSelect = options.multiSelect || false;
                 this.selectedIds = options.preSelected || [];
                 this.showApplyAll = options.showApplyAll || false;
+                this.includeSelectionMeta = options.includeSelectionMeta === true;
+                this.roleOptions = Array.isArray(options.roleOptions) ? options.roleOptions.slice() : [];
+                this.selectedMetaById = Object.assign({}, options.preSelectedMeta || {});
 
                 // 「全担当者に適用」ボタンの表示制御
                 const applyAllBtn = document.getElementById('select-members-apply-all-btn');
@@ -82,9 +88,12 @@
                     const isSelected = this.selectedIds.includes(member.id);
                     const safeDisplayName = escapeHtml(member.display_name || member.email || '名前未設定');
                     const safeId = escapeHtmlAttribute(member.id);
+                    const selectedRole = this._getSelectedRole(member.id);
+                    const roleSelector = this._buildRoleSelector(member.id, selectedRole, isSelected);
 
                     return `
-                        <div><label class="${this.multiSelect ? 'checkbox' : 'radio'} left-align small-space">
+                        <div class="padding border small-round bottom-margin">
+                        <label class="${this.multiSelect ? 'checkbox' : 'radio'} left-align small-space">
                             <input type="${this.multiSelect ? 'checkbox' : 'radio'}" 
                                 name="member-select" 
                                 value="${safeId}" 
@@ -93,9 +102,43 @@
                             <span class="small-margin">
                                 <strong>${safeDisplayName}</strong>
                             </span>
-                        </label></div>
+                        </label>
+                        ${roleSelector}
+                        </div>
                     `;
                 }).join('');
+            },
+
+            _getSelectedRole: function (memberId) {
+                const meta = this.selectedMetaById && this.selectedMetaById[memberId] ? this.selectedMetaById[memberId] : {};
+                const role = meta && typeof meta.role === 'string' ? meta.role.trim() : '';
+                return role || '';
+            },
+
+            _buildRoleSelector: function (memberId, selectedRole, isSelected) {
+                if (!this.includeSelectionMeta || this.roleOptions.length === 0) return '';
+                const optionsHtml = ['<option value="">（未設定）</option>'].concat(this.roleOptions.map(function (roleValue) {
+                    const safeRole = escapeHtmlAttribute(roleValue);
+                    const selectedAttr = roleValue === selectedRole ? ' selected' : '';
+                    return '<option value="' + safeRole + '"' + selectedAttr + '>' + escapeHtml(roleValue) + '</option>';
+                })).join('');
+                const disabledAttr = isSelected ? '' : ' disabled';
+                return '<div class="field border label small top-margin no-margin">' +
+                    '<select onchange="App.modals.selectMembers.updateSelectionRole(\'' + escapeHtmlAttribute(memberId) + '\', this.value)"' + disabledAttr + '>' +
+                    optionsHtml +
+                    '</select>' +
+                    '<label>役割</label>' +
+                    '<i>arrow_drop_down</i>' +
+                    '</div>';
+            },
+
+            updateSelectionRole: function (memberId, roleValue) {
+                if (!memberId) return;
+                const normalizedRole = String(roleValue || '').trim();
+                if (!this.selectedMetaById[memberId]) {
+                    this.selectedMetaById[memberId] = {};
+                }
+                this.selectedMetaById[memberId].role = normalizedRole || null;
             },
 
             toggleSelectAll: function (checked) {
@@ -112,6 +155,11 @@
                     // 表示されているメンバーの選択を解除
                     const filteredIds = this.filteredMembers.map(m => m.id);
                     this.selectedIds = this.selectedIds.filter(id => !filteredIds.includes(id));
+                    filteredIds.forEach((id) => {
+                        if (this.selectedMetaById[id]) {
+                            this.selectedMetaById[id].role = null;
+                        }
+                    });
                 }
                 this.render();
             },
@@ -122,6 +170,9 @@
                         this.selectedIds.push(id);
                     } else if (!checked) {
                         this.selectedIds = this.selectedIds.filter(sid => sid !== id);
+                        if (this.selectedMetaById[id]) {
+                            this.selectedMetaById[id].role = null;
+                        }
                     }
                     this.render();
                 } else {
@@ -129,31 +180,34 @@
                 }
             },
 
+            _buildCallbackPayload: function () {
+                if (!this.includeSelectionMeta) {
+                    return this.selectedIds.slice();
+                }
+                return this.selectedIds.map((memberId) => {
+                    const meta = this.selectedMetaById[memberId] || {};
+                    return {
+                        member_id: memberId,
+                        role: (meta.role || '').trim() || null
+                    };
+                });
+            },
+
             confirm: function () {
-                // 共通処理を使用
-                this.selectedIds = App.utils.modal.getSelectedIds(
-                    '#member-results-container',
-                    'member-select',
-                    this.multiSelect
-                );
+                const payload = this._buildCallbackPayload();
 
                 if (this.callback && typeof this.callback === 'function') {
-                    this.callback(this.selectedIds);
+                    this.callback(payload);
                 }
 
                 appUi('#modal-select-members',true);
             },
 
             confirmAll: function () {
-                // 共通処理を使用
-                this.selectedIds = App.utils.modal.getSelectedIds(
-                    '#member-results-container',
-                    'member-select',
-                    this.multiSelect
-                );
+                const payload = this._buildCallbackPayload();
 
                 if (this.applyAllCallback && typeof this.applyAllCallback === 'function') {
-                    this.applyAllCallback(this.selectedIds);
+                    this.applyAllCallback(payload);
                 }
 
                 appUi('#modal-select-members',true);
