@@ -13,7 +13,7 @@
             originalDirectories: [],
             originalSkills: [],
 
-            open: function (memberId) {
+            open: function (memberId, skipUrlUpdate = false) {
                 if (!memberId) return;
 
                 const requestId = String(memberId);
@@ -55,6 +55,7 @@
                 }
 
                 appUi('#modal-detail-member', true);
+                this._updateUrlOnOpen(memberKey, skipUrlUpdate);
 
                 this._render(member);
                 this._renderDirectories(memberKey);
@@ -69,6 +70,7 @@
 
             close: function (options = {}) {
                 const skipDirtyCheck = options.skipDirtyCheck === true;
+                const skipUrlUpdate = options.skipUrlUpdate === true;
                 const reason = options.reason || 'user';
 
                 if (this.isSaving) {
@@ -83,6 +85,7 @@
                     if (!confirm(message)) return false;
                 }
                 appUi('#modal-detail-member', false);
+                this._updateUrlOnClose(skipUrlUpdate);
                 this._reset();
                 return true;
             },
@@ -92,8 +95,7 @@
                 if (this.isDirty) {
                     if (!confirm('変更を破棄しますか？')) return;
                 }
-                appUi('#modal-detail-member', false);
-                this._reset();
+                this.close({ skipDirtyCheck: true, reason: 'discard' });
             },
 
             onPrimaryAction: function () {
@@ -246,7 +248,7 @@
                     if (App.pages.members && App.pages.members.loadData) {
                         App.pages.members.loadData(true);
                     }
-                    appUi('#modal-detail-member', false);
+                    this.close({ skipDirtyCheck: true, reason: 'save-success' });
                 } catch (err) {
                     console.error('[MemberDetail] 保存エラー:', err);
                     if (memberInState) Object.assign(memberInState, orig);
@@ -302,6 +304,34 @@
                     return navigator.clipboard.writeText(text);
                 }
                 return Promise.reject(new Error('Clipboard API is not available'));
+            },
+
+            _buildBaseUrlParams: function () {
+                const currentParams = App.utils.url.getParams();
+                const nextParams = {
+                    tab: currentParams.tab || 'home'
+                };
+                if (nextParams.tab === 'board' && currentParams.board_id) {
+                    nextParams.board_id = currentParams.board_id;
+                }
+                if (nextParams.tab === 'catalog' && currentParams.table) {
+                    nextParams.table = currentParams.table;
+                }
+                return nextParams;
+            },
+
+            _updateUrlOnOpen: function (memberId, skipUrlUpdate) {
+                if (skipUrlUpdate || !memberId || !App.utils.url || !App.utils.url.updateParams) return;
+                const nextParams = this._buildBaseUrlParams();
+                nextParams.modal = 'member-detail';
+                nextParams.member_id = memberId;
+                App.utils.url.updateParams(nextParams, false);
+            },
+
+            _updateUrlOnClose: function (skipUrlUpdate) {
+                if (skipUrlUpdate || !App.utils.url || !App.utils.url.updateParams) return;
+                const nextParams = this._buildBaseUrlParams();
+                App.utils.url.updateParams(nextParams, false);
             },
 
             _setDirty: function (nextValue) {

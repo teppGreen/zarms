@@ -21,7 +21,7 @@
             assignmentRoleOptions: ['出展代表者', '出展副代表者', '管理代表者', '管理副代表者', 'ステージ出演者', 'その他運営者'],
             assignmentColumnVisibility: null,
 
-            open: function (planId) {
+            open: function (planId, skipUrlUpdate = false) {
                 if (!planId) return;
 
                 const plan = (App.state.data.plans || []).find(function (item) {
@@ -65,12 +65,14 @@
                 this._bindTabStateSync();
                 this._setErrorMessage('', 'error');
                 this._setOperationState('idle');
+                this._updateUrlOnOpen(planId, skipUrlUpdate);
 
                 this._syncLatest(planId);
             },
 
             close: function (options = {}) {
                 const skipDirtyCheck = options.skipDirtyCheck === true;
+                const skipUrlUpdate = options.skipUrlUpdate === true;
                 const reason = options.reason || 'user';
 
                 if (this.isSaving || this.isDeleting) {
@@ -84,6 +86,7 @@
                     if (!confirm(message)) return;
                 }
                 appUi('#modal-detail-plan', false);
+                this._updateUrlOnClose(skipUrlUpdate);
                 this._reset();
             },
 
@@ -93,8 +96,7 @@
                     return;
                 }
                 if (this.isDirty && !confirm('変更を破棄しますか？')) return;
-                appUi('#modal-detail-plan', false);
-                this._reset();
+                this.close({ skipDirtyCheck: true, reason: 'discard' });
             },
 
             toggleDirty: function (nextValue) {
@@ -291,6 +293,7 @@
 
                         await this._refreshPlansData(true);
                         appUi('#modal-detail-plan', false);
+                        this._updateUrlOnClose(false);
                         this._reset();
                         showSnackbar('企画を削除しました', 'success');
                     } catch (error) {
@@ -377,6 +380,34 @@
                     });
                     tab.dataset.planDetailTabBound = '1';
                 });
+            },
+
+            _buildBaseUrlParams: function () {
+                const currentParams = App.utils.url.getParams();
+                const nextParams = {
+                    tab: currentParams.tab || 'home'
+                };
+                if (nextParams.tab === 'board' && currentParams.board_id) {
+                    nextParams.board_id = currentParams.board_id;
+                }
+                if (nextParams.tab === 'catalog' && currentParams.table) {
+                    nextParams.table = currentParams.table;
+                }
+                return nextParams;
+            },
+
+            _updateUrlOnOpen: function (planId, skipUrlUpdate) {
+                if (skipUrlUpdate || !planId || !App.utils.url || !App.utils.url.updateParams) return;
+                const nextParams = this._buildBaseUrlParams();
+                nextParams.modal = 'plan-detail';
+                nextParams.plan_id = planId;
+                App.utils.url.updateParams(nextParams, false);
+            },
+
+            _updateUrlOnClose: function (skipUrlUpdate) {
+                if (skipUrlUpdate || !App.utils.url || !App.utils.url.updateParams) return;
+                const nextParams = this._buildBaseUrlParams();
+                App.utils.url.updateParams(nextParams, false);
             },
 
             openNewComment: function () {

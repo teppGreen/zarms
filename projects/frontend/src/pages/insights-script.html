@@ -26,40 +26,11 @@
                 requestAnimationFrame(() => this.applyPanelHeights());
 
                 try {
-                    const sevenDaysAgo = new Date();
-                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-                    const isoDate = sevenDaysAgo.toISOString();
-                    const userId = App.state.userId;
+                    const insightData = await callGAS('getInsightsTabData', App.state.userId, isRefresh);
 
-                    // クエリの準備
-                    const logsQuery = {
-                        where: {
-                            table_name: ['=', 'tasks'],
-                            operation_type_key: ['!=', 'REMOVE'],
-                            created_at: ['>', isoDate],
-                            created_by: ['!=', 'system']
-                        }
-                    };
-                    const boardTasksQuery = {
-                        where: { updated_at: ['>', isoDate] },
-                        columns: ['board_id', 'updated_at']
-                    };
-                    const insightTasksQuery = {
-                        columns: ['id', 'board_id', 'task_status_key', 'starts_at', 'ends_at', 'processed_by', 'created_by', 'reviewed_by', 'received_by']
-                    };
-
-                    // 一括取得
-                    const [logsRes, boardTasksRes, insightTasksRes] = await Promise.all([
-                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LOGS, 'select', logsQuery, null, isRefresh),
-                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', boardTasksQuery, null, isRefresh),
-                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', insightTasksQuery, null, isRefresh)
-                    ]);
-
-                    // データ展開
-                    const logs = logsRes?.data || logsRes || [];
-                    const boardTasks = boardTasksRes?.data || boardTasksRes || [];
-                    const insightTasks = insightTasksRes?.data || insightTasksRes || [];
-                    const userInsightTasks = this.filterTasksRelatedToUser(insightTasks, userId);
+                    const logs = insightData?.logs || [];
+                    const boardTasks = insightData?.boardTasks || [];
+                    const userInsightTasks = insightData?.userInsightTasks || [];
 
                     // キャッシュ更新
                     this.cachedLogs = logs;
@@ -75,7 +46,7 @@
                     this.applyPanelHeights();
 
                     // キャッシュヒット時の再取得（バックグラウンド）
-                    if (!isRefresh && (logsRes?.isCached || boardTasksRes?.isCached)) {
+                    if (!isRefresh && insightData?.isCached) {
                         console.log('[Home] Cached data detected. Refreshing in background...');
                         setTimeout(() => {
                             this.loadData(true);

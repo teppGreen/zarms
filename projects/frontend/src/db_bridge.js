@@ -81,6 +81,49 @@ function getMyBoardTasks(...args) {
   return ZARMS_DB.getMyBoardTasks(...cleanArgs);
 }
 
+function getInsightsTabData(...args) {
+  const useApiMode = args.length > 0 ? Boolean(args[args.length - 1]) : false;
+  const cleanArgs = args.slice(0, Math.max(0, args.length - 1));
+
+  if (useApiMode) {
+    const userId = cleanArgs[0];
+    const forceRefresh = !!cleanArgs[1];
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const isoDate = sevenDaysAgo.toISOString();
+    const escapedUserId = String(userId || '').replace(/'/g, "\\'");
+
+    const logs = callDatabaseApi(TABLE_NAMES.LOGS, 'select', {
+      where: {
+        table_name: ['=', TABLE_NAMES.TASKS],
+        operation_type_key: ['!=', 'REMOVE'],
+        created_at: ['>', isoDate],
+        created_by: ['!=', 'system']
+      }
+    }, forceRefresh) || [];
+
+    const boardTasks = callDatabaseApi(TABLE_NAMES.TASKS, 'select', {
+      where: { updated_at: ['>', isoDate] },
+      columns: ['board_id', 'updated_at']
+    }, forceRefresh) || [];
+
+    const insightTasks = callDatabaseApi(TABLE_NAMES.TASKS, 'select', {
+      columns: ['id', 'board_id', 'task_status_key', 'starts_at', 'ends_at', 'processed_by', 'created_by', 'reviewed_by', 'received_by'],
+      rawWhere: `(O = '${escapedUserId}' OR K = '${escapedUserId}' OR L = '${escapedUserId}' OR M = '${escapedUserId}')`
+    }, forceRefresh) || [];
+
+    return {
+      logs: logs,
+      boardTasks: boardTasks,
+      userInsightTasks: insightTasks,
+      isCached: false
+    };
+  }
+
+  return ZARMS_DB.getInsightsTabData(...cleanArgs);
+}
+
 // 必要に応じて他の外部公開関数を追加してください
 
 // ============================================
