@@ -3,6 +3,7 @@
         App.pages.insights = {
             isLoading: false,
             taskLogs: [],
+            tasks: [],
             taskMetaMap: new Map(),
 
             loadData: async function (forceRefresh = false) {
@@ -36,6 +37,7 @@
                     const tasks = unwrapArray(tasksRes);
 
                     this.taskLogs = this.filterTaskLogs(logs);
+                    this.tasks = tasks;
                     this.taskMetaMap = this.buildTaskMetaMap(tasks);
                     this.renderCharts();
                 } catch (error) {
@@ -136,29 +138,32 @@
                 if (!container) return;
                 container.classList.remove('shimmer-loading');
 
-                const counts = new Map();
+                const counts = {};
                 this.taskLogs.forEach((log) => {
-                    const taskId = this.extractTaskIdFromLog(log);
-                    if (!taskId) return;
-                    counts.set(taskId, (counts.get(taskId) || 0) + 1);
+                    const userId = log.created_by;
+                    if (!userId) return;
+                    counts[userId] = (counts[userId] || 0) + 1;
                 });
 
-                const ranking = Array.from(counts.entries())
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 10)
-                    .map(([taskId, count]) => ({ taskId: taskId, count: count }));
+                const ranking = Object.keys(counts)
+                    .map((userId) => ({ userId: userId, count: counts[userId] }))
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 10);
 
                 if (ranking.length === 0) {
                     this.showEmpty('insights-task-ranking-chart', '集計対象のタスク更新ログがありません');
                     return;
                 }
 
+                const members = App.state.data.members || [];
+                const getMember = (id) => members.find((member) => member.id === id);
+
                 let html = `
                     <table class="border small-text">
                       <thead class="fixed surface-container-low">
                         <tr>
                            <th class="center-align" style="width: 0; white-space: nowrap;">順位</th>
-                           <th class="left-align">タスク名</th>
+                           <th class="left-align">表示名</th>
                            <th class="right-align" style="width: 0; white-space: nowrap;">件数</th>
                         </tr>
                       </thead>
@@ -167,18 +172,31 @@
 
                 let currentRank = 1;
                 ranking.forEach((item, index) => {
-                    const taskMeta = this.taskMetaMap.get(item.taskId) || {};
-                    const prefix = taskMeta.display_id ? ('#' + taskMeta.display_id + ' ') : '';
-                    const taskName = (prefix + (taskMeta.name || '不明なタスク')).trim();
+                    const member = getMember(item.userId);
+                    const name = member ? (member.display_name || member.name || '不明') : '不明';
+                    const photo = member ? member.profile_photo_url : null;
 
                     if (index > 0 && ranking[index - 1].count !== item.count) {
                         currentRank = index + 1;
                     }
 
+                    const rowClass = item.userId === App.state.userId ? 'fill' : '';
+                    const avatarHtml = photo
+                        ? `<i class="small circle"><img src="${escapeHtml(photo)}" class="responsive"></i>`
+                        : `<i class="small">account_circle</i>`;
+                    const canOpenMyBoard = !!(App.pages.home && typeof App.pages.home.openMyBoardForMember === 'function');
+                    const clickAttr = canOpenMyBoard
+                        ? ` style="cursor: pointer;" onclick="App.pages.home.openMyBoardForMember('${item.userId}')"`
+                        : '';
+
                     html += `
-                        <tr>
+                        <tr class="${rowClass}"${clickAttr}>
                             <td class="center-align font-number">${currentRank}</td>
-                            <td class="left-align">${escapeHtml(taskName)}</td>
+                            <td>
+                                <div class="row left-align tiny-space">
+                                    ${avatarHtml}${escapeHtml(name)}
+                                </div>
+                            </td>
                             <td class="right-align font-number">${item.count}</td>
                         </tr>
                     `;
@@ -193,23 +211,27 @@
                 if (!container) return;
                 container.classList.remove('shimmer-loading');
 
-                const counts = new Map();
-                this.taskLogs.forEach((log) => {
-                    const boardId = this.extractBoardIdFromLog(log);
-                    if (!boardId) return;
-                    counts.set(boardId, (counts.get(boardId) || 0) + 1);
+                const counts = {};
+                (this.tasks || []).forEach((task) => {
+                    const boardId = task && task.board_id;
+                    if (!boardId || boardId === 'null' || boardId === 'my-board') return;
+                    counts[boardId] = (counts[boardId] || 0) + 1;
                 });
 
-                const boardNameMap = new Map((App.state.data.boards || []).map((board) => [board.id, board.name || '無名のボード']));
+                const boards = App.state.data.boards || [];
+                const getBoard = (id) => boards.find((board) => board.id === id);
 
-                const ranking = Array.from(counts.entries())
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 10)
-                    .map(([boardId, count]) => ({
-                        boardId: boardId,
-                        count: count,
-                        name: boardNameMap.get(boardId) || ('不明なボード (' + boardId + ')')
-                    }));
+                const ranking = Object.keys(counts)
+                    .map((boardId) => {
+                        const board = getBoard(boardId);
+                        return {
+                            boardId: boardId,
+                            count: counts[boardId],
+                            name: board ? board.name : '不明'
+                        };
+                    })
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 10);
 
                 if (ranking.length === 0) {
                     this.showEmpty('insights-board-ranking-chart', '集計対象のボード更新ログがありません');

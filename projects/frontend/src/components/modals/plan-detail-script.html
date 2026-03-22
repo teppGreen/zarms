@@ -18,6 +18,8 @@
             thumbnailPreviewDebounceTimer: null,
             thumbnailCopyFeedbackTimer: null,
             lastOperationState: 'idle',
+            assignmentRoleOptions: ['出展代表者', '出展副代表者', '管理代表者', '管理副代表者', 'ステージ出演者', 'その他運営者'],
+            assignmentColumnVisibility: null,
 
             open: function (planId) {
                 if (!planId) return;
@@ -43,6 +45,7 @@
                 this.originalAssignments = assignments.map(function (assignment) {
                     return Object.assign({}, assignment);
                 });
+                this.assignmentColumnVisibility = this._createDefaultAssignmentColumnVisibility();
                 this.isDeleteRequested = false;
                 this.isDirty = false;
                 this.isSaving = false;
@@ -103,35 +106,65 @@
                 const preSelected = this.currentAssignments
                     .filter(function (assignment) { return assignment.is_active !== false; })
                     .map(function (assignment) { return assignment.member_id; });
+                const preSelectedMeta = this.currentAssignments.reduce((acc, assignment) => {
+                    if (assignment && assignment.member_id) {
+                        acc[assignment.member_id] = {
+                            role: (assignment.role || '').trim() || null
+                        };
+                    }
+                    return acc;
+                }, {});
 
                 App.modals.selectMembers.open({
                     multiSelect: true,
                     preSelected: preSelected,
+                    includeSelectionMeta: true,
+                    roleOptions: this.assignmentRoleOptions,
+                    preSelectedMeta: preSelectedMeta,
                     callback: function (selectedIds) {
                         App.modals.planDetail.applyMemberSelection(selectedIds);
                     }
                 });
             },
 
-            applyMemberSelection: function (selectedIds) {
+            applyMemberSelection: function (selectedEntries) {
                 const before = this.currentAssignments.slice();
                 const existingByMemberId = before.reduce(function (acc, assignment) {
                     acc[assignment.member_id] = assignment;
                     return acc;
                 }, {});
 
-                const nextAssignments = (selectedIds || []).map(function (memberId) {
+                const normalizedEntries = (selectedEntries || []).map((entry) => {
+                    if (typeof entry === 'string') {
+                        return { member_id: entry, role: null };
+                    }
+                    return {
+                        member_id: entry && entry.member_id ? String(entry.member_id) : '',
+                        role: entry && entry.role ? this._normalizeAssignmentRole(entry.role) : null
+                    };
+                }).filter(function (entry) {
+                    return !!entry.member_id;
+                });
+
+                const nextAssignments = normalizedEntries.map((entry) => {
+                    const memberId = entry.member_id;
                     const existing = existingByMemberId[memberId];
                     if (existing) {
                         const next = Object.assign({}, existing);
                         next.is_active = true;
+                        if (entry.role !== undefined) {
+                            next.role = entry.role || null;
+                        }
+                        next.user_note = (next.user_note || next.remark || '').trim() || null;
                         return next;
                     }
                     return {
                         id: null,
                         plan_id: App.modals.planDetail.currentId,
                         member_id: memberId,
-                        role: null,
+                        role: entry.role || null,
+                        user_note: null,
+                        remark: null,
                         is_active: true
                     };
                 });
@@ -145,7 +178,21 @@
             updateAssignmentRole: function (index, roleValue) {
                 const target = this.currentAssignments[index];
                 if (!target) return;
-                target.role = (roleValue || '').trim() || null;
+                target.role = this._normalizeAssignmentRole(roleValue);
+                this.toggleDirty(true);
+            },
+
+            updateAssignmentUserNote: function (index, noteValue) {
+                const target = this.currentAssignments[index];
+                if (!target) return;
+                target.user_note = (noteValue || '').trim() || null;
+                this.toggleDirty(true);
+            },
+
+            updateAssignmentRemark: function (index, remarkValue) {
+                const target = this.currentAssignments[index];
+                if (!target) return;
+                target.remark = (remarkValue || '').trim() || null;
                 this.toggleDirty(true);
             },
 
@@ -393,11 +440,14 @@
 
                 for (let i = 0; i < this.currentAssignments.length; i += 1) {
                     const assignment = this.currentAssignments[i];
+                    const userNote = (assignment.user_note || '').trim() || null;
+                    const remark = (assignment.remark || '').trim() || userNote;
                     const payload = {
                         plan_id: this.currentId,
                         member_id: assignment.member_id,
                         role: (assignment.role || '').trim() || null,
-                        is_active: assignment.is_active !== false
+                        is_active: assignment.is_active !== false,
+                        remark: remark
                     };
 
                     if (assignment.id) {
@@ -405,6 +455,7 @@
                         const changed =
                             String(payload.member_id ?? '') !== String(original.member_id ?? '') ||
                             String(payload.role ?? '') !== String(original.role ?? '') ||
+                            String(payload.remark ?? '') !== String(original.remark ?? '') ||
                             Boolean(payload.is_active) !== Boolean(original.is_active !== false);
 
                         if (!changed) continue;
@@ -599,35 +650,150 @@
                     return;
                 }
 
-                container.innerHTML = this.currentAssignments.map(function (assignment, index) {
+                const columns = this._getAssignmentTableColumns();
+                const visibility = this.assignmentColumnVisibility || this._createDefaultAssignmentColumnVisibility();
+                const visibleColumns = columns.filter(function (column) {
+                    return visibility[column.key] !== false;
+                });
+                const toggleButtonsHtml = columns.map(function (column) {
+                    const isVisible = visibility[column.key] !== false;
+                    const buttonClass = isVisible ? 'small border round' : 'small border round tertiary';
+                    const suffix = isVisible ? '' : '（非表示）';
+                    return '<button class="' + buttonClass + '" type="button" onclick="App.modals.planDetail.toggleAssignmentColumnVisibility(\'' + App.modals.planDetail._escapeAttr(column.key) + '\')">' +
+                        '<span>' + App.modals.planDetail._escapeHtml(column.label + suffix) + '</span>' +
+                        '</button>';
+                }).join('');
+
+                const headerHtml = visibleColumns.map(function (column) {
+                    return '<th>' + App.modals.planDetail._escapeHtml(column.label) + '</th>';
+                }).join('') + '<th>操作</th>';
+
+                const rowsHtml = this.currentAssignments.map(function (assignment, index) {
                     const member = (App.state.data.members || []).find(function (item) {
                         return item.id === assignment.member_id;
-                    });
-                    const memberName = member ? (member.display_name || member.name || '名称未設定') : '不明な人物';
-                    const memberEmail = member ? (member.email || '') : '';
-                    const role = App.modals.planDetail._escapeAttr(assignment.role || '');
-                    const checked = assignment.is_active === false ? '' : 'checked';
-
-                    return '<article class="border small-round padding bottom-margin">' +
-                        '<div class="row tiny-space middle-align">' +
-                        '<div class="max">' +
-                        '<div class="bold">' + App.modals.planDetail._escapeHtml(memberName) + '</div>' +
-                        '<div class="small-text secondary-text">' + App.modals.planDetail._escapeHtml(memberEmail) + '</div>' +
-                        '</div>' +
-                        '<button class="circle transparent" onclick="App.modals.planDetail.removeAssignmentAt(' + index + ')" title="この関係者を削除">' +
-                        '<i>remove_circle</i>' +
-                        '</button>' +
-                        '</div>' +
-                        '<div class="field border label small top-margin">' +
-                        '<input placeholder=" " type="text" value="' + role + '" oninput="App.modals.planDetail.updateAssignmentRole(' + index + ', this.value)">' +
-                        '<label>役割</label>' +
-                        '</div>' +
-                        '<label class="row tiny-space top-margin">' +
-                        '<input type="checkbox" ' + checked + ' onchange="App.modals.planDetail.updateAssignmentActive(' + index + ', this.checked)">' +
-                        '<span>有効</span>' +
-                        '</label>' +
-                        '</article>';
+                    }) || null;
+                    const cellsHtml = visibleColumns.map(function (column) {
+                        return '<td>' + App.modals.planDetail._buildAssignmentCellHtml(column.key, assignment, member, index) + '</td>';
+                    }).join('');
+                    return '<tr>' + cellsHtml +
+                        '<td><button class="small border round" type="button" onclick="App.modals.planDetail.removeAssignmentAt(' + index + ')">解除</button></td>' +
+                        '</tr>';
                 }).join('');
+
+                container.innerHTML =
+                    '<div class="row tiny-space wrap bottom-margin">' + toggleButtonsHtml + '</div>' +
+                    '<div class="scroll">' +
+                    '<table class="border small-text">' +
+                    '<thead class="fixed"><tr>' + headerHtml + '</tr></thead>' +
+                    '<tbody>' + rowsHtml + '</tbody>' +
+                    '</table>' +
+                    '</div>';
+            },
+
+            _getAssignmentTableColumns: function () {
+                return [
+                    { key: 'display_name', label: '表示名' },
+                    { key: 'name', label: '名前' },
+                    { key: 'role', label: '役割' },
+                    { key: 'remark', label: '備考' },
+                    { key: 'user_note', label: 'user_note' },
+                    { key: 'email', label: 'メールアドレス' },
+                    { key: 'slack_id', label: 'Slack ID' },
+                    { key: 'phone_number', label: '電話番号' },
+                    { key: 'is_active', label: '有効' }
+                ];
+            },
+
+            _createDefaultAssignmentColumnVisibility: function () {
+                return {
+                    display_name: true,
+                    name: true,
+                    role: true,
+                    remark: true,
+                    user_note: true,
+                    email: true,
+                    slack_id: true,
+                    phone_number: false,
+                    is_active: true
+                };
+            },
+
+            toggleAssignmentColumnVisibility: function (columnKey) {
+                if (!columnKey) return;
+                if (!this.assignmentColumnVisibility) {
+                    this.assignmentColumnVisibility = this._createDefaultAssignmentColumnVisibility();
+                }
+                this.assignmentColumnVisibility[columnKey] = this.assignmentColumnVisibility[columnKey] === false;
+                this._renderAssignments();
+            },
+
+            _buildAssignmentCellHtml: function (columnKey, assignment, member, index) {
+                if (columnKey === 'display_name') {
+                    const displayName = member ? (member.display_name || member.name || member.email || '不明') : '不明';
+                    const safeDisplayName = this._escapeHtml(displayName);
+                    const photoUrl = member ? (member.profile_photo_url || '') : '';
+                    const slackProfileUrl = member ? (member.slack_profile_url || '') : '';
+                    const avatarHtml = photoUrl
+                        ? '<img class="responsive" src="' + this._escapeAttr(photoUrl) + '" alt="' + safeDisplayName + '">'
+                        : this._escapeHtml(String(displayName).slice(0, 1) || '?');
+                    const labelHtml = slackProfileUrl
+                        ? '<a target="_blank" rel="noopener noreferrer" href="' + this._escapeAttr(slackProfileUrl) + '">' + safeDisplayName + '</a>'
+                        : '<span>' + safeDisplayName + '</span>';
+                    return '<div class="row tiny-space middle-align"><i class="circle tiny">' + avatarHtml + '</i>' + labelHtml + '</div>';
+                }
+                if (columnKey === 'name') {
+                    return this._escapeHtml(member ? (member.name || '') : '');
+                }
+                if (columnKey === 'role') {
+                    const roleOptionsHtml = ['<option value="">（未設定）</option>'].concat(this.assignmentRoleOptions.map((roleLabel) => {
+                        const selectedAttr = roleLabel === (assignment.role || '') ? ' selected' : '';
+                        return '<option value="' + this._escapeAttr(roleLabel) + '"' + selectedAttr + '>' + this._escapeHtml(roleLabel) + '</option>';
+                    })).join('');
+                    return '<div class="field border label small no-margin suffix no-wrap">' +
+                        '<select onchange="App.modals.planDetail.updateAssignmentRole(' + index + ', this.value)">' + roleOptionsHtml + '</select>' +
+                        '<label>役割</label><i>arrow_drop_down</i></div>';
+                }
+                if (columnKey === 'remark') {
+                    return '<input class="small" type="text" placeholder="備考" value="' + this._escapeAttr(assignment.remark || '') + '" onchange="App.modals.planDetail.updateAssignmentRemark(' + index + ', this.value)">';
+                }
+                if (columnKey === 'user_note') {
+                    const currentNote = assignment.user_note || assignment.remark || '';
+                    return '<input class="small" type="text" placeholder="user_note" value="' + this._escapeAttr(currentNote) + '" onchange="App.modals.planDetail.updateAssignmentUserNote(' + index + ', this.value)">';
+                }
+                if (columnKey === 'email') {
+                    return this._escapeHtml(member ? (member.email || '') : '');
+                }
+                if (columnKey === 'slack_id') {
+                    return this._escapeHtml(this._extractSlackId(member ? member.slack_profile_url : ''));
+                }
+                if (columnKey === 'phone_number') {
+                    return this._escapeHtml(member ? (member.phone_number || '') : '');
+                }
+                if (columnKey === 'is_active') {
+                    const checked = assignment.is_active !== false ? ' checked' : '';
+                    return '<label class="checkbox"><input type="checkbox"' + checked + ' onchange="App.modals.planDetail.updateAssignmentActive(' + index + ', this.checked)"><span></span></label>';
+                }
+                return '';
+            },
+
+            _extractSlackId: function (slackProfileUrl) {
+                const rawUrl = String(slackProfileUrl || '').trim();
+                if (!rawUrl) return '';
+                try {
+                    const parsed = new URL(rawUrl);
+                    const segments = String(parsed.pathname || '').split('/').filter(function (part) {
+                        return !!part;
+                    });
+                    return segments.length > 0 ? segments[segments.length - 1] : '';
+                } catch (_) {
+                    return '';
+                }
+            },
+
+            _normalizeAssignmentRole: function (roleValue) {
+                const normalized = String(roleValue || '').trim();
+                if (!normalized) return null;
+                return this.assignmentRoleOptions.indexOf(normalized) !== -1 ? normalized : null;
             },
 
             _bindChangeListeners: function () {
@@ -715,6 +881,7 @@
                 this.originalData = null;
                 this.currentAssignments = [];
                 this.originalAssignments = [];
+                this.assignmentColumnVisibility = this._createDefaultAssignmentColumnVisibility();
                 this.isDeleteRequested = false;
                 this.isDirty = false;
                 this.isSaving = false;
