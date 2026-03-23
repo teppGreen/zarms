@@ -42,6 +42,18 @@ App.test.resetState();
 await App.test.closeAllModals();
 ```
 
+### 自動更新の一時停止
+```javascript
+// autoRefreshを手動再開まで停止
+App.test.pauseAutoRefresh();
+
+// 30秒だけ停止して自動再開
+App.test.pauseAutoRefresh(30000);
+
+// 停止中のautoRefreshを手動で再開
+App.test.resumeAutoRefresh();
+```
+
 ## 手動テストチェックリスト
 
 ### 認証フロー

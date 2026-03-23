@@ -12,16 +12,7 @@ function getMemberByEmail(email) {
         let result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
             where: { email: ["=", email] }
         }, null, false);
-        let members = result?.data || result || [];
-        if (members.length === 0) {
-            result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
-                where: { email: ["=", email] }
-            }, null, true);
-            members = result?.data || result || [];
-            if (members.length === 0) {
-                throw new ValidationError('User not found', 'email', email);
-            }
-        }
+        const members = result?.data || result || [];
         return members[0];
     } catch (error) {
         console.error('[getMemberByEmail] Error:', error);
@@ -40,7 +31,7 @@ function findUserBySlackUrl(slackProfileUrl) {
             where: { slack_profile_url: ["=", slackProfileUrl] }
         }, null, false);
         const members = result?.data || result || [];
-        return members.length === 0 ? null : members[0];
+        return members[0];
     } catch (error) {
         console.error('findUserBySlackUrl error:', error);
         return null;
