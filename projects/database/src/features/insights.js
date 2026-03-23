@@ -50,7 +50,8 @@ function getInsightsTabData(userId, forceRefresh = false) {
                 operation_type_key: ['!=', 'REMOVE'],
                 created_at: ['>', isoDate],
                 created_by: ['!=', 'system']
-            }
+            },
+            columns: ['created_at', 'created_by']
         };
 
         const boardTasksQuery = {
@@ -59,7 +60,7 @@ function getInsightsTabData(userId, forceRefresh = false) {
         };
 
         const userInsightTasksQuery = {
-            columns: ['id', 'board_id', 'task_status_key', 'starts_at', 'ends_at', 'processed_by', 'created_by', 'reviewed_by', 'received_by'],
+            columns: ['board_id', 'task_status_key', 'starts_at', 'ends_at', 'processed_by', 'created_by', 'reviewed_by', 'received_by'],
             rawWhere: `(${createdByCol} = '${escapedUserId}' OR ${processedByCol} = '${escapedUserId}' OR ${reviewedByCol} = '${escapedUserId}' OR ${receivedByCol} = '${escapedUserId}')`
         };
 
