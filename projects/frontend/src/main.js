@@ -55,9 +55,9 @@ function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false
     userProperties: PropertiesService.getUserProperties().getProperties()
   };
 
-  // デスクトップ版の場合のみ初期データを事前取得
+  // デスクトップ版の場合のみHome画面用の初期データを事前取得（最小限）
   if (!isMobile) {
-    templateVariables.initialData = _prefetchInitialData(activeUser.id, useApiMode);
+    templateVariables.initialData = _prefetchHomeInitialData(activeUser.id, useApiMode);
   }
 
   template.templateVariables = templateVariables;
@@ -185,11 +185,77 @@ function _checkRequiresReAgreement(userAgreementData, policyUpdateDates) {
 }
 
 /**
- * アプリ起動に必要なマスタデータを一括事前取得（CacheService活用）
+ * ホーム画面の初回表示に必要なデータを事前取得（最小限）
+ * 初回ローディング高速化のため、home で実際に使用するデータのみを取得
  * @param {string} userId - ユーザーID
- * @returns {Object} { boards, apps, members, directories, directoryAssignments, skills, skillAssignments, systemUpdates, isCached }
+ * @returns {Object} { tasks, notices, isCached }
  */
-function _prefetchInitialData(userId, useApiMode = false) {
+function _prefetchHomeInitialData(userId, useApiMode = false) {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const isoDate = sevenDaysAgo.toISOString();
+
+  const queries = [
+    {
+      key: 'tasks',
+      tableName: TABLE_NAMES.TASKS,
+      operation: 'select',
+      dataObject: {
+        where: { task_status_key: ['!=', 'DONE'] },
+        columns: ['id', 'display_id', 'name', 'board_id', 'task_status_key']
+      },
+      forceRefresh: false
+    },
+    {
+      key: 'notices',
+      tableName: TABLE_NAMES.NOTICES,
+      operation: 'select',
+      dataObject: {
+        orderBy: { starts_at: 'desc' }
+      },
+      forceRefresh: false
+    },
+    {
+      key: 'logs',
+      tableName: TABLE_NAMES.LOGS,
+      operation: 'select',
+      dataObject: {
+        where: { created_at: ['>', isoDate] },
+        orderBy: { created_at: 'desc' },
+        limit: 100
+      },
+      forceRefresh: false
+    },
+    {
+      key: 'systemUpdates',
+      tableName: TABLE_NAMES.SYSTEM_UPDATES,
+      operation: 'select',
+      dataObject: { orderBy: { created_at: 'desc' } },
+      forceRefresh: true  // 常に最新を取得（top-navigation で必要）
+    }
+  ];
+
+  const batchResult = useApiMode
+    ? handleBatchDatabaseProcessViaApi(queries)
+    : handleBatchDatabaseProcess(userId, queries);
+  const r = batchResult.results || {};
+
+  return {
+    tasks: (r.tasks?.data || r.tasks || []),
+    notices: (r.notices?.data || r.notices || []),
+    logs: (r.logs?.data || r.logs || []),
+    systemUpdates: (r.systemUpdates?.data || r.systemUpdates || []),
+    isCached: !batchResult.hasAnyUncached
+  };
+}
+
+/**
+ * マスタデータ一括取得（遅延ロード用）
+ * 初回ページロードの高速化のため、home 画面以外で必要になるまで取得を遅延させます
+ * @param {string} userId - ユーザーID
+ * @returns {Object} { boards, apps, members, directories, directoryAssignments, skills, skillAssignments, isCached }
+ */
+function _prefetchMasterData(userId, useApiMode = false) {
   const queries = [
     {
       key: 'boards',
@@ -203,15 +269,6 @@ function _prefetchInitialData(userId, useApiMode = false) {
       tableName: TABLE_NAMES.APPS,
       operation: 'select',
       dataObject: {},
-      forceRefresh: false
-    },
-    {
-      key: 'notices',
-      tableName: TABLE_NAMES.NOTICES,
-      operation: 'select',
-      dataObject: {
-        orderBy: { starts_at: 'desc' }
-      },
       forceRefresh: false
     },
     {
@@ -257,23 +314,6 @@ function _prefetchInitialData(userId, useApiMode = false) {
       operation: 'select',
       dataObject: {},
       forceRefresh: false
-    },
-    {
-      key: 'systemUpdates',
-      tableName: TABLE_NAMES.SYSTEM_UPDATES,
-      operation: 'select',
-      dataObject: { orderBy: { created_at: 'desc' } },
-      forceRefresh: true  // 常に最新を取得
-    },
-    {
-      key: 'tasks',
-      tableName: TABLE_NAMES.TASKS,
-      operation: 'select',
-      dataObject: {
-        columns: ['id', 'display_id', 'name', 'board_id', 'task_status_key'],
-        orderBy: { display_id: 'desc' }
-      },
-      forceRefresh: false
     }
   ];
 
@@ -285,16 +325,12 @@ function _prefetchInitialData(userId, useApiMode = false) {
   return {
     boards: (r.boards?.data || r.boards || []),
     apps: (r.apps?.data || r.apps || []),
-    notices: (r.notices?.data || r.notices || []),
     links: (r.links?.data || r.links || []),
     members: (r.members?.data || r.members || []),
     directories: (r.directories?.data || r.directories || []),
     directoryAssignments: (r.directoryAssignments?.data || r.directoryAssignments || []),
     skills: (r.skills?.data || r.skills || []),
     skillAssignments: (r.skillAssignments?.data || r.skillAssignments || []),
-    systemUpdates: (r.systemUpdates?.data || r.systemUpdates || []),
-    tasks: (r.tasks?.data || r.tasks || []),
-    // いずれかがキャッシュから取得された場合 true
     isCached: !batchResult.hasAnyUncached
   };
 }

@@ -446,12 +446,19 @@
       let skillAssignments = [];
       let systemUpdates = [];
       let tasks = [];
+      let logs = [];
       let wasCached = false;
+      let needsBackgroundMasterDataRefresh = false;
 
       if (embedded) {
+        // ホーム画面用の最小初期データ（task, notices, logs）が埋め込まれている
+        tasks = embedded.tasks || [];
+        notices = embedded.notices || [];
+        logs = embedded.logs || [];
+        
+        // その他のマスタデータは後でバックグラウンドで取得
         boards = embedded.boards || [];
         apps = embedded.apps || [];
-        notices = embedded.notices || [];
         links = embedded.links || [];
         members = embedded.members || [];
         directories = embedded.directories || [];
@@ -461,9 +468,12 @@
         skills = embedded.skills || [];
         skillAssignments = embedded.skillAssignments || [];
         systemUpdates = embedded.systemUpdates || [];
-        tasks = embedded.tasks || [];
+        
         wasCached = embedded.isCached || false;
-        console.log('[loadAllData] Server-embedded initialData (isCached:', wasCached, ')');
+        // 埋め込みデータがホーム用（tasks, notices, logsのみ）の場合、マスタデータが不足している
+        needsBackgroundMasterDataRefresh = !embedded.boards || !embedded.members || !embedded.skills;
+        
+        console.log('[loadAllData] Server-embedded initialData (isCached:', wasCached, ', isHomeOnly:', needsBackgroundMasterDataRefresh, ')');
       } else {
         // フォールバック: initialData が埋め込まれていない場合（旧来どおり並列GAS呼び出し）
         console.log('[loadAllData] No embedded initialData. Fetching via GAS...');
@@ -536,30 +546,49 @@
       // ユーザー要望により、キャッシュの有無に関わらず、初期描画後に必ず最新データを再取得して更新する
       let backgroundUpdatePromise = null;
 
-      console.log('[loadAllData] 初期表示完了。バックグラウンドで最新データを全取得します...');
+      console.log('[loadAllData] 初期表示完了。バックグラウンドでマスタデータを全取得します...');
 
       backgroundUpdatePromise = new Promise((resolve) => {
         setTimeout(async () => {
           try {
+            // ホーム専用初期データの場合は、不足しているマスタデータを今ここで取得
+            let queryList = [];
+            
+            if (needsBackgroundMasterDataRefresh) {
+              // マスタデータが不足している場合は、すぐに取得（優先度高）
+              queryList = [
+                { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: false },
+                { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh: false },
+                { key: 'links', tableName: TABLE_NAMES.LINKS, operation: 'select', dataObject: { orderBy: { label: 'asc' } }, forceRefresh: false },
+                { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: false },
+                { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: false },
+                { key: 'directoryAssignments', tableName: TABLE_NAMES.DIRECTORY_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: false },
+                { key: 'plans', tableName: TABLE_NAMES.PLANS, operation: 'select', dataObject: {}, forceRefresh: false },
+                { key: 'planAssignments', tableName: TABLE_NAMES.PLAN_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: false },
+                { key: 'skills', tableName: TABLE_NAMES.SKILLS, operation: 'select', dataObject: {}, forceRefresh: false },
+                { key: 'skillAssignments', tableName: TABLE_NAMES.SKILL_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: false }
+              ];
+            } else {
+              // マスタデータは既に利用可能なため、最新データのrefreshのみ
+              queryList = [
+                { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: true },
+                { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh: true },
+                { key: 'links', tableName: TABLE_NAMES.LINKS, operation: 'select', dataObject: { orderBy: { label: 'asc' } }, forceRefresh: true },
+                { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: true },
+                { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: true },
+                { key: 'directoryAssignments', tableName: TABLE_NAMES.DIRECTORY_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true },
+                { key: 'plans', tableName: TABLE_NAMES.PLANS, operation: 'select', dataObject: {}, forceRefresh: true },
+                { key: 'planAssignments', tableName: TABLE_NAMES.PLAN_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true },
+                { key: 'skills', tableName: TABLE_NAMES.SKILLS, operation: 'select', dataObject: {}, forceRefresh: true },
+                { key: 'skillAssignments', tableName: TABLE_NAMES.SKILL_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true }
+              ];
+            }
+
             // 1回のGAS呼び出しにバッチ化
-            const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, [
-              { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: true },
-              { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh: true },
-              { key: 'notices', tableName: TABLE_NAMES.NOTICES, operation: 'select', dataObject: { orderBy: { starts_at: 'desc' } }, forceRefresh: true },
-              { key: 'links', tableName: TABLE_NAMES.LINKS, operation: 'select', dataObject: { orderBy: { label: 'asc' } }, forceRefresh: true },
-              { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: true },
-              { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: true },
-              { key: 'directoryAssignments', tableName: TABLE_NAMES.DIRECTORY_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true },
-              { key: 'plans', tableName: TABLE_NAMES.PLANS, operation: 'select', dataObject: {}, forceRefresh: true },
-              { key: 'planAssignments', tableName: TABLE_NAMES.PLAN_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true },
-              { key: 'skills', tableName: TABLE_NAMES.SKILLS, operation: 'select', dataObject: {}, forceRefresh: true },
-              { key: 'skillAssignments', tableName: TABLE_NAMES.SKILL_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true },
-              { key: 'tasks', tableName: TABLE_NAMES.TASKS, operation: 'select', dataObject: { columns: ['id', 'display_id', 'name', 'board_id', 'task_status_key', 'is_active'], where: { is_active: ['!=', false] }, orderBy: { display_id: 'desc' } }, forceRefresh: true }
-            ]);
+            const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, queryList);
             const r = batchResult?.results || {};
             const freshBoards = r.boards?.data || r.boards || [];
             const freshApps = r.apps?.data || r.apps || [];
-            const freshNotices = r.notices?.data || r.notices || [];
             const freshLinks = r.links?.data || r.links || [];
             const freshMembers = r.members?.data || r.members || [];
             const freshDirectories = r.directories?.data || r.directories || [];
@@ -568,11 +597,9 @@
             const freshPlanAssignments = r.planAssignments?.data || r.planAssignments || [];
             const freshSkills = r.skills?.data || r.skills || [];
             const freshSkillAssignments = r.skillAssignments?.data || r.skillAssignments || [];
-            const freshTasks = r.tasks?.data || r.tasks || [];
 
             App.state.data.boards = freshBoards;
             App.state.data.apps = freshApps;
-            App.state.data.notices = freshNotices;
             App.state.data.links = freshLinks;
             App.state.data.members = freshMembers;
             App.state.data.directories = freshDirectories;
@@ -581,7 +608,6 @@
             App.state.data.planAssignments = freshPlanAssignments;
             App.state.data.skills = freshSkills;
             App.state.data.skillAssignments = freshSkillAssignments;
-            App.state.data.tasks = freshTasks;
 
             // ナビゲーションを更新（アクティブ状態を保持）
             const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#board-nav a.active');
