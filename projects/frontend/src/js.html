@@ -619,6 +619,7 @@
   // 自動データ更新
   let autoRefreshInterval = null;
   let refreshDataAbortController = null;
+  let autoRefreshResumeTimeout = null;
 
   function startAutoRefresh() {
     // 既存のインターバルがあればクリア
@@ -626,8 +627,30 @@
       clearInterval(autoRefreshInterval);
     }
 
+    // 既存の再開予約があればクリア
+    if (autoRefreshResumeTimeout) {
+      clearTimeout(autoRefreshResumeTimeout);
+      autoRefreshResumeTimeout = null;
+    }
+
     // 2分ごとにデータを更新
     autoRefreshInterval = setInterval(refreshData, 120000);
+  }
+
+  function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+      clearInterval(autoRefreshInterval);
+      autoRefreshInterval = null;
+    }
+
+    if (refreshDataAbortController) {
+      refreshDataAbortController.aborted = true;
+    }
+
+    if (autoRefreshResumeTimeout) {
+      clearTimeout(autoRefreshResumeTimeout);
+      autoRefreshResumeTimeout = null;
+    }
   }
 
   async function refreshData() {
@@ -2347,6 +2370,36 @@
           await appUi(modal.id, false);
         }
         console.log('[App.test] All modals closed');
+      },
+
+      /**
+       * autoRefreshを一時停止します
+       * @param {number} durationMs - 停止時間（ms）。0以下の場合は明示的にresumeAutoRefreshを呼ぶまで停止
+       */
+      pauseAutoRefresh: function (durationMs = 0) {
+        stopAutoRefresh();
+
+        const waitMs = Number(durationMs);
+        if (Number.isFinite(waitMs) && waitMs > 0) {
+          autoRefreshResumeTimeout = setTimeout(function () {
+            autoRefreshResumeTimeout = null;
+            startAutoRefresh();
+            console.log('[App.test] Auto refresh resumed');
+          }, waitMs);
+          console.log('[App.test] Auto refresh paused for', waitMs, 'ms');
+          return waitMs;
+        }
+
+        console.log('[App.test] Auto refresh paused until resumeAutoRefresh()');
+        return 0;
+      },
+
+      /**
+       * 停止中のautoRefreshを再開します
+       */
+      resumeAutoRefresh: function () {
+        startAutoRefresh();
+        console.log('[App.test] Auto refresh resumed manually');
       }
     };
 

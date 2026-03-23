@@ -1,57 +1,53 @@
 <!-- 新規コメント作成モーダル -->
  <!-- 将来的には、タスク追加画面単体で動作するようにしたい（タスクを選択する欄を作る） -->
-<dialog id="modal-new-comment" class="modal padding no-scroll">
-    <nav class="small-padding bottom-margin">
-        <h5 class="max bold">新規コメント作成</h5>
-        <button class="circle transparent" onclick="App.modals.newComment.close()">
-            <i>close</i>
-        </button>
-    </nav>
+<dialog id="modal-new-comment" class="modal large-width padding">
+    <header class="fixed top-padding">
+        <nav class="small-padding">
+            <h5 class="max bold">新規コメント作成</h5>
+            <button class="circle transparent" onclick="App.modals.newComment.close()">
+                <i>close</i>
+            </button>
+        </nav>
+    </header>
 
-    <article id="new-comment-related-fixed" class="small-round border small-padding bottom-margin" style="display: none;">
-        <div class="row tiny-space middle-align">
-            <i class="small secondary-text">link</i>
-            <span class="small-text secondary-text">対象</span>
-        </div>
-        <p id="new-comment-related-fixed-label" class="no-margin small-text bold">-</p>
-    </article>
-
-    <article id="new-comment-related-selector" class="small-round border small-padding bottom-margin" style="display: none;">
-        <div class="field border label suffix small bottom-margin">
-            <select id="new-comment-target-table" onchange="App.modals.newComment.handleTargetTableChange()">
-                <option value="">すべて</option>
-                <option value="tasks">タスク</option>
-                <option value="plans">企画</option>
-                <option value="directories">組織</option>
-                <option value="skills">技能</option>
-                <option value="members">人物</option>
-            </select>
-            <label>対象種別</label>
-            <i>arrow_drop_down</i>
-        </div>
-
-        <div class="field border prefix small bottom-margin">
-            <i class="front" onclick="App.modals.newComment.searchTargets()">search</i>
-            <input id="new-comment-target-search" type="text" placeholder="ID・名称・表示番号で検索"
-                onkeydown="if(event.key === 'Enter' && !event.isComposing){event.preventDefault();App.modals.newComment.searchTargets();}">
+    <div id="new-comment-related-selector" class="small-round small-padding bottom-margin" style="display: none;">
+        <div class="grid tiny-space">
+            <div class="s12 m6 field border prefix small bottom-margin">
+                <i class="front" onclick="App.modals.newComment.searchTargets()">search</i>
+                <input id="new-comment-target-search" type="text" placeholder="ID・名称・表示番号で検索"
+                    onkeydown="if(event.key === 'Enter' && !event.isComposing){event.preventDefault();App.modals.newComment.searchTargets();}">
+            </div>
+            <div class="s12 m6 field border suffix small bottom-margin">
+                <select id="new-comment-target-table" onchange="App.modals.newComment.handleTargetTableChange()">
+                    <option value="">すべて</option>
+                    <option value="tasks">タスク</option>
+                    <option value="plans">企画</option>
+                    <option value="directories">組織</option>
+                    <option value="skills">技能</option>
+                    <option value="members">人物</option>
+                </select>
+                <i>arrow_drop_down</i>
+            </div>
         </div>
 
-        <article id="new-comment-target-results" class="scroll small-round background small-padding no-elevate">
+        <div id="new-comment-target-results" class="scroll small-height small-round small-padding">
             <div class="secondary-text small-text">検索キーワードを入力してください</div>
-        </article>
+        </div>
 
         <div id="new-comment-target-selected" class="row tiny-space middle-align top-margin small-text secondary-text">
             <i class="small">info</i>
             <span>対象が未選択です</span>
         </div>
-    </article>
+    </div>
 
-    <div class="field no-border background scroll large-width small-round">
+    <div class="field no-border background scroll small-round">
         <textarea id="new-comment-content" rows="10" placeholder="コメント内容を入力..."></textarea>
     </div>
 
-    <nav class="right-align small-padding">
-        <button class="border" onclick="App.modals.newComment.close()">キャンセル</button>
-        <button onclick="App.modals.newComment.save()">作成</button>
-    </nav>
+    <footer class="fixed bottom-padding">
+        <nav class="right-align small-padding">
+            <button class="border" onclick="App.modals.newComment.close()">キャンセル</button>
+            <button onclick="App.modals.newComment.save()">作成</button>
+        </nav>
+    </footer>
 </dialog>
