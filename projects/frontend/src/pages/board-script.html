@@ -236,7 +236,7 @@
                 this.syncViewToggle(boardId);
             },
 
-            loadData: async function (boardId, isRefresh = false) {
+            loadData: async function (boardId, isRefresh = false, showLoading = null) {
                 if (!boardId) {
                     return;
                 }
@@ -254,7 +254,8 @@
                 this.syncViewToggle(boardId);
 
                 // 読み込み中アニメーションを表示
-                if (!isRefresh) {
+                const shouldShowLoading = typeof showLoading === 'boolean' ? showLoading : !isRefresh;
+                if (shouldShowLoading) {
                     if (this.viewMode === 'list') {
                         this.renderList(boardId, true);
                     } else {

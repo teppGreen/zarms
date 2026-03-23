@@ -355,12 +355,8 @@
 
                 // ボードタブに切り替え
                 if (App.utils.navigation && App.utils.navigation.switchTab) {
-                    await App.utils.navigation.switchTab(`board-${targetBoardId}`);
-
-                    // ボードのロード完了を待機
-                    if (App.pages.boards && App.pages.boards.waitForBoardLoad) {
-                        await App.pages.boards.waitForBoardLoad(targetBoardId);
-                    }
+                    // この経路ではswitchTab側の読み込みをスキップし、tryOpenTask側のloadDataに統一する
+                    await App.utils.navigation.switchTab(`board-${targetBoardId}`, false, false, true);
 
                     // タスクを開く処理（共通関数を使用）
                     if (App.utils.navigation && App.utils.navigation.tryOpenTask) {
