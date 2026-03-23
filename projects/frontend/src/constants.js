@@ -39,12 +39,14 @@ const KEY_LABELS = {
     RECEPTION: '懇親会',
     OTHER: 'その他'
   },
-  ASIGNEE_TYPE: {
+  ASSIGNEE_TYPE: {
     CREATED_BY: '作成者',
     PROCESSED_BY: '進行者',
     REVIEWED_BY: '確認者',
     RECEIVED_BY: '受領者'
   },
+  // 後方互換のためのエイリアス（ASIGNEE_TYPE はタイポ、以後は ASSIGNEE_TYPE を使用）
+  get ASIGNEE_TYPE() { return this.ASSIGNEE_TYPE; },
   DIRECTORY_TYPE: {
     COMPANY: '法人・学校・団体',
     FACULTY: '学部・学科・専攻',
