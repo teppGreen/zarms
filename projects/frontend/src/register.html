@@ -2,9 +2,6 @@
 <html lang="ja">
 
 <head>
-    <script src="https://www.gstatic.com/charts/loader.js"></script>
-    <script src="https://apis.google.com/js/api.js"></script>
-    <script src="https://apis.google.com/js/picker.js"></script>
     <?!= include('css'); ?>
 </head>
 
@@ -202,8 +199,8 @@
             <!-- ステップ2: 確認画面 -->
             <div id="step-confirm" class="page right large-padding">
                 <h2 class="bold small bottom-margin">サインアップ</h2>
-                <div class="top-padding bottom-padding">
-                    <div id="user-profile-photo" class="small-height small-width"></div>
+                <div class="top-padding bottom-padding center-align">
+                    <div id="user-profile-photo" class="small-height small-width center"></div>
                     <div id="user-name"></div>
                     <div id="user-name-warning" class="top-margin"></div>
                 </div>
@@ -347,6 +344,15 @@
                             output.classList.remove('invalid');
                             output.innerHTML = DEFAULT_HELPER_TEXT;
                         }
+                    }
+                });
+            }
+
+            if (input) {
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        searchUserSubmit.click();
                     }
                 });
             }
@@ -588,7 +594,7 @@
                 return;
             }
 
-            appUi('step-finishing', true);
+            ui('#step-finishing'); // まだappUiを定義していないので、BeerCSS標準のui関数を呼び出す
 
             google.script.run
                 .withSuccessHandler(function (success) {
