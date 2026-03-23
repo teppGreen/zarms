@@ -32,6 +32,43 @@
                 requestAnimationFrame(() => this.applyPanelHeights());
 
                 try {
+                    // 初回ロード時に initialData（サーバー埋め込み）をキャッシュに反映し、即座に描画
+                    if (!isRefresh && (typeof initialData !== 'undefined') && initialData) {
+                        let hasInitialData = false;
+                        if (initialData.tasks && initialData.tasks.length > 0 && this.cachedTasks.length === 0) {
+                            this.cachedTasks = initialData.tasks;
+                            hasInitialData = true;
+                            console.log('[Home] Initialized cachedTasks from initialData:', this.cachedTasks.length, 'items');
+                        }
+                        if (initialData.notices && initialData.notices.length > 0 && this.cachedNotices.length === 0) {
+                            this.cachedNotices = initialData.notices;
+                            hasInitialData = true;
+                            console.log('[Home] Initialized cachedNotices from initialData:', this.cachedNotices.length, 'items');
+                        }
+                        if (initialData.logs && initialData.logs.length > 0 && this.cachedLogs.length === 0) {
+                            this.cachedLogs = initialData.logs;
+                            this.cachedRelatedLogs = this.filterRelatedLogs(initialData.logs);
+                            hasInitialData = true;
+                            console.log('[Home] Initialized cachedLogs from initialData:', this.cachedLogs.length, 'items');
+                        }
+
+                        // initialData があれば、即座にキャッシュから描画してから、バックグラウンドで最新データを取得
+                        if (hasInitialData) {
+                            this.cachedRelatedLogs = this.filterRelatedLogs(this.cachedLogs);
+                            this.historyVisibleCount = 10;
+                            this.renderNextTasks(this.cachedTasks);
+                            this.renderNoticesForHome(this.cachedNotices);
+                            this.renderRelatedHistoryForHome();
+                            this.applyPanelHeights();
+                            this.updateHeader();
+
+                            // バックグラウンドで最新データを取得（100ms後）
+                            console.log('[Home] Initial data rendered. Fetching fresh data in background...');
+                            setTimeout(() => this.loadData(true), 100);
+                            return;
+                        }
+                    }
+
                     const sevenDaysAgo = new Date();
                     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
                     const isoDate = sevenDaysAgo.toISOString();
