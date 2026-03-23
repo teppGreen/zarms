@@ -1,43 +1,40 @@
 <!-- コメント一覧モーダル -->
 <dialog id="modal-comments-hub" class="modal large padding">
-    <nav class="small-padding bottom-margin">
-        <h5 class="bold max">コメント一覧</h5>
-        <span id="comments-hub-summary" class="chip small border">0件</span>
-        <button class="circle transparent" onclick="App.utils.header.comments.closeHub()" title="閉じる">
-            <i>close</i>
-        </button>
-    </nav>
+    <header class="fixed top-padding">
+        <nav class="small-padding bottom-margin">
+            <h5 class="bold max">あなたに関係するコメント</h5>
+            <span id="comments-hub-summary" class="border left-padding right-padding small-round">0件</span>
+            <button class="circle transparent" onclick="App.utils.header.comments.closeHub()" title="閉じる">
+                <i>close</i>
+            </button>
+        </nav>
+    </header>
 
-    <div class="row wrap tiny-space small-padding bottom-margin">
-        <div class="field border label suffix small">
+    <div class="row wrap tiny-space small-padding bottom-margin" style="display: none;">
+        <div class="field border suffix small">
             <select id="comments-hub-table-filter" onchange="App.utils.header.comments.applyHubFilters()">
-                <option value="">すべての種別</option>
+                <option value="">すべて</option>
                 <option value="tasks">タスク</option>
-                <option value="members">メンバー</option>
+                <option value="members">人物</option>
                 <option value="directories">組織</option>
-                <option value="skills">スキル</option>
+                <option value="skills">技能</option>
                 <option value="plans">企画</option>
             </select>
-            <label>対象種別</label>
             <i>arrow_drop_down</i>
         </div>
-        <label class="row tiny-space middle-align">
+        <label class="checkbox">
             <input type="checkbox" id="comments-hub-unread-only" onchange="App.utils.header.comments.applyHubFilters()">
             <span>未読のみ</span>
         </label>
-        <button class="chip small border" onclick="App.utils.header.comments.refreshHub()">
-            <i>refresh</i>
-            <span>更新</span>
-        </button>
         <button class="chip small border" onclick="App.utils.header.comments.markCurrentAsRead()">
             <i>done_all</i>
             <span>表示中を既読</span>
         </button>
     </div>
 
-    <article class="scroll border small-round no-elevate">
+    <div>
         <div id="comments-hub-list">
             <!-- コメント一覧は動的に描画 -->
         </div>
-    </article>
+    </div>
 </dialog>

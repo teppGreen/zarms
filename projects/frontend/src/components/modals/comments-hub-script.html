@@ -38,10 +38,6 @@
                 appUi('#modal-comments-hub', false);
             },
 
-            refreshHub: function () {
-                this.loadData(true);
-            },
-
             /**
              * シマーエフェクトを表示
              */
@@ -129,7 +125,7 @@
                     const unreadCount = comments.filter(function (item) {
                         return savedData[item.id] !== true;
                     }).length;
-                    summaryEl.textContent = `${comments.length}件 / 全${totalCount || 0}件（未読${unreadCount}件）`;
+                    summaryEl.textContent = `${comments.length}件 / 全${totalCount || 0}件`;
                 }
 
                 if (!comments || comments.length === 0) {
@@ -149,53 +145,45 @@
 
                     // 更新日時のフォーマット
                     const updatedAt = comment.updated_at
-                        ? formatDateTimeForDisplay(comment.updated_at, 'MM/dd HH:mm')
+                        ? formatDateTimeForDisplay(comment.updated_at, 'MM/dd(E) HH:mm')
                         : '';
 
-                    const contentLengthLimit = 110;
-                    // コメント内容（先頭のみ表示、改行はスペースに置換）
+                    // コメント内容
                     let commentContent = comment.content ? comment.content : '';
-                    commentContent = commentContent.replace(/\r\n/g, ' ').replace(/\n/g, ' ');
-                    let commentContent75 = commentContent.substring(0, contentLengthLimit);
+                    // commentContent = commentContent.replace(/\r\n/g, ' ').replace(/\n/g, ' '); // 改行をスペースに置換（必要に応じて調整）
 
-                    if (commentContent.length > contentLengthLimit) {
-                        commentContent75 += '…';
-                    }
-
-                    const targetLabel = escapeHtml(comment.related_table_label || '');
                     const targetName = escapeHtml(comment.target_name || '');
                     const targetSubtitle = escapeHtml(comment.target_subtitle || '');
-                    const targetLine = targetSubtitle
-                        ? `${targetName} · ${targetSubtitle}`
-                        : targetName;
+                    const targetLabel = escapeHtml(comment.related_table_label || '') + (targetSubtitle);
 
                     return `
-                        <article class="no-elevate padding top-align small-margin small-round ${readClass}"
+                        <article class="no-elevate padding small-margin small-round ${readClass}"
                            onclick="App.utils.header.comments.openCommentById('${comment.id}')">
-                            <div class="row">
-                            <div>
-                                <i class="circle extra">${avatarHtml}</i>
-                            </div>
-                            <div class="max">
-                                <div class="row">
-                                    <span class="bold small-text">${escapeHtml(comment.display_name)}</span>
-                                    <span class="small-text secondary-text font-number">${updatedAt}</span>
+                            <div class="row top-align">
+                                <div>
+                                    <i class="circle extra">${avatarHtml}</i>
                                 </div>
-                                <div class="small-text row tiny-space middle-align secondary-text">
-                                    <i class="small">${this._tableIcon(comment.related_table)}</i>
-                                    <span>${targetLabel}</span>
-                                    <span>${targetLine}</span>
+                                <div class="max">
+                                    <div class="row">
+                                        <span class="bold small-text">${escapeHtml(comment.display_name)}</span>
+                                        <span class="small-text secondary-text font-number">${updatedAt}</span>
+                                    </div>
+                                    <div class="small-text row tiny-space no-margin secondary-text">
+                                        <i class="tiny">${this._tableIcon(comment.related_table)}</i>
+                                        <span>${targetLabel}</span>
+                                        <span>${targetName}</span>
+                                    </div>
+                                    <div class="tiny-space"></div>
+                                    <div><span>${escapeHtml(commentContent)}</span></div>
+                                </div>
+                                <div>
+                                    <button class="transparent circle small no-margin"
+                                        onclick="event.stopPropagation(); App.utils.header.comments.toggleReadStatus('${comment.id}')"
+                                        title="${isRead ? '未読にする' : '既読にする'}">
+                                    <i class="small">${readIcon}</i>
+                                    </button>
                                 </div>
                             </div>
-                            <div>
-                                <button class="transparent circle small no-margin"
-                                    onclick="event.stopPropagation(); App.utils.header.comments.toggleReadStatus('${comment.id}')"
-                                    title="${isRead ? '未読にする' : '既読にする'}">
-                                <i class="small">${readIcon}</i>
-                                </button>
-                            </div>
-                            <div class="tiny-space"></div>
-                            <div class="small-text">${escapeHtml(commentContent75)}</div>
                         </article>
                     `;
                 }).join('');
@@ -337,11 +325,11 @@
 
             _tableIcon: function (tableName) {
                 const icons = {
-                    tasks: 'checklist',
+                    tasks: 'task_alt',
                     members: 'person',
                     directories: 'account_tree',
-                    skills: 'workspace_premium',
-                    plans: 'event_note'
+                    skills: 'psychology',
+                    plans: 'store'
                 };
                 return icons[tableName] || 'comment';
             }
