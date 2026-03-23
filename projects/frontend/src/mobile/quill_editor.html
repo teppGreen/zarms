@@ -40,10 +40,29 @@
             }
           });
 
-          // href / src / action 等の危険なURLスキームを除去
+          // href / src / action 等の危険なURLスキームを除去（URLパーサによる allowlist 検証）
           ['href', 'src', 'action', 'formaction', 'data', 'xlink:href'].forEach(function (attrName) {
-            const val = element.getAttribute(attrName);
-            if (val && /^\s*(javascript|data|vbscript):/i.test(val)) {
+            var rawVal = element.getAttribute(attrName);
+            if (!rawVal) {
+              return;
+            }
+            // 属性値を正規化: ASCII制御文字（U+0000-U+001F）および Latin-1補助制御文字（U+007F-U+009F）を除去
+            // ブラウザによる制御文字入りURLの正規化で javascript: 等を迂回されるのを防ぐ
+            var normalizedVal = String(rawVal).replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim();
+            if (!normalizedVal) {
+              element.removeAttribute(attrName);
+              return;
+            }
+            try {
+              var url = new URL(normalizedVal, window.location.origin);
+              // XSSリスクのあるスキームを除外し、安全なプロトコルのみ許可
+              // blob: / ftp: 等は Quill エディタの用途外のため許可しない
+              var allowedProtocols = ['http:', 'https:', 'mailto:', 'tel:'];
+              if (allowedProtocols.indexOf(url.protocol) === -1) {
+                element.removeAttribute(attrName);
+              }
+            } catch (e) {
+              // 不正なURL形式の場合は属性を除去
               element.removeAttribute(attrName);
             }
           });
