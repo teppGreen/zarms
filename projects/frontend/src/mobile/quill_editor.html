@@ -27,7 +27,27 @@
         const container = document.createElement('div');
         container.innerHTML = String(html);
 
+        // 危険な要素（script/style）を除去
+        container.querySelectorAll('script, style').forEach(function (el) {
+          el.parentNode.removeChild(el);
+        });
+
         container.querySelectorAll('*').forEach(function (element) {
+          // on* イベント属性を除去（XSS防止）
+          Array.from(element.attributes).forEach(function (attr) {
+            if (/^on\w+/i.test(attr.name)) {
+              element.removeAttribute(attr.name);
+            }
+          });
+
+          // href / src / action 等の危険なURLスキームを除去
+          ['href', 'src', 'action', 'formaction', 'data', 'xlink:href'].forEach(function (attrName) {
+            const val = element.getAttribute(attrName);
+            if (val && /^\s*(javascript|data|vbscript):/i.test(val)) {
+              element.removeAttribute(attrName);
+            }
+          });
+
           element.removeAttribute('color');
           element.removeAttribute('bgcolor');
           element.removeAttribute('face');

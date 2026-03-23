@@ -57,7 +57,7 @@ function registerUserEmail(userId, useApiMode = false) {
     const email = Session.getActiveUser().getEmail();
     return callDatabaseApi(TABLE_NAMES.MEMBERS, 'update', {
       set: { email: email },
-      where: { id: ["=", userId], email: ["=", null] }
+      where: { id: ["=", userId], email: ['is null'] }
     });
   }
   return ZARMS_DB.registerUserEmail(userId);
@@ -68,22 +68,28 @@ function getSpreadsheet(...args) {
 }
 
 function getCommentNavData(...args) {
-  const useApiMode = args.length > 0 ? Boolean(args[args.length - 1]) : false;
-  const cleanArgs = args.slice(0, Math.max(0, args.length - 1));
+  const lastArg = args.length > 0 ? args[args.length - 1] : undefined;
+  const hasBooleanFlag = typeof lastArg === 'boolean';
+  const useApiMode = hasBooleanFlag ? lastArg : false;
+  const cleanArgs = hasBooleanFlag ? args.slice(0, -1) : args;
   if (useApiMode) return { comments: [], unreadCount: 0 }; // APIモードでは未実装または制限付き
   return ZARMS_DB.getCommentNavData(...cleanArgs);
 }
 
 function getMyBoardTasks(...args) {
-  const useApiMode = args.length > 0 ? Boolean(args[args.length - 1]) : false;
-  const cleanArgs = args.slice(0, Math.max(0, args.length - 1));
+  const lastArg = args.length > 0 ? args[args.length - 1] : undefined;
+  const hasBooleanFlag = typeof lastArg === 'boolean';
+  const useApiMode = hasBooleanFlag ? lastArg : false;
+  const cleanArgs = hasBooleanFlag ? args.slice(0, -1) : args;
   if (useApiMode) return [];
   return ZARMS_DB.getMyBoardTasks(...cleanArgs);
 }
 
 function getInsightsTabData(...args) {
-  const useApiMode = args.length > 0 ? Boolean(args[args.length - 1]) : false;
-  const cleanArgs = args.slice(0, Math.max(0, args.length - 1));
+  const lastArg = args.length > 0 ? args[args.length - 1] : undefined;
+  const hasBooleanFlag = typeof lastArg === 'boolean';
+  const useApiMode = hasBooleanFlag ? lastArg : false;
+  const cleanArgs = hasBooleanFlag ? args.slice(0, -1) : args;
 
   if (useApiMode) {
     const userId = cleanArgs[0];

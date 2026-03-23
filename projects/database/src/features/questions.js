@@ -71,7 +71,9 @@ function processQuestion_(userId, question, boardEmail) {
     };
 
     const insertResult = handleDatabaseProcess(userId, TABLE_NAMES.TASKS, 'insert', taskData, '問い合わせからタスクを自動作成');
-    const createdTask = insertResult?.data || taskData;
+    // insertResult.data が配列の場合は先頭を取り出して正規化
+    const rawData = insertResult?.data;
+    const createdTask = (Array.isArray(rawData) ? rawData[0] : rawData) || taskData;
 
     // 5. 共有URLを構築
     const shareUrl = buildTaskShareUrl_(createdTask.id || taskId);
