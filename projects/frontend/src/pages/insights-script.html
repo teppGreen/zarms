@@ -114,7 +114,6 @@
             renderUserEffortInsights: async function (tasks) {
                 const container = document.getElementById('insight-user-effort-charts');
                 if (!container) return;
-                container.classList.remove('shimmer-loading');
                 
                 const summaryEl = document.getElementById('insight-user-effort-summary');
                 const boardChartEl = document.getElementById('insight-user-board-chart');
@@ -150,7 +149,13 @@
                 summaryEl.textContent = `${activeUser.display_name ? activeUser.display_name + 'さん' : 'あなた'}はこれまでに、${doneProcessedTasks.length}件のタスクを進行し、約${totalHours}時間で完了しました。`;
 
                 try {
+                    // Google Chartsの読み込みを待つ（this.shimmer-loadingは続行）
                     await this.loadGoogleCharts();
+                    
+                    // ローディング表示を削除（Google Chartsの準備完了後）
+                    container.classList.remove('shimmer-loading');
+                    
+                    // グラフを描画
                     this.drawBoardPieChart(tasks, boardChartEl);
                     this.drawStatusBarChart(tasks, statusChartEl);
                 } catch (error) {
@@ -165,104 +170,143 @@
                 }
 
                 this.googleChartsLoadingPromise = new Promise((resolve, reject) => {
+                    // Google Charts loader が存在するか確認
                     if (!window.google || !google.charts) {
                         reject(new Error('Google Charts loader が見つかりません'));
                         return;
                     }
 
+                    // Google Charts が既に読み込まれているか確認
+                    if (google.visualization && google.visualization.PieChart && google.visualization.BarChart) {
+                        console.log('[Insights] Google Charts は既に読み込まれています');
+                        resolve();
+                        return;
+                    }
+
+                    // Google Charts を読み込み
                     google.charts.load('current', { packages: ['corechart'] });
-                    google.charts.setOnLoadCallback(() => resolve());
+                    
+                    // 読み込み完了後のコールバック
+                    google.charts.setOnLoadCallback(() => {
+                        // 読み込み完了直後に API が利用可能か確認
+                        if (google.visualization && google.visualization.PieChart && google.visualization.BarChart) {
+                            console.log('[Insights] Google Charts の読み込みが完了しました');
+                            resolve();
+                        } else {
+                            reject(new Error('Google Charts の API が利用できません'));
+                        }
+                    });
                 });
 
                 return this.googleChartsLoadingPromise;
             },
 
             drawBoardPieChart: function (tasks, container) {
-                container.classList.add('border');
-                const counts = {};
-                (tasks || []).forEach(task => {
-                    const boardId = task.board_id || 'unknown';
-                    counts[boardId] = (counts[boardId] || 0) + 1;
-                });
+                try {
+                    // Google Chartsの利用可否を確認
+                    if (!window.google || !google.visualization || !google.visualization.PieChart) {
+                        throw new Error('Google Charts API が利用できません');
+                    }
 
-                const boards = App.state.data.boards || [];
-                const rows = Object.entries(counts).map(([boardId, count]) => {
-                    const boardName = boards.find(board => board.id === boardId)?.name || '未分類';
-                    return [boardName, count];
-                }).sort((a, b) => b[1] - a[1]);
+                    container.classList.add('border');
+                    const counts = {};
+                    (tasks || []).forEach(task => {
+                        const boardId = task.board_id || 'unknown';
+                        counts[boardId] = (counts[boardId] || 0) + 1;
+                    });
 
-                if (rows.length === 0) {
-                    container.innerHTML = '<div class="center-align secondary-text">データがありません</div>';
-                    return;
+                    const boards = App.state.data.boards || [];
+                    const rows = Object.entries(counts).map(([boardId, count]) => {
+                        const boardName = boards.find(board => board.id === boardId)?.name || '未分類';
+                        return [boardName, count];
+                    }).sort((a, b) => b[1] - a[1]);
+
+                    if (rows.length === 0) {
+                        container.innerHTML = '<div class="center-align secondary-text">データがありません</div>';
+                        return;
+                    }
+
+                    const data = google.visualization.arrayToDataTable([
+                        ['ボード', '件数'],
+                        ...rows
+                    ]);
+
+                    const chart = new google.visualization.PieChart(container);
+                    chart.draw(data, {
+                        title: '自分が担当者のタスクがあるボード',
+                        legend: { position: 'right' },
+                        // コンテナ側のBeerCSS背景色を活かすため、チャート背景を透過
+                        backgroundColor: 'transparent',
+                        chartArea: { top: '24px', width: '100%', height: '80%', backgroundColor: 'transparent' },
+                        pieSliceText: 'value'
+                    });
+                } catch (error) {
+                    console.error('[Insights] ボードPieChart描画エラー:', error);
+                    container.innerHTML = '<div class="center-align error-text"><i>error</i><p class="small-text">グラフの描画に失敗しました</p></div>';
                 }
-
-                const data = google.visualization.arrayToDataTable([
-                    ['ボード', '件数'],
-                    ...rows
-                ]);
-
-                const chart = new google.visualization.PieChart(container);
-                chart.draw(data, {
-                    title: '自分が担当者のタスクがあるボード',
-                    legend: { position: 'right' },
-                    // コンテナ側のBeerCSS背景色を活かすため、チャート背景を透過
-                    backgroundColor: 'transparent',
-                    chartArea: { top: '24px', width: '100%', height: '80%', backgroundColor: 'transparent' },
-                    pieSliceText: 'value'
-                });
             },
 
             drawStatusBarChart: function (tasks, container) {
-                container.classList.add('border');
-                const statusOrder = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
-                const statusLabels = {
-                    TODO: '未着手',
-                    IN_PROGRESS: '進行中',
-                    IN_REVIEW: '確認中',
-                    DONE: '受領済'
-                };
-                const counts = { TODO: 0, IN_PROGRESS: 0, IN_REVIEW: 0, DONE: 0 };
-
-                (tasks || []).forEach(task => {
-                    const key = task.task_status_key;
-                    if (counts[key] !== undefined) {
-                        counts[key] += 1;
+                try {
+                    // Google Chartsの利用可否を確認
+                    if (!window.google || !google.visualization || !google.visualization.BarChart) {
+                        throw new Error('Google Charts API が利用できません');
                     }
-                });
 
-                const data = google.visualization.arrayToDataTable([
-                    ['区分', '未着手', { role: 'annotation' }, '進行中', { role: 'annotation' }, '確認中', { role: 'annotation' }, '受領済', { role: 'annotation' }],
-                    [
-                        'ステータス',
-                        counts[statusOrder[0]],
-                        counts[statusOrder[0]] > 0 ? String(counts[statusOrder[0]]) : '',
-                        counts[statusOrder[1]],
-                        counts[statusOrder[1]] > 0 ? String(counts[statusOrder[1]]) : '',
-                        counts[statusOrder[2]],
-                        counts[statusOrder[2]] > 0 ? String(counts[statusOrder[2]]) : '',
-                        counts[statusOrder[3]],
-                        counts[statusOrder[3]] > 0 ? String(counts[statusOrder[3]]) : ''
-                    ]
-                ]);
+                    container.classList.add('border');
+                    const statusOrder = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
+                    const statusLabels = {
+                        TODO: '未着手',
+                        IN_PROGRESS: '進行中',
+                        IN_REVIEW: '確認中',
+                        DONE: '受領済'
+                    };
+                    const counts = { TODO: 0, IN_PROGRESS: 0, IN_REVIEW: 0, DONE: 0 };
 
-                const chart = new google.visualization.BarChart(container);
-                chart.draw(data, {
-                    title: '自分が担当者のタスクのステータス',
-                    isStacked: 'percent',
-                    legend: { position: 'top', maxLines: 1 },
-                    // コンテナ側のBeerCSS背景色を活かすため、チャート背景を透過
-                    backgroundColor: 'transparent',
-                    chartArea: { top: '24px', width: '100%', height: '80%', backgroundColor: 'transparent' },
-                    hAxis: { textPosition: 'none' },
-                    vAxis: { textPosition: 'none' },
-                    series: {
-                        0: { labelInLegend: statusLabels.TODO },
-                        1: { labelInLegend: statusLabels.IN_PROGRESS },
-                        2: { labelInLegend: statusLabels.IN_REVIEW },
-                        3: { labelInLegend: statusLabels.DONE }
-                    },
-                    colors: ['#f44336', '#ffc107', '#9c27b0', '#4caf50']
-                });
+                    (tasks || []).forEach(task => {
+                        const key = task.task_status_key;
+                        if (counts[key] !== undefined) {
+                            counts[key] += 1;
+                        }
+                    });
+
+                    const data = google.visualization.arrayToDataTable([
+                        ['区分', '未着手', { role: 'annotation' }, '進行中', { role: 'annotation' }, '確認中', { role: 'annotation' }, '受領済', { role: 'annotation' }],
+                        [
+                            'ステータス',
+                            counts[statusOrder[0]],
+                            counts[statusOrder[0]] > 0 ? String(counts[statusOrder[0]]) : '',
+                            counts[statusOrder[1]],
+                            counts[statusOrder[1]] > 0 ? String(counts[statusOrder[1]]) : '',
+                            counts[statusOrder[2]],
+                            counts[statusOrder[2]] > 0 ? String(counts[statusOrder[2]]) : '',
+                            counts[statusOrder[3]],
+                            counts[statusOrder[3]] > 0 ? String(counts[statusOrder[3]]) : ''
+                        ]
+                    ]);
+
+                    const chart = new google.visualization.BarChart(container);
+                    chart.draw(data, {
+                        title: '自分が担当者のタスクのステータス',
+                        isStacked: 'percent',
+                        legend: { position: 'top', maxLines: 1 },
+                        // コンテナ側のBeerCSS背景色を活かすため、チャート背景を透過
+                        backgroundColor: 'transparent',
+                        chartArea: { top: '24px', width: '100%', height: '80%', backgroundColor: 'transparent' },
+                        hAxis: { textPosition: 'none' },
+                        vAxis: { textPosition: 'none' },
+                        series: {
+                            0: { labelInLegend: statusLabels.TODO },
+                            1: { labelInLegend: statusLabels.IN_PROGRESS },
+                            2: { labelInLegend: statusLabels.IN_REVIEW },
+                            3: { labelInLegend: statusLabels.DONE }
+                        },
+                        colors: ['#f44336', '#ffc107', '#9c27b0', '#4caf50']
+                    });
+                } catch (error) {
+                    console.error('[Insights] ステータスBarChart描画エラー:', error);
+                    container.innerHTML = '<div class="center-align error-text"><i>error</i><p class="small-text">グラフの描画に失敗しました</p></div>';
+                }
             },
 
             /**
