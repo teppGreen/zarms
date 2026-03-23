@@ -68,28 +68,30 @@ function getSpreadsheet(...args) {
 }
 
 function getCommentNavData(...args) {
+  // 想定シグネチャ: (userId, forceRefresh) = 2引数。第3引数が boolean の場合のみ useApiMode
   const lastArg = args.length > 0 ? args[args.length - 1] : undefined;
-  const hasBooleanFlag = typeof lastArg === 'boolean';
-  const useApiMode = hasBooleanFlag ? lastArg : false;
-  const cleanArgs = hasBooleanFlag ? args.slice(0, -1) : args;
+  const hasUseApiFlag = args.length === 3 && typeof lastArg === 'boolean';
+  const useApiMode = hasUseApiFlag ? lastArg : false;
+  const cleanArgs = hasUseApiFlag ? args.slice(0, -1) : args;
   if (useApiMode) return { comments: [], unreadCount: 0 }; // APIモードでは未実装または制限付き
   return ZARMS_DB.getCommentNavData(...cleanArgs);
 }
 
 function getMyBoardTasks(...args) {
+  // 想定シグネチャ: (userId, filters, forceRefresh) = 3引数。第4引数が boolean の場合のみ useApiMode
   const lastArg = args.length > 0 ? args[args.length - 1] : undefined;
-  const hasBooleanFlag = typeof lastArg === 'boolean';
-  const useApiMode = hasBooleanFlag ? lastArg : false;
-  const cleanArgs = hasBooleanFlag ? args.slice(0, -1) : args;
+  const hasUseApiFlag = args.length === 4 && typeof lastArg === 'boolean';
+  const useApiMode = hasUseApiFlag ? lastArg : false;
+  const cleanArgs = hasUseApiFlag ? args.slice(0, -1) : args;
   if (useApiMode) return [];
   return ZARMS_DB.getMyBoardTasks(...cleanArgs);
 }
 
 function getInsightsTabData(...args) {
-  const lastArg = args.length > 0 ? args[args.length - 1] : undefined;
-  const hasBooleanFlag = typeof lastArg === 'boolean';
-  const useApiMode = hasBooleanFlag ? lastArg : false;
-  const cleanArgs = hasBooleanFlag ? args.slice(0, -1) : args;
+  // 想定シグネチャ: (userId, forceRefresh) = 2引数。第3引数が boolean の場合のみ useApiMode
+  const hasUseApiFlag = args.length >= 3 && typeof args[2] === 'boolean';
+  const useApiMode = hasUseApiFlag ? args[2] : false;
+  const cleanArgs = hasUseApiFlag ? args.slice(0, 2) : args;
 
   if (useApiMode) {
     const userId = cleanArgs[0];
