@@ -79,7 +79,10 @@ function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false
  *   status: 'ok' | 'unauthorized' | 'not_registered',
  *   activeUser: Object|null,     // 認証済みメンバー情報
  *   appHtml: string|null,        // アプリケーションHTML
- *   error: string|null
+ *   error: string|null,
+ *   userAgreementData: Object,   // ユーザーの利用規約・プライバシーポリシー同意情報
+ *   policyUpdateDates: Object,   // 利用規約・プライバシーポリシーの更新日時（ISO8601形式）
+ *   requiresReAgreement: Object  // 再同意が必要な規約・ポリシー（terms, privacy）
  * }
  */
 function getInitialAppData(email, urlParams, isMobile = false) {
@@ -100,10 +103,36 @@ function getInitialAppData(email, urlParams, isMobile = false) {
       throw new Error('User info not found');
     }
 
-    // 3. アプリのHTMLを生成
+    // 3. ユーザープロパティから利用規約・プライバシーポリシーの同意情報を取得
+    const userProperties = PropertiesService.getUserProperties().getProperties();
+    const userAgreementData = {
+      termsAgreedAt: userProperties['termsAgreedAt'] || null,
+      privacyAgreedAt: userProperties['privacyAgreedAt'] || null
+    };
+
+    // 4. scriptPropertiesから利用規約・プライバシーポリシーの更新日時を取得
+    const scriptProperties = PropertiesService.getScriptProperties().getProperties();
+    const policyUpdateDates = {
+      termsUpdatedAt: scriptProperties['termsUpdatedAt'] || null,
+      privacyUpdatedAt: scriptProperties['privacyUpdatedAt'] || null
+    };
+
+    // 5. 再同意が必要かどうかを判定
+    const requiresReAgreement = _checkRequiresReAgreement(userAgreementData, policyUpdateDates);
+
+    // 6. アプリのHTMLを生成
     const appHtml = loadAppHtml(activeUser, urlParams, isMobile, useApiMode);
 
-    return { status: 'ok', activeUser: activeUser, appHtml: appHtml, error: null, useApiMode: useApiMode };
+    return {
+      status: 'ok',
+      activeUser: activeUser,
+      appHtml: appHtml,
+      error: null,
+      useApiMode: useApiMode,
+      userAgreementData: userAgreementData,
+      policyUpdateDates: policyUpdateDates,
+      requiresReAgreement: requiresReAgreement
+    };
   } catch (e) {
     // ユーザーが見つからない場合はサインアップ画面へ
     const isNotFound = e.name === 'ValidationError' || (e.message && e.message.includes('not found'));
@@ -112,6 +141,47 @@ function getInitialAppData(email, urlParams, isMobile = false) {
     }
     return { status: 'unauthorized', useApiMode: useApiMode, activeUser: null, appHtml: null, error: e.message };
   }
+}
+
+/**
+ * 再同意が必要かどうかを判定します
+ * @param {Object} userAgreementData - ユーザーの同意日時 {termsAgreedAt, privacyAgreedAt}
+ * @param {Object} policyUpdateDates - ポリシーの更新日時 {termsUpdatedAt, privacyUpdatedAt}
+ * @returns {Object} {terms: boolean, privacy: boolean}
+ */
+function _checkRequiresReAgreement(userAgreementData, policyUpdateDates) {
+  const requiresReAgreement = {
+    terms: false,
+    privacy: false
+  };
+
+  // 規約: 更新日時が存在し、ユーザーの同意日時がない または 更新日時より後に同意されていない場合
+  if (policyUpdateDates.termsUpdatedAt) {
+    if (!userAgreementData.termsAgreedAt) {
+      requiresReAgreement.terms = true;
+    } else {
+      const agreedAt = new Date(userAgreementData.termsAgreedAt);
+      const updatedAt = new Date(policyUpdateDates.termsUpdatedAt);
+      if (agreedAt < updatedAt) {
+        requiresReAgreement.terms = true;
+      }
+    }
+  }
+
+  // プライバシーポリシー: 同様の判定
+  if (policyUpdateDates.privacyUpdatedAt) {
+    if (!userAgreementData.privacyAgreedAt) {
+      requiresReAgreement.privacy = true;
+    } else {
+      const agreedAt = new Date(userAgreementData.privacyAgreedAt);
+      const updatedAt = new Date(policyUpdateDates.privacyUpdatedAt);
+      if (agreedAt < updatedAt) {
+        requiresReAgreement.privacy = true;
+      }
+    }
+  }
+
+  return requiresReAgreement;
 }
 
 /**
@@ -241,6 +311,68 @@ function saveUserProperty(key, value) {
     return true;
   } catch (error) {
     console.error('saveUserProperty error:', error);
+    return false;
+  }
+}
+
+/**
+ * scriptPropertiesに利用規約の更新日時を設定します（ISO8601形式）
+ * @param {string} termsUpdatedAt - ISO8601形式の日時文字列（例: '2024-03-24T12:34:56.000Z'）
+ */
+function setPolicyUpdateDate(type, dateString) {
+  try {
+    if (!['terms', 'privacy'].includes(type)) {
+      throw new Error('type must be "terms" or "privacy"');
+    }
+    const key = type === 'terms' ? 'termsUpdatedAt' : 'privacyUpdatedAt';
+    PropertiesService.getScriptProperties().setProperty(key, dateString);
+    return true;
+  } catch (error) {
+    console.error('setPolicyUpdateDate error:', error);
+    return false;
+  }
+}
+
+/**
+ * scriptPropertiesから利用規約・プライバシーポリシーの更新日時を取得します
+ * @returns {Object} { termsUpdatedAt: string|null, privacyUpdatedAt: string|null }
+ */
+function getPolicyUpdateDates() {
+  try {
+    const props = PropertiesService.getScriptProperties().getProperties();
+    return {
+      termsUpdatedAt: props['termsUpdatedAt'] || null,
+      privacyUpdatedAt: props['privacyUpdatedAt'] || null
+    };
+  } catch (error) {
+    console.error('getPolicyUpdateDates error:', error);
+    return { termsUpdatedAt: null, privacyUpdatedAt: null };
+  }
+}
+
+/**
+ * ユーザーが規約・ポリシーに同意した日時をユーザープロパティに記録します
+ * @param {string} type - 'terms' または 'privacy' または 'both'
+ * @returns {boolean}
+ */
+function recordAgreement(type) {
+  try {
+    if (!['terms', 'privacy', 'both'].includes(type)) {
+      throw new Error('type must be "terms", "privacy", or "both"');
+    }
+    const now = new Date().toISOString();
+    const userProperties = PropertiesService.getUserProperties();
+
+    if (type === 'terms' || type === 'both') {
+      userProperties.setProperty('termsAgreedAt', now);
+    }
+    if (type === 'privacy' || type === 'both') {
+      userProperties.setProperty('privacyAgreedAt', now);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('recordAgreement error:', error);
     return false;
   }
 }

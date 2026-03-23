@@ -40,6 +40,7 @@ function findUserBySlackUrl(slackProfileUrl) {
 
 /**
  * ユーザーのemailを登録します
+ * 同時に、利用規約・プライバシーポリシーの同意日時をユーザープロパティに記録します
  * @param {string} userId - ユーザーのID
  * @returns {boolean}
  */
@@ -54,6 +55,15 @@ function registerUserEmail(userId) {
             set: { email: email },
             where: { id: ["=", userId], email: ["is null"] }
         }, 'ユーザーのemailを登録');
+
+        // ユーザープロパティに利用規約・プライバシーポリシーの同意日時を記録
+        if (result) {
+            const now = new Date().toISOString();
+            const userProperties = PropertiesService.getUserProperties();
+            userProperties.setProperty('termsAgreedAt', now);
+            userProperties.setProperty('privacyAgreedAt', now);
+        }
+
         return !!result;
     } catch (error) {
         console.error('registerUserEmail error:', error);
