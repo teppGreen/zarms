@@ -221,6 +221,11 @@
 
         this.currentItem = task;
         this.originalData = { ...task }; // 元のデータを保存
+        // 関連タスクの元データを初期化（loadRelatedTasks完了前のisDirtyバグを防ぐ）
+        this.originalParentTaskId = task.parent_task_id || null;
+        this.originalChildTaskIds = [];
+        this.addedChildTaskIds = [];
+        this.deletedChildTaskIds = [];
         this.applyAssigneeLabels();
         this.applyStatusSelectOptions();
 
