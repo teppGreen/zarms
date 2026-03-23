@@ -549,7 +549,6 @@
           hasChanges = true;
         }
 
-        // const descInput = document.getElementById('task-description-input');
         const description = this.getDescription();
 
         if (description !== (originalData.description || '')) {
@@ -735,9 +734,16 @@
             }
           } else if (boardId && App.pages.boards && App.pages.boards.renderKanban) {
             // メンバーフィールド以外の更新はカンバンを再描画（Optimistic UIの反映）
-            App.pages.boards.renderKanban(boardId);
-            if (App.pages.boards.currentBoardId === 'my-board') {
-              App.pages.boards.renderKanban('my-board');
+            if (App.pages.boards.viewMode === 'list') {
+              this.renderList(boardId, false);
+              if (App.pages.boards.currentBoardId === 'my-board') {
+                App.pages.boards.renderList('my-board');
+              }
+            } else {
+              App.pages.boards.renderKanban(boardId);
+              if (App.pages.boards.currentBoardId === 'my-board') {
+                App.pages.boards.renderKanban('my-board');
+              }
             }
           }
 

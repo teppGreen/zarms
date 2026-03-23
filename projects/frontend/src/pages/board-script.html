@@ -561,16 +561,11 @@
 
                 // 現在のソート状態を取得
                 if (!this.listSortState[boardId]) {
-                    this.listSortState[boardId] = boardId === 'my-board'
-                        ? [
-                            { col: '_done_last', dir: 'asc' },
-                            { col: 'starts_at', dir: 'asc' },
-                            { col: 'ends_at', dir: 'asc' }
-                        ]
-                        : [
-                            { col: 'starts_at', dir: 'asc' },
-                            { col: 'ends_at', dir: 'asc' }
-                        ];
+                    this.listSortState[boardId] = [
+                        { col: '_done_last', dir: 'asc' },
+                        { col: 'starts_at', dir: 'asc' },
+                        { col: 'ends_at', dir: 'asc' }
+                    ]
                 }
                 const sortCriteria = this.listSortState[boardId];
 
@@ -689,8 +684,8 @@
 
                         // 期限超過チェック
                         const now = new Date();
-                        const isStartsAtOverdue = task.starts_at && new Date(task.starts_at) < now;
-                        const isEndsAtOverdue = task.ends_at && new Date(task.ends_at) < now;
+                        const isStartsAtOverdue = task.starts_at && new Date(task.starts_at) < now && task.task_status_key === 'TODO';
+                        const isEndsAtOverdue = task.ends_at && new Date(task.ends_at) < now && task.task_status_key !== 'DONE';
                         const rowClass = (isEndsAtOverdue && task.task_status_key !== 'DONE') ? ' class="error-container"' : '';
                         const startsAtClass = isStartsAtOverdue ? ' class="font-number error-text"' : ' class="font-number"';
                         const endsAtClass = isEndsAtOverdue ? ' class="font-number error-text"' : ' class="font-number"';
