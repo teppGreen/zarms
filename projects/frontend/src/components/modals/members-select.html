@@ -1,0 +1,37 @@
+<dialog id="modal-select-members" class="modal padding no-scroll">
+    <nav class="small-padding bottom-margin">
+        <h5 class="bold max">人物を選択</h5>
+        <button class="circle transparent" onclick="appUi('#modal-select-members',false)">
+            <i>close</i>
+        </button>
+    </nav>
+
+    <!-- 検索バー -->
+    <div class="field small-round border prefix bottom-margin top-margin">
+        <i>search</i>
+        <input type="text" id="member-search-input" placeholder="名前またはメールで検索..."
+            oninput="App.modals.selectMembers.filterResults()">
+    </div>
+
+    <!-- 全選択チェックボックス (複数選択時のみ表示) -->
+    <div id="member-select-all-container" class="row left-align margin" style="display: none;">
+        <label class="checkbox">
+            <input type="checkbox" id="member-select-all-checkbox"
+                onchange="App.modals.selectMembers.toggleSelectAll(this.checked)">
+            <span>すべて選択</span>
+        </label>
+    </div>
+
+    <!-- 結果リスト -->
+    <div id="member-results-container"
+        class="scroll large-width medium-height small-padding small-round extra-line background">
+        <!-- 動的に生成 -->
+    </div>
+
+    <nav class="right-align small-padding">
+        <button class="border" onclick="appUi('#modal-select-members',false)">キャンセル</button>
+        <button id="select-members-apply-all-btn" style="display: none;"
+            onclick="App.modals.selectMembers.confirmAll()">全担当者に適用</button>
+        <button onclick="App.modals.selectMembers.confirm()">適用</button>
+    </nav>
+</dialog>

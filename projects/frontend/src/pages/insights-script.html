@@ -1,0 +1,556 @@
+<script>
+    (function () {
+        App.pages.insights = {
+            cachedLogs: [],
+            cachedBoardTasks: [],
+            cachedUserInsightTasks: [],
+            googleChartsLoadingPromise: null,
+
+            loadData: async function (isRefresh = false) {
+                console.log('[Home] Loading data... isRefresh:', isRefresh);
+
+                // 常にリサイズハンドラーをセットアップ（二重登録防止済み）
+                this.setupResizeHandler();
+
+                if (!isRefresh) {
+                    this.renderContent();
+                }
+
+                // すぐに高さを調整（非表示中に行われたリサイズへの対応）
+                requestAnimationFrame(() => this.applyPanelHeights());
+
+                try {
+                    const insightData = await callGAS('getInsightsTabData', App.state.userId, isRefresh);
+
+                    const logs = insightData?.logs || [];
+                    const boardTasks = insightData?.boardTasks || [];
+                    const userInsightTasks = insightData?.userInsightTasks || [];
+
+                    // キャッシュ更新
+                    this.cachedLogs = logs;
+                    this.cachedBoardTasks = boardTasks;
+                    this.cachedUserInsightTasks = userInsightTasks;
+
+                    // 描画
+                    this.renderMemberRanking(logs);
+                    this.renderBoardRanking(boardTasks);
+                    await this.renderUserEffortInsights(userInsightTasks);
+
+                    // 描画後にパネルの高さを調整
+                    this.applyPanelHeights();
+
+                    // キャッシュヒット時の再取得（バックグラウンド）
+                    if (!isRefresh && insightData?.isCached) {
+                        console.log('[Home] Cached data detected. Refreshing in background...');
+                        setTimeout(() => {
+                            this.loadData(true);
+                        }, 100);
+                    }
+
+                } catch (error) {
+                    console.error('[Home] Error loading data:', error);
+                    // エラー表示
+                    this.showError('insight-member-ranking', 'データの読み込みに失敗しました');
+                    this.showError('insight-board-ranking', 'データの読み込みに失敗しました');
+                    this.showError('insight-user-effort-charts', 'データの読み込みに失敗しました');
+                }
+            },
+
+            renderContent: function () {
+                const container = document.getElementById('insight-content');
+                if (!container) return;
+
+                // タイトルとカウントダウン部分は共通
+                // 残りは4カラムグリッドで描画
+                container.innerHTML = `
+                    <div class="grid no-space">
+                        <div class="s12 m6 l6 small-margin">
+                            <article class="padding">
+                                <nav>
+                                    <h6 class="small bold">あなたの頑張り</h6>
+                                    <div class="max"></div>
+                                    <button class="chip" disabled>全期間</button>
+                                </nav>
+                                <span class="small-text secondary-text">自分が関わったタスクをボード別・ステータス別に可視化</span>
+                                <div id="insight-user-effort-charts" class="shimmer-loading scroll top-margin">
+                                    <p id="insight-user-effort-summary" class="no-margin"></p>
+                                    <div id="insight-user-status-chart" class="small-round top-margin padding"></div>
+                                    <div id="insight-user-board-chart" class="small-round top-margin padding"></div>
+                                </div>
+                            </article>
+                        </div>
+
+                        <!-- 3. メンバーランキング (Member Ranking) -->
+                        <div class="s12 m3 l3 small-margin">
+                           <article class="padding">
+                                <nav class="">
+                                    <h6 class="small bold">メンバーランキング</h6>
+                                    <div class="max"></div>
+                                    <button class="chip" disabled>直近7日間</button>
+                                </nav>
+                                <span class="small-text secondary-text">期間内のタスクの作成・更新数</span>
+                                <div id="home-member-ranking" class="shimmer-loading scroll top-margin ">
+                                </div>
+                            </article>
+                        </div>
+
+                        <!-- 4. ボードランキング (Board Ranking) -->
+                        <div class="s12 m3 l3 small-margin">
+                           <article class="padding">
+                                <nav class="">
+                                    <h6 class="small bold">ボードランキング</h6>
+                                    <div class="max"></div>
+                                    <button class="chip" disabled>直近7日間</button>
+                                </nav>
+                                <span class="small-text secondary-text">期間内に作成・更新されたタスク数</span>
+                                <div id="home-board-ranking" class="shimmer-loading scroll top-margin ">
+                                </div>
+                            </article>
+                        </div>
+                    </div>
+                `;
+            },
+
+            renderUserEffortInsights: async function (tasks) {
+                const container = document.getElementById('insight-user-effort-charts');
+                if (!container) return;
+                
+                const summaryEl = document.getElementById('insight-user-effort-summary');
+                const boardChartEl = document.getElementById('insight-user-board-chart');
+                const statusChartEl = document.getElementById('insight-user-status-chart');
+
+                if (!summaryEl || !boardChartEl || !statusChartEl) return;
+
+                const doneProcessedTasks = (tasks || []).filter(task => task.task_status_key === 'DONE' && task.processed_by === App.state.userId);
+                const intervals = doneProcessedTasks.map(task => {
+                    if (!task.starts_at || !task.ends_at) return null;
+                    const start = new Date(task.starts_at).getTime();
+                    const end = new Date(task.ends_at).getTime();
+                    if (isNaN(start) || isNaN(end) || end < start) return null;
+                    return { start: start, end: end };
+                }).filter(interval => interval !== null).sort((a, b) => a.start - b.start);
+
+                const mergedIntervals = [];
+                intervals.forEach(interval => {
+                    const last = mergedIntervals[mergedIntervals.length - 1];
+                    if (!last || interval.start > last.end) {
+                        mergedIntervals.push({ start: interval.start, end: interval.end });
+                        return;
+                    }
+                    if (interval.end > last.end) {
+                        last.end = interval.end;
+                    }
+                });
+
+                const totalHours = Math.floor(mergedIntervals.reduce((sum, interval) => {
+                    return sum + ((interval.end - interval.start) / (1000 * 60 * 60));
+                }, 0));
+
+                summaryEl.textContent = `${activeUser.display_name ? activeUser.display_name + 'さん' : 'あなた'}はこれまでに、${doneProcessedTasks.length}件のタスクを進行し、約${totalHours}時間で完了しました。`;
+
+                try {
+                    // Google Chartsの読み込みを待つ（this.shimmer-loadingは続行）
+                    await this.loadGoogleCharts();
+                    
+                    // ローディング表示を削除（Google Chartsの準備完了後）
+                    container.classList.remove('shimmer-loading');
+                    
+                    // グラフを描画
+                    this.drawBoardPieChart(tasks, boardChartEl);
+                    this.drawStatusBarChart(tasks, statusChartEl);
+                } catch (error) {
+                    console.error('[Insights] Google Chart 描画に失敗:', error);
+                    this.showError('insight-user-effort-charts', 'グラフの描画に失敗しました');
+                }
+            },
+
+            loadGoogleCharts: function () {
+                if (this.googleChartsLoadingPromise) {
+                    return this.googleChartsLoadingPromise;
+                }
+
+                this.googleChartsLoadingPromise = new Promise((resolve, reject) => {
+                    // Google Charts loader が存在するか確認
+                    if (!window.google || !google.charts) {
+                        reject(new Error('Google Charts loader が見つかりません'));
+                        return;
+                    }
+
+                    // Google Charts が既に読み込まれているか確認
+                    if (google.visualization && google.visualization.PieChart && google.visualization.BarChart) {
+                        console.log('[Insights] Google Charts は既に読み込まれています');
+                        resolve();
+                        return;
+                    }
+
+                    // Google Charts を読み込み
+                    google.charts.load('current', { packages: ['corechart'] });
+                    
+                    // 読み込み完了後のコールバック
+                    google.charts.setOnLoadCallback(() => {
+                        // 読み込み完了直後に API が利用可能か確認
+                        if (google.visualization && google.visualization.PieChart && google.visualization.BarChart) {
+                            console.log('[Insights] Google Charts の読み込みが完了しました');
+                            resolve();
+                        } else {
+                            reject(new Error('Google Charts の API が利用できません'));
+                        }
+                    });
+                });
+
+                return this.googleChartsLoadingPromise;
+            },
+
+            drawBoardPieChart: function (tasks, container) {
+                try {
+                    // Google Chartsの利用可否を確認
+                    if (!window.google || !google.visualization || !google.visualization.PieChart) {
+                        throw new Error('Google Charts API が利用できません');
+                    }
+
+                    container.classList.add('border');
+                    const counts = {};
+                    (tasks || []).forEach(task => {
+                        const boardId = task.board_id || 'unknown';
+                        counts[boardId] = (counts[boardId] || 0) + 1;
+                    });
+
+                    const boards = App.state.data.boards || [];
+                    const rows = Object.entries(counts).map(([boardId, count]) => {
+                        const boardName = boards.find(board => board.id === boardId)?.name || '未分類';
+                        return [boardName, count];
+                    }).sort((a, b) => b[1] - a[1]);
+
+                    if (rows.length === 0) {
+                        container.innerHTML = '<div class="center-align secondary-text">データがありません</div>';
+                        return;
+                    }
+
+                    const data = google.visualization.arrayToDataTable([
+                        ['ボード', '件数'],
+                        ...rows
+                    ]);
+
+                    const chart = new google.visualization.PieChart(container);
+                    chart.draw(data, {
+                        title: '自分が担当者のタスクがあるボード',
+                        legend: { position: 'right' },
+                        // コンテナ側のBeerCSS背景色を活かすため、チャート背景を透過
+                        backgroundColor: 'transparent',
+                        chartArea: { top: '24px', width: '100%', height: '80%', backgroundColor: 'transparent' },
+                        pieSliceText: 'value'
+                    });
+                } catch (error) {
+                    console.error('[Insights] ボードPieChart描画エラー:', error);
+                    container.innerHTML = '<div class="center-align error-text"><i>error</i><p class="small-text">グラフの描画に失敗しました</p></div>';
+                }
+            },
+
+            drawStatusBarChart: function (tasks, container) {
+                try {
+                    // Google Chartsの利用可否を確認
+                    if (!window.google || !google.visualization || !google.visualization.BarChart) {
+                        throw new Error('Google Charts API が利用できません');
+                    }
+
+                    container.classList.add('border');
+                    const statusOrder = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
+                    const statusLabels = {
+                        TODO: '未着手',
+                        IN_PROGRESS: '進行中',
+                        IN_REVIEW: '確認中',
+                        DONE: '受領済'
+                    };
+                    const counts = { TODO: 0, IN_PROGRESS: 0, IN_REVIEW: 0, DONE: 0 };
+
+                    (tasks || []).forEach(task => {
+                        const key = task.task_status_key;
+                        if (counts[key] !== undefined) {
+                            counts[key] += 1;
+                        }
+                    });
+
+                    const data = google.visualization.arrayToDataTable([
+                        ['区分', '未着手', { role: 'annotation' }, '進行中', { role: 'annotation' }, '確認中', { role: 'annotation' }, '受領済', { role: 'annotation' }],
+                        [
+                            'ステータス',
+                            counts[statusOrder[0]],
+                            counts[statusOrder[0]] > 0 ? String(counts[statusOrder[0]]) : '',
+                            counts[statusOrder[1]],
+                            counts[statusOrder[1]] > 0 ? String(counts[statusOrder[1]]) : '',
+                            counts[statusOrder[2]],
+                            counts[statusOrder[2]] > 0 ? String(counts[statusOrder[2]]) : '',
+                            counts[statusOrder[3]],
+                            counts[statusOrder[3]] > 0 ? String(counts[statusOrder[3]]) : ''
+                        ]
+                    ]);
+
+                    const chart = new google.visualization.BarChart(container);
+                    chart.draw(data, {
+                        title: '自分が担当者のタスクのステータス',
+                        isStacked: 'percent',
+                        legend: { position: 'top', maxLines: 1 },
+                        // コンテナ側のBeerCSS背景色を活かすため、チャート背景を透過
+                        backgroundColor: 'transparent',
+                        chartArea: { top: '24px', width: '100%', height: '80%', backgroundColor: 'transparent' },
+                        hAxis: { textPosition: 'none' },
+                        vAxis: { textPosition: 'none' },
+                        series: {
+                            0: { labelInLegend: statusLabels.TODO },
+                            1: { labelInLegend: statusLabels.IN_PROGRESS },
+                            2: { labelInLegend: statusLabels.IN_REVIEW },
+                            3: { labelInLegend: statusLabels.DONE }
+                        },
+                        colors: ['#f44336', '#ffc107', '#9c27b0', '#4caf50']
+                    });
+                } catch (error) {
+                    console.error('[Insights] ステータスBarChart描画エラー:', error);
+                    container.innerHTML = '<div class="center-align error-text"><i>error</i><p class="small-text">グラフの描画に失敗しました</p></div>';
+                }
+            },
+
+            /**
+             * 指定したメンバーでマイボードをフィルタして開く
+             */
+            openMyBoardForMember: function (userId) {
+                if (App.pages.boards) {
+                    // タブ切り替え（ロードはスキップ）
+                    App.utils.navigation.switchTab('board-my-board', false, false, true);
+
+                    // フィルタ設定を構成
+                    const filters = {
+                        members: {
+                            created_by: [userId],
+                            processed_by: [userId],
+                            reviewed_by: [userId],
+                            received_by: [userId]
+                        }
+                    };
+
+                    // 最初にフィルタをリセットしてからカスタム設定を適用
+                    App.pages.boards.initializeMyBoardFilters(false); // 空で初期化
+                    App.pages.boards.setMyBoardFilters(filters);
+
+                    // 明示的にデータをロード
+                    App.pages.boards.loadData('my-board', false);
+                }
+            },
+
+            // ---------------------------------------------------------
+            // 3. メンバーランキング (Member Ranking)
+            // ---------------------------------------------------------
+
+
+            renderMemberRanking: function (logs) {
+                const container = document.getElementById('home-member-ranking');
+                if (!container) return;
+                container.classList.remove('shimmer-loading');
+
+                // tasklogsからcreated_byを集計（簡易的）
+                const counts = {};
+                logs.forEach(log => {
+                    const userId = log.created_by;
+                    if (userId) {
+                        counts[userId] = (counts[userId] || 0) + 1;
+                    }
+                });
+
+                const ranking = Object.keys(counts).map(userId => {
+                    return { userId: userId, count: counts[userId] };
+                }).sort((a, b) => b.count - a.count);
+
+                let html = `
+                    <table class="border small-text">
+                      <thead class="fixed surface-container-low">
+                        <tr>
+                           <th class="center-align" style="width: 0; white-space: nowrap;">順位</th>
+                           <th class="left-align">表示名</th>
+                           <th class="right-align" style="width: 0; white-space: nowrap;">件数</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                `;
+
+                if (ranking.length === 0) {
+                    html += `<tr><td colspan="3" class="center-align secondary-text">データがありません</td></tr>`;
+                } else {
+                    const members = App.state.data.members || [];
+                    const getMember = (id) => members.find(m => m.id === id);
+
+                    let currentRank = 1;
+                    ranking.forEach((item, index) => {
+                        const member = getMember(item.userId);
+                        const name = member ? member.display_name : '不明';
+                        const photo = member ? member.profile_photo_url : null;
+
+                        // 同率順位の対応: 前の項目と件数を比較
+                        if (index > 0 && ranking[index - 1].count !== item.count) {
+                            currentRank = index + 1;
+                        }
+                        const rank = currentRank;
+
+                        // 現在のユーザーの行にfillクラスを追加
+                        const isCurrentUser = item.userId === App.state.userId;
+                        const rowClass = isCurrentUser ? 'fill' : '';
+
+                        let rankBadge = `<span>${rank}</span>`;
+
+                        const avatarHtml = photo
+                            ? `<i class="small circle"><img src="${photo}" class="responsive"></i>`
+                            : `<i class="small">account_circle</i>`;
+
+                        html += `
+                            <tr class="${rowClass}" style="cursor: pointer;" onclick="App.pages.insights.openMyBoardForMember('${item.userId}')">
+                                <td class="center-align font-number">${rankBadge}</td>
+                                <td>
+                                    <div class="row left-align tiny-space">
+                                        ${avatarHtml}${escapeHtml(name)}
+                                    </div>
+                                </td>
+                                <td class="right-align font-number">${item.count}</td>
+                            </tr>
+                        `;
+                    });
+                }
+                html += `</tbody></table>`;
+                container.innerHTML = html;
+            },
+
+            // ---------------------------------------------------------
+            // 4. ボードランキング (Board Ranking)
+            // ---------------------------------------------------------
+
+
+            renderBoardRanking: function (tasks) {
+                const container = document.getElementById('home-board-ranking');
+                if (!container) return;
+                container.classList.remove('shimmer-loading');
+
+                const counts = {};
+                tasks.forEach(t => {
+                    // my-board と空欄を除外
+                    if (t.board_id && t.board_id !== 'null' && t.board_id !== 'my-board' && t.board_id !== '') {
+                        counts[t.board_id] = (counts[t.board_id] || 0) + 1;
+                    }
+                });
+
+                const ranking = Object.keys(counts).map(boardId => {
+                    return { boardId: boardId, count: counts[boardId] };
+                }).sort((a, b) => b.count - a.count);
+
+                let html = `
+                    <table class="border small-text">
+                      <thead class="fixed surface-container-low">
+                        <tr>
+                           <th class="center-align" style="width: 0; white-space: nowrap;">順位</th>
+                           <th class="left-align">ボード名</th>
+                           <th class="right-align" style="width: 0; white-space: nowrap;">件数</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                `;
+
+                if (ranking.length === 0) {
+                    html += `<tr><td colspan="3" class="center-align secondary-text">データがありません</td></tr>`;
+                } else {
+                    const boards = App.state.data.boards || [];
+                    const getBoard = (id) => boards.find(b => b.id === id);
+
+                    let currentRank = 1;
+                    ranking.forEach((item, index) => {
+                        const board = getBoard(item.boardId);
+                        const name = board ? board.name : '不明';
+
+                        // 同率順位の対応: 前の項目と件数を比較
+                        if (index > 0 && ranking[index - 1].count !== item.count) {
+                            currentRank = index + 1;
+                        }
+                        const rank = currentRank;
+
+                        html += `
+                            <tr style="cursor: pointer;" onclick="App.utils.navigation.switchTab('board-${item.boardId}')">
+                                <td class="center-align font-number">${rank}</td>
+                                <td class="left-align">${escapeHtml(name)}</td>
+                                <td class="right-align font-number">${item.count}</td>
+                            </tr>
+                        `;
+                    });
+                }
+                html += `</tbody></table>`;
+                container.innerHTML = html;
+            },
+
+            showError: function (elementId, message) {
+                const container = document.getElementById(elementId);
+                if (container) {
+                    container.classList.remove('shimmer-loading');
+                    container.innerHTML = `<div class="padding error-text center-align"><i class="large">error_outline</i><p>${message}</p></div>`;
+                }
+            },
+
+            applyPanelHeights: function () {
+                const panelIds = ['insight-user-effort-charts', 'home-member-ranking', 'home-board-ranking'];
+                try {
+                    const main = document.querySelector('main');
+                    if (!main) return;
+
+                    const windowHeight = window.innerHeight;
+                    const mainStyle = window.getComputedStyle(main);
+                    const mainPaddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
+                    const mainMarginBottom = parseFloat(mainStyle.marginBottom) || 0;
+
+                    // ウィンドウ高さからmainの余白を引いた下端位置を計算
+                    const mainBottomLimit = windowHeight - mainMarginBottom - mainPaddingBottom;
+
+                    panelIds.forEach(id => {
+                        const el = document.getElementById(id);
+                        if (!el) return;
+                        const article = el.closest('article');
+                        if (!article) return;
+
+                        const articleRect = article.getBoundingClientRect();
+                        // 記事がメインコンテナ内に収まるように利用可能な高さを計算
+                        const availableHeightForArticle = mainBottomLimit - articleRect.top;
+
+                        // 記事内の装飾要素（ヘッダー、説明文、パディング、マージン）を計測
+                        const nav = article.querySelector('nav');
+                        const span = article.querySelector('span.small-text');
+                        const articleStyle = window.getComputedStyle(article);
+                        const paddingTop = parseFloat(articleStyle.paddingTop) || 0;
+                        const paddingBottom = parseFloat(articleStyle.paddingBottom) || 0;
+                        
+                        // 余白やマージンのための微調整 (BeerCSSのデフォルトなどを考慮)
+                        const extraBuffer = 32;
+
+                        const decorationsHeight = (nav ? nav.offsetHeight : 0) +
+                            (span ? span.offsetHeight : 0) +
+                            paddingTop + paddingBottom + extraBuffer;
+                        const newHeight = availableHeightForArticle - decorationsHeight;
+                        if (newHeight > 0) {
+                            el.style.height = `${newHeight}px`;
+                        }
+                    });
+                } catch (e) {
+                    console.error('Home panel height calculation failed:', e);
+                }
+            },
+
+            setupResizeHandler: function () {
+                if (this.isResizeHandlerBound) return;
+                this.isResizeHandlerBound = true;
+
+                window.addEventListener('resize', () => {
+                    // insightsタブが表示されている場合のみ再計算
+                    const tab = document.getElementById('tab-insights');
+                    if (tab && tab.style.display !== 'none') {
+                        if (this.resizeRafId) cancelAnimationFrame(this.resizeRafId);
+                        this.resizeRafId = requestAnimationFrame(() => {
+                            this.applyPanelHeights();
+                            this.renderUserEffortInsights(this.cachedUserInsightTasks || []);
+                        });
+                    }
+                });
+            }
+        };
+    })();
+</script>

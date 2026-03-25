@@ -1,0 +1,337 @@
+<script>
+    (function () {
+        if (!App.utils) App.utils = {};
+        if (!App.utils.header) App.utils.header = {};
+
+        App.utils.header.comments = {
+            /** キャッシュされたコメントデータ */
+            cachedComments: null,
+            /** フィルタ適用後のコメントデータ */
+            filteredComments: null,
+            /** 最終更新日時 */
+            lastUpdatedAt: null,
+            /** 初回ロード済みフラグ */
+            isLoaded: false,
+            /** ロード中フラグ（重複呼び出し防止） */
+            isLoading: false,
+
+            /**
+             * コメントハブの表示切替とデータロード
+             */
+            toggle: function () {
+                const dialog = document.getElementById('modal-comments-hub');
+                const container = document.getElementById('comments-hub-list');
+                if (!dialog || !container) return;
+
+                appUi('#modal-comments-hub', true);
+                this.showShimmer(container);
+
+                if (this.isLoaded && this.cachedComments) {
+                    this.render(this.cachedComments);
+                    this.loadData(true);
+                    return;
+                }
+                this.loadData(false);
+            },
+
+            closeHub: function () {
+                appUi('#modal-comments-hub', false);
+            },
+
+            /**
+             * シマーエフェクトを表示
+             */
+            showShimmer: function (container) {
+                container.innerHTML = `
+                    <div class="center padding center-align row small-space">
+                        <progress class="circle indeterminate small"></progress>
+                        <span>読み込み中...</span>
+                    </div>
+                `;
+            },
+
+            /**
+             * データを取得して描画
+             * @param {boolean} forceRefresh - キャッシュを無視して強制再取得するか
+             * @returns {Promise}
+             */
+            loadData: async function (forceRefresh = false) {
+                if (this.isLoading && !forceRefresh) return;
+                this.isLoading = true;
+
+                try {
+                    console.log('[Comments] Loading data... forceRefresh:', forceRefresh);
+                    const result = await callGAS('getCommentNavData', App.state.userId, forceRefresh);
+
+                    const comments = result?.comments || [];
+                    this.cachedComments = comments;
+                    this.isLoaded = true;
+                    this.lastUpdatedAt = new Date();
+
+                    // 描画
+                    this.render(comments);
+
+                    // キャッシュデータだった場合、バックグラウンドで最新データを取得して再描画
+                    if (!forceRefresh && result?.isCached === true) {
+                        console.log('[Comments] Cache detected. Fetching fresh data in background...');
+                        setTimeout(() => this.loadData(true), 100);
+                    }
+                } catch (error) {
+                    console.error('[Comments] Error loading data:', error);
+                    const container = document.getElementById('comments-hub-list');
+                    if (container && !this.cachedComments) {
+                        container.innerHTML = '<div class="padding center-align error-text"><i>error_outline</i><span>コメントの読み込みに失敗しました</span></div>';
+                    }
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            /**
+             * コメント一覧を描画（フィルタ適用含む）
+             * @param {Array} comments - コメントデータ
+             */
+            render: function (comments) {
+                const container = document.getElementById('comments-hub-list');
+                if (!container) return;
+
+                App.utils.header.syncCommentReadStatusAndBadge(comments);
+                this.applyHubFilters();
+            },
+
+            applyHubFilters: function () {
+                const comments = this.cachedComments || [];
+                const tableFilter = document.getElementById('comments-hub-table-filter')?.value || '';
+                const unreadOnly = document.getElementById('comments-hub-unread-only')?.checked === true;
+                const savedData = App.state.getUserProperty('comment_read_status', {});
+
+                this.filteredComments = comments.filter(comment => {
+                    if (tableFilter && comment.related_table !== tableFilter) return false;
+                    if (unreadOnly && savedData[comment.id] === true) return false;
+                    return true;
+                });
+
+                this.renderHubList(this.filteredComments || [], comments.length);
+            },
+
+            renderHubList: function (comments, totalCount) {
+                const container = document.getElementById('comments-hub-list');
+                if (!container) return;
+                const savedData = App.state.getUserProperty('comment_read_status', {});
+                let html = '';
+
+                const summaryEl = document.getElementById('comments-hub-summary');
+                if (summaryEl) {
+                    const unreadCount = comments.filter(function (item) {
+                        return savedData[item.id] !== true;
+                    }).length;
+                    summaryEl.textContent = `${comments.length}件 / 全${totalCount || 0}件`;
+                }
+
+                if (!comments || comments.length === 0) {
+                    container.innerHTML = '<div class="padding center-align row tiny-space secondary-text"><i>info</i><span>条件に一致するコメントはありません</span></div>';
+                    return;
+                }
+
+                html += comments.map(comment => {
+                    const isRead = savedData[comment.id] === true;
+                    const readClass = isRead ? 'surface-container-low' : 'error-container';
+                    const readIcon = isRead ? 'mark_email_read' : 'mark_email_unread';
+
+                    // プロフィール写真
+                    const avatarHtml = comment.profile_photo_url
+                        ? `<img class="responsive" src="${comment.profile_photo_url}" alt="${escapeHtml(comment.display_name)}">`
+                        : `account_circle`;
+
+                    // 更新日時のフォーマット
+                    const updatedAt = comment.updated_at
+                        ? formatDateTimeForDisplay(comment.updated_at, 'MM/dd(E) HH:mm')
+                        : '';
+
+                    // コメント内容
+                    let commentContent = comment.content ? comment.content : '';
+                    // commentContent = commentContent.replace(/\r\n/g, ' ').replace(/\n/g, ' '); // 改行をスペースに置換（必要に応じて調整）
+
+                    const targetName = escapeHtml(comment.target_name || '');
+                    const targetSubtitle = escapeHtml(comment.target_subtitle || '');
+                    const targetLabel = escapeHtml(comment.related_table_label || '') + (targetSubtitle);
+
+                    return `
+                        <article title="${targetLabel ? escapeHtml(targetLabel) + 'を開く' : ''}" class="no-elevate padding small-margin small-round ${readClass}" style="cursor: pointer;" onclick="App.utils.header.comments.openCommentById('${comment.id}')">
+                            <div class="row top-align">
+                                <div>
+                                    <i class="circle extra">${avatarHtml}</i>
+                                </div>
+                                <div class="max">
+                                    <div class="row">
+                                        <span class="bold small-text">${escapeHtml(comment.display_name)}</span>
+                                        <span class="small-text secondary-text font-number">${updatedAt}</span>
+                                    </div>
+                                    <div class="small-text row tiny-space no-margin secondary-text">
+                                        <i class="tiny">${this._tableIcon(comment.related_table)}</i>
+                                        <span>${targetLabel}</span>
+                                        <span>${targetName}</span>
+                                    </div>
+                                    <div class="tiny-space"></div>
+                                    <div><span>${escapeHtml(commentContent)}</span></div>
+                                </div>
+                                <div>
+                                    <button class="transparent circle small no-margin"
+                                        onclick="event.stopPropagation(); App.utils.header.comments.toggleReadStatus('${comment.id}')"
+                                        title="${isRead ? '未読にする' : '既読にする'}">
+                                    <i class="small">${readIcon}</i>
+                                    </button>
+                                </div>
+                            </div>
+                        </article>
+                    `;
+                }).join('');
+
+                if (this.lastUpdatedAt) {
+                    const timeStr = formatDateTimeForDisplay(this.lastUpdatedAt, 'yyyy/MM/dd(E) HH:mm');
+                    html += `<div class="row padding no-margin center-align secondary-text small-text tiny-space"><span>最終更新: ${timeStr}</span></div>`;
+                }
+
+                container.innerHTML = html;
+            },
+
+            /**
+             * コメントIDからコメントを開く
+             */
+            openCommentById: function (commentId) {
+                const comment = (this.cachedComments || []).find(function (item) {
+                    return item.id === commentId;
+                });
+                if (!comment) return;
+                this.openComment(comment);
+            },
+
+            /**
+             * コメントをクリックして対象レコードを開く
+             * @param {Object} comment - コメントデータ
+             */
+            openComment: function (comment) {
+                if (!comment || !comment.id) return;
+                this.markAsRead(comment.id);
+                this.closeHub();
+
+                if (comment.related_table === 'tasks') {
+                    if (App.pages.home && App.pages.home.openTaskFromHome) {
+                        App.pages.home.openTaskFromHome(comment.task_id || comment.related_id, comment.task_board_id || '');
+                        return;
+                    }
+                    if (App.modals.taskDetail && App.modals.taskDetail.open) {
+                        App.modals.taskDetail.open(comment.task_id || comment.related_id);
+                        return;
+                    }
+                }
+
+                if (comment.related_table === 'members' && App.modals.memberDetail?.open) {
+                    App.modals.memberDetail.open(comment.related_id);
+                    return;
+                }
+                if (comment.related_table === 'directories' && App.modals.directoryDetail?.open) {
+                    App.modals.directoryDetail.open(comment.related_id);
+                    return;
+                }
+                if (comment.related_table === 'skills' && App.modals.skillDetail?.open) {
+                    App.modals.skillDetail.open(comment.related_id);
+                    return;
+                }
+                if (comment.related_table === 'plans' && App.modals.planDetail?.open) {
+                    App.modals.planDetail.open(comment.related_id);
+                    return;
+                }
+
+                showSnackbar('対象レコードを開けませんでした', 'error');
+            },
+
+            /**
+             * コメントの既読/未読状態をトグル
+             * @param {string} commentId - コメントID
+             */
+            toggleReadStatus: function (commentId) {
+                const savedData = App.state.getUserProperty('comment_read_status', {});
+                savedData[commentId] = !savedData[commentId];
+
+                App.utils.header.syncCommentReadStatusAndBadge(this.cachedComments, savedData);
+
+                if (this.cachedComments) {
+                    this.applyHubFilters();
+                }
+            },
+
+            markCurrentAsRead: function () {
+                const targetComments = this.filteredComments || this.cachedComments || [];
+                if (!targetComments.length) {
+                    showSnackbar('既読にするコメントがありません', 'info');
+                    return;
+                }
+                const savedData = App.state.getUserProperty('comment_read_status', {});
+                let changed = 0;
+                targetComments.forEach(function (comment) {
+                    if (savedData[comment.id] !== true) {
+                        savedData[comment.id] = true;
+                        changed += 1;
+                    }
+                });
+                App.utils.header.syncCommentReadStatusAndBadge(this.cachedComments, savedData);
+                this.applyHubFilters();
+                if (changed > 0) {
+                    showSnackbar(`${changed}件を既読にしました`, 'success');
+                } else {
+                    showSnackbar('表示中のコメントは既読です', 'info');
+                }
+            },
+
+            /**
+             * コメントを既読にマーク（openComment用）
+             * @param {string} commentId - コメントID
+             */
+            markAsRead: function (commentId) {
+                const savedData = App.state.getUserProperty('comment_read_status', {});
+                savedData[commentId] = true;
+
+                App.utils.header.syncCommentReadStatusAndBadge(this.cachedComments, savedData);
+                this.applyHubFilters();
+            },
+
+            /**
+             * 指定したタスクに関連する未読コメントをすべて既読にする
+             * @param {string} taskId - タスクID
+             */
+            markCommentsAsReadByTaskId: function (taskId) {
+                if (!this.cachedComments || this.cachedComments.length === 0) {
+                    return;
+                }
+
+                const savedData = App.state.getUserProperty('comment_read_status', {});
+                let hasChanges = false;
+
+                this.cachedComments.forEach(comment => {
+                    if (comment.related_table === 'tasks' && (comment.related_id === taskId || comment.task_id === taskId) && savedData[comment.id] !== true) {
+                        savedData[comment.id] = true;
+                        hasChanges = true;
+                    }
+                });
+
+                if (hasChanges) {
+                    console.log(`[Comments] Marked comments for task ${taskId} as read.`);
+                    App.utils.header.syncCommentReadStatusAndBadge(this.cachedComments, savedData);
+                    this.applyHubFilters();
+                }
+            },
+
+            _tableIcon: function (tableName) {
+                const icons = {
+                    tasks: 'task_alt',
+                    members: 'person',
+                    directories: 'account_tree',
+                    skills: 'psychology',
+                    plans: 'store'
+                };
+                return icons[tableName] || 'comment';
+            }
+        };
+    })();
+</script>

@@ -1,0 +1,591 @@
+<script>
+    (function () {
+        App.utils.navigation = {
+            leftNavPreferredSize: 'min',
+            leftNavIsHovering: false,
+
+            applyTabHeightImmediately: function (tabName, boardId = null) {
+                const run = () => {
+                    try {
+                        if (tabName === 'home' && App.pages.home && typeof App.pages.home.applyLayoutHeight === 'function') {
+                            App.pages.home.applyLayoutHeight();
+                            return;
+                        }
+
+                        const isBoardTab = typeof tabName === 'string' && tabName.startsWith('board-');
+                        if (isBoardTab && App.pages.boards && typeof App.pages.boards.applyCurrentLayoutHeight === 'function') {
+                            const targetBoardId = boardId || tabName.replace('board-', '');
+                            App.pages.boards.applyCurrentLayoutHeight(targetBoardId);
+                            return;
+                        }
+
+                        if (tabName === 'catalog' && App.pages.members && typeof App.pages.members.applyCurrentLayoutHeight === 'function') {
+                            App.pages.members.applyCurrentLayoutHeight();
+                            return;
+                        }
+
+                        if (tabName === 'boards' && App.pages.boardsList && typeof App.pages.boardsList.applyCurrentLayoutHeight === 'function') {
+                            App.pages.boardsList.applyCurrentLayoutHeight();
+                        }
+                    } catch (error) {
+                        console.warn('[navigation] applyTabHeightImmediately failed:', error);
+                    }
+                };
+
+                run();
+                requestAnimationFrame(run);
+            },
+
+            applyLeftNavSize: function (size) {
+                const leftNav = document.getElementById('left-nav');
+                if (!leftNav) return;
+
+                const targetSize = size === 'min' ? 'min' : 'max';
+                leftNav.classList.remove('max', 'min');
+                leftNav.classList.add(targetSize);
+
+                // min/max に応じて要素の表示/非表示を制御
+                const boardsNav = document.getElementById('board-nav');
+                const hrNav = boardsNav ? boardsNav.previousElementSibling : null;
+                const h1Content = document.getElementById('h1-content');
+
+                if (targetSize === 'min') {
+                    if (boardsNav) boardsNav.style.display = 'none';
+                    if (hrNav) hrNav.style.display = 'none';
+                    if (h1Content) h1Content.style.display = 'none';
+                } else {
+                    if (boardsNav) boardsNav.style.display = '';
+                    if (hrNav) hrNav.style.display = '';
+                    if (h1Content) h1Content.style.display = '';
+                }
+            },
+
+            initializeLeftNavToggle: function () {
+                const leftNav = document.getElementById('left-nav');
+                const hoverAnchor = document.getElementById('boards-hover-anchor');
+                if (!leftNav || !hoverAnchor) return;
+
+                this.leftNavPreferredSize = leftNav.classList.contains('min') ? 'min' : 'max';
+
+                leftNav.addEventListener('mousemove', (event) => {
+                    const anchorTop = hoverAnchor.getBoundingClientRect().top;
+                    const isInBoardsHoverArea = event.clientY >= anchorTop;
+
+                    if (isInBoardsHoverArea) {
+                        if (!this.leftNavIsHovering) {
+                            this.leftNavIsHovering = true;
+                            this.applyLeftNavSize('max');
+                        }
+                        return;
+                    }
+
+                    if (this.leftNavIsHovering) {
+                        this.leftNavIsHovering = false;
+                        this.applyLeftNavSize(this.leftNavPreferredSize);
+                    }
+                });
+
+                leftNav.addEventListener('mouseleave', () => {
+                    this.leftNavIsHovering = false;
+                    this.applyLeftNavSize(this.leftNavPreferredSize);
+                });
+            },
+
+            toggleLeftNavSize: function (event) {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+
+                this.leftNavPreferredSize = this.leftNavPreferredSize === 'min' ? 'max' : 'min';
+
+                if (this.leftNavIsHovering) {
+                    this.applyLeftNavSize('max');
+                } else {
+                    this.applyLeftNavSize(this.leftNavPreferredSize);
+                }
+            },
+
+            hasRenderedChildren: function (element) {
+                if (!element) return false;
+                if (element.children && element.children.length > 0) return true;
+                return !!String(element.innerHTML || '').trim();
+            },
+
+            shouldUseBackgroundLoad: function (tabName, forceLoadData = false) {
+                if (forceLoadData) return false;
+
+                const page = App.pages[tabName];
+                if (page && typeof page.hasRenderedContent === 'function') {
+                    try {
+                        return !!page.hasRenderedContent();
+                    } catch (error) {
+                        console.warn('[navigation] hasRenderedContent check failed:', error);
+                    }
+                }
+
+                const tabRoot = document.getElementById('tab-' + tabName);
+                if (!tabRoot) return false;
+
+                const probes = tabRoot.querySelectorAll('[data-tab-render-root]');
+                if (!probes.length) return false;
+                return Array.from(probes).some((probe) => this.hasRenderedChildren(probe));
+            },
+
+            /**
+             * タブを切り替える
+             * @param {string} tabName - タブID（例: 'home', 'catalog', 'board-UUID'）
+             * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
+             */
+            switchTab: async function (tabName, skipUrlUpdate = false, forceLoadData = false, skipLoadData = false) {
+                if (tabName === 'members') {
+                    tabName = 'catalog';
+                }
+                console.log(`switchTab called with: ${tabName}, skipUrlUpdate: ${skipUrlUpdate}`);
+                let isBoardTab = tabName.startsWith('board-');
+
+                // 現在のタブを取得して処理（必要なら）
+                const currentTab = Array.from(document.querySelectorAll('main > div')).find(el => el.style.display !== 'none');
+                console.log(`Current tab:`, currentTab);
+
+                const modalClosed = await App.utils.ui.closeTopModal();
+                // モーダルが閉じられなかった場合（キャンセルされた場合）、タブ切り替えを中止
+                if (modalClosed === false) {
+                    console.log(`[switchTab] Modal close was cancelled, aborting tab switch`);
+                    return;
+                }
+
+                // URLパラメータを更新（skipUrlUpdateがfalseの場合のみ）
+                if (!skipUrlUpdate) {
+                    const params = App.utils.url.getParamsFromTabId(tabName);
+                    App.utils.url.updateParams(params, false);
+                }
+
+                // 左navのアクティブ状態管理
+                const sidebarLinks = document.querySelectorAll('nav.left a');
+                sidebarLinks.forEach(item => item.classList.remove('active'));
+
+                let activeLink;
+                if (tabName === 'boards') {
+                    activeLink = document.getElementById('boards-nav');
+                } else if (tabName === 'board-my-board') {
+                    activeLink = document.getElementById('my-board-nav');
+                } else if (isBoardTab) {
+                    const boardId = tabName.replace('board-', '');
+                    activeLink = document.querySelector(`a[data-board-id="${boardId}"]`);
+                } else {
+                    activeLink = document.getElementById(tabName + '-nav');
+                }
+
+                if (activeLink) activeLink.classList.add('active');
+
+                // ページ表示切り替え
+                document.querySelectorAll('main > div').forEach(el => el.style.display = 'none');
+
+                if (isBoardTab) {
+                    // ボードタブの場合、ボードコンテナを表示し、その中の特定ボードを表示する
+                    const boardId = tabName.replace('board-', '');
+                    const boardContainer = document.getElementById('tab-board');
+                    if (boardContainer) {
+                        boardContainer.style.display = 'block';
+                        // 全ての個別ボードを一旦非表示
+                        Array.from(boardContainer.children).forEach(child => {
+                            if (child.id && child.id.startsWith('tab-board-')) {
+                                child.style.display = 'none';
+                            }
+                        });
+
+                        const targetBoardPageId = 'tab-board-' + boardId;
+                        const targetBoardPage = document.getElementById(targetBoardPageId);
+                        if (targetBoardPage) {
+                            targetBoardPage.style.display = 'block';
+                            this.applyTabHeightImmediately(tabName, boardId);
+                            if (!skipLoadData && App.pages.boards && App.pages.boards.loadData) {
+                                // 既に描画済み（キャンバスにコンテンツがある）場合はtrueを渡してローディング表示をスキップ
+                                const viewMode = (App.pages.boards && App.pages.boards.viewMode) ? App.pages.boards.viewMode : 'kanban';
+                                const canvasId = viewMode === 'list' ? 'list-canvas-' + boardId : 'kanban-canvas-' + boardId;
+                                const canvas = document.getElementById(canvasId);
+                                let isRendered;
+                                if (forceLoadData) {
+                                    isRendered = false;
+                                } else {
+                                    isRendered = canvas && canvas.children.length > 0;
+                                }
+                                await App.pages.boards.loadData(boardId, isRendered);
+                            }
+                        } else {
+                            console.error('Target board page not found:', targetBoardPageId);
+                        }
+                    }
+                } else {
+                    let targetPageId = 'tab-' + tabName;
+                    let targetPage = document.getElementById(targetPageId);
+                    console.log(`Target page ID: ${targetPageId}, Found:`, !!targetPage);
+
+                    if (targetPage) {
+                        targetPage.style.display = 'block';
+                        this.applyTabHeightImmediately(tabName);
+
+                        const isBackground = this.shouldUseBackgroundLoad(tabName, forceLoadData);
+
+                        await this.loadTabData(tabName, isBackground);
+                    } else {
+                        alert(`開こうとしたページが見つかりません。削除された可能性があります。\nページID: ${targetPageId}`);
+                        // フォールバック: Homeへ
+                        if (tabName !== 'home') {
+                            await this.switchTab('home');
+                        }
+                    }
+                }
+            },
+
+            /**
+             * 詳細画面から戻る
+             */
+            goBack: function (targetId) {
+                if (!targetId) targetId = 'home';
+
+                if (targetId.startsWith('tab-')) {
+                    this.switchTab(targetId.replace('tab-', ''));
+                } else {
+                    this.switchTab(targetId);
+                }
+            },
+
+            /**
+             * 通常タブデータを読み込む
+             */
+            loadTabData: async function (tabName, isBackground = false) {
+                console.log(`loadTabData called for: ${tabName}, isBackground: ${isBackground}`);
+                if (tabName === 'boards' && App.pages.boardsList && App.pages.boardsList.loadData) {
+                    const listCanvas = document.getElementById('boards-list-canvas');
+                    const isRendered = !!(listCanvas && listCanvas.children.length > 0);
+                    await App.pages.boardsList.loadData(isBackground || isRendered);
+                    return;
+                }
+                if (App.pages[tabName] && App.pages[tabName].loadData) {
+                    await App.pages[tabName].loadData(isBackground);
+                }
+            },
+
+            /**
+             * 動的にボードリストを生成
+             */
+            renderBoardsNavigation: function () {
+                console.log('[renderBoardsNavigation] Start. UserProperties:', App.state.userProperties);
+
+                // 現在のアクティブなボードIDを保存
+                const activeLink = document.querySelector('#board-nav a.active');
+                const activeBoardId = activeLink ? activeLink.dataset.boardId : null;
+                console.log('[renderBoardsNavigation] Current active board ID:', activeBoardId);
+
+                const boards = App.state.data.boards || [];
+                console.log('[renderBoardsNavigation] Total boards:', boards.length);
+                let html = '';
+                let starredBoardIndex = [];
+                let activeBoardIndex = [];
+                let archiveBoardIndex = [];
+                const boardsNavigation = document.getElementById('board-nav');
+
+                // ユーザープロパティからstarred_boardsを取得してパース
+                // 共通の getUserProperty を使用
+                const starredBoards = App.state.getUserProperty('starred_boards', []);
+                console.log('[renderBoardsNavigation] Starred boards:', JSON.stringify(starredBoards));
+                console.log('[renderBoardsNavigation] Starred boards type:', typeof starredBoards, 'isArray:', Array.isArray(starredBoards));
+
+                // 1. Starred Boards (Active only)
+                if (Array.isArray(starredBoards) && starredBoards.length > 0) {
+                    console.log('[renderBoardsNavigation] Rendering starred boards section...');
+                    let hasRenderedStarred = false;
+                    starredBoards.forEach(starredId => {
+                        console.log('[renderBoardsNavigation] Processing starred board ID:', starredId);
+                        const boardIndex = boards.findIndex(b => b.id === starredId);
+                        if (boardIndex !== -1) {
+                            const board = boards[boardIndex];
+                            console.log('[renderBoardsNavigation] Found board:', board.name, 'is_active:', board.is_active);
+                            // is_activeがTRUEの場合のみ描画
+                            if (board.is_active) {
+                                html += this.createBoardLink(board, true);
+                                starredBoardIndex.push(boardIndex);
+                                hasRenderedStarred = true;
+                                console.log('[renderBoardsNavigation] Rendered starred board:', board.name);
+                            }
+                        } else {
+                            console.warn('[renderBoardsNavigation] Starred board not found in boards array:', starredId);
+                        }
+                    });
+                    console.log('[renderBoardsNavigation] Starred boards rendered count:', starredBoardIndex.length);
+
+                }
+
+                if (!starredBoardIndex.length) {
+                    console.log('[renderBoardsNavigation] No starred boards, showing placeholder');
+                    html += `<p class="left-padding top-margin bottom-margin secondary-text left-align middle-align row tiny-space">
+                        <i class="medium">folder_special</i>
+                        <span class="small-text no-line">スター付きのボードは<br>ここに表示されます</span>
+                    </p>`;
+                }
+
+                html += `<hr class="small-margin">`;
+
+                // 2. Active Boards (Non-starred)
+                console.log('[renderBoardsNavigation] Rendering active boards section...');
+                boards.forEach((board, index) => {
+                    // 既に描画済みのindexはスキップ
+                    if (starredBoardIndex.includes(index)) return;
+
+                    if (board.is_active) {
+                        html += this.createBoardLink(board, false);
+                        activeBoardIndex.push(index);
+                    }
+                });
+                console.log('[renderBoardsNavigation] Active boards rendered count:', activeBoardIndex.length);
+
+                if (!activeBoardIndex.length) {
+                    html += `<p class="left-padding top-margin bottom-margin secondary-text left-align middle-align row tiny-space">
+                        <i class="medium">folder</i>
+                        <span class="small-text no-line">アクティブなボードは<br>ここに表示されます</span>
+                    </p>`;
+                }
+
+
+                html += `<hr class="small-margin">`;
+
+                // 3. Inactive Boards (Archive)
+                console.log('[renderBoardsNavigation] Rendering archived boards section...');
+                boards.forEach((board, index) => {
+                    if (!board.is_active) {
+                        html += this.createBoardLink(board, false);
+                        archiveBoardIndex.push(index);
+                    }
+                });
+                console.log('[renderBoardsNavigation] Archived boards rendered count:', archiveBoardIndex.length);
+
+                if (!archiveBoardIndex.length) {
+                    html += `<p class="left-padding top-margin bottom-margin secondary-text left-align middle-align row tiny-space">
+                        <i class="medium">folder_off</i>
+                        <span class="small-text no-line">アーカイブ済のボードは<br>ここに表示されます</span>
+                    </p>`;
+                }
+
+                boardsNavigation.innerHTML = html;
+                console.log('[renderBoardsNavigation] Navigation HTML updated');
+
+                // アクティブ状態を復元
+                if (activeBoardId) {
+                    const newActiveLink = boardsNavigation.querySelector(`a[data-board-id="${activeBoardId}"]`);
+                    if (newActiveLink) {
+                        newActiveLink.classList.add('active');
+                        console.log('[renderBoardsNavigation] Restored active class to:', activeBoardId);
+                    } else {
+                        console.warn('[renderBoardsNavigation] Could not find link to restore active class for:', activeBoardId);
+                    }
+                }
+                console.log('[renderBoardsNavigation] End.');
+            },
+
+            formatBoardName: function (name) {
+                if (!name) return '';
+
+                const getWeight = (c) => (c.match(/[ -~]/) || c.match(/[\uFF61-\uFF9F]/)) ? 0.5 : 1;
+
+                let totalWeight = 0;
+                for (let c of name) {
+                    totalWeight += getWeight(c);
+                }
+
+                let processingName = name;
+                // 合計19文字以上（19含む）なら17文字で切って…をつける
+                if (totalWeight >= 19) {
+                    let w = 0;
+                    let cutIdx = 0;
+                    for (let i = 0; i < name.length; i++) {
+                        let cw = getWeight(name[i]);
+                        if (w + cw > 17) break;
+                        w += cw;
+                        cutIdx = i + 1;
+                    }
+                    processingName = name.substring(0, cutIdx) + '…';
+                }
+
+                let html = '';
+                let lineWeight = 0;
+                for (let c of processingName) {
+                    let w = getWeight(c);
+                    // 9文字（weight 9）を超えたら改行
+                    if (lineWeight + w > 9) {
+                        html += '<br>';
+                        lineWeight = 0;
+                    }
+                    html += escapeHtml(c);
+                    lineWeight += w;
+                }
+
+                return html;
+            },
+
+            createBoardLink: function (board, isStarred) {
+                const boardTabName = 'board-' + board.id;
+                // アイコン: Inactiveならfolder_off, Activeならstarred状態に合わせて変更
+                const icon = !board.is_active ? 'folder_off' : (isStarred ? 'folder_special' : 'folder');
+                // text class: Inactiveなら薄くするなどのスタイルがあれば適用
+                const textClass = !board.is_active ? 'secondary-text' : '';
+
+                // user_noteをtitle属性用に変換（改行を&#13;&#10;に変換）
+                let titleAttr = escapeHtml(board.name || '');
+                titleAttr = board.user_note ? `:&#13;&#10; ${escapeHtml(board.user_note).replace(/\n/g, '&#13;&#10;')}` : '';
+
+                return `
+                        <a onclick="App.utils.navigation.switchTab('${boardTabName}')" data-board-id="${board.id}" title="${titleAttr}">
+                            <i class="${textClass}">${icon}</i>
+                            <span class="left-align ${textClass}">${this.formatBoardName(board.name || '')}</span>
+                        </a>
+                    `;
+            },
+
+            /**
+             * 初期ロード時のシマーエフェクトを描画
+             */
+            renderLoadingPlaceholders: function () {
+                const nav = document.getElementById('board-nav');
+                if (!nav) return;
+
+                let html = '';
+                for (let i = 0; i < 9; i++) {
+                    const delay = i * 0.1;
+                    html += `
+                        <a class="shimmer-loading" style="animation-delay: ${delay}s">
+                            <i></i>
+                            <span>　　　　　　　　</span>
+                        </a>
+                    `;
+                    if (i === 2 || i === 5) html += `<hr class="small-margin">`;
+                }
+                nav.innerHTML = html;
+            },
+
+            changeH1: function () {
+                if (App.state.isDevelopment) {
+                    const h1 = document.querySelector('#h1-content h1');
+                    if (h1) {
+                        h1.textContent = 'DEV';
+                        h1.classList.add('error');
+                    }
+                }
+            },
+
+            /**
+             * 指定したタスクを開く（キャッシュになければリフレッシュして再試行）
+             * @param {string} taskId - タスクID
+             * @param {string} boardId - ボードID
+             */
+            tryOpenTask: async function (taskId, boardId, options = {}) {
+                if (!taskId || !boardId) return;
+
+                const skipInitialLoad = options.skipInitialLoad === true;
+                const initialForceRefresh = options.initialForceRefresh !== false;
+                const initialShowLoading = options.initialShowLoading !== false;
+
+                // 必要な場合のみ初回ロードを実行
+                if (!skipInitialLoad) {
+                    await App.pages.boards.loadData(boardId, initialForceRefresh, initialShowLoading);
+                }
+
+                // ロード完了後、タスクが存在するか確認
+                let boardTasks = (App.pages.boards.cachedBoardTasks && App.pages.boards.cachedBoardTasks[boardId]) || [];
+                let targetTask = boardTasks.find(t => t.id === taskId);
+
+                if (targetTask) {
+                    // タスクが見つかった場合はモーダルを開く
+                    if (App.modals && App.modals.taskDetail && App.modals.taskDetail.open) {
+                        console.log(`[tryOpenTask] Task found in cache, opening: ${taskId}`);
+                        App.modals.taskDetail.open(taskId, false);
+                    }
+                } else {
+                    // タスクが見つからない場合は強制リフレッシュして再確認
+                    console.log(`[tryOpenTask] Task not found in cache, refreshing board ${boardId}...`);
+                    if (App.pages.boards.loadData) {
+                        await App.pages.boards.loadData(boardId, true, true);
+                    }
+
+                    // 再度確認
+                    boardTasks = (App.pages.boards.cachedBoardTasks && App.pages.boards.cachedBoardTasks[boardId]) || [];
+                    targetTask = boardTasks.find(t => t.id === taskId);
+
+                    if (targetTask) {
+                        // リフレッシュ後に見つかった場合
+                        if (App.modals && App.modals.taskDetail && App.modals.taskDetail.open) {
+                            console.log(`[tryOpenTask] Task found after refresh, opening: ${taskId}`);
+                            App.modals.taskDetail.open(taskId, false);
+                        }
+                    } else {
+                        // それでも見つからない場合
+                        if (App.modals && App.modals.taskDetail && App.modals.taskDetail.open) {
+                            console.warn(`[tryOpenTask] Task still not found after refresh: ${taskId}`);
+                            App.modals.taskDetail.open(taskId, false);
+                        }
+                    }
+                }
+            },
+
+            /**
+             * 指定したタスク名でマイボードをフィルタして表示
+             * @param {string} taskId - タスクID
+             */
+            navigateToMyBoardWithTaskName: async function (taskId) {
+                if (!taskId) return;
+
+                // 即座にマイボードへ遷移（ロードはスキップ）
+                await this.switchTab('board-my-board', false, false, true);
+
+                // シマーエフェクトを即座に表示
+                if (App.pages.boards && App.pages.boards.renderKanban) {
+                    App.pages.boards.renderKanban('my-board', true);
+                }
+
+                // タスクを検索
+                // まずキャッシュから検索
+                let task = App.state.data.tasks ? App.state.data.tasks.find(t => t.id === taskId) : null;
+                let taskName = task ? task.name : null;
+
+                // キャッシュにない、または詳細が必要な場合はサーバーから取得（handleDatabaseProcessを使用）
+                if (!taskName) {
+                    try {
+                        const response = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
+                            where: { id: ["=", taskId] }
+                        }, null, true); // forceRefresh=true
+
+                        if (response && response.data && response.data.length > 0) {
+                            taskName = response.data[0].name;
+                        }
+                    } catch (e) {
+                        console.error('[navigateToMyBoardWithTaskName] Failed to fetch task:', e);
+                    }
+                }
+
+                if (!taskName) {
+                    console.warn('[navigateToMyBoardWithTaskName] Task name not found for ID:', taskId);
+                    // タスク名が見つからない場合でも、とりあえずマイボードは開く（フィルタなし）
+                }
+
+                // フィルタを設定
+                if (App.pages.boards) {
+                    // フィルタを初期化（自分に関連するタスク）
+                    App.pages.boards.initializeMyBoardFilters(true);
+
+                    if (taskName) {
+                        // タイトルフィルタを設定
+                        App.pages.boards.myBoardFilters.title = taskName;
+                        App.pages.boards.myBoardFilters.titleMatchMode = 'contains'; // 部分一致
+                        console.log(`[navigateToMyBoardWithTaskName] Set filter title: ${taskName}`);
+                    }
+
+                    // タスクを開く処理（共通関数を使用）
+                    await this.tryOpenTask(taskId, 'my-board');
+                }
+            }
+        };
+        App.utils.navigation.initializeLeftNavToggle();
+        App.utils.navigation.renderLoadingPlaceholders();
+    })();
+</script>

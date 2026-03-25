@@ -1,0 +1,314 @@
+<script>
+    (function () {
+        App.modals.newComment = {
+            relatedId: null,
+            relatedTable: '',
+            relatedLabel: '',
+            isContextFixed: false,
+            searchResults: [],
+
+            /**
+             * 新規コメントモーダルを開く
+             * @param {string} taskId - タスクID
+             */
+            open: function (taskId) {
+                this.reset();
+                if (taskId) {
+                    this.relatedId = taskId;
+                    this.relatedTable = 'tasks';
+                    this.relatedLabel = this._buildLabel('tasks', taskId);
+                    this.isContextFixed = true;
+                } else {
+                    this.isContextFixed = false;
+                }
+                this.renderContext();
+
+                appUi('modal-new-comment', true);
+
+                setTimeout(() => {
+                    const contentField = document.getElementById('new-comment-content');
+                    if (contentField) contentField.focus();
+                }, 200);
+            },
+
+            /**
+             * 任意テーブル向けに新規コメントモーダルを開く
+             * @param {string} relatedTable - 関連テーブル名
+             * @param {string} relatedId - 関連ID
+             */
+            openFor: function (relatedTable, relatedId) {
+                this.reset();
+                this.relatedId = relatedId;
+                this.relatedTable = relatedTable || 'tasks';
+                this.relatedLabel = this._buildLabel(this.relatedTable, this.relatedId);
+                this.isContextFixed = true;
+                this.renderContext();
+
+                appUi('modal-new-comment', true);
+
+                setTimeout(() => {
+                    const contentField = document.getElementById('new-comment-content');
+                    if (contentField) contentField.focus();
+                }, 200);
+            },
+
+            /**
+             * モーダルを閉じる
+             */
+            close: function () {
+                appUi('modal-new-comment', false);
+                this.reset();
+            },
+
+            /**
+             * モーダルをリセット
+             */
+            reset: function () {
+                const contentField = document.getElementById('new-comment-content');
+                if (contentField) contentField.value = '';
+                this.relatedId = null;
+                this.relatedTable = '';
+                this.relatedLabel = '';
+                this.isContextFixed = false;
+                this.searchResults = [];
+
+                const targetTable = document.getElementById('new-comment-target-table');
+                if (targetTable) targetTable.value = '';
+                const searchInput = document.getElementById('new-comment-target-search');
+                if (searchInput) searchInput.value = '';
+                const results = document.getElementById('new-comment-target-results');
+                if (results) results.innerHTML = '<div class="secondary-text small-text">検索キーワードを入力してください</div>';
+                const selected = document.getElementById('new-comment-target-selected');
+                if (selected) selected.innerHTML = '<i class="small">info</i><span>対象が未選択です</span>';
+            },
+
+            renderContext: function () {
+                const selector = document.getElementById('new-comment-related-selector');
+                const selected = document.getElementById('new-comment-target-selected');
+                const targetTable = document.getElementById('new-comment-target-table');
+
+                if (selector) selector.style.display = this.isContextFixed ? 'none' : '';
+                if (targetTable && !this.isContextFixed) {
+                    targetTable.value = this.relatedTable || '';
+                }
+                if (selected && this.relatedId && !this.isContextFixed) {
+                    selected.innerHTML = `<i class="small">check_circle</i><span>${escapeHtml(this.relatedLabel || this._buildLabel(this.relatedTable, this.relatedId))}</span>`;
+                }
+            },
+
+            handleTargetTableChange: function () {
+                if (this.isContextFixed) return;
+                const targetTable = document.getElementById('new-comment-target-table');
+                this.relatedTable = targetTable && targetTable.value ? targetTable.value : '';
+            },
+
+            searchTargets: function () {
+                if (this.isContextFixed) return;
+                const searchInput = document.getElementById('new-comment-target-search');
+                const resultsContainer = document.getElementById('new-comment-target-results');
+                const targetTable = document.getElementById('new-comment-target-table');
+                const keyword = searchInput ? searchInput.value.trim() : '';
+                const selectedTable = targetTable ? targetTable.value : '';
+
+                if (!resultsContainer) return;
+                if (!keyword) {
+                    resultsContainer.innerHTML = '<div class="secondary-text small-text">検索キーワードを入力してください</div>';
+                    return;
+                }
+
+                resultsContainer.innerHTML = '<div class="row tiny-space middle-align secondary-text small-text"><progress class="circle indeterminate small"></progress><span>検索中...</span></div>';
+                const tables = selectedTable ? [selectedTable] : ['tasks', 'plans', 'directories', 'skills', 'members'];
+                App.utils.entitySearch.searchAcross(keyword, { tables, forceRefresh: true, limit: 100 })
+                    .then(results => {
+                        this.searchResults = (results || []).map(item => ({
+                            table: item.table,
+                            id: item.id,
+                            name: item.name || '',
+                            displayId: item.display_id || null
+                        }));
+                        this.renderSearchResults();
+                    })
+                    .catch(error => {
+                        console.error('[NewComment] Search error:', error);
+                        resultsContainer.innerHTML = '<div class="secondary-text small-text">検索中にエラーが発生しました</div>';
+                    });
+            },
+
+            renderSearchResults: function () {
+                const resultsContainer = document.getElementById('new-comment-target-results');
+                if (!resultsContainer) return;
+                if (!this.searchResults.length) {
+                    resultsContainer.innerHTML = '<div class="secondary-text small-text">対象が見つかりません</div>';
+                    return;
+                }
+
+                resultsContainer.innerHTML = this.searchResults.map(item => {
+                    const tableLabel = App.utils.entitySearch.getLabel(item.table);
+                    const displayId = item.displayId ? `#${item.displayId}` : '';
+                    const title = escapeHtml(item.name || '(名称なし)');
+                    return `
+                        <button class="transparent border small-round row tiny-space middle-align small-padding bottom-margin"
+                            onclick="App.modals.newComment.selectTarget('${escapeHtmlAttribute(item.table)}','${escapeHtmlAttribute(item.id)}','${escapeHtmlAttribute(item.name || '')}','${escapeHtmlAttribute(item.displayId || '')}')">
+                            <span class="chip small border">${tableLabel}</span>
+                            <span class="font-number">${displayId}</span>
+                            <span class="small-text">${title}</span>
+                        </button>
+                    `;
+                }).join('');
+            },
+
+            selectTarget: function (table, id, name, displayId) {
+                if (this.isContextFixed) return;
+                this.relatedTable = table;
+                this.relatedId = id;
+                this.relatedLabel = this._buildLabel(table, id, name, displayId);
+                const selected = document.getElementById('new-comment-target-selected');
+                if (selected) {
+                    selected.innerHTML = `<i class="small">check_circle</i><span>${escapeHtml(this.relatedLabel)}</span>`;
+                }
+            },
+
+            _tableLabel: function (table) {
+                return App.utils.entitySearch.getLabel(table);
+            },
+
+            _buildLabel: function (table, id, name, displayId) {
+                const tableLabel = this._tableLabel(table);
+                const num = displayId ? `#${displayId}` : '';
+                const text = name || '';
+                if (num && text) return `${tableLabel} ${num} ${text}`;
+                if (num) return `${tableLabel} ${num}`;
+                if (text) return `${tableLabel} ${text}`;
+                return `${tableLabel}`;
+            },
+
+            /**
+             * コメントを保存
+             */
+            save: function () {
+                const contentField = document.getElementById('new-comment-content');
+                const content = contentField ? contentField.value.trim() : '';
+
+                if (!content) {
+                    alert('コメントの内容を入力してください');
+                    return;
+                }
+
+                if (!this.relatedId) {
+                    alert('コメント対象を選択してください');
+                    return;
+                }
+
+                const relatedTable = this.relatedTable;
+                const relatedId = this.relatedId;
+
+                // タスク詳細モーダル内のコメントはDB即時反映せず、保存待ちとしてキューに積む
+                if (relatedTable === 'tasks' && App.modals.taskDetail && App.modals.taskDetail.currentId === relatedId && App.modals.taskDetail.queuePendingComment) {
+                    App.modals.taskDetail.queuePendingComment(content);
+                    this.close();
+                    return;
+                }
+                
+                // 即座にUIに反映（Optimistic UI Update）
+                const tempComment = {
+                    id: 'temp-' + Date.now(),
+                    content: content,
+                    related_table: relatedTable,
+                    related_id: relatedId,
+                    created_by: App.state.userId,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+                
+                // 各モーダルでコメントをUIに即座に追加
+                if (relatedTable === 'tasks' && App.modals.taskDetail && App.modals.taskDetail.currentId === relatedId) {
+                    App.modals.taskDetail.appendCommentToUI(tempComment);
+                }
+
+                if (relatedTable === 'members' && App.modals.memberDetail && App.modals.memberDetail.currentId === relatedId) {
+                    App.modals.memberDetail.appendCommentToUI(tempComment);
+                }
+
+                if (relatedTable === 'directories' && App.modals.directoryDetail && App.modals.directoryDetail.currentId === relatedId) {
+                    App.modals.directoryDetail.appendCommentToUI(tempComment);
+                }
+
+                if (relatedTable === 'skills' && App.modals.skillDetail && App.modals.skillDetail.currentId === relatedId) {
+                    App.modals.skillDetail.appendCommentToUI(tempComment);
+                }
+
+                if (relatedTable === 'plans' && App.modals.planDetail && App.modals.planDetail.currentId === relatedId) {
+                    App.modals.planDetail.appendCommentToUI(tempComment);
+                }
+                
+                this.close();
+                showSnackbar('コメントを作成しています...', 'info', 'top', 0);
+
+                // 非同期でDBに保存
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'insert', {
+                    content: content,
+                    related_table: relatedTable,
+                    related_id: relatedId
+                }, 'コメントを作成')
+                    .then(result => {
+                        if (!result || (Array.isArray(result) && result.length === 0)) {
+                            showSnackbar('コメントの作成に失敗しました', 'error');
+                            // 失敗時はUIから削除（ロールバック）
+                            if (relatedTable === 'tasks' && App.modals.taskDetail && App.modals.taskDetail.currentId === relatedId) {
+                                App.modals.taskDetail.loadComments(relatedId, true);
+                            }
+                            if (relatedTable === 'members' && App.modals.memberDetail && App.modals.memberDetail.currentId === relatedId) {
+                                App.modals.memberDetail.loadComments(relatedId, true);
+                            }
+                            if (relatedTable === 'directories' && App.modals.directoryDetail && App.modals.directoryDetail.currentId === relatedId) {
+                                App.modals.directoryDetail.loadComments(relatedId, true);
+                            }
+                            if (relatedTable === 'skills' && App.modals.skillDetail && App.modals.skillDetail.currentId === relatedId) {
+                                App.modals.skillDetail.loadComments(relatedId, true);
+                            }
+                            if (relatedTable === 'plans' && App.modals.planDetail && App.modals.planDetail.currentId === relatedId) {
+                                App.modals.planDetail.loadComments(relatedId, true);
+                            }
+                            return;
+                        }
+
+                        showSnackbar('コメントを作成しました', 'success');
+                        // tasksはOptimistic UIで反映済みのため、成功時の再読み込みは行わない
+                        if (relatedTable === 'members' && App.modals.memberDetail && App.modals.memberDetail.currentId === relatedId) {
+                            App.modals.memberDetail.loadComments(relatedId, true);
+                        }
+                        if (relatedTable === 'directories' && App.modals.directoryDetail && App.modals.directoryDetail.currentId === relatedId) {
+                            App.modals.directoryDetail.loadComments(relatedId, true);
+                        }
+                        if (relatedTable === 'skills' && App.modals.skillDetail && App.modals.skillDetail.currentId === relatedId) {
+                            App.modals.skillDetail.loadComments(relatedId, true);
+                        }
+                        if (relatedTable === 'plans' && App.modals.planDetail && App.modals.planDetail.currentId === relatedId) {
+                            App.modals.planDetail.loadComments(relatedId, true);
+                        }
+
+                    })
+                    .catch(error => {
+                        console.error('[NewComment] Save error:', error);
+                        App.utils.error.handle(error);
+                        // エラー時もUIから削除
+                        if (relatedTable === 'tasks' && App.modals.taskDetail && App.modals.taskDetail.currentId === relatedId) {
+                            App.modals.taskDetail.loadComments(relatedId, true);
+                        }
+                        if (relatedTable === 'members' && App.modals.memberDetail && App.modals.memberDetail.currentId === relatedId) {
+                            App.modals.memberDetail.loadComments(relatedId, true);
+                        }
+                        if (relatedTable === 'directories' && App.modals.directoryDetail && App.modals.directoryDetail.currentId === relatedId) {
+                            App.modals.directoryDetail.loadComments(relatedId, true);
+                        }
+                        if (relatedTable === 'skills' && App.modals.skillDetail && App.modals.skillDetail.currentId === relatedId) {
+                            App.modals.skillDetail.loadComments(relatedId, true);
+                        }
+                        if (relatedTable === 'plans' && App.modals.planDetail && App.modals.planDetail.currentId === relatedId) {
+                            App.modals.planDetail.loadComments(relatedId, true);
+                        }
+                    });
+            }
+        };
+    })();
+</script>

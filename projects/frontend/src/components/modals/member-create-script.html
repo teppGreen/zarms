@@ -1,0 +1,87 @@
+<script>
+    (function () {
+        App.modals.newMember = {
+
+            open: function () {
+                this._resetForm();
+                const dialog = document.getElementById('modal-new-member');
+                if (dialog) {
+                    appUi(dialog, true);
+                    setTimeout(function () {
+                        const nameInput = document.getElementById('new-member-name-input');
+                        if (nameInput) nameInput.focus();
+                    }, 80);
+                }
+            },
+
+            close: function () {
+                const dialog = document.getElementById('modal-new-member');
+                if (dialog) appUi(dialog, false);
+            },
+
+            create: async function () {
+                const name = (document.getElementById('new-member-name-input')?.value || '').trim();
+                const displayName = (document.getElementById('new-member-display-name-input')?.value || '').trim();
+                const email = (document.getElementById('new-member-email-input')?.value || '').trim();
+                const slackUrl = (document.getElementById('new-member-slack-url-input')?.value || '').trim();
+                const photoUrl = (document.getElementById('new-member-photo-url-input')?.value || '').trim();
+                const isActive = document.getElementById('new-member-is-active-input')?.checked !== false;
+                const remark = (document.getElementById('new-member-remark-input')?.value || '').trim();
+
+                const errorEl = document.getElementById('new-member-error');
+                const createBtn = document.getElementById('new-member-create-btn');
+
+                // バリデーション
+                if (!name) {
+                    if (errorEl) { errorEl.textContent = '氏名は必須です'; errorEl.style.display = ''; }
+                    return;
+                }
+                if (!email) {
+                    if (errorEl) { errorEl.textContent = 'メールアドレスは必須です'; errorEl.style.display = ''; }
+                    return;
+                }
+
+                if (errorEl) errorEl.style.display = 'none';
+                if (createBtn) createBtn.disabled = true;
+
+                try {
+                    const dataObject = {
+                        name: name,
+                        display_name: displayName || name,
+                        email: email,
+                        slack_profile_url: slackUrl || null,
+                        profile_photo_url: photoUrl || null,
+                        is_active: isActive,
+                        remark: remark || null
+                    };
+
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'insert', dataObject, null, false);
+
+                    // キャッシュをクリアして再取得
+                    await loadAllData();
+
+                    showSnackbar('人物を登録しました', 'success');
+                    this.close();
+
+                } catch (err) {
+                    console.error('[newMember] 登録エラー:', err);
+                    if (errorEl) { errorEl.textContent = '登録に失敗しました: ' + (err.message || err); errorEl.style.display = ''; }
+                } finally {
+                    if (createBtn) createBtn.disabled = false;
+                }
+            },
+
+            _resetForm: function () {
+                const ids = ['new-member-name-input', 'new-member-display-name-input', 'new-member-email-input', 'new-member-slack-url-input', 'new-member-photo-url-input', 'new-member-remark-input'];
+                ids.forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (el) el.value = '';
+                });
+                const cb = document.getElementById('new-member-is-active-input');
+                if (cb) cb.checked = true;
+                const err = document.getElementById('new-member-error');
+                if (err) err.style.display = 'none';
+            }
+        };
+    })();
+</script>

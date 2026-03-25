@@ -1,0 +1,187 @@
+<script>
+    (function () {
+        if (!App.utils.commentManager) {
+            App.utils.commentManager = {};
+        }
+
+        Object.assign(App.utils.commentManager, {
+            /**
+             * コメントを読み込んで描画する
+             * @param {Object} options
+             * @param {string} options.relatedTable
+             * @param {string} options.relatedId
+             * @param {string} options.containerId
+             * @param {boolean} [options.skipLoadingCache]
+             * @param {Function} options.isCurrent
+             * @param {Function} options.onRender
+             * @param {string} [options.logPrefix]
+             */
+            loadComments: function (options) {
+                if (!options || !options.relatedTable || !options.relatedId || !options.containerId || !options.isCurrent || !options.onRender) {
+                    return;
+                }
+
+                const relatedTable = options.relatedTable;
+                const relatedId = options.relatedId;
+                const containerId = options.containerId;
+                const skipLoadingCache = options.skipLoadingCache === true;
+                const isCurrent = options.isCurrent;
+                const onRender = options.onRender;
+                const logPrefix = options.logPrefix || 'CommentManager';
+
+                const commentsList = document.getElementById(containerId);
+                if (commentsList) {
+                    commentsList.innerHTML = '<div class="small-padding center row small-space"><progress class="circle indeterminate small"></progress><span class="small-text">読み込み中</span></div>';
+                }
+
+                const query = {
+                    where: {
+                        related_table: ['=', relatedTable],
+                        related_id: ['=', relatedId]
+                    },
+                    orderBy: {
+                        created_at: 'desc'
+                    }
+                };
+
+                callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, skipLoadingCache)
+                    .then(function (results) {
+                        if (!isCurrent()) return;
+
+                        const comments = results && results.data ? results.data : (results || []);
+                        onRender(comments);
+
+                        if (results && results.isCached) {
+                            callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.COMMENTS, 'select', query, null, true)
+                                .then(function (refreshedResults) {
+                                    if (!isCurrent()) return;
+                                    const refreshedComments = refreshedResults && refreshedResults.data ? refreshedResults.data : (refreshedResults || []);
+                                    onRender(refreshedComments);
+                                });
+                        }
+                    })
+                    .catch(function (error) {
+                        console.error('[' + logPrefix + '] コメント読み込みエラー:', error);
+                        if (isCurrent() && commentsList) {
+                            commentsList.innerHTML = '<p class="error-text padding">コメントの読み込みに失敗しました</p>';
+                        }
+                    });
+            },
+
+            /**
+             * コメント一覧を描画する
+             * @param {Object} options
+             * @param {string} options.containerId
+             * @param {Array} options.comments
+             * @param {Function} [options.escapeText]
+             * @param {Function} [options.escapeUrl]
+             * @param {boolean} [options.useLegacyCreatorFields]
+             */
+            renderComments: function (options) {
+                if (!options || !options.containerId) return;
+
+                const container = document.getElementById(options.containerId);
+                if (!container) return;
+
+                const comments = options.comments || [];
+                const escapeText = options.escapeText || function (value) { return escapeHtml(value || ''); };
+                const escapeUrl = options.escapeUrl || function (value) { return escapeHtml(value || '#'); };
+                const useLegacyCreatorFields = options.useLegacyCreatorFields === true;
+
+                if (!comments || comments.length === 0) {
+                    container.innerHTML = '<p>コメントはありません</p>';
+                    return;
+                }
+
+                const members = App.state.data.members || [];
+                container.innerHTML = comments.map(function (comment, index) {
+                    const creator = members.find(function (member) {
+                        return member.id === comment.created_by;
+                    });
+
+                    const creatorName = creator
+                        ? (creator.display_name || '不明')
+                        : (useLegacyCreatorFields ? (comment.creator_display_name || '不明') : '不明');
+                    const creatorPhoto = creator
+                        ? (creator.profile_photo_url || '')
+                        : (useLegacyCreatorFields ? (comment.creator_profile_photo_url || '') : '');
+                    const creatorSlackProfileUrl = creator
+                        ? (creator.slack_profile_url || '#')
+                        : (useLegacyCreatorFields ? (comment.creator_slack_profile_url || '#') : '#');
+
+                    const creatorIcon = creatorPhoto
+                        ? '<img src="' + creatorPhoto + '" alt="' + escapeText(creatorName) + '" class="circle tiny">'
+                        : '<i class="tiny">account_circle</i>';
+
+                    const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
+                    const hr = index > 0 ? '<hr class="max small-margin">' : '';
+
+                    return '' +
+                        hr +
+                        '<div class="small-padding">' +
+                        '<div class="row tiny-space">' +
+                        '<a href="' + escapeUrl(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '</a>' +
+                        '<div class="max row tiny-space">' +
+                        '<span class="bold small-text">' + escapeText(creatorName) + '</span>' +
+                        '<span class="small-text secondary-text">' + createdAt + '</span>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="tiny-space"></div>' +
+                        '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '</p>' +
+                        '</div>';
+                }).join('');
+            },
+
+            /**
+             * コメントを先頭に追加する
+             * @param {Object} options
+             * @param {string} options.containerId
+             * @param {Object} options.comment
+             * @param {Function} [options.escapeText]
+             * @param {Function} [options.escapeUrl]
+             */
+            appendCommentToUI: function (options) {
+                if (!options || !options.containerId || !options.comment) return;
+
+                const container = document.getElementById(options.containerId);
+                if (!container) return;
+
+                const comment = options.comment;
+                const escapeText = options.escapeText || function (value) { return escapeHtml(value || ''); };
+                const escapeUrl = options.escapeUrl || function (value) { return escapeHtml(value || '#'); };
+
+                const members = App.state.data.members || [];
+                const creator = members.find(function (member) {
+                    return member.id === comment.created_by;
+                });
+                const creatorName = creator ? (creator.display_name || '不明') : '不明';
+                const creatorPhoto = creator ? (creator.profile_photo_url || '') : '';
+                const creatorSlackProfileUrl = creator ? (creator.slack_profile_url || '#') : '#';
+                const createdAt = formatDateTimeForDisplay(comment.created_at, 'MM/dd HH:mm');
+
+                const creatorIcon = creatorPhoto
+                    ? '<img src="' + creatorPhoto + '" alt="' + escapeText(creatorName) + '" class="circle tiny">'
+                    : '<i class="tiny">account_circle</i>';
+
+                const newCommentHtml = '' +
+                    '<div class="small-padding">' +
+                    '<div class="row tiny-space">' +
+                    '<a href="' + escapeUrl(creatorSlackProfileUrl) + '" target="_blank">' + creatorIcon + '</a>' +
+                    '<div class="max row tiny-space">' +
+                    '<span class="bold small-text">' + escapeText(creatorName) + '</span>' +
+                    '<span class="small-text secondary-text">' + createdAt + '</span>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="tiny-space"></div>' +
+                    '<p class="small-text no-margin tiny-line">' + escapeHtmlWithLineBreaks(comment.content) + '</p>' +
+                    '</div>';
+
+                if (container.innerHTML.indexOf('コメントはありません') >= 0) {
+                    container.innerHTML = newCommentHtml;
+                } else {
+                    container.innerHTML = newCommentHtml + '<hr class="max small-margin">' + container.innerHTML;
+                }
+            }
+        });
+    })();
+</script>

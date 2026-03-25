@@ -1,0 +1,147 @@
+<!-- タスクフィルタモーダル -->
+<dialog id="modal-filter-task" class="padding no-scroll">
+    <nav class="bottom-margin small-padding">
+        <h5 class="bold">タスクのフィルタ</h5>
+        <div class="max"></div>
+        <button class="circle transparent" onclick="appUi('#modal-filter-task')">
+            <i>close</i>
+        </button>
+    </nav>
+
+    <div class="grid background large-width medium-height scroll padding tiny-space no-margin small-round">
+        <!-- Title Filter -->
+        <div class="s12 m12 l12 extra-line">
+            <span class="bold small-text">タスク名</span>
+            <div class="grid tiny-space no-margin">
+                <div class="s8 field border small prefix">
+                    <i class="">search</i>
+                    <input type="text" id="filter-title-input" placeholder="キーワード">
+                </div>
+                <div class="s4 field border small">
+                    <select id="filter-title-match-select">
+                        <option value="contains">含む</option>
+                        <option value="not_contains">含まない</option>
+                        <option value="starts_with">前方一致</option>
+                        <option value="ends_with">後方一致</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <hr class="max s12">
+
+        <!-- Member Filters -->
+        <div class="s12 m12 l12 extra-line">
+            <span id="filter-label-assignee-section" class="bold small-text"></span>
+            <!-- Created By -->
+            <div class="row tiny-space no-margin">
+                <span id="filter-label-created-by" class="small"></span>
+                <button class="chip fill" onclick="App.modals.filterTask.selectMembers('created_by')">
+                    <i>person_add</i>
+                    <span>追加</span>
+                </button>
+                <div id="filter-members-created-by" class="row tiny-space wrap top-align">
+                    <!-- Chips will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Processed By -->
+            <div class="row tiny-space no-margin">
+                <span id="filter-label-processed-by" class="small"></span>
+                <button class="chip fill" onclick="App.modals.filterTask.selectMembers('processed_by')">
+                    <i>person_add</i>
+                    <span>追加</span>
+                </button>
+                <div id="filter-members-processed-by" class="row tiny-space wrap top-align">
+                    <!-- Chips will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Reviewed By -->
+            <div class="row tiny-space no-margin">
+                <span id="filter-label-reviewed-by" class="small"></span>
+                <button class="chip fill" onclick="App.modals.filterTask.selectMembers('reviewed_by')">
+                    <i>person_add</i>
+                    <span>追加</span>
+                </button>
+                <div id="filter-members-reviewed-by" class="row tiny-space wrap top-align">
+                    <!-- Chips will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Received By -->
+            <div class="row tiny-space no-margin">
+                <span id="filter-label-received-by" class="small"></span>
+                <button class="chip fill" onclick="App.modals.filterTask.selectMembers('received_by')">
+                    <i>person_add</i>
+                    <span>追加</span>
+                </button>
+                <div id="filter-members-received-by" class="row tiny-space wrap top-align">
+                    <!-- Chips will be rendered here -->
+                </div>
+            </div>
+
+            <div class="row">
+                <label class="checkbox">
+                    <input type="checkbox" id="filter-processed-by-include-list-members">
+                    <span id="filter-label-processed-by-include-list-members"></span>
+                </label>
+            </div>
+            <div class="row">
+                <label class="checkbox">
+                    <input type="checkbox" id="filter-ball-holder-only">
+                    <span>設定した担当者がボールを持っているタスクのみ表示</span>
+                </label>
+            </div>
+        </div>
+
+        <hr class="max s12">
+
+        <!-- Date Filters -->
+        <div class="s12 m12 l12 extra-line">
+            <span class="bold small-text">期間</span>
+            <div class="grid no-margin no-space">
+                <div class="s5 field border small">
+                    <input type="datetime-local" id="filter-starts-at-from" placeholder=" ">
+                </div>
+                <div class="s2 middle-align center-align">
+                    <span>〜</span>
+                </div>
+                <div class="s5 field border small">
+                    <input type="datetime-local" id="filter-ends-at-to" placeholder=" ">
+                </div>
+            </div>
+            <div class="row">
+                <label class="checkbox">
+                    <input type="checkbox" id="filter-is-overdue">
+                    <span>タスクの｢終了日時｣が現在を超過しているもののみ表示</span>
+                </label>
+            </div>
+        </div>
+
+        <hr class="max s12">
+
+        <!-- Board Filter -->
+        <div class="s12 m12 l12 extra-line">
+            <span class="bold small-text">ボード</span>
+            <div class="row tiny-space no-margin">
+                <button class="chip fill" onclick="App.modals.filterTask.selectBoards()">
+                    <i>create_new_folder</i>
+                    <span>追加</span>
+                </button>
+                <div id="filter-boards" class="row wrap">
+                    <!-- Board chips will be rendered here -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <nav class="right-align small-padding">
+        <a onclick="App.modals.filterTask.resetAll()"><span>リセット</span></a>
+        <div class="max"></div>
+        <button class="border" onclick="appUi('#modal-filter-task',false)">キャンセル</button>
+        <button onclick="App.modals.filterTask.apply()">適用</button>
+    </nav>
+</dialog>
+

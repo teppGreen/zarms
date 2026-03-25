@@ -1,0 +1,221 @@
+<!-- メンバー詳細モーダル -->
+<dialog id="modal-detail-member" class="surface-container modal padding max">
+    <div class="grid small-padding bottom-margin">
+        <div class="s12 m8">
+            <div class="row tiny-space middle-align">
+                <h5 class="bold no-margin">人物詳細</h5>
+                <span id="member-detail-status-chip" class="chip small"></span>
+                <span class="small-text secondary-text">保存前の変更は「変更を保存」まで確定されません</span>
+            </div>
+        </div>
+        <div class="s12 m4">
+            <nav class="row right-align">
+                <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-email-input','email')" title="連絡先をコピー">content_copy</i>
+                <button class="circle transparent" onclick="App.modals.memberDetail.openNewComment()" title="コメントを作成">
+                    <i>add_comment</i>
+                </button>
+                <button class="circle transparent" onclick="App.modals.memberDetail.close()" title="閉じる">
+                    <i>close</i>
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <div class="grid small-padding tiny-space no-margin">
+        <div class="s12 m3 l3 background small-round padding">
+            <h6 class="bold small bottom-margin">基本情報</h6>
+
+            <div class="grid tiny-space no-margin bottom-margin">
+                <div class="s12 m6 field border label small suffix no-wrap no-margin">
+                    <input placeholder=" " type="text" id="member-detail-name-input">
+                    <label>氏名</label>
+                    <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-name-input')">content_copy</i>
+                </div>
+
+                <div class="s12 m6 field border label small suffix no-wrap no-margin">
+                    <input placeholder=" " type="text" id="member-detail-name-yomi-input">
+                    <label>氏名ヨミ</label>
+                    <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-name-yomi-input')">content_copy</i>
+                </div>
+
+                <div class="s12 m6 field border label small suffix no-wrap no-margin">
+                    <input placeholder=" " type="text" id="member-detail-display-name-input">
+                    <label>表示名</label>
+                    <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-display-name-input')">content_copy</i>
+                </div>
+
+                <div class="s12 m6 field border label small suffix no-wrap no-margin">
+                    <input placeholder=" " type="text" id="member-detail-display-name-yomi-input">
+                    <label>表示名ヨミ</label>
+                    <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-display-name-yomi-input')">content_copy</i>
+                </div>
+            </div>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="email" id="member-detail-email-input" readonly>
+                <label>メールアドレス</label>
+                <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-email-input','email')">content_copy</i>
+            </div>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="text" id="member-detail-system-role-key-input">
+                <label>システム権限</label>
+                <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-system-role-key-input')">content_copy</i>
+            </div>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="tel" id="member-detail-phone-number-input">
+                <label>電話番号</label>
+                <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-phone-number-input')">content_copy</i>
+            </div>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="date" id="member-detail-birthday-input">
+                <label>生年月日</label>
+                <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-birthday-input')">content_copy</i>
+            </div>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="text" id="member-detail-title-input">
+                <label>筆頭役職</label>
+                <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-title-input')">content_copy</i>
+            </div>
+
+            <label class="row padding no-margin bottom-margin">
+                <input type="checkbox" id="member-detail-is-active-input">
+                <span>在籍中（有効）</span>
+            </label>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <textarea placeholder=" " id="member-detail-remark-input" rows="2"></textarea>
+                <label>備考</label>
+                <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-remark-input')">content_copy</i>
+            </div>
+
+            <h6 class="bold small top-margin bottom-margin">連携リンク</h6>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="url" id="member-detail-website-url-input">
+                <label>ウェブサイトURL</label>
+                <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-website-url-input')">content_copy</i>
+            </div>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="url" id="member-detail-slack-url-input">
+                <label>SlackプロフィールURL</label>
+                <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-slack-url-input')">content_copy</i>
+            </div>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="text" id="member-detail-slack-tail-input" readonly>
+                <label>SlackプロフィールID（末尾11桁）</label>
+                <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-slack-tail-input','slackTail')">content_copy</i>
+            </div>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="url" id="member-detail-photo-file-url-input">
+                <label>プロフィール写真GファイルURL</label>
+                <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-photo-file-url-input')">content_copy</i>
+            </div>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="url" id="member-detail-photo-url-input">
+                <label>プロフィール写真URL</label>
+                <i class="front" onclick="App.modals.memberDetail.copyField('member-detail-photo-url-input')">content_copy</i>
+            </div>
+        </div>
+
+        <div class="s12 m6 l6 background small-round padding">
+            <nav class="center-align max tiny-space bottom-margin">
+                <nav class="tabbed small max" id="member-detail-tabs">
+                    <a class="active" data-ui="#member-detail-tab-profile">
+                        <span>プロフィール</span>
+                    </a>
+                    <a data-ui="#member-detail-tab-directories">
+                        <span>所属</span>
+                    </a>
+                    <a data-ui="#member-detail-tab-skills">
+                        <span>技能</span>
+                    </a>
+                </nav>
+            </nav>
+
+            <div id="member-detail-tab-profile" class="page medium-height active">
+                <div class="field border label small bottom-margin">
+                    <div id="member-description-editor" class="quill-editor"></div>
+                    <label>プロフィール説明</label>
+                </div>
+            </div>
+
+            <div id="member-detail-tab-directories" class="page medium-height scroll">
+                <div class="row tiny-space bottom-margin">
+                    <h6 class="bold small max">所属組織</h6>
+                    <button class="small round border" onclick="App.modals.memberDetail.openAddDirectory()">
+                        <i>add</i>
+                        <span>所属を追加</span>
+                    </button>
+                </div>
+                <div id="member-detail-directories-list"></div>
+            </div>
+
+            <div id="member-detail-tab-skills" class="page medium-height scroll">
+                <div class="row tiny-space bottom-margin">
+                    <h6 class="bold small max">技能</h6>
+                    <button class="small round border" onclick="App.modals.memberDetail.openAddSkill()">
+                        <i>add</i>
+                        <span>技能を追加</span>
+                    </button>
+                </div>
+                <div id="member-detail-skills-list"></div>
+            </div>
+        </div>
+
+        <div class="s12 m3 l3 background small-round padding">
+            <h6 class="bold small bottom-margin">監査情報</h6>
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="text" id="member-detail-created-by-input" readonly>
+                <label>作成者</label>
+                <button class="transparent circle" type="button" onclick="App.modals.memberDetail.copyField('member-detail-created-by-input')"><i>content_copy</i></button>
+            </div>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="text" id="member-detail-created-at-input" readonly>
+                <label>作成日時</label>
+                <button class="transparent circle" type="button" onclick="App.modals.memberDetail.copyField('member-detail-created-at-input')"><i>content_copy</i></button>
+            </div>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="text" id="member-detail-updated-by-input" readonly>
+                <label>最終更新者</label>
+                <button class="transparent circle" type="button" onclick="App.modals.memberDetail.copyField('member-detail-updated-by-input')"><i>content_copy</i></button>
+            </div>
+
+            <div class="field border label small suffix no-wrap bottom-margin">
+                <input placeholder=" " type="text" id="member-detail-updated-at-input" readonly>
+                <label>最終更新日時</label>
+                <button class="transparent circle" type="button" onclick="App.modals.memberDetail.copyField('member-detail-updated-at-input')"><i>content_copy</i></button>
+            </div>
+
+            <div class="center-align row tiny-space secondary-text small-text top-margin bottom-margin" id="member-detail-last-updated"></div>
+
+            <hr class="small-margin">
+
+            <div class="row tiny-space center-align bottom-margin">
+                <h6 class="bold small max no-margin">コメント</h6>
+                <button class="small round border" onclick="App.modals.memberDetail.openNewComment()">
+                    <i>add_comment</i>
+                    <span>追加</span>
+                </button>
+            </div>
+            <div class="scroll medium-height" id="member-comments-list"></div>
+        </div>
+    </div>
+
+    <p id="member-detail-error" class="error-text small-text small-padding" style="display: none;"></p>
+
+    <nav class="small-padding no-margin">
+        <div class="max"></div>
+        <button id="member-detail-discard-button" class="border large round error-text" onclick="App.modals.memberDetail.discard()">変更を破棄</button>
+        <button id="member-detail-primary-button" class="primary large round" onclick="App.modals.memberDetail.onPrimaryAction()">閉じる</button>
+    </nav>
+</dialog>

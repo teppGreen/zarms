@@ -1,0 +1,186 @@
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/beercss@4.0.19/dist/cdn/beer.min.css" integrity="sha512-52rOlkYYva4+izdKVYtiOmXsg+k9ILGm4Jw/tevyYXrimTLLpdyKqHMIZd+3oN4vbGXGL6zwlhoAOi2BfYtyig==" crossorigin="anonymous">
+<script type="module" src="https://cdn.jsdelivr.net/npm/beercss@4.0.19/dist/cdn/beer.min.js" integrity="sha512-camf4cjFhDL2aupsZ0SkVVuyG+UjMzfgXW3U3zHDVHzKJmYZO97RouY1hUbb3Ef/XaS4RNSvH7tu1tQttiXQkg==" crossorigin="anonymous"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:opsz,wght@17..18,600&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+
+<style>
+    :root,
+    body.light {
+        --primary: #2d3eff;
+        --on-primary: #ffffff;
+        --primary-container: #e0e0ff;
+        --on-primary-container: #000668;
+        --secondary: #5c5d72;
+        --on-secondary: #ffffff;
+        --secondary-container: #e1e0f9;
+        --on-secondary-container: #191a2c;
+        --tertiary: #78536b;
+        --on-tertiary: #ffffff;
+        --tertiary-container: #ffd7ef;
+        --on-tertiary-container: #2e1126;
+        --error: #ba1a1a;
+        --on-error: #ffffff;
+        --error-container: #ffdad6;
+        --on-error-container: #410002;
+        --background: #fffbff;
+        --on-background: #1b1b1f;
+        --surface: #fcf8fd;
+        --on-surface: #1b1b1f;
+        --surface-variant: #e3e1ec;
+        --on-surface-variant: #46464f;
+        --outline: #777680;
+        --outline-variant: #c7c5d0;
+        --shadow: #000000;
+        --scrim: #000000;
+        --inverse-surface: #303034;
+        --inverse-on-surface: #f3f0f4;
+        --inverse-primary: #bdc2ff;
+        --surface-dim: #dcd9de;
+        --surface-bright: #fcf8fd;
+        --surface-container-lowest: #ffffff;
+        --surface-container-low: #f6f2f7;
+        --surface-container: #f0edf1;
+        --surface-container-high: #eae7ec;
+        --surface-container-highest: #e4e1e6;
+    }
+
+    body.dark {
+        --primary: #bdc2ff;
+        --on-primary: #000fa3;
+        --primary-container: #0019e3;
+        --on-primary-container: #e0e0ff;
+        --secondary: #c4c4dd;
+        --on-secondary: #2d2f42;
+        --secondary-container: #444559;
+        --on-secondary-container: #e1e0f9;
+        --tertiary: #e7b9d5;
+        --on-tertiary: #45263c;
+        --tertiary-container: #5e3c53;
+        --on-tertiary-container: #ffd7ef;
+        --error: #ffb4ab;
+        --on-error: #690005;
+        --error-container: #93000a;
+        --on-error-container: #ffb4ab;
+        --background: #1b1b1f;
+        --on-background: #e4e1e6;
+        --surface: #131316;
+        --on-surface: #e4e1e6;
+        --surface-variant: #46464f;
+        --on-surface-variant: #c7c5d0;
+        --outline: #91909a;
+        --outline-variant: #46464f;
+        --shadow: #000000;
+        --scrim: #000000;
+        --inverse-surface: #e4e1e6;
+        --inverse-on-surface: #303034;
+        --inverse-primary: #2d3eff;
+        --surface-dim: #131316;
+        --surface-bright: #39393c;
+        --surface-container-lowest: #0e0e11;
+        --surface-container-low: #1b1b1f;
+        --surface-container: #1f1f23;
+        --surface-container-high: #2a2a2d;
+        --surface-container-highest: #353438;
+    }
+
+    :root {
+        --font: "Noto Sans JP", sans-serif;
+        --font-title: "Google Sans", sans-serif;
+        --font-number: "Roboto Mono", monospace;
+    }
+
+    .font-title {
+        font-family: var(--font-title);
+    }
+
+    .font-number {
+        font-family: var(--font-number);
+    }
+
+    /* Loading Shimmer */
+    .shimmer-loading {
+        background: linear-gradient(90deg,
+                var(--surface-variant) 25%,
+                var(--surface) 50%,
+                var(--surface-variant) 75%);
+        background-size: 200% 100%;
+        animation: shimmerMove 1.5s infinite linear;
+    }
+
+    @keyframes shimmer {
+        from {
+            transform: translateX(-200%);
+        }
+
+        to {
+            transform: translateX(200%);
+        }
+    }
+
+    @keyframes shimmerMove {
+        0% {
+            background-position: 200% 0;
+        }
+
+        100% {
+            background-position: -200% 0;
+        }
+    }
+
+    /* Quill Rich Text Editor - 共通スタイル */
+    .quill-editor .ql-editor a {
+        word-break: break-all !important;
+        overflow-wrap: anywhere !important;
+        white-space: pre-wrap !important;
+    }
+
+    .quill-editor .ql-tooltip {
+        z-index: 10005 !important;
+    }
+
+    .view-toggle-input {
+        background-color: var(--on-surface) !important;
+        border: none !important;
+    }
+
+    .members-tabulator-host {
+        width: 100%;
+        overflow: hidden;
+        background: var(--surface-container-low);
+    }
+
+    .members-tabulator-frame {
+        width: 100%;
+        border: 0;
+        display: block;
+        background: transparent;
+    }
+</style>
+
+<script>
+    (function () {
+        function applyTheme() {
+            if (!document.body) return; // bodyがまだ存在しない場合はスキップ
+            var theme = 'light'; // Default
+            // 端末の設定状況を取得できるか確認し、ダークモードが有効かチェック
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                theme = 'dark';
+            }
+            document.body.classList.remove('light', 'dark');
+            document.body.classList.add(theme);
+        }
+
+        // 初回適用
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', applyTheme);
+        } else {
+            applyTheme();
+        }
+
+        // 設定変更を監視
+        if (window.matchMedia) {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+        }
+    })();
+</script>

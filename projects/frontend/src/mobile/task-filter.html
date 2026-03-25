@@ -1,0 +1,258 @@
+<!-- モバイル版フィルタモーダル -->
+<dialog id="modal-mobile-filter" class="modal max">
+  <div class="surface padding small-round">
+    <!-- ヘッダー -->
+    <nav class="row">
+      <button class="circle transparent" onclick="App.modals.mobileFilter.close()">
+        <i>close</i>
+      </button>
+      <h6 class="max">フィルタ</h6>
+      <button class="circle transparent" onclick="App.modals.mobileFilter.reset()">
+        <i>refresh</i>
+      </button>
+    </nav>
+
+    <!-- フィルタ項目 -->
+    <div id="mobile-filter-content" class="top-margin">
+      <!-- ステータス -->
+      <fieldset class="border">
+        <legend>ステータス</legend>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-status-todo" value="TODO">
+          <span>未着手</span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-status-in-progress" value="IN_PROGRESS">
+          <span>進行中</span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-status-in-review" value="IN_REVIEW">
+          <span>確認中</span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-status-done" value="DONE">
+          <span>完了</span>
+        </label>
+      </fieldset>
+
+      <!-- 優先度 -->
+      <fieldset class="border top-margin">
+        <legend>優先度</legend>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-priority-low" value="LOW">
+          <span>低</span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-priority-medium" value="MEDIUM">
+          <span>中</span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-priority-high" value="HIGH">
+          <span>高</span>
+        </label>
+      </fieldset>
+
+      <!-- 担当者 -->
+      <fieldset class="border top-margin">
+        <legend>担当者</legend>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-assignee-created-by">
+          <span id="mobile-filter-label-created-by"></span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-assignee-processed-by">
+          <span id="mobile-filter-label-processed-by"></span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-assignee-reviewed-by">
+          <span id="mobile-filter-label-reviewed-by"></span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-assignee-received-by">
+          <span id="mobile-filter-label-received-by"></span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="filter-ball-holder-only">
+          <span>自分がボールを持っているタスクのみ表示</span>
+        </label>
+      </fieldset>
+
+      <!-- 適用ボタン -->
+      <div class="top-margin">
+        <button class="responsive primary extra" onclick="App.modals.mobileFilter.apply()">
+          <i>done</i>
+          <span>適用</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  (function () {
+    App.modals.mobileFilter = {
+      applyAssigneeLabels: function () {
+        const roleLabels = {
+          'mobile-filter-label-created-by': KEY_LABELS.ASIGNEE_TYPE.CREATED_BY,
+          'mobile-filter-label-processed-by': KEY_LABELS.ASIGNEE_TYPE.PROCESSED_BY,
+          'mobile-filter-label-reviewed-by': KEY_LABELS.ASIGNEE_TYPE.REVIEWED_BY,
+          'mobile-filter-label-received-by': KEY_LABELS.ASIGNEE_TYPE.RECEIVED_BY
+        };
+
+        Object.keys(roleLabels).forEach(id => {
+          const element = document.getElementById(id);
+          if (element) {
+            element.textContent = roleLabels[id];
+          }
+        });
+      },
+
+      /**
+       * フィルタモーダルを開く
+       */
+      open: function () {
+        console.log('[MobileFilter] Opening modal');
+
+        const dialog = document.getElementById('modal-mobile-filter');
+        if (!dialog) {
+          console.error('[MobileFilter] Dialog not found');
+          return;
+        }
+
+        this.applyAssigneeLabels();
+
+        // 現在のフィルタ設定を反映
+        this.loadCurrentFilters();
+
+        ui(dialog);
+      },
+
+      /**
+       * 現在のフィルタ設定を読み込み
+       */
+      loadCurrentFilters: function () {
+        const filters = App.pages.mobileBoard.currentFilters;
+
+        // ステータス
+        document.getElementById('filter-status-todo').checked = filters.status.includes('TODO');
+        document.getElementById('filter-status-in-progress').checked = filters.status.includes('IN_PROGRESS');
+        document.getElementById('filter-status-in-review').checked = filters.status.includes('IN_REVIEW');
+        document.getElementById('filter-status-done').checked = filters.status.includes('DONE');
+
+        // 優先度
+        document.getElementById('filter-priority-low').checked = filters.priority.includes('LOW');
+        document.getElementById('filter-priority-medium').checked = filters.priority.includes('MEDIUM');
+        document.getElementById('filter-priority-high').checked = filters.priority.includes('HIGH');
+
+        // 担当者ロール
+        const roles = filters.assigneeRoles || {};
+        document.getElementById('filter-assignee-created-by').checked = !!roles.created_by;
+        document.getElementById('filter-assignee-processed-by').checked = !!roles.processed_by;
+        document.getElementById('filter-assignee-reviewed-by').checked = !!roles.reviewed_by;
+        document.getElementById('filter-assignee-received-by').checked = !!roles.received_by;
+
+        // ボールホルダー
+        document.getElementById('filter-ball-holder-only').checked = !!filters.ballHolderOnly;
+      },
+
+      /**
+       * フィルタを適用
+       */
+      apply: function () {
+        const statusFilters = [];
+        if (document.getElementById('filter-status-todo')?.checked) {
+          statusFilters.push('TODO');
+        }
+        if (document.getElementById('filter-status-in-progress')?.checked) {
+          statusFilters.push('IN_PROGRESS');
+        }
+        if (document.getElementById('filter-status-in-review')?.checked) {
+          statusFilters.push('IN_REVIEW');
+        }
+        if (document.getElementById('filter-status-done')?.checked) {
+          statusFilters.push('DONE');
+        }
+
+        const priorityFilters = [];
+        if (document.getElementById('filter-priority-low')?.checked) {
+          priorityFilters.push('LOW');
+        }
+        if (document.getElementById('filter-priority-medium')?.checked) {
+          priorityFilters.push('MEDIUM');
+        }
+        if (document.getElementById('filter-priority-high')?.checked) {
+          priorityFilters.push('HIGH');
+        }
+
+        const assigneeRoles = {
+          created_by: !!document.getElementById('filter-assignee-created-by')?.checked,
+          processed_by: !!document.getElementById('filter-assignee-processed-by')?.checked,
+          reviewed_by: !!document.getElementById('filter-assignee-reviewed-by')?.checked,
+          received_by: !!document.getElementById('filter-assignee-received-by')?.checked
+        };
+
+        const ballHolderOnly = !!document.getElementById('filter-ball-holder-only')?.checked;
+
+        // フィルタを更新
+        App.pages.mobileBoard.currentFilters.status = statusFilters;
+        App.pages.mobileBoard.currentFilters.priority = priorityFilters;
+        App.pages.mobileBoard.currentFilters.assigneeRoles = assigneeRoles;
+        App.pages.mobileBoard.currentFilters.ballHolderOnly = ballHolderOnly;
+
+        // タスク一覧を再描画
+        App.pages.mobileBoard.renderTasks(App.pages.mobileBoard.cachedTasks);
+
+        showSnackbar('フィルタを適用しました');
+
+        // モーダルを閉じる
+        this.close();
+      },
+
+      /**
+       * フィルタをリセット
+       */
+      reset: function () {
+        // デフォルトの状態に戻す（DONE以外をチェック）
+        document.getElementById('filter-status-todo').checked = true;
+        document.getElementById('filter-status-in-progress').checked = true;
+        document.getElementById('filter-status-in-review').checked = true;
+        document.getElementById('filter-status-done').checked = false;
+        document.getElementById('filter-priority-low').checked = false;
+        document.getElementById('filter-priority-medium').checked = false;
+        document.getElementById('filter-priority-high').checked = false;
+        document.getElementById('filter-assignee-created-by').checked = false;
+        document.getElementById('filter-assignee-processed-by').checked = false;
+        document.getElementById('filter-assignee-reviewed-by').checked = false;
+        document.getElementById('filter-assignee-received-by').checked = false;
+        document.getElementById('filter-ball-holder-only').checked = false;
+
+        // フィルタをデフォルトに戻す
+        App.pages.mobileBoard.currentFilters.status = ['TODO', 'IN_PROGRESS', 'IN_REVIEW'];
+        App.pages.mobileBoard.currentFilters.priority = [];
+        App.pages.mobileBoard.currentFilters.assigneeRoles = {
+          created_by: false,
+          processed_by: false,
+          reviewed_by: false,
+          received_by: false
+        };
+        App.pages.mobileBoard.currentFilters.ballHolderOnly = false;
+
+        // タスク一覧を再描画
+        App.pages.mobileBoard.renderTasks(App.pages.mobileBoard.cachedTasks);
+
+        showSnackbar('フィルタをリセットしました');
+      },
+
+      /**
+       * モーダルを閉じる
+       */
+      close: function () {
+        const dialog = document.getElementById('modal-mobile-filter');
+        if (dialog) {
+          ui(dialog);
+        }
+        return true;
+      }
+    };
+  })();
+</script>

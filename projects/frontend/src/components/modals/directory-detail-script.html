@@ -1,0 +1,934 @@
+<script>
+    (function () {
+        App.modals.directoryDetail = {
+            currentId: null,
+            isSaving: false,
+            isDirty: false,
+            assignmentRoleOptions: ['出展代表者', '出展副代表者', '管理代表者', '管理副代表者', 'ステージ出演者', 'その他運営者'],
+            assignmentColumnVisibility: null,
+
+            open: function (directoryId, skipUrlUpdate = false) {
+                if (!directoryId) return;
+
+                const requestId = String(directoryId);
+                const directory = (App.state.data.directories || []).find(function (item) {
+                    const value = item ? (item.id || item.directory_id || null) : null;
+                    return value !== undefined && value !== null && String(value) === requestId;
+                });
+                if (!directory) return;
+
+                const directoryKey = directory.id || directory.directory_id;
+                this.currentId = directoryKey;
+                this.isSaving = false;
+                this.isDirty = false;
+                this.assignmentColumnVisibility = this._createDefaultAssignmentColumnVisibility();
+                this._populateSelects(directoryKey);
+                this._render(directory);
+                this.loadComments(directoryKey);
+                appUi('#modal-detail-directory', true);
+                this._updateUrlOnOpen(directoryKey, skipUrlUpdate);
+                this._bindEscClose();
+            },
+
+            close: function (options = {}) {
+                const skipDirtyCheck = options.skipDirtyCheck === true;
+                const skipUrlUpdate = options.skipUrlUpdate === true;
+                const reason = options.reason || 'user';
+
+                if (!skipDirtyCheck && this.isDirty && !this.isSaving) {
+                    const message = reason === 'escape'
+                        ? '未保存の変更があります。変更を破棄して閉じますか？'
+                        : '変更を破棄しますか？';
+                    const proceed = confirm(message);
+                    if (!proceed) return false;
+                }
+                appUi('#modal-detail-directory', false);
+                this._updateUrlOnClose(skipUrlUpdate);
+                this.currentId = null;
+                this.isSaving = false;
+                this.isDirty = false;
+                this.assignmentColumnVisibility = this._createDefaultAssignmentColumnVisibility();
+                return true;
+            },
+
+            save: async function () {
+                if (!this.currentId) return;
+                if (this.isSaving) return;
+
+                const errorEl = document.getElementById('directory-detail-error');
+                const saveBtn = document.getElementById('directory-detail-save-btn');
+                const name = (document.getElementById('directory-detail-name-input')?.value || '').trim();
+                const typeKey = document.getElementById('directory-detail-type-select')?.value || null;
+                const parentId = document.getElementById('directory-detail-parent-select')?.value || null;
+                const slackUrl = this._normalizeSlackUrl(document.getElementById('directory-detail-slack-url-input')?.value || '') || null;
+                const gfolderId = (document.getElementById('directory-detail-gfolder-id-input')?.value || '').trim() || null;
+                const isActive = document.getElementById('directory-detail-is-active-input')?.checked !== false;
+                const remark = (document.getElementById('directory-detail-remark-input')?.value || '').trim() || null;
+
+                if (!name) {
+                    this._showValidationError('組織名は必須です');
+                    return;
+                }
+
+                if (slackUrl && !this._isValidSlackChannelUrl(slackUrl)) {
+                    this._showValidationError('SlackチャンネルURLの形式が正しくありません');
+                    return;
+                }
+                const slackInput = document.getElementById('directory-detail-slack-url-input');
+                if (slackInput) slackInput.value = slackUrl || '';
+
+                if (parentId && this._hasParentCycle(parentId, this.currentId)) {
+                    this._showValidationError('親組織に自身または子孫組織は設定できません');
+                    return;
+                }
+                if (this._hasDuplicateSiblingName(name, parentId, this.currentId)) {
+                    this._showValidationError('同じ親組織配下に同名の組織があります');
+                    return;
+                }
+
+                if (errorEl) errorEl.style.display = 'none';
+                this.isSaving = true;
+                this._setSaveState(true, '保存中');
+                showSnackbar('ディレクトリを保存しています...', 'info', 'top', 0);
+
+                const updateSet = {
+                    name: name,
+                    directory_type_key: typeKey || null,
+                    parent_directory_id: parentId || null,
+                    slack_channel_url: slackUrl,
+                    gfolder_id: gfolderId,
+                    is_active: isActive,
+                    remark: remark
+                };
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORIES, 'update', {
+                        where: { id: ['=', this.currentId] },
+                        set: updateSet
+                    }, 'ディレクトリを更新');
+
+                    const target = (App.state.data.directories || []).find(function (item) { return item.id === App.modals.directoryDetail.currentId; });
+                    if (target) {
+                        Object.assign(target, updateSet);
+                    }
+
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+
+                    this._setFooterStatus('保存が完了しました。画面を閉じます。');
+                    showSnackbar('ディレクトリを更新しました', 'success');
+                    this.isDirty = false;
+                    this.close();
+                } catch (err) {
+                    console.error('[directoryDetail] save failed', err);
+                    showSnackbar('更新に失敗しました', 'error');
+                    if (errorEl) {
+                        errorEl.textContent = '更新に失敗しました';
+                        errorEl.style.display = '';
+                    }
+                    this._setSaveState(false, '保存失敗');
+                    this._setFooterStatus('保存に失敗しました。入力内容を確認して再試行してください。');
+                } finally {
+                    this.isSaving = false;
+                    if (saveBtn) saveBtn.disabled = false;
+                    if (errorEl && errorEl.style.display === 'none') {
+                        this._setSaveState(false);
+                    }
+                }
+            },
+
+            openNewComment: function () {
+                if (!this.currentId) return;
+                if (!App.modals.newComment) return;
+
+                if (App.modals.newComment.openFor) {
+                    App.modals.newComment.openFor('directories', this.currentId);
+                    return;
+                }
+
+                App.modals.newComment.open(this.currentId);
+            },
+
+            loadComments: function (directoryId, skipLoadingCache = false) {
+                App.utils.commentManager.loadComments({
+                    relatedTable: 'directories',
+                    relatedId: directoryId,
+                    containerId: 'directory-comments-list',
+                    skipLoadingCache: skipLoadingCache,
+                    isCurrent: () => this.currentId === directoryId,
+                    onRender: (comments) => this.renderComments(comments),
+                    logPrefix: 'DirectoryDetail'
+                });
+            },
+
+            renderComments: function (comments) {
+                App.utils.commentManager.renderComments({
+                    containerId: 'directory-comments-list',
+                    comments: comments,
+                    escapeText: function (value) {
+                        return escapeHtml(value || '');
+                    },
+                    escapeUrl: function (value) {
+                        return escapeHtml(value || '#');
+                    }
+                });
+            },
+
+            // コメントを即座にUIに追加（Optimistic UI Update）
+            appendCommentToUI: function (comment) {
+                App.utils.commentManager.appendCommentToUI({
+                    containerId: 'directory-comments-list',
+                    comment: comment,
+                    escapeText: function (value) {
+                        return escapeHtml(value || '');
+                    },
+                    escapeUrl: function (value) {
+                        return escapeHtml(value || '#');
+                    }
+                });
+            },
+
+            openAddMembers: function () {
+                if (!this.currentId) return;
+                if (!App.modals.selectMembers || !App.modals.selectMembers.open) return;
+
+                const directoryId = this.currentId;
+                const preSelected = (App.state.data.directoryAssignments || [])
+                    .filter(function (a) { return a.directory_id === directoryId && a.is_active !== false; })
+                    .map(function (a) { return a.member_id; });
+                const preSelectedMeta = (App.state.data.directoryAssignments || [])
+                    .filter(function (a) { return a.directory_id === directoryId; })
+                    .reduce(function (acc, assignment) {
+                        if (assignment && assignment.member_id) {
+                            acc[assignment.member_id] = {
+                                role: (assignment.role || '').trim() || null
+                            };
+                        }
+                        return acc;
+                    }, {});
+
+                App.modals.selectMembers.open({
+                    multiSelect: true,
+                    preSelected: preSelected,
+                    includeSelectionMeta: true,
+                    roleOptions: this.assignmentRoleOptions,
+                    preSelectedMeta: preSelectedMeta,
+                    callback: function (selectedIds) {
+                        App.modals.directoryDetail.applyMembersSelection(directoryId, selectedIds);
+                    }
+                });
+            },
+
+            applyMembersSelection: async function (directoryId, selectedEntries) {
+                if (!directoryId) return;
+                if (!selectedEntries || selectedEntries.length === 0) return;
+
+                const normalizedEntries = (selectedEntries || []).map((entry) => {
+                    if (typeof entry === 'string') {
+                        return { member_id: entry, role: null };
+                    }
+                    return {
+                        member_id: entry && entry.member_id ? String(entry.member_id) : '',
+                        role: entry && entry.role ? this._normalizeAssignmentRole(entry.role) : null
+                    };
+                }).filter(function (entry) {
+                    return !!entry.member_id;
+                });
+
+                const assignments = App.state.data.directoryAssignments || [];
+                showSnackbar('所属人物を更新しています...', 'info', 'top', 0);
+
+                try {
+                    for (let i = 0; i < normalizedEntries.length; i++) {
+                        const memberId = normalizedEntries[i].member_id;
+                        const selectedRole = normalizedEntries[i].role || null;
+                        const existing = assignments.find(function (a) {
+                            return a.directory_id === directoryId && a.member_id === memberId;
+                        });
+
+                        if (existing) {
+                            const shouldActivate = existing.is_active === false;
+                            const shouldUpdateRole = String(existing.role || '') !== String(selectedRole || '');
+                            if (shouldActivate || shouldUpdateRole) {
+                                await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                                    where: { id: ['=', existing.id] },
+                                    set: {
+                                        is_active: true,
+                                        role: selectedRole
+                                    }
+                                }, '所属人物を更新');
+                                existing.is_active = true;
+                                existing.role = selectedRole;
+                            }
+                            continue;
+                        }
+
+                        const record = {
+                            directory_id: directoryId,
+                            member_id: memberId,
+                            role: selectedRole,
+                            is_active: true
+                        };
+
+                        const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'insert', record, '所属人物を追加');
+                        if (inserted && inserted.data && inserted.data.id) {
+                            record.id = inserted.data.id;
+                        }
+                        assignments.push(record);
+                    }
+
+                    showSnackbar('所属人物を更新しました', 'success');
+                } catch (err) {
+                    console.error('[directoryDetail] applyMembersSelection failed', err);
+                    showSnackbar('所属人物の更新に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+                }
+
+                const directory = (App.state.data.directories || []).find(function (item) { return item.id === directoryId; });
+                if (directory) {
+                    this._render(directory);
+                }
+                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                    App.utils.modalFlow.refreshMembersDataInBackground(false);
+                } else if (App.pages.members && App.pages.members.loadData) {
+                    App.pages.members.loadData(false);
+                }
+            },
+
+            deactivateMemberAssignment: async function (assignmentId) {
+                if (!assignmentId) return;
+                if (!confirm('所属人物を解除しますか？')) return;
+
+                const assignments = App.state.data.directoryAssignments || [];
+                const target = assignments.find(function (a) { return a.id === assignmentId; });
+                if (!target) return;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', assignmentId] },
+                        set: { is_active: false }
+                    }, '所属人物を解除');
+                    target.is_active = false;
+                    showSnackbar('所属人物を解除しました', 'success');
+                } catch (err) {
+                    console.error('[directoryDetail] deactivateMemberAssignment failed', err);
+                    showSnackbar('所属人物の解除に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+                }
+
+                const directory = (App.state.data.directories || []).find(function (item) { return item.id === this.currentId; }, this);
+                if (directory) {
+                    this._render(directory);
+                }
+                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                    App.utils.modalFlow.refreshMembersDataInBackground(false);
+                } else if (App.pages.members && App.pages.members.loadData) {
+                    App.pages.members.loadData(false);
+                }
+            },
+
+            openMemberDetail: function (memberId) {
+                if (!memberId) return;
+                if (App.modals.memberDetail && App.modals.memberDetail.open) {
+                    App.modals.memberDetail.open(memberId);
+                }
+            },
+
+            updateMemberRole: async function (assignmentId, roleValue) {
+                if (!assignmentId) return;
+
+                const assignments = App.state.data.directoryAssignments || [];
+                const target = assignments.find(function (a) { return a.id === assignmentId; });
+                if (!target) return;
+
+                const normalizedRole = this._normalizeAssignmentRole(roleValue);
+                const prevRole = target.role || null;
+                if (normalizedRole === prevRole) return;
+
+                target.role = normalizedRole;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', assignmentId] },
+                        set: { role: normalizedRole }
+                    }, '所属人物の役割を更新');
+                    showSnackbar('役割を更新しました', 'success');
+                } catch (err) {
+                    console.error('[directoryDetail] updateMemberRole failed', err);
+                    target.role = prevRole;
+                    showSnackbar('役割の更新に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    }
+                }
+
+                const directory = (App.state.data.directories || []).find(function (item) { return item.id === this.currentId; }, this);
+                if (directory) {
+                    this._render(directory);
+                }
+            },
+
+            updateMemberRemark: async function (assignmentId, remarkValue) {
+                if (!assignmentId) return;
+                const assignments = App.state.data.directoryAssignments || [];
+                const target = assignments.find(function (a) { return a.id === assignmentId; });
+                if (!target) return;
+
+                const normalizedRemark = (remarkValue || '').trim() || null;
+                const prevRemark = target.remark || null;
+                if (normalizedRemark === prevRemark) return;
+
+                target.remark = normalizedRemark;
+                target.user_note = normalizedRemark;
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', assignmentId] },
+                        set: { remark: normalizedRemark }
+                    }, '所属人物の備考を更新');
+                    showSnackbar('備考を更新しました', 'success');
+                } catch (err) {
+                    console.error('[directoryDetail] updateMemberRemark failed', err);
+                    target.remark = prevRemark;
+                    target.user_note = prevRemark;
+                    showSnackbar('備考の更新に失敗しました', 'error');
+                }
+                const directory = (App.state.data.directories || []).find(function (item) { return item.id === this.currentId; }, this);
+                if (directory) this._render(directory);
+            },
+
+            updateMemberUserNote: async function (assignmentId, noteValue) {
+                await this.updateMemberRemark(assignmentId, noteValue);
+            },
+
+            updateMemberActiveStatus: async function (assignmentId, isActive) {
+                if (!assignmentId) return;
+                const assignments = App.state.data.directoryAssignments || [];
+                const target = assignments.find(function (a) { return a.id === assignmentId; });
+                if (!target) return;
+
+                const nextActive = isActive === true;
+                if ((target.is_active !== false) === nextActive) return;
+                const prevActive = target.is_active !== false;
+                target.is_active = nextActive;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', assignmentId] },
+                        set: { is_active: nextActive }
+                    }, '所属人物の有効状態を更新');
+                    showSnackbar('有効状態を更新しました', 'success');
+                } catch (err) {
+                    console.error('[directoryDetail] updateMemberActiveStatus failed', err);
+                    target.is_active = prevActive;
+                    showSnackbar('有効状態の更新に失敗しました', 'error');
+                }
+
+                const directory = (App.state.data.directories || []).find(function (item) { return item.id === this.currentId; }, this);
+                if (directory) this._render(directory);
+            },
+
+            _populateSelects: function (currentId) {
+                const typeSelect = document.getElementById('directory-detail-type-select');
+                const parentSelect = document.getElementById('directory-detail-parent-select');
+                const directories = App.state.data.directories || [];
+
+                if (typeSelect) {
+                    typeSelect.innerHTML = '<option value="">（種別なし）</option>';
+                    Object.entries((KEY_LABELS && KEY_LABELS.DIRECTORY_TYPE) ? KEY_LABELS.DIRECTORY_TYPE : {}).forEach(function (entry) {
+                        const option = document.createElement('option');
+                        option.value = entry[0];
+                        option.textContent = entry[1];
+                        typeSelect.appendChild(option);
+                    });
+                }
+
+                if (parentSelect) {
+                    parentSelect.innerHTML = '<option value="">（なし）</option>';
+                    directories.filter(function (item) {
+                        return item.id !== currentId;
+                    }).sort(function (left, right) {
+                        return (left.name || '').localeCompare(right.name || '');
+                    }).forEach(function (item) {
+                        const option = document.createElement('option');
+                        option.value = item.id;
+                        option.textContent = item.name;
+                        parentSelect.appendChild(option);
+                    });
+                }
+            },
+
+            _render: function (directory) {
+                const assignments = (App.state.data.directoryAssignments || []).filter(function (assignment) {
+                    return assignment.directory_id === directory.id;
+                });
+                const members = App.state.data.members || [];
+                const activeCount = assignments.filter(function (assignment) { return assignment.is_active !== false; }).length;
+                const columns = this._getAssignmentTableColumns();
+                const visibility = this.assignmentColumnVisibility || this._createDefaultAssignmentColumnVisibility();
+                const visibleColumns = columns.filter(function (column) {
+                    return visibility[column.key] !== false;
+                });
+
+                const toggleButtonsHtml = columns.map(function (column) {
+                    const isVisible = visibility[column.key] !== false;
+                    const buttonClass = isVisible ? 'small border round' : 'small border round tertiary';
+                    const suffix = isVisible ? '' : '（非表示）';
+                    return '<button class="' + buttonClass + '" type="button" onclick="App.modals.directoryDetail.toggleAssignmentColumnVisibility(\'' + escapeHtmlAttribute(column.key) + '\')">' +
+                        '<span>' + escapeHtml(column.label + suffix) + '</span>' +
+                        '</button>';
+                }).join('');
+
+                const headerHtml = visibleColumns.map(function (column) {
+                    return '<th>' + escapeHtml(column.label) + '</th>';
+                }).join('') + '<th>操作</th>';
+
+                const rowsHtml = assignments.map(function (assignment) {
+                    const member = members.find(function (item) { return item.id === assignment.member_id; }) || null;
+                    const rowCells = visibleColumns.map(function (column) {
+                        return '<td>' + App.modals.directoryDetail._buildAssignmentCellHtml(column.key, assignment, member) + '</td>';
+                    }).join('');
+                    const openButton = member && member.id
+                        ? '<button class="small border round" type="button" onclick="App.modals.directoryDetail.openMemberDetail(\'' + escapeHtmlAttribute(member.id) + '\')">詳細</button>'
+                        : '';
+                    return '<tr>' + rowCells + '<td>' + openButton + '</td></tr>';
+                }).join('');
+                const tableHtml = assignments.length === 0
+                    ? '<p class="small-text secondary-text">所属人物はありません</p>'
+                    : '<div class="row tiny-space wrap bottom-margin">' + toggleButtonsHtml + '</div>' +
+                    '<div class="scroll"><table class="border small-text"><thead class="fixed"><tr>' + headerHtml + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
+
+                const setValue = function (id, value) {
+                    const el = document.getElementById(id);
+                    if (el) el.value = value || '';
+                };
+
+                setValue('directory-detail-name-input', directory.name);
+                setValue('directory-detail-slack-url-input', directory.slack_channel_url);
+                setValue('directory-detail-gfolder-id-input', directory.gfolder_id);
+                setValue('directory-detail-remark-input', directory.remark);
+
+                const findDisplayName = function (memberId) {
+                    if (!memberId) return '';
+                    const member = members.find(function (item) { return item.id === memberId; });
+                    return member ? (member.display_name || member.name || member.email || '') : '不明';
+                };
+                setValue('directory-detail-created-by-input', findDisplayName(directory.created_by));
+                setValue('directory-detail-created-at-input', directory.created_at ? formatDateTimeForDisplay(directory.created_at) : '');
+                setValue('directory-detail-updated-by-input', findDisplayName(directory.updated_by));
+                setValue('directory-detail-updated-at-input', directory.updated_at ? formatDateTimeForDisplay(directory.updated_at) : '');
+
+                const typeSelect = document.getElementById('directory-detail-type-select');
+                if (typeSelect) typeSelect.value = directory.directory_type_key || '';
+                const parentSelect = document.getElementById('directory-detail-parent-select');
+                if (parentSelect) parentSelect.value = directory.parent_directory_id || '';
+                const activeInput = document.getElementById('directory-detail-is-active-input');
+                if (activeInput) activeInput.checked = directory.is_active !== false;
+                const memberCountEl = document.getElementById('directory-detail-member-count');
+                if (memberCountEl) memberCountEl.textContent = '所属人数 ' + String(activeCount);
+                const membersEl = document.getElementById('directory-detail-members');
+                if (membersEl) membersEl.innerHTML = tableHtml;
+                const errorEl = document.getElementById('directory-detail-error');
+                if (errorEl) errorEl.style.display = 'none';
+                this._setSaveState(false);
+                this._setFooterStatus('未保存の変更は保存ボタンで反映されます');
+                this._attachInputListeners();
+                this._updateValidationHint();
+                this._updateSaveAvailability();
+            },
+
+            _getAssignmentTableColumns: function () {
+                return [
+                    { key: 'display_name', label: '表示名' },
+                    { key: 'name', label: '名前' },
+                    { key: 'role', label: '役割' },
+                    { key: 'remark', label: '備考' },
+                    { key: 'user_note', label: 'user_note' },
+                    { key: 'email', label: 'メールアドレス' },
+                    { key: 'slack_id', label: 'Slack ID' },
+                    { key: 'phone_number', label: '電話番号' },
+                    { key: 'is_active', label: '有効' }
+                ];
+            },
+
+            _createDefaultAssignmentColumnVisibility: function () {
+                return {
+                    display_name: true,
+                    name: true,
+                    role: true,
+                    remark: true,
+                    user_note: true,
+                    email: true,
+                    slack_id: true,
+                    phone_number: false,
+                    is_active: true
+                };
+            },
+
+            toggleAssignmentColumnVisibility: function (columnKey) {
+                if (!columnKey) return;
+                if (!this.assignmentColumnVisibility) {
+                    this.assignmentColumnVisibility = this._createDefaultAssignmentColumnVisibility();
+                }
+                this.assignmentColumnVisibility[columnKey] = this.assignmentColumnVisibility[columnKey] === false;
+                const directory = (App.state.data.directories || []).find(function (item) {
+                    return item.id === App.modals.directoryDetail.currentId;
+                });
+                if (directory) this._render(directory);
+            },
+
+            _buildAssignmentCellHtml: function (columnKey, assignment, member) {
+                if (columnKey === 'display_name') {
+                    const displayName = member ? (member.display_name || member.name || member.email || '不明') : '不明';
+                    const safeDisplayName = escapeHtml(displayName);
+                    const photoUrl = member ? (member.profile_photo_url || '') : '';
+                    const slackProfileUrl = member ? (member.slack_profile_url || '') : '';
+                    const avatarHtml = photoUrl
+                        ? '<img class="responsive" src="' + escapeHtmlAttribute(photoUrl) + '" alt="' + safeDisplayName + '">'
+                        : escapeHtml(String(displayName).slice(0, 1) || '?');
+                    const labelHtml = slackProfileUrl
+                        ? '<a target="_blank" rel="noopener noreferrer" href="' + escapeHtmlAttribute(slackProfileUrl) + '">' + safeDisplayName + '</a>'
+                        : '<span>' + safeDisplayName + '</span>';
+                    return '<div class="row tiny-space middle-align"><i class="circle tiny">' + avatarHtml + '</i>' + labelHtml + '</div>';
+                }
+                if (columnKey === 'name') {
+                    return escapeHtml(member ? (member.name || '') : '');
+                }
+                if (columnKey === 'role') {
+                    const roleOptionsHtml = ['<option value="">（未設定）</option>'].concat(this.assignmentRoleOptions.map((roleLabel) => {
+                        const selectedAttr = roleLabel === (assignment.role || '') ? ' selected' : '';
+                        return '<option value="' + escapeHtmlAttribute(roleLabel) + '"' + selectedAttr + '>' + escapeHtml(roleLabel) + '</option>';
+                    })).join('');
+                    return '<div class="field border label small no-margin suffix no-wrap">' +
+                        '<select onchange="App.modals.directoryDetail.updateMemberRole(\'' + escapeHtmlAttribute(assignment.id || '') + '\', this.value)">' + roleOptionsHtml + '</select>' +
+                        '<label>役割</label><i>arrow_drop_down</i></div>';
+                }
+                if (columnKey === 'remark') {
+                    return '<input class="small" type="text" placeholder="備考" value="' + escapeHtmlAttribute(assignment.remark || '') + '" onchange="App.modals.directoryDetail.updateMemberRemark(\'' + escapeHtmlAttribute(assignment.id || '') + '\', this.value)">';
+                }
+                if (columnKey === 'user_note') {
+                    const currentNote = assignment.user_note || assignment.remark || '';
+                    return '<input class="small" type="text" placeholder="user_note" value="' + escapeHtmlAttribute(currentNote) + '" onchange="App.modals.directoryDetail.updateMemberUserNote(\'' + escapeHtmlAttribute(assignment.id || '') + '\', this.value)">';
+                }
+                if (columnKey === 'email') {
+                    return escapeHtml(member ? (member.email || '') : '');
+                }
+                if (columnKey === 'slack_id') {
+                    return escapeHtml(this._extractSlackId(member ? member.slack_profile_url : ''));
+                }
+                if (columnKey === 'phone_number') {
+                    return escapeHtml(member ? (member.phone_number || '') : '');
+                }
+                if (columnKey === 'is_active') {
+                    const checked = assignment.is_active !== false ? ' checked' : '';
+                    return '<label class="checkbox"><input type="checkbox"' + checked + ' onchange="App.modals.directoryDetail.updateMemberActiveStatus(\'' + escapeHtmlAttribute(assignment.id || '') + '\', this.checked)"><span></span></label>';
+                }
+                return '';
+            },
+
+            _extractSlackId: function (slackProfileUrl) {
+                const rawUrl = String(slackProfileUrl || '').trim();
+                if (!rawUrl) return '';
+                try {
+                    const parsed = new URL(rawUrl);
+                    const segments = String(parsed.pathname || '').split('/').filter(function (part) {
+                        return !!part;
+                    });
+                    return segments.length > 0 ? segments[segments.length - 1] : '';
+                } catch (_) {
+                    return '';
+                }
+            },
+
+            _normalizeAssignmentRole: function (roleValue) {
+                const normalized = String(roleValue || '').trim();
+                if (!normalized) return null;
+                return this.assignmentRoleOptions.indexOf(normalized) !== -1 ? normalized : null;
+            },
+
+            _hasParentCycle: function (parentId, currentId) {
+                const directories = App.state.data.directories || [];
+                const visited = {};
+                let cursor = parentId;
+
+                while (cursor) {
+                    if (cursor === currentId) return true;
+                    if (visited[cursor]) return true;
+                    visited[cursor] = true;
+                    const node = directories.find(function (item) { return item.id === cursor; });
+                    cursor = node ? (node.parent_directory_id || null) : null;
+                }
+
+                return false;
+            },
+
+            _setSaveState: function (isSaving, text) {
+                const saveBtn = document.getElementById('directory-detail-save-btn');
+                const chip = document.getElementById('directory-detail-status-chip');
+                if (saveBtn) {
+                    saveBtn.disabled = !!isSaving;
+                }
+                if (!chip) return;
+                if (isSaving) {
+                    chip.textContent = text || '保存中';
+                    chip.style.display = '';
+                    return;
+                }
+                if (text) {
+                    chip.textContent = text;
+                    chip.style.display = '';
+                    this._updateSaveAvailability();
+                    return;
+                }
+                chip.style.display = 'none';
+                this._updateSaveAvailability();
+            },
+
+            _setFooterStatus: function (text) {
+                const footerStatus = document.getElementById('directory-detail-footer-status');
+                if (!footerStatus) return;
+                footerStatus.textContent = text || '未保存の変更は保存ボタンで反映されます';
+            },
+
+            _showValidationError: function (message) {
+                const errorEl = document.getElementById('directory-detail-error');
+                if (errorEl) {
+                    errorEl.textContent = message || '入力内容に不備があります';
+                    errorEl.style.display = '';
+                }
+                this._setSaveState(false, '入力エラー');
+                this._setFooterStatus('必須項目または入力内容を確認してください');
+            },
+
+            _attachInputListeners: function () {
+                const self = this;
+                const fieldIds = ['directory-detail-name-input', 'directory-detail-type-select', 'directory-detail-parent-select', 'directory-detail-slack-url-input', 'directory-detail-gfolder-id-input', 'directory-detail-is-active-input', 'directory-detail-remark-input'];
+                fieldIds.forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (!el || el.dataset.directoryDetailBound === '1') return;
+                    const handler = function () {
+                        self.isDirty = true;
+                        self._clearError();
+                        self._setFooterStatus('変更があります。保存して反映してください');
+                        self._updateValidationHint();
+                        self._updateSaveAvailability();
+                    };
+                    el.addEventListener('input', handler);
+                    el.addEventListener('change', handler);
+                    el.addEventListener('keydown', function (event) {
+                        self._handleEnterSave(event);
+                    });
+                    el.dataset.directoryDetailBound = '1';
+                });
+                const slackInput = document.getElementById('directory-detail-slack-url-input');
+                if (slackInput && slackInput.dataset.directoryDetailBlurBound !== '1') {
+                    slackInput.addEventListener('blur', function () {
+                        if (self.isSaving) return;
+                        const normalized = self._normalizeSlackUrl(slackInput.value || '');
+                        if (slackInput.value !== normalized) {
+                            slackInput.value = normalized;
+                            self.isDirty = true;
+                            self._updateValidationHint();
+                            self._updateSaveAvailability();
+                            self._setFooterStatus(normalized ? 'Slack URLを自動整形しました。保存して反映してください' : 'Slack URL入力欄を空にしました');
+                        }
+                    });
+                    slackInput.dataset.directoryDetailBlurBound = '1';
+                }
+                const folderInput = document.getElementById('directory-detail-gfolder-id-input');
+                if (folderInput && folderInput.dataset.directoryDetailFolderBound !== '1') {
+                    folderInput.addEventListener('blur', function () {
+                        if (self.isSaving) return;
+                        const extracted = self._extractGoogleDriveFolderId(folderInput.value || '');
+                        if (extracted && folderInput.value !== extracted) {
+                            folderInput.value = extracted;
+                            self.isDirty = true;
+                            self._updateValidationHint();
+                            self._updateSaveAvailability();
+                            self._setFooterStatus('Google DriveフォルダIDを自動抽出しました。保存して反映してください');
+                        }
+                    });
+                    folderInput.dataset.directoryDetailFolderBound = '1';
+                }
+            },
+
+            _updateValidationHint: function () {
+                const hint = document.getElementById('directory-detail-validation-hint');
+                if (!hint) return;
+                const name = (document.getElementById('directory-detail-name-input')?.value || '').trim();
+                const slackUrl = this._normalizeSlackUrl(document.getElementById('directory-detail-slack-url-input')?.value || '');
+                const parentId = document.getElementById('directory-detail-parent-select')?.value || null;
+                if (!name) {
+                    hint.textContent = '組織名は必須です';
+                    return;
+                }
+                if (slackUrl && !this._isValidSlackChannelUrl(slackUrl)) {
+                    hint.textContent = 'Slack URLは https:\\/\\/slack.com\\/ などの形式で入力してください';
+                    return;
+                }
+                if (this.currentId && this._hasDuplicateSiblingName(name, parentId, this.currentId)) {
+                    hint.textContent = '同じ親組織配下に同名の組織があります';
+                    return;
+                }
+                hint.textContent = this.isDirty ? '入力内容は有効です。保存できます' : '変更後に保存を押すと反映されます';
+            },
+
+            _updateSaveAvailability: function () {
+                const saveBtn = document.getElementById('directory-detail-save-btn');
+                if (!saveBtn) return;
+                if (this.isSaving) {
+                    saveBtn.disabled = true;
+                    return;
+                }
+                const name = (document.getElementById('directory-detail-name-input')?.value || '').trim();
+                const slackUrl = this._normalizeSlackUrl(document.getElementById('directory-detail-slack-url-input')?.value || '');
+                const parentId = document.getElementById('directory-detail-parent-select')?.value || null;
+                const hasInvalidParent = !!(parentId && this.currentId && this._hasParentCycle(parentId, this.currentId));
+                const hasInvalidUrl = !!(slackUrl && !this._isValidSlackChannelUrl(slackUrl));
+                const hasDuplicate = !!(this.currentId && this._hasDuplicateSiblingName(name, parentId, this.currentId));
+                saveBtn.disabled = !this.isDirty || !name || hasInvalidParent || hasInvalidUrl || hasDuplicate;
+            },
+
+            normalizeSlackUrl: function () {
+                if (this.isSaving) return;
+                const input = document.getElementById('directory-detail-slack-url-input');
+                if (!input) return;
+                const normalized = this._normalizeSlackUrl(input.value || '');
+                input.value = normalized;
+                this.isDirty = true;
+                this._clearError();
+                this._updateValidationHint();
+                this._updateSaveAvailability();
+                this._setFooterStatus(normalized ? 'Slack URLを整形しました。保存して反映してください' : 'Slack URL入力欄を空にしました');
+            },
+
+            extractGfolderId: function () {
+                if (this.isSaving) return;
+                const input = document.getElementById('directory-detail-gfolder-id-input');
+                if (!input) return;
+                const extracted = this._extractGoogleDriveFolderId(input.value || '');
+                if (!extracted) {
+                    this._setFooterStatus('Google DriveフォルダIDを抽出できませんでした');
+                    return;
+                }
+                input.value = extracted;
+                this.isDirty = true;
+                this._clearError();
+                this._updateValidationHint();
+                this._updateSaveAvailability();
+                this._setFooterStatus('Google DriveフォルダIDを抽出しました。保存して反映してください');
+            },
+
+            _clearError: function () {
+                const errorEl = document.getElementById('directory-detail-error');
+                if (!errorEl) return;
+                errorEl.style.display = 'none';
+                errorEl.textContent = '';
+            },
+
+            _normalizeSlackUrl: function (value) {
+                const trimmed = String(value || '').trim();
+                if (!trimmed) return '';
+                if (/^https?:\/\//i.test(trimmed)) return trimmed;
+                return 'https:\/\/' + trimmed.replace(/^\/+/, '');
+            },
+
+            _extractGoogleDriveFolderId: function (value) {
+                const trimmed = String(value || '').trim();
+                if (!trimmed) return '';
+                const folderMatch = trimmed.match(/\/folders\/([a-zA-Z0-9_-]{10,})/);
+                if (folderMatch && folderMatch[1]) return folderMatch[1];
+                const queryMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+                if (queryMatch && queryMatch[1]) return queryMatch[1];
+                if (/^[a-zA-Z0-9_-]{10,}$/.test(trimmed)) return trimmed;
+                return '';
+            },
+
+            _isValidSlackChannelUrl: function (value) {
+                if (!value) return true;
+                try {
+                    const parsed = new URL(value);
+                    return parsed.protocol === 'https:' && /(^|\\.)slack\\.com$/i.test(parsed.hostname);
+                } catch (_) {
+                    return false;
+                }
+            },
+
+            _buildBaseUrlParams: function () {
+                const currentParams = App.utils.url.getParams();
+                const nextParams = {
+                    tab: currentParams.tab || 'home'
+                };
+                if (nextParams.tab === 'board' && currentParams.board_id) {
+                    nextParams.board_id = currentParams.board_id;
+                }
+                if (nextParams.tab === 'catalog' && currentParams.table) {
+                    nextParams.table = currentParams.table;
+                }
+                return nextParams;
+            },
+
+            _updateUrlOnOpen: function (directoryId, skipUrlUpdate) {
+                if (skipUrlUpdate || !directoryId || !App.utils.url || !App.utils.url.updateParams) return;
+                const nextParams = this._buildBaseUrlParams();
+                nextParams.modal = 'directory-detail';
+                nextParams.directory_id = directoryId;
+                App.utils.url.updateParams(nextParams, false);
+            },
+
+            _updateUrlOnClose: function (skipUrlUpdate) {
+                if (skipUrlUpdate || !App.utils.url || !App.utils.url.updateParams) return;
+                const nextParams = this._buildBaseUrlParams();
+                App.utils.url.updateParams(nextParams, false);
+            },
+
+            _handleEnterSave: function (event) {
+                if (this.isSaving || !event || event.key !== 'Enter') return;
+                const target = event.target;
+                if (!target) return;
+                const tagName = (target.tagName || '').toLowerCase();
+                const inputType = (target.type || '').toLowerCase();
+                const shouldIgnore = tagName === 'textarea' || tagName === 'select' || inputType === 'checkbox';
+                if (shouldIgnore) return;
+                event.preventDefault();
+                this.save();
+            },
+
+            _bindEscClose: function () {
+                const dialog = document.getElementById('modal-detail-directory');
+                if (!dialog || dialog.dataset.directoryEscBound === '1') return;
+                const self = this;
+                dialog.addEventListener('keydown', function (event) {
+                    if (!event || event.key !== 'Escape') return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    self.close({ reason: 'escape' });
+                });
+                dialog.dataset.directoryEscBound = '1';
+            },
+
+            _hasDuplicateSiblingName: function (name, parentId, currentId) {
+                const normalizedName = String(name || '').trim().toLowerCase();
+                if (!normalizedName) return false;
+                const normalizedParent = parentId || null;
+                const directories = App.state.data.directories || [];
+                return directories.some(function (dir) {
+                    if (!dir || dir.id === currentId) return false;
+                    const dirName = String(dir.name || '').trim().toLowerCase();
+                    const dirParent = dir.parent_directory_id || null;
+                    return dirName === normalizedName && dirParent === normalizedParent;
+                });
+            }
+        };
+    })();
+</script>

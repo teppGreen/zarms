@@ -1,0 +1,38 @@
+<dialog id="modal-select-tasks" class="modal padding no-scroll">
+    <nav class="small-padding bottom-margin">
+        <h5 class="max bold">タスクを選択</h5>
+        <button class="circle transparent" onclick="appUi('#modal-select-tasks',false)">
+            <i>close</i>
+        </button>
+    </nav>
+
+    <!-- 検索バー -->
+    <div class="field small-round border prefix bottom-margin top-margin">
+        <i class="front" onclick="App.modals.selectTasks.searchTasks()">search</i>
+        <input type="text" id="task-search-input" placeholder="タスク名またはタスク番号を入力してください"
+            onkeydown="if(event.key === 'Enter' && !event.isComposing) { event.preventDefault(); App.modals.selectTasks.searchTasks(); }">
+    </div>
+
+    <!-- 全選択チェックボックス (複数選択時のみ表示) -->
+    <div id="task-select-all-container" class="row left-align margin" style="display: none;">
+        <label class="checkbox">
+            <input type="checkbox" id="task-select-all-checkbox"
+                onchange="App.modals.selectTasks.toggleSelectAll(this.checked)">
+            <span>すべて選択</span>
+        </label>
+    </div>
+
+    <!-- 結果リスト -->
+    <article id="task-results-container"
+        class="scroll large-width medium-height small-padding small-round extra-line background no-elevate">
+        <!-- 動的に生成 -->
+    </article>
+
+    <nav class="right-align small-padding">
+        <a onclick="App.modals.selectTasks.confirm(true)"><span>選択を解除</span></a>
+        <div class="max"></div>
+        <button class="border" onclick="appUi('#modal-select-tasks',false)">キャンセル</button>
+        <button onclick="App.modals.selectTasks.confirm()">適用</button>
+    </nav>
+</dialog>
+

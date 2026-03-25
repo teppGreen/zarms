@@ -1,4 +1,4 @@
-# ZARMS (Zen University Festival All Resource Management System)
+# ZARMS (ZEN University Festival All Resource Management System)
 
 ZARMS（ザームス）は、大学祭実行委員会の業務効率化を目的としたタスク管理システムです。
 Google Apps Script (GAS) を利用したWebアプリケーションとして構築されており、Google Sheetsをデータベースとして使用しています。
@@ -13,7 +13,8 @@ Google Apps Script (GAS) を利用したWebアプリケーションとして構�
 - **進捗管理**: カンバン方式によるタスクの進捗管理
 - **内容管理**: タスクの説明・期限・担当者・優先度の設定
 - **コミュニケーション**: タスクごとのコメント機能
-- **ダッシュボード**: 直近のタスク一覧表示、メンバーランニング、ボードランキング
+- **ダッシュボード**: マイタスク、お知らせ、更新履歴の表示
+- **分析**: 更新履歴ログの曜日別可視化
 
 ### モバイル版
 
@@ -48,6 +49,11 @@ ZARMSは画面サイズが600px未満のデバイス（スマートフォンな�
 
 ## 技術スタック
 
+### 構成
+本システムはモノレポ構成となっており、以下の2つのGASプロジェクトで構成されています。
+1. **Database (Library)**: スプレッドシートへの低レベルなアクセスを担当し、ライブラリとして提供されます。
+2. **Frontend (Web App)**: UIおよびビジネスロジックを担当し、Databaseライブラリを呼び出して動作します。
+
 ### バックエンド
 - **Google Apps Script (GAS)**: サーバーサイドの処理に利用
 - **Google Sheets**: データベースとして利用
@@ -65,34 +71,40 @@ ZARMSは画面サイズが600px未満のデバイス（スマートフォンな�
 
 ```
 zarms/
-├── src/                    # ソースコードディレクトリ
-│   ├── components/         # 再利用可能なUIコンポーネント
-│   │   ├── headers/        # ヘッダー関連（ナビゲーション）
-│   │   ├── modals/         # 各種モーダル（タスク作成、詳細、選択画面など）
-│   │   └── popups/         # ポップアップ通知など
-│   ├── pages/              # 各ページのメインコンテンツ
-│   │   ├── board.html      # ボード画面
-│   │   ├── calendar.html   # カレンダー画面
-│   │   ├── home.html       # ダッシュボード（ホーム）画面
-│   │   └── members.html    # メンバー一覧画面
-│   ├── mobile/             # モバイル版専用ファイル
-│   │   ├── board.html      # モバイル版ボード画面
-│   │   ├── detail_task.html  # モバイル版タスク詳細画面
-│   │   ├── new_task.html   # モバイル版タスク作成画面
-│   │   ├── quill_editor.html  # モバイル版クイルエディタ画面
-│   │   ├── filter_task.html  # モバイル版フィルタタスク画面
-│   │   ├── menu.html       # モバイル版メニュー画面
-│   │   ├── js.html         # モバイル版フロントエンドロジック
-│   │   └── index.html      # モバイル版のベースHTML
-│   ├── constants.js        # 定数定義（テーブル名、設定値など）
-│   ├── database.js         # データベース操作（Spreadsheet連携）ロジック
-│   ├── main.js             # GASエントリーポイント（doGet, ルーティング）
-│   ├── index.html          # アプリケーションのベースHTML
-│   ├── js.html             # フロントエンドロジック（JavaScript）
-│   └── css.html            # 追加スタイルシート
-├── docs/                   # ドキュメント関連
-└── README.md               # 本ファイル
+├── projects/
+│   ├── database/           # データベース操作（GASライブラリ）
+│   │   ├── src/
+│   │   │   ├── constants.js   # 共通定数・スキーマ定義
+│   │   │   ├── database.js    # 抽象化されたDB操作ロジック
+│   │   │   ├── db_features.js # 特定機能向けのDB操作（マイボード等）
+│   │   │   └── sync/          # 同期処理ロジック
+│   │   └── package.json
+│   └── frontend/           # フロントエンド（GAS Web App）
+│       ├── src/
+│       │   ├── components/    # 再利用可能なUIコンポーネント
+│       │   ├── pages/         # 各ページのコンテンツ
+│       │   ├── mobile/        # モバイル版専用ファイル
+│       │   ├── main.js        # Webアプリのエントリーポイント
+│       │   ├── db_bridge.js   # Library呼び出しのブリッジ層
+│       │   └── index.html     # メインHTML
+│       └── package.json
+├── scripts/
+│   └── update-library-id.js # Library ID自動同期スクリプト
+├── package.json            # ルート管理（ワークスペース設定）
+└── README.md
 ```
+
+## ドキュメント
+
+本プロジェクトの詳細な仕様やガイドラインについては、以下のドキュメントを参照してください：
+
+* **[データベーススキーマ](docs/database-schema.mmd)**: テーブル構造やリレーションの定義
+* **[APIリファレンス](docs/api-reference.md)**: Database API のリクエスト形式やセキュリティ設計、権限評価ルール
+* **[テストガイド](docs/testing-guide.md)**: ローカルでの結合テスト実行方法
+* **[docsとskillsの使い分け](docs/docs-skills-boundary.md)**: 仕様文書と実行ガイドの責務分担
+* **[Copilot Skills（正本）](.github/skills/)**: GitHub Copilot がタスク実行時に参照するスキル集
+* **[Beer CSS / Tabulator リファレンス](docs/beercss-tabulator-reference.md)**: 実装方針と更新運用
+* **[AIエージェント向けガイドライン](.github/copilot-instructions.md)**: AIが開発・計画を行うためのプロジェクト規約・振る舞い指示
 
 ## 開発環境とデプロイ
 
@@ -100,24 +112,8 @@ zarms/
 
 ### 前提条件
 - Google Account (権限のあるアカウント)
+- Node.js 環境
+- **1PasswordCLI** (`op` コマンド) がインストールされ、認証済みであること
 
 ### 環境設定
-開発モードと本番モードの切り替えは、URLパラメータ `use_prod_db=true` またはユーザープロパティによって制御されます。
-- GASのscriptPropertiesにて Spreadsheet ID などの環境変数が定義されています。
-
-### デプロイ手順
-
-本プロジェクトでは、開発環境（dev）と本番環境（prod）を分けてデプロイできます。
-
-```bash
-# 開発環境へデプロイ
-npm run deploy:dev
-
-# 本番環境へデプロイ
-npm run deploy:prod
-
-# 開発環境で自動プッシュ（監視モード）
-npm run watch:dev
-```
-
-※ 初回利用前に、`src/.clasp-dev.json` と `src/.clasp-prod.json` の `scriptId` が正しいか確認してください。
+[セットアップガイド](docs/setup-guide.md) を参照してください。

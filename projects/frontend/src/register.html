@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <?!= include('css'); ?>
+</head>
+
+<body class="light">
+    <main class="surface-container">
+        <div class="row large-margin center-align small-space">
+            <img id="favicon-img" class="large">
+            <div class="row tiny-space">
+                <h1 id="project-name" class="font-title" style="font-size: 2rem;"></h1>
+            </div>
+        </div>
+        <div id="register-pages" class="background center large-width round large-padding">
+            <!-- ローディング画面 -->
+            <div id="step-loading" class="page large-padding">
+                <h2 class="bold small bottom-margin">サインイン</h2>
+                <div class="top-padding bottom-padding">
+                    <p>展軸祭運営者向け業務システム「ZARMS」へようこそ！<br>
+                        大学のGoogle アカウントでサインインしてください。</p>
+                    <p class="s error-text">
+                        <i>info</i>
+                        <span>モバイル版では一部機能の利用が制限されます。通常はデスクトップ版（パソコンのブラウザからアクセス）をご利用ください。</span>
+                    </p>
+                </div>
+                <nav class="top-margin">
+                    <button disabled class="primary responsive extra">
+                        <progress class="circle small indeterminate"></progress>
+                        <span>サインイン中</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- ステップ: メンテナンス画面 -->
+            <div id="step-maintenance" class="page right large-padding">
+                <h2 class="bold small bottom-margin error-text">メンテナンス中</h2>
+                <div class="top-padding bottom-padding">
+                    <div class="row tiny-space">
+                        <i class="extra error-text">build</i>
+                    </div>
+                    <p class="large-text bold">システムをご利用いただけません</p>
+                    <p>
+                        <span>現在、臨時のメンテナンスを行っております。<br>
+                            ご不便をおかけしますが、再開までしばらくお待ちください。</span>
+                    </p>
+                </div>
+                <nav class="right-align top-margin">
+                    <button onclick="reloadPage(this)" class="primary extra">
+                        <i>refresh</i>
+                        <span>再読み込み</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- ステップ: 利用規約・プライバシーポリシーへの同意画面 -->
+            <div id="step-agreement" class="page right large-padding">
+                <h2 class="bold small bottom-margin">同意事項</h2>
+                <div class="top-padding bottom-padding">
+                    <p>ZARMSは、展軸祭運営関係者向けの業務システムです。企画・人員・タスクなどの円滑な管理を支援します。<br>
+                    これからZARMSの利用を開始、または継続するための手続きを行います。<br>
+                    既に利用を開始している人にも、システムがアップデートされた場合などにこの画面が表示されることがあります。</p>
+                    <div class="space"></div>
+                    <nav id="agreement-form" class="vertical">
+                        <label class="radio">
+                            <input type="radio" id="terms-agreement" required>
+                            <span><a id="terms-link" class="link" target="_blank">利用規約</a>に同意する</span>
+                        </label>
+                        <label class="radio">
+                            <input type="radio" id="privacy-agreement" required>
+                            <span><a id="privacy-link" class="link" target="_blank">プライバシーポリシー</a>に同意する</span>
+                        </label>
+                    </nav>
+                </div>
+                <nav class="right-align top-margin">
+                    <button id="agreement-submit" class="primary extra">
+                        <span>次へ</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- ステップ: 権限の説明画面 -->
+            <div id="step-scope-explanation" class="page right large-padding">
+                <h2 class="bold small bottom-margin">アクセス権限の許可</h2>
+                <div class="top-padding bottom-padding">
+                    <div class="row tiny-space">
+                        <i class="green-text extra">security</i>
+                    </div>
+                    <p class="large-text">ZARMSを利用するためには、以下の権限の許可が必要です。<br>
+                        ZARMSに関連するデータの処理は、すべて大学のGoogle Workspace上で安全に行われます。</p>
+                    <hr class="top-margin bottom-margin">
+                    <p class="vertical">
+                        <span class="bold">プロフィール情報の参照</span>
+                        <span>ZARMSへのサインアップ・サインイン、展軸祭関係者名簿の作成</span>
+                    </p>
+                    <p class="vertical">
+                        <span class="bold">Google ドライブのすべてのファイルの参照、編集、作成、削除</span>
+                        <span>ZARMSにアップロードされたファイルの管理</span>
+                    </p>
+                    <p class="vertical">
+                        <span class="bold">Google スプレッドシートのすべてのスプレッドシートの参照、編集、作成、削除</span>
+                        <span>ZARMSのデータベースの操作</span>
+                    </p>
+                    <p class="vertical">
+                        <span class="bold">外部サービスへの接続</span>
+                        <span style="cursor: help;" title="ZARMSのデータベースへの接続等に必要です。&#13;&#10;ZARMSは">ZARMSと接続しているサービスとの通信</span>
+                    </p>
+                    <p class="vertical">
+                        <span class="bold">ユーザー本人に代わってのメールの送信</span>
+                        <span style="cursor: help;" title="ZARMSからのお知らせやタスクのリマインドなどを受け取るために必要です。&#13;&#10;システムの制約により、サービスアカウント（ZARMSの送信専用メールアドレス）がないため、あなた自身のアドレスからあなた自身のアドレス宛に送信する仕様となっています。&#13;&#10;事前の許可なく、あなたのアドレスから他の人のアドレスにメールを送信することはありません。">ZARMSからの通知メールの受信</span>
+                    </p>
+                </div>
+                <nav class="right-align top-margin">
+                    <button onclick="requestAppScopes()" class="primary extra">
+                        <span>すべての権限を許可する</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- ステップ: 権限付与中の画面 -->
+            <div id="step-scope-confirm" class="page right large-padding">
+                <h2 class="bold small bottom-margin">アクセス権限の許可</h2>
+                <div class="top-padding bottom-padding">
+                    <div class="row tiny-space">
+                        <i class="green-text extra">security</i>
+                    </div>
+                    <p>ポップアップの案内に沿って、すべてのアクセス権限を許可してください。</p>
+                </div>
+                <nav class="right-align top-margin">
+                    <button onclick="checkScopesFirst()" class="primary extra">
+                        <span>次へ</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- ステップ0: 利用制限 -->
+            <div id="step-access-error" class="page right large-padding">
+                <h2 class="bold small bottom-margin error-text">利用できません</h2>
+                <div class="top-padding bottom-padding">
+                    <div class="row tiny-space">
+                        <i class="extra error-text">lock</i>
+                    </div>
+                    <p>ZARMSは展軸祭運営関係者のみが使用できます。<br>
+                        また、サインインに大学のGoogle アカウント以外を使用することはできません。<br>
+                        間違いだと思われる場合は、<a target="_blank" class="help-site-link link">ヘルプサイト</a>の問い合わせ先までご連絡ください。
+                    </p>
+                    <p id="active-user-email" class="secondary-text small-text"></p>
+                </div>
+                <nav class="right-align top-margin">
+                    <button onclick="reloadPage(this)" class="primary extra">
+                        <i>refresh</i>
+                        <span>再読み込み</span>
+                    </button>
+                </nav>
+            </div>
+
+            <div id="step-system-error" class="page right large-padding">
+                <h2 class="bold small bottom-margin error-text">エラーが発生しました</h2>
+                <div class="top-padding bottom-padding">
+                    <div class="row tiny-space">
+                        <i class="extra error-text">error</i>
+                    </div>
+                    <p>ページを再読み込み（リロード）してください。<br>
+                        再度試してもうまくいかない場合は、<a target="_blank" class="help-site-link link">ヘルプサイト</a>の問い合わせ先までご連絡ください。
+                    </p>
+                </div>
+                <nav class="right-align top-margin">
+                    <button onclick="reloadPage(this)" class="primary extra">
+                        <i>refresh</i>
+                        <span>再読み込み</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- ステップ1: Slack URLの入力 -->
+            <div id="step-input" class="page right large-padding">
+                <h2 class="bold small bottom-margin">サインアップ</h2>
+                <div class="top-padding bottom-padding">
+                    <form id="slack-profile-form">
+                        <div id="slack-profile-url-container" class="field label border">
+                            <input type="url" id="slack-profile-input" value="" required>
+                            <label>Slack プロフィールURL</label>
+                            <output>
+                                パソコンで<a id="slack-profile-link" tabindex="-1" target="_blank" class="link">Slack
+                                    プロフィール</a>を開き、︙メニューからコピーしてください。
+                            </output>
+                        </div>
+
+                    </form>
+                </div>
+                <nav class="right-align top-margin">
+                    <button id="search-user-submit" class="primary extra">
+                        <span>次へ</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- ステップ2: 確認画面 -->
+            <div id="step-confirm" class="page right large-padding">
+                <h2 class="bold small bottom-margin">サインアップ</h2>
+                <div class="top-padding bottom-padding center-align">
+                    <div id="user-profile-photo" class="small-height small-width center"></div>
+                    <div id="user-name"></div>
+                    <div id="user-name-warning" class="top-margin"></div>
+                </div>
+                <nav id="confirm-nav" class="right-align top-margin">
+                    <button onclick="showInputStep(true)" class="border extra">
+                        <span>いいえ</span>
+                    </button>
+                    <button onclick="registerUser()" class="primary extra">
+                        <span>はい</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- ステップ3: エラー表示 -->
+            <div id="step-error" class="page right large-padding">
+                <h2 class="bold small bottom-margin">サインアップ</h2>
+                <div class="top-padding bottom-padding">
+                    <div class="row tiny-space">
+                        <i class="extra error-text">error</i>
+                    </div>
+                    <p class="large-text error-text bold">あなたはZARMSの利用対象者ではありません</p>
+                    <p>もしくは、入力されたSlack プロフィールURLが間違っているか、実行委員会があなたを展軸祭運営関係者として把握していない可能性があります。<br>再度試してもうまくいかない場合は、<a target="_blank"
+                            class="help-site-link link">ヘルプサイト</a>の問い合わせ先までご連絡ください。</p>
+                    <p id="error-url" class="secondary-text small-text"></p>
+                </div>
+                <nav class="right-align top-margin">
+                    <button onclick="showInputStep(true)" class="primary extra">
+                        <span>戻る</span>
+                    </button>
+                </nav>
+            </div>
+        </div>
+        <div class="row wrap no-margin center no-space secondary-text small-text large-padding large-width">
+            <span id="copyright"></span>
+            <div class="max"></div>
+            <button id="help-site-button" class="small small-text transparent">ヘルプ</button>
+        </div>
+        <dialog id="step-finishing" class="modal max surface">
+            <div class="middle center-align">
+                <progress class="circle extra"></progress>
+                <div class="space"></div>
+                <span id="loading-text" class="large-text">サインアップを完了しています<br>しばらくお待ちください</span>
+            </div>
+        </dialog>
+    </main>
+
+    <script>
+        const { activeUserEmail, urlParams, scriptUrl, EVENT_CONFIG, AUTH_CONFIG, EXTERNAL_URLS, UI_CONFIG, UI_TEXT } = <?!= JSON.stringify(templateVariables) ?>;
+
+        const DEFAULT_HELPER_TEXT = `パソコンで<a href="https://${AUTH_CONFIG.SLACK_DOMAIN}/account/profile" tabindex="-1" target="_blank" class="link">Slack プロフィール</a>を開き、︙メニューからコピーしてください。`;
+        const REQUIRED_HELPER_TEXT = `この項目は必須入力です。`;
+        const ERROR_HELPER_TEXT = `URLの形式が間違っています。`;
+
+        let foundUser = null;
+        let useApiMode = false;
+        let hasAgreed = false;
+        let agreementNextAction = null;
+        let userAgreementData = null;
+        let policyUpdateDates = null;
+        let currentRequiresReAgreement = null;
+        setupElements();
+        setupListeners();
+
+        function setupElements() {
+            document.getElementById('favicon-img').src = EXTERNAL_URLS.FAVICON_IMAGE;
+            document.getElementById('project-name').textContent = UI_TEXT.APP_TITLE;
+            document.querySelectorAll('.help-site-link').forEach(link => link.href = `${EXTERNAL_URLS.PORTAL_SITE}/help`);
+            document.getElementById('help-site-button').onclick = () => window.open(`${EXTERNAL_URLS.PORTAL_SITE}/help`, '_blank');
+            document.getElementById('copyright').innerHTML = `<a href="${EXTERNAL_URLS.PORTAL_SITE}/" target="_blank">${UI_TEXT.APP_COPYRIGHT}</a>`;
+            document.getElementById('slack-profile-input').pattern = `^https:\/\/${AUTH_CONFIG.SLACK_DOMAIN}\/team\/U[A-Z0-9]{10}$`;
+            document.getElementById('terms-link').href = `${EXTERNAL_URLS.PORTAL_SITE}/terms`;
+            document.getElementById('privacy-link').href = `${EXTERNAL_URLS.PORTAL_SITE}/privacy`;
+            document.getElementById('slack-profile-link').href = `https:\/\/${AUTH_CONFIG.SLACK_DOMAIN}/account/profile`;
+        }
+
+        function setupListeners() {
+            searchUserListeners();
+        }
+
+        function searchUserListeners() {
+            const form = document.getElementById('slack-profile-form');
+            const input = document.getElementById('slack-profile-input');
+            const output = input ? input.parentNode.querySelector('output') : null;
+            const searchUserSubmit = document.getElementById('search-user-submit');
+
+            const agreementSubmit = document.getElementById('agreement-submit');
+            const terms = document.getElementById('terms-agreement');
+            const privacy = document.getElementById('privacy-agreement');
+
+            if (agreementSubmit) {
+                agreementSubmit.addEventListener('click', function (e) {
+                    if ((terms && !terms.checked) || (privacy && !privacy.checked)) {
+                        terms.parentNode.classList.add('invalid');
+                        privacy.parentNode.classList.add('invalid');
+                        alert('利用規約・プライバシーポリシーに同意してください');
+                        return;
+                    }
+                    hasAgreed = true;
+                    proceedToNextAction(agreementNextAction, currentRequiresReAgreement);
+                });
+            }
+            if (terms) {
+                terms.addEventListener('change', function () {
+                    this.parentNode.classList.remove('invalid');
+                });
+            }
+            if (privacy) {
+                privacy.addEventListener('change', function () {
+                    this.parentNode.classList.remove('invalid');
+                });
+            }
+
+            if (input) {
+                input.addEventListener('change', function () {
+                    if (this.value === '') {
+                        this.parentNode.classList.remove('invalid');
+                        if (output) {
+                            output.classList.remove('invalid');
+                            output.innerHTML = DEFAULT_HELPER_TEXT;
+                        }
+                    }
+                });
+                input.addEventListener('focus', function () {
+                    this.placeholder = `https:\/\/${AUTH_CONFIG.SLACK_DOMAIN}/team/U0123456789`;
+                });
+                input.addEventListener('blur', function () {
+                    this.placeholder = ' ';
+                });
+                input.addEventListener('input', function () {
+                    this.parentNode.classList.remove('invalid');
+                    if (output) {
+                        output.classList.remove('invalid');
+                        output.innerHTML = DEFAULT_HELPER_TEXT;
+                    }
+                    if (!this.validity.valid) {
+                        this.parentNode.classList.add('invalid');
+                        if (output) {
+                            output.classList.add('invalid');
+                            output.innerHTML = ERROR_HELPER_TEXT;
+                        }
+                    } else {
+                        this.parentNode.classList.remove('invalid');
+                        if (output) {
+                            output.classList.remove('invalid');
+                            output.innerHTML = DEFAULT_HELPER_TEXT;
+                        }
+                    }
+                });
+            }
+
+            if (input) {
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        searchUserSubmit.click();
+                    }
+                });
+            }
+
+            if (searchUserSubmit) {
+                searchUserSubmit.addEventListener('click', function (e) {
+                    if (input && !input.validity.valid) {
+                        input.parentNode.classList.add('invalid');
+                        if (output) {
+                            output.classList.add('invalid');
+                            output.innerHTML = ERROR_HELPER_TEXT;
+                        }
+                        return;
+                    }
+                    if (form) {
+                        const firstInvalid = form.querySelector(':invalid');
+                        if (firstInvalid) {
+                            firstInvalid.focus();
+                            return;
+                        }
+                    }
+                    searchUserBySlackProfileUrl(input.value);
+                });
+            }
+        }
+
+        // モバイル検出: Beer CSSのsクラスが適用される条件をチェック
+        function isMobileDevice() {
+            const breakPoint_S = 600;
+            return window.innerWidth <= breakPoint_S;
+        }
+
+        function checkMaintenance() {
+            return EVENT_CONFIG.TEMPORARILY_MAINTENANCE;
+
+            const now = new Date();
+            const jstHours = (now.getUTCHours() + 9) % 24;
+            return jstHours >= EVENT_CONFIG.MAINTENANCE_HOURS.START &&
+                jstHours < EVENT_CONFIG.MAINTENANCE_HOURS.END;
+        }
+
+        function showMaintenanceStep() {
+            showStep('step-maintenance');
+        }
+
+        // ページ読み込み時にメンテナンス時間をチェック、問題なければアクセス権限チェックを実行
+        if (checkMaintenance()) {
+            showMaintenanceStep();
+        } else {
+            checkScopesFirst();
+        }
+
+        let authUrl = null;
+
+        /**
+         * アプリのスコープ権限が許可されているか確認します
+         */
+        function checkScopesFirst() {
+            showStep('step-loading');
+            google.script.run
+                .withSuccessHandler(function (authInfo) {
+                    if (authInfo.status === 'REQUIRED') {
+                        authUrl = authInfo.url;
+                        showAgreementStep('scope');
+                    } else {
+                        checkAccess();
+                    }
+                })
+                .withFailureHandler(function (error) {
+                    console.error('checkScopesFirst failed:', error);
+                    checkAccess(); // failure fallback
+                })
+                .checkAppAuthorization();
+        }
+
+        function showAgreementStep(nextAction, requiresReAgreement) {
+            if (hasAgreed) {
+                proceedToNextAction(nextAction, requiresReAgreement);
+                return;
+            }
+            agreementNextAction = nextAction;
+            currentRequiresReAgreement = requiresReAgreement;
+            showStep('step-agreement');
+        }
+
+        function proceedToNextAction(action, requiresReAgreement) {
+            if (action === 'scope') {
+                showScopeExplanationStep();
+            } else if (action === 'input') {
+                showInputStep();
+            } else if (action === 're-agreement') {
+                // 再同意を記録（キャッシュされた値を使用）
+                recordReAgreement(requiresReAgreement || currentRequiresReAgreement);
+            }
+        }
+
+        /**
+         * 再同意を記録します
+         */
+        function recordReAgreement(requiresReAgreement) {
+            if (!requiresReAgreement) {
+                console.error('recordReAgreement: requiresReAgreement is undefined');
+                alert('エラーが発生しました');
+                showStep('step-agreement');
+                return;
+            }
+
+            let agreementType = 'both';
+            if (requiresReAgreement.terms && !requiresReAgreement.privacy) {
+                agreementType = 'terms';
+            } else if (requiresReAgreement.privacy && !requiresReAgreement.terms) {
+                agreementType = 'privacy';
+            }
+
+            ui('#step-finishing');
+
+            google.script.run
+                .withSuccessHandler(function (success) {
+                    if (success) {
+                        reloadPage();
+                    } else {
+                        alert('同意の記録に失敗しました');
+                        showStep('step-agreement');
+                    }
+                })
+                .withFailureHandler(function (error) {
+                    alert('エラーが発生しました: ' + error.message);
+                    showStep('step-agreement');
+                })
+                .recordAgreement(agreementType);
+        }
+
+        function showScopeExplanationStep() {
+            showStep('step-scope-explanation');
+        }
+
+        function requestAppScopes() {
+            showStep('step-scope-confirm');
+            if (authUrl) {
+                window.open(authUrl, '_blank');
+            } else {
+                checkAccess();
+            }
+        }
+
+        /**
+         * アクセス権限をチェックし、問題なければアプリケーションをロードします。
+         * デバイスタイプ（モバイル/デスクトップ）に応じて最適なHTMLを取得します。
+         */
+        function checkAccess() {
+            const isMobile = isMobileDevice();
+
+            google.script.run
+                .withSuccessHandler(function (result) {
+                    if (!result) {
+                        console.error('checkAccess: 結果が空です');
+                        showAccessErrorStep();
+                        return;
+                    }
+
+                    if (result.status === 'not_registered') {
+                        // ユーザー未登録時も、scriptPropertiesから方針更新日時を取得
+                        if (result.policyUpdateDates) {
+                            policyUpdateDates = result.policyUpdateDates;
+                        }
+                        showAgreementStep('input');
+                        return;
+                    }
+
+                    if (result.status === 'ok') {
+                        useApiMode = !!result.useApiMode;
+                        // ユーザープロパティと方針更新日時を保存
+                        if (result.userAgreementData) {
+                            userAgreementData = result.userAgreementData;
+                        }
+                        if (result.policyUpdateDates) {
+                            policyUpdateDates = result.policyUpdateDates;
+                        }
+
+                        // 規約・ポリシーの再同意が必要かチェック
+                        if (result.requiresReAgreement && (result.requiresReAgreement.terms || result.requiresReAgreement.privacy)) {
+                            // 再同意が必要な場合、同意画面を表示
+                            showAgreementStep('re-agreement', result.requiresReAgreement);
+                            return;
+                        }
+
+                        // 通常モード: ライブラリ経由でアプリHTMLを取得済み
+                        if (result.appHtml) {
+                            document.open();
+                            document.write(result.appHtml);
+                            document.close();
+                        } else {
+                            console.error('checkAccess: appHtml is empty');
+                            showAccessErrorStep();
+                        }
+                        return;
+                    }
+
+                    // その他のunauthorized
+                    console.error('checkAccess failed:', result?.error);
+                    showAccessErrorStep();
+                })
+                .withFailureHandler(function (error) {
+                    console.error('checkAccess failed:', error);
+                    showAccessErrorStep();
+                })
+                .getInitialAppData(activeUserEmail, urlParams, isMobile);
+        }
+
+        function showStep(id) {
+            const steps = document.querySelectorAll('#register-pages > div');
+            steps.forEach(step => step.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function showAccessErrorStep() {
+            const allowedDomains = AUTH_CONFIG.ALLOWED_DOMAINS.join(', ');
+            document.getElementById('active-user-email').innerHTML = `
+                <span class="secondary-text small-text">
+                    サインイン中のアカウント: <a target="_blank" href="https:\/\/myaccount.google.com/?authuser=${activeUserEmail}">${activeUserEmail}</a><br>
+                    サインイン可能なドメイン: ${allowedDomains}
+                </span>`;
+            showStep('step-access-error');
+        }
+
+        function showInputStep(retry = false) {
+            showStep('step-input');
+            if (retry) {
+                document.getElementById('slack-profile-input').value = '';
+            }
+        }
+
+        function showConfirmStep() {
+            showStep('step-confirm');
+
+            // ローディング表示を初期化
+            document.getElementById('user-profile-photo').innerHTML = '<div class="shape loading-indicator max rotate"></div>';
+            document.getElementById('user-name').innerHTML = '<p class="large-text">検索中です。しばらくお待ちください。</p>';
+            document.getElementById('user-name-warning').innerHTML = '';
+            document.getElementById('confirm-nav').style.display = 'none';
+        }
+
+        function showErrorStep() {
+            showStep('step-error');
+
+            const slackProfileUrl = document.getElementById('slack-profile-input').value;
+            document.getElementById('error-url').innerHTML = `
+                入力されたURL: <a href="${slackProfileUrl}" target="_blank" tabindex="-1">${slackProfileUrl}</a><br>
+                正しいURLの例: https://${AUTH_CONFIG.SLACK_DOMAIN}/team/U0123456789
+            `;
+        }
+
+        function reloadPage(btn) {
+            if (btn) {
+                const icon = btn.querySelector('i');
+                if (icon) {
+                    icon.outerHTML = '<progress class="circle indeterminate small"></progress>';
+                }
+                btn.disabled = true;
+            }
+            window.open(scriptUrl, '_top');
+        }
+
+        function searchUserBySlackProfileUrl(slackProfileUrl) {
+            showConfirmStep();
+            google.script.run
+                .withSuccessHandler(function (user) {
+                    if (user) {
+                        foundUser = user;
+                        displayUserInfo(user);
+                        document.getElementById('confirm-nav').style.display = 'flex';
+                    } else {
+                        showErrorStep();
+                    }
+                })
+                .withFailureHandler(function (error) {
+                    alert('エラーが発生しました: ' + error.message);
+                    showInputStep();
+                })
+                .findUserBySlackUrl(slackProfileUrl, useApiMode);
+        }
+
+        function displayUserInfo(user) {
+            document.getElementById('user-profile-photo').innerHTML = `
+                <div class="shape sunny max rotate">    
+                    <img src="${user.profile_photo_url}" class="responsive" alt="${user.display_name}">
+                </div>
+            `;
+            document.getElementById('user-name').innerHTML = `
+                <p class="large-text">はじめまして！あなたは<strong>${user.display_name}</strong>さんですか？</p>
+            `;
+            document.getElementById('user-name-warning').innerHTML = ``;
+        }
+
+        function registerUser() {
+            if (!foundUser) {
+                alert('ユーザー情報が見つかりません');
+                return;
+            }
+
+            ui('#step-finishing'); // まだappUiを定義していないので、BeerCSS標準のui関数を呼び出す
+
+            google.script.run
+                .withSuccessHandler(function (success) {
+                    if (!success) {
+                        // 登録失敗時はアラートを出してステップ2に戻る（もしくはエラー画面）
+                        alert('登録に失敗しました');
+                        showConfirmStep();
+                        displayUserInfo(foundUser);
+                        document.getElementById('confirm-nav').style.display = 'flex';
+                    }
+                    this.reloadPage();
+                })
+                .withFailureHandler(function (error) {
+                    alert('エラーが発生しました: ' + error.message);
+                    showConfirmStep();
+                    displayUserInfo(foundUser);
+                    document.getElementById('confirm-nav').style.display = '';
+                })
+                .registerUserEmail(foundUser.id, useApiMode);
+        }
+    </script>
+</body>
+
+</html>

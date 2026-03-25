@@ -1,0 +1,145 @@
+<nav class="top right-margin surface">
+
+    <button id="new-button" class="large round primary">
+        <i><svg viewBox="0 0 1024 1024"><path d="M335.01,245.57c0-68.25,31.27-105.17,95.13-105.17h118.76c36.36,0,65.84,29.48,65.84,65.84v56.77c0,36.36-29.48,65.84-65.84,65.84h-85.42l-128.47-83.28Z"/><circle cx="772.15" cy="715.46" r="137.49"/><path d="M641.67,845.93c-16.93-16.93-30.23-36.66-39.53-58.64-9.63-22.78-14.52-46.95-14.52-71.84s4.89-49.06,14.52-71.84c1.24-2.93,2.55-5.81,3.93-8.65-61.16-40.88-142.06-53.42-227.03-18.21l58.64-238.28-121.6-78.99-182.89,415.98s-36.54,70.96,39.01,86.65c60.98,12.66,376.18,51.13,495.51,65.49-9.27-6.38-17.98-13.6-26.04-21.67Z"/></svg></i>
+        <span class="l">新規作成</span>
+        <menu id="new-button-dropdown" class="min no-wrap">
+            <li>
+                <a onclick="App.modals.newTask.open()">
+                    <i>task_alt</i>
+                    <span>新しいタスク</span>
+                </a>
+            </li>
+            <li>
+                <a onclick="App.pages.boards.createBoard()">
+                    <i>folder</i>
+                    <span>新しいボード</span>
+                </a>
+            </li>
+            <li style="display: none;">
+                <a onclick="App.modals.newMember.open()">
+                    <i>person</i>
+                    <span>新しい人物</span>
+                </a>
+            </li>
+            <li style="display: none;">
+                <a onclick="App.modals.newDirectory.open()">
+                    <i>account_tree</i>
+                    <span>新しい組織</span>
+                </a>
+            </li>
+            <li style="display: none;">
+                <a onclick="App.modals.newSkill.open()">
+                    <i>psychology</i>
+                    <span>新しい技能</span>
+                </a>
+            </li>
+            <li style="display: none;">
+                <a onclick="App.modals.newPlan.open()">
+                    <i>store</i>
+                    <span>新しい企画</span>
+                </a>
+            </li>
+            <li style="display: none;">
+                <a onclick="App.modals.newComment.open()">
+                    <i>comment</i>
+                    <span>新しいコメント</span>
+                </a>
+            </li>
+            <li style="display: none;">
+                <a onclick="App.modals.newNotice.open()">
+                    <i>campaign</i>
+                    <span>新しいお知らせ</span>
+                </a>
+            </li>
+        </menu>
+    </button>
+
+    <!-- 検索バー -->
+    <div class="field round prefix border" id="search-container">
+        <i id="search-icon" class="front" style="cursor: pointer;"
+            onclick="App.utils.search.handleSearchClick()">search</i>
+        <input placeholder="検索" id="search-input" onkeydown="App.utils.search.handleSearchKeydown(event)"
+            onblur="App.utils.search.handleSearchBlur(event)">
+        <div class="l tooltip right round left-padding right-padding">
+            <p>タスク名またはタスク番号を検索します</p>
+            <span><i class="tiny no-padding no-margin">keyboard_option_key</i>F</span>
+        </div>
+    </div>
+
+    <div class="max"></div>
+
+    <nav class="left-margin right-margin">
+        <button id="comments-button" class="m l circle transparent" onclick="App.utils.header.comments.toggle()" title="コメント">
+            <i>comment</i>
+            <span id="comments-badge" class="badge" style="display: none;">0</span>
+        </button>
+
+        <button class="l circle transparent" title="リンク">
+            <i>apps</i>
+            <menu id="apps-menu" class="left no-padding medium-width">
+                <div id="apps-grid">
+                    <!-- リンクはloadAllData実行時に動的に生成される -->
+                </div>
+            </menu>
+        </button>
+
+        <button class="circle transparent" title="ヘルプ">
+            <i>help</i>
+            <menu id="help-menu" class="left no-wrap">
+                <li style="display: none;"><a onclick="App.utils.header.shortcuts.open()">ショートカット</a></li>
+                <li><a id="help-link" href="" target="_blank">ヘルプ</a></li>
+                <li><a id="terms-link" href="" target="_blank">利用規約</a></li>
+                <li><a id="privacy-link" href="" target="_blank">プライバシーポリシー</a></li>
+            </menu>
+        </button>
+
+        <button id="system-info-button" class="l circle transparent" title="ZARMSについて" onclick="App.utils.header.systemUpdates.toggle()">
+            <i>info</i>
+            <menu id="system-info-menu" class="left no-padding medium-width">
+                <div id="system-info-list">
+                    <!-- アップデート情報はloadAllData実行時に動的に生成される -->
+                </div>
+            </menu>
+        </button>
+    </nav>
+</nav>
+
+<!-- ショートカット一覧モーダル -->
+<dialog id="modal-shortcuts-help" class="modal medium-width padding">
+    <nav class="small-padding bottom-margin">
+        <h5 class="bold max">ショートカット一覧</h5>
+        <button class="circle transparent" onclick="App.utils.header.shortcuts.close()" title="閉じる">
+            <i>close</i>
+        </button>
+    </nav>
+    <article class="border small-round no-elevate scroll">
+        <div id="shortcuts-help-list" class="padding">
+            <div class="row tiny-space center-align secondary-text">
+                <progress class="circle indeterminate small"></progress>
+                <span>読み込み中...</span>
+            </div>
+        </div>
+    </article>
+</dialog>
+
+<!-- システムアップデート通知モーダル -->
+<dialog id="modal-system-update" class="modal max large-padding">
+    <div class="large-margin large-padding center-align">
+        <h5 class="bold">ZARMSがアップデートされました</h5>
+        <p>新しいバージョンを使うために、ページを更新してください。</p>
+        <div class="grid large-margin">
+            <div class="s6">
+                <button class="primary-container extra responsive" data-ui="#modal-system-update">
+                    <span class="secondary-text">あとで</span>
+                </button>
+            </div>
+            <div class="s6">
+                <button class="primary extra responsive" onclick="App.utils.header.systemUpdates.reloadPage(this)">
+                    <i>refresh</i>
+                    <span>今すぐ更新する</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</dialog>

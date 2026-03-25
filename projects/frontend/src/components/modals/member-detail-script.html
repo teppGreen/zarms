@@ -1,0 +1,1126 @@
+<script>
+    (function () {
+        App.modals.memberDetail = {
+            currentId: null,
+            currentItem: null,
+            originalData: null,
+            isLoading: false,
+            isSaving: false,
+            isDirty: false,
+            quill: null,
+            pendingDirectoryChanges: { toAdd: [], toRemove: [], toUpdate: [] },
+            pendingSkillChanges: { toAdd: [], toRemove: [], toUpdate: [] },
+            originalDirectories: [],
+            originalSkills: [],
+
+            open: function (memberId, skipUrlUpdate = false) {
+                if (!memberId) return;
+
+                const requestId = String(memberId);
+                const member = (App.state.data.members || []).find(function (m) {
+                    const value = m ? (m.id || m.member_id || null) : null;
+                    return value !== undefined && value !== null && String(value) === requestId;
+                });
+                if (!member) {
+                    console.error('[MemberDetail] Member not found:', memberId);
+                    return;
+                }
+
+                const memberKey = member.id || member.member_id;
+                this.currentId = memberKey;
+                this.currentItem = Object.assign({}, member);
+                this.originalData = Object.assign({}, member);
+                this.isLoading = true;
+                this.isSaving = false;
+                this._setDirty(false);
+
+                // 一時保存用データをリセット
+                this.pendingDirectoryChanges = { toAdd: [], toRemove: [], toUpdate: [] };
+                this.pendingSkillChanges = { toAdd: [], toRemove: [], toUpdate: [] };
+                
+                // 現在の所属・技能を取得して保持
+                const assignments = App.state.data.directoryAssignments || [];
+                const skillAssignments = App.state.data.skillAssignments || [];
+                this.originalDirectories = assignments
+                    .filter(function (a) { return String(a.member_id) === String(memberKey) && a.is_active !== false; })
+                    .map(function (a) { return Object.assign({}, a); });
+                this.originalSkills = skillAssignments
+                    .filter(function (a) { return String(a.member_id) === String(memberKey); })
+                    .map(function (a) { return Object.assign({}, a); });
+
+                if (!this.quill) {
+                    this.quill = App.utils.quill.init('#member-description-editor', {
+                        placeholder: 'プロフィール説明を入力...'
+                    });
+                }
+
+                appUi('#modal-detail-member', true);
+                this._updateUrlOnOpen(memberKey, skipUrlUpdate);
+
+                this._render(member);
+                this._renderDirectories(memberKey);
+                this._renderSkills(memberKey);
+                this.loadComments(memberKey);
+                appUi('#member-detail-tab-profile');
+                this._bindTabStateSync();
+                this._bindEscClose();
+                this.isLoading = false;
+                this._updateActionButtons();
+            },
+
+            close: function (options = {}) {
+                const skipDirtyCheck = options.skipDirtyCheck === true;
+                const skipUrlUpdate = options.skipUrlUpdate === true;
+                const reason = options.reason || 'user';
+
+                if (this.isSaving) {
+                    showSnackbar('保存処理中は閉じられません', 'info');
+                    return false;
+                }
+
+                if (!skipDirtyCheck && this.isDirty) {
+                    const message = reason === 'escape'
+                        ? '未保存の変更があります。変更を破棄して閉じますか？'
+                        : '変更を破棄して閉じますか？';
+                    if (!confirm(message)) return false;
+                }
+                appUi('#modal-detail-member', false);
+                this._updateUrlOnClose(skipUrlUpdate);
+                this._reset();
+                return true;
+            },
+
+            discard: function () {
+                if (this.isSaving) return;
+                if (this.isDirty) {
+                    if (!confirm('変更を破棄しますか？')) return;
+                }
+                this.close({ skipDirtyCheck: true, reason: 'discard' });
+            },
+
+            onPrimaryAction: function () {
+                if (this.isSaving) return;
+                if (this.isDirty) {
+                    this.save();
+                    return;
+                }
+                this.close({ skipDirtyCheck: true, reason: 'primary' });
+            },
+
+            save: async function () {
+                const id = this.currentId;
+                if (!id || this.isSaving) return;
+
+                this.isSaving = true;
+                this._updateActionButtons();
+
+                const errorEl = document.getElementById('member-detail-error');
+                const newName = (document.getElementById('member-detail-name-input')?.value || '').trim();
+                const nameYomi = (document.getElementById('member-detail-name-yomi-input')?.value || '').trim();
+                const displayNameInput = (document.getElementById('member-detail-display-name-input')?.value || '').trim();
+                const displayName = displayNameInput || newName;
+                const displayNameYomi = (document.getElementById('member-detail-display-name-yomi-input')?.value || '').trim();
+                const currentEmail = (document.getElementById('member-detail-email-input')?.value || '').trim();
+                const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                const yomiPattern = /^[ァ-ヶー\s　]+$/;
+
+                if (!newName) {
+                    if (errorEl) { errorEl.textContent = '氏名は必須です'; errorEl.style.display = ''; }
+                    return;
+                }
+                if (newName.length > 80) {
+                    if (errorEl) { errorEl.textContent = '氏名は80文字以内で入力してください'; errorEl.style.display = ''; }
+                    return;
+                }
+                if (!currentEmail) {
+                    if (errorEl) { errorEl.textContent = 'メールアドレスは必須です'; errorEl.style.display = ''; }
+                    return;
+                }
+                if (!emailPattern.test(currentEmail)) {
+                    if (errorEl) { errorEl.textContent = 'メールアドレスの形式が正しくありません'; errorEl.style.display = ''; }
+                    return;
+                }
+                if (displayName.length > 80) {
+                    if (errorEl) { errorEl.textContent = '表示名は80文字以内で入力してください'; errorEl.style.display = ''; }
+                    return;
+                }
+                if (nameYomi && (!yomiPattern.test(nameYomi) || nameYomi.length > 80)) {
+                    if (errorEl) { errorEl.textContent = '氏名ヨミはカタカナ80文字以内で入力してください'; errorEl.style.display = ''; }
+                    return;
+                }
+                if (displayNameYomi && (!yomiPattern.test(displayNameYomi) || displayNameYomi.length > 80)) {
+                    if (errorEl) { errorEl.textContent = '表示名ヨミはカタカナ80文字以内で入力してください'; errorEl.style.display = ''; }
+                    return;
+                }
+
+                const urlFields = [
+                    { id: 'member-detail-website-url-input', label: 'ウェブサイトURL' },
+                    { id: 'member-detail-slack-url-input', label: 'SlackプロフィールURL' },
+                    { id: 'member-detail-photo-file-url-input', label: 'プロフィール写真GファイルURL' },
+                    { id: 'member-detail-photo-url-input', label: 'プロフィール写真URL' }
+                ];
+                for (let i = 0; i < urlFields.length; i += 1) {
+                    const field = urlFields[i];
+                    const value = (document.getElementById(field.id)?.value || '').trim();
+                    if (!value) continue;
+                    try {
+                        const parsed = new URL(value);
+                        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+                            throw new Error('invalid protocol');
+                        }
+                    } catch (e) {
+                        if (errorEl) { errorEl.textContent = field.label + ' の形式が正しくありません'; errorEl.style.display = ''; }
+                        return;
+                    }
+                }
+
+                if (errorEl) errorEl.style.display = 'none';
+
+                const updates = {
+                    name: newName,
+                    display_name: displayName,
+                    email: currentEmail,
+                    name_yomi: nameYomi || null,
+                    display_name_yomi: displayNameYomi || null,
+                    phone_number: (document.getElementById('member-detail-phone-number-input')?.value || '').trim() || null,
+                    birthday: (document.getElementById('member-detail-birthday-input')?.value || '').trim() || null,
+                    title: (document.getElementById('member-detail-title-input')?.value || '').trim() || null,
+                    website_url: (document.getElementById('member-detail-website-url-input')?.value || '').trim() || null,
+                    description: App.utils.quill.getContent(this.quill) || null,
+                    slack_profile_url: (document.getElementById('member-detail-slack-url-input')?.value || '').trim() || null,
+                    profile_photo_file_url: (document.getElementById('member-detail-photo-file-url-input')?.value || '').trim() || null,
+                    profile_photo_url: (document.getElementById('member-detail-photo-url-input')?.value || '').trim() || null,
+                    system_role_key: (document.getElementById('member-detail-system-role-key-input')?.value || '').trim() || null,
+                    is_active: document.getElementById('member-detail-is-active-input')?.checked !== false,
+                    remark: (document.getElementById('member-detail-remark-input')?.value || '').trim() || null
+                };
+
+                const orig = this.originalData || {};
+                let hasChanges = false;
+                for (const key of Object.keys(updates)) {
+                    if (String(updates[key] ?? '') !== String(orig[key] ?? '')) {
+                        hasChanges = true;
+                        break;
+                    }
+                }
+
+                // 所属組織・技能の変更があるかチェック
+                const hasDirectoryChanges = this.pendingDirectoryChanges.toAdd.length > 0 ||
+                    this.pendingDirectoryChanges.toRemove.length > 0 ||
+                    this.pendingDirectoryChanges.toUpdate.length > 0;
+                const hasSkillChanges = this.pendingSkillChanges.toAdd.length > 0 ||
+                    this.pendingSkillChanges.toRemove.length > 0 ||
+                    this.pendingSkillChanges.toUpdate.length > 0;
+
+                if (!hasChanges && !hasDirectoryChanges && !hasSkillChanges) {
+                    this._setDirty(false);
+                    this.close({ skipDirtyCheck: true, reason: 'save-no-change' });
+                    return;
+                }
+
+                Object.assign(this.currentItem, updates);
+                const memberInState = (App.state.data.members || []).find(function (m) { return m.id === id; });
+                if (memberInState) Object.assign(memberInState, updates);
+
+                this._setDirty(false);
+                showSnackbar('変更を保存しています...', 'info', 'top', 0);
+
+                try {
+                    // メンバー基本情報の更新
+                    if (hasChanges) {
+                        await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'update', {
+                            where: { id: ['=', id] },
+                            set: updates
+                        }, '人物情報を更新');
+                    }
+
+                    // 所属組織の変更を保存
+                    if (hasDirectoryChanges) {
+                        await this._saveDirectoryChanges(id);
+                    }
+
+                    // スキルの変更を保存
+                    if (hasSkillChanges) {
+                        await this._saveSkillChanges(id);
+                    }
+
+                    showSnackbar('変更を保存しました', 'success');
+                    if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+                    this.close({ skipDirtyCheck: true, reason: 'save-success' });
+                } catch (err) {
+                    console.error('[MemberDetail] 保存エラー:', err);
+                    if (memberInState) Object.assign(memberInState, orig);
+                    this._setDirty(true);
+                    showSnackbar('保存に失敗しました', 'error');
+                } finally {
+                    this.isSaving = false;
+                    this._updateActionButtons();
+                }
+
+                this._reset();
+            },
+
+            copyField: async function (fieldId, mode) {
+                const text = this._buildCopyText(fieldId, mode);
+                if (!text) {
+                    showSnackbar('コピー対象の値がありません', 'error');
+                    return;
+                }
+
+                try {
+                    await this._copyToClipboard(text);
+                    showSnackbar('コピーしました', 'success');
+                } catch (err) {
+                    console.error('[MemberDetail] コピーエラー:', err);
+                    showSnackbar('コピーに失敗しました', 'error');
+                }
+            },
+
+            _buildCopyText: function (fieldId, mode) {
+                const value = (document.getElementById(fieldId)?.value || '').trim();
+                if (!value && mode !== 'email') return '';
+
+                if (mode === 'email') {
+                    const email = (document.getElementById('member-detail-email-input')?.value || '').trim();
+                    if (!email) return '';
+                    const displayName = (document.getElementById('member-detail-display-name-input')?.value || '').trim();
+                    const name = (document.getElementById('member-detail-name-input')?.value || '').trim();
+                    const title = displayName || name;
+                    if (!title) return '<' + email + '>';
+                    return title + '(' + name + ') <' + email + '>';
+                }
+
+                if (mode === 'slackTail') {
+                    return this._extractSlackProfileTail(value);
+                }
+
+                return value;
+            },
+
+            _copyToClipboard: function (text) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    return navigator.clipboard.writeText(text);
+                }
+                return Promise.reject(new Error('Clipboard API is not available'));
+            },
+
+            _buildBaseUrlParams: function () {
+                const currentParams = App.utils.url.getParams();
+                const nextParams = {
+                    tab: currentParams.tab || 'home'
+                };
+                if (nextParams.tab === 'board' && currentParams.board_id) {
+                    nextParams.board_id = currentParams.board_id;
+                }
+                if (nextParams.tab === 'catalog' && currentParams.table) {
+                    nextParams.table = currentParams.table;
+                }
+                return nextParams;
+            },
+
+            _updateUrlOnOpen: function (memberId, skipUrlUpdate) {
+                if (skipUrlUpdate || !memberId || !App.utils.url || !App.utils.url.updateParams) return;
+                const nextParams = this._buildBaseUrlParams();
+                nextParams.modal = 'member-detail';
+                nextParams.member_id = memberId;
+                App.utils.url.updateParams(nextParams, false);
+            },
+
+            _updateUrlOnClose: function (skipUrlUpdate) {
+                if (skipUrlUpdate || !App.utils.url || !App.utils.url.updateParams) return;
+                const nextParams = this._buildBaseUrlParams();
+                App.utils.url.updateParams(nextParams, false);
+            },
+
+            _setDirty: function (nextValue) {
+                this.isDirty = nextValue === true;
+                this._updateActionButtons();
+            },
+
+            _updateActionButtons: function () {
+                const primaryButton = document.getElementById('member-detail-primary-button');
+                const discardButton = document.getElementById('member-detail-discard-button');
+                const closeButton = document.querySelector('#modal-detail-member button[title="閉じる"]');
+
+                const processing = this.isSaving === true || this.isLoading === true;
+                const hasChanges = this.isDirty === true;
+
+                if (primaryButton) {
+                    primaryButton.disabled = processing;
+                    if (this.isSaving) {
+                        primaryButton.innerHTML = '<progress class="circle small"></progress><span>保存中...</span>';
+                    } else if (hasChanges) {
+                        primaryButton.innerHTML = '<i>save</i><span>変更を保存</span>';
+                    } else {
+                        primaryButton.innerHTML = '<i>close</i><span>閉じる</span>';
+                    }
+                }
+                if (discardButton) {
+                    discardButton.disabled = processing || !hasChanges;
+                }
+                if (closeButton) {
+                    closeButton.disabled = processing;
+                }
+            },
+
+            _bindTabStateSync: function () {
+                const tabs = document.querySelectorAll('#member-detail-tabs > a');
+                tabs.forEach(function (tab) {
+                    if (!tab || tab.dataset.memberDetailTabBound === '1') return;
+                    tab.addEventListener('click', function () {
+                        setTimeout(function () {
+                            App.modals.memberDetail._updateActionButtons();
+                        }, 0);
+                    });
+                    tab.dataset.memberDetailTabBound = '1';
+                });
+            },
+
+            openNewComment: function () {
+                if (!this.currentId) return;
+                if (!App.modals.newComment) return;
+
+                if (App.modals.newComment.openFor) {
+                    App.modals.newComment.openFor('members', this.currentId);
+                    return;
+                }
+
+                App.modals.newComment.open(this.currentId);
+            },
+
+            openAddDirectory: function () {
+                if (!this.currentId) return;
+                if (!App.modals.selectDirectories || !App.modals.selectDirectories.open) return;
+
+                const memberId = this.currentId;
+                const preSelected = (App.state.data.directoryAssignments || [])
+                    .filter(function (a) { return a.member_id === memberId && a.is_active !== false; })
+                    .map(function (a) { return a.directory_id; });
+
+                App.modals.selectDirectories.open({
+                    multiSelect: true,
+                    preSelected: preSelected,
+                    callback: function (selectedIds) {
+                        App.modals.memberDetail.applyDirectorySelection(memberId, selectedIds);
+                    }
+                });
+            },
+
+            applyDirectorySelection: function (memberId, selectedIds) {
+                if (!memberId) return;
+                if (!selectedIds || selectedIds.length === 0) return;
+
+                const self = this;
+                
+                // 一時保存リストに追加（即座にDBに反映しない）
+                selectedIds.forEach(function (directoryId) {
+                    // 既に追加予定リストにあるかチェック
+                    const alreadyPending = self.pendingDirectoryChanges.toAdd.find(function (d) {
+                        return d.directory_id === directoryId;
+                    });
+                    if (alreadyPending) return;
+
+                    // 削除予定リストから除外
+                    self.pendingDirectoryChanges.toRemove = self.pendingDirectoryChanges.toRemove.filter(function (id) {
+                        return id !== directoryId;
+                    });
+
+                    // 既存の割り当てかチェック
+                    const existing = self.originalDirectories.find(function (d) {
+                        return d.directory_id === directoryId;
+                    });
+
+                    if (!existing) {
+                        // 新規追加
+                        self.pendingDirectoryChanges.toAdd.push({
+                            member_id: memberId,
+                            directory_id: directoryId,
+                            is_active: true,
+                            role: null
+                        });
+                    }
+                });
+
+                this._setDirty(true);
+                this._renderDirectories(memberId);
+                showSnackbar('所属組織を追加しました（保存ボタンで確定）', 'info');
+            },
+
+            deactivateDirectoryAssignment: function (assignmentId, directoryId) {
+                if (!directoryId) return;
+                if (!confirm('所属組織を解除しますか？')) return;
+
+                // 追加予定リストから削除
+                this.pendingDirectoryChanges.toAdd = this.pendingDirectoryChanges.toAdd.filter(function (d) {
+                    return d.directory_id !== directoryId;
+                });
+
+                // 削除予定リストに追加（既存のものの場合のみ）
+                const existing = this.originalDirectories.find(function (d) {
+                    return d.directory_id === directoryId;
+                });
+                if (existing && !this.pendingDirectoryChanges.toRemove.includes(directoryId)) {
+                    this.pendingDirectoryChanges.toRemove.push(directoryId);
+                }
+
+                this._setDirty(true);
+                this._renderDirectories(this.currentId);
+                showSnackbar('所属組織を解除しました（保存ボタンで確定）', 'info');
+            },
+
+            updateDirectoryRole: function (assignmentId, directoryId, roleValue) {
+                if (!directoryId) return;
+
+                const normalizedRole = (roleValue || '').trim() || null;
+
+                // 追加予定リスト内で更新
+                const pending = this.pendingDirectoryChanges.toAdd.find(function (d) {
+                    return d.directory_id === directoryId;
+                });
+                if (pending) {
+                    pending.role = normalizedRole;
+                    this._setDirty(true);
+                    return;
+                }
+
+                // 更新予定リストに追加
+                const updateIndex = this.pendingDirectoryChanges.toUpdate.findIndex(function (u) {
+                    return u.directory_id === directoryId;
+                });
+                if (updateIndex >= 0) {
+                    this.pendingDirectoryChanges.toUpdate[updateIndex].role = normalizedRole;
+                } else {
+                    const existing = this.originalDirectories.find(function (d) {
+                        return d.directory_id === directoryId;
+                    });
+                    if (existing && existing.role !== normalizedRole) {
+                        this.pendingDirectoryChanges.toUpdate.push({
+                            id: existing.id,
+                            directory_id: directoryId,
+                            role: normalizedRole
+                        });
+                    }
+                }
+
+                this._setDirty(true);
+                showSnackbar('役割を変更しました（保存ボタンで確定）', 'info');
+            },
+
+            openAddSkill: function () {
+                if (!this.currentId) return;
+                if (!App.modals.selectSkills || !App.modals.selectSkills.open) return;
+
+                const memberId = this.currentId;
+                const preSelected = (App.state.data.skillAssignments || [])
+                    .filter(function (a) { return a.member_id === memberId; })
+                    .map(function (a) { return a.skill_id; });
+
+                App.modals.selectSkills.open({
+                    multiSelect: true,
+                    preSelected: preSelected,
+                    defaultLevel: 'INTERMEDIATE',
+                    callback: function (result) {
+                        App.modals.memberDetail.applySkillSelection(memberId, result.selectedIds, result.levelKey);
+                    }
+                });
+            },
+
+            applySkillSelection: function (memberId, selectedIds, levelKey) {
+                if (!memberId) return;
+                if (!selectedIds || selectedIds.length === 0) return;
+
+                const self = this;
+                const level = levelKey || 'INTERMEDIATE';
+
+                // 一時保存リストに追加
+                selectedIds.forEach(function (skillId) {
+                    const alreadyPending = self.pendingSkillChanges.toAdd.find(function (s) {
+                        return s.skill_id === skillId;
+                    });
+                    if (alreadyPending) return;
+
+                    // 削除予定リストから除外
+                    self.pendingSkillChanges.toRemove = self.pendingSkillChanges.toRemove.filter(function (id) {
+                        return id !== skillId;
+                    });
+
+                    // 既存の技能かチェック
+                    const existing = self.originalSkills.find(function (s) {
+                        return s.skill_id === skillId;
+                    });
+
+                    if (!existing) {
+                        // 新規追加
+                        self.pendingSkillChanges.toAdd.push({
+                            member_id: memberId,
+                            skill_id: skillId,
+                            skill_level_key: level,
+                            user_note: null
+                        });
+                    } else if (existing.skill_level_key !== level) {
+                        // レベル更新
+                        const updateIndex = self.pendingSkillChanges.toUpdate.findIndex(function (u) {
+                            return u.skill_id === skillId;
+                        });
+                        if (updateIndex >= 0) {
+                            self.pendingSkillChanges.toUpdate[updateIndex].skill_level_key = level;
+                        } else {
+                            self.pendingSkillChanges.toUpdate.push({
+                                id: existing.id,
+                                skill_id: skillId,
+                                skill_level_key: level,
+                                user_note: existing.user_note || existing.remark || null
+                            });
+                        }
+                    }
+                });
+
+                this._setDirty(true);
+                this._renderSkills(memberId);
+            },
+
+            removeSkillAssignment: function (assignmentId, skillId) {
+                if (!skillId) return;
+                if (!confirm('技能を削除しますか？')) return;
+
+                // 追加予定リストから削除
+                this.pendingSkillChanges.toAdd = this.pendingSkillChanges.toAdd.filter(function (s) {
+                    return s.skill_id !== skillId;
+                });
+
+                // 削除予定リストに追加（既存のものの場合のみ）
+                const existing = this.originalSkills.find(function (s) {
+                    return s.skill_id === skillId;
+                });
+                if (existing && !this.pendingSkillChanges.toRemove.includes(skillId)) {
+                    this.pendingSkillChanges.toRemove.push(skillId);
+                }
+
+                this._setDirty(true);
+                this._renderSkills(this.currentId);
+            },
+
+            updateSkillLevel: function (assignmentId, skillId, levelKey) {
+                if (!skillId) return;
+
+                // 追加予定リスト内で更新
+                const pending = this.pendingSkillChanges.toAdd.find(function (s) {
+                    return s.skill_id === skillId;
+                });
+                if (pending) {
+                    pending.skill_level_key = levelKey;
+                    this._setDirty(true);
+                    return;
+                }
+
+                // 更新予定リストに追加
+                const updateIndex = this.pendingSkillChanges.toUpdate.findIndex(function (u) {
+                    return u.skill_id === skillId;
+                });
+                if (updateIndex >= 0) {
+                    this.pendingSkillChanges.toUpdate[updateIndex].skill_level_key = levelKey;
+                } else {
+                    const existing = this.originalSkills.find(function (s) {
+                        return s.skill_id === skillId;
+                    });
+                    if (existing && existing.skill_level_key !== levelKey) {
+                        this.pendingSkillChanges.toUpdate.push({
+                            id: existing.id,
+                            skill_id: skillId,
+                            skill_level_key: levelKey,
+                            user_note: existing.user_note || existing.remark || null
+                        });
+                    }
+                }
+
+                this._setDirty(true);
+                this._renderSkills(this.currentId);
+            },
+
+            updateSkillRemark: function (assignmentId, skillId, remarkValue) {
+                if (!skillId) return;
+
+                const normalizedRemark = (remarkValue || '').trim() || null;
+
+                // 追加予定リスト内で更新
+                const pending = this.pendingSkillChanges.toAdd.find(function (s) {
+                    return s.skill_id === skillId;
+                });
+                if (pending) {
+                    pending.user_note = normalizedRemark;
+                    this._setDirty(true);
+                    return;
+                }
+
+                // 更新予定リストに追加
+                const updateIndex = this.pendingSkillChanges.toUpdate.findIndex(function (u) {
+                    return u.skill_id === skillId;
+                });
+                if (updateIndex >= 0) {
+                    this.pendingSkillChanges.toUpdate[updateIndex].user_note = normalizedRemark;
+                } else {
+                    const existing = this.originalSkills.find(function (s) {
+                        return s.skill_id === skillId;
+                    });
+                    const existingNote = existing ? (existing.user_note || existing.remark || null) : null;
+                    if (existing && existingNote !== normalizedRemark) {
+                        this.pendingSkillChanges.toUpdate.push({
+                            id: existing.id,
+                            skill_id: skillId,
+                            skill_level_key: existing.skill_level_key,
+                            user_note: normalizedRemark
+                        });
+                    }
+                }
+
+                this._setDirty(true);
+                showSnackbar('メモを変更しました（保存ボタンで確定）', 'info');
+            },
+
+            // 保存時に呼ばれる関数: 所属組織の変更をDBに反映
+            _saveDirectoryChanges: async function (memberId) {
+                const assignments = App.state.data.directoryAssignments || [];
+
+                // 削除
+                for (let i = 0; i < this.pendingDirectoryChanges.toRemove.length; i++) {
+                    const directoryId = this.pendingDirectoryChanges.toRemove[i];
+                    const existing = assignments.find(function (a) {
+                        return a.member_id === memberId && a.directory_id === directoryId;
+                    });
+                    if (existing && existing.id) {
+                        await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                            where: { id: ['=', existing.id] },
+                            set: { is_active: false }
+                        }, '所属組織を解除');
+                        existing.is_active = false;
+                    }
+                }
+
+                // 追加
+                for (let i = 0; i < this.pendingDirectoryChanges.toAdd.length; i++) {
+                    const record = this.pendingDirectoryChanges.toAdd[i];
+                    const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'insert', record, '所属組織を追加');
+                    if (inserted && inserted.data && inserted.data.id) {
+                        record.id = inserted.data.id;
+                        assignments.push(record);
+                    }
+                }
+
+                // 更新
+                for (let i = 0; i < this.pendingDirectoryChanges.toUpdate.length; i++) {
+                    const update = this.pendingDirectoryChanges.toUpdate[i];
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.DIRECTORY_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', update.id] },
+                        set: { role: update.role }
+                    }, '組織での役割を更新');
+                    const target = assignments.find(function (a) { return a.id === update.id; });
+                    if (target) target.role = update.role;
+                }
+            },
+
+            _saveSkillChanges: async function (memberId) {
+                const assignments = App.state.data.skillAssignments || [];
+
+                // 削除
+                for (let i = 0; i < this.pendingSkillChanges.toRemove.length; i++) {
+                    const skillId = this.pendingSkillChanges.toRemove[i];
+                    const existing = assignments.find(function (a) {
+                        return a.member_id === memberId && a.skill_id === skillId;
+                    });
+                    if (existing && existing.id) {
+                        await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'remove', {
+                            where: { id: ['=', existing.id] }
+                        }, 'スキルを削除');
+                        const index = assignments.findIndex(function (a) { return a.id === existing.id; });
+                        if (index >= 0) assignments.splice(index, 1);
+                    }
+                }
+
+                // 追加
+                for (let i = 0; i < this.pendingSkillChanges.toAdd.length; i++) {
+                    const record = this.pendingSkillChanges.toAdd[i];
+                    const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'insert', record, '技能を追加');
+                    if (inserted && inserted.data && inserted.data.id) {
+                        record.id = inserted.data.id;
+                        assignments.push(record);
+                    }
+                }
+
+                // 更新
+                for (let i = 0; i < this.pendingSkillChanges.toUpdate.length; i++) {
+                    const update = this.pendingSkillChanges.toUpdate[i];
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', update.id] },
+                        set: {
+                            skill_level_key: update.skill_level_key,
+                            user_note: update.user_note
+                        }
+                    }, 'スキルを更新');
+                    const target = assignments.find(function (a) { return a.id === update.id; });
+                    if (target) {
+                        target.skill_level_key = update.skill_level_key;
+                        target.user_note = update.user_note;
+                    }
+                }
+            },
+
+            loadComments: function (memberId, skipLoadingCache = false) {
+                App.utils.commentManager.loadComments({
+                    relatedTable: 'members',
+                    relatedId: memberId,
+                    containerId: 'member-comments-list',
+                    skipLoadingCache: skipLoadingCache,
+                    isCurrent: () => this.currentId === memberId,
+                    onRender: (comments) => this.renderComments(comments),
+                    logPrefix: 'MemberDetail'
+                });
+            },
+
+            renderComments: function (comments) {
+                App.utils.commentManager.renderComments({
+                    containerId: 'member-comments-list',
+                    comments: comments,
+                    escapeText: function (value) {
+                        return escapeHtml(value || '');
+                    },
+                    escapeUrl: function (value) {
+                        return escapeHtml(value || '#');
+                    }
+                });
+            },
+
+            // コメントを即座にUIに追加（Optimistic UI Update）
+            appendCommentToUI: function (comment) {
+                App.utils.commentManager.appendCommentToUI({
+                    containerId: 'member-comments-list',
+                    comment: comment,
+                    escapeText: function (value) {
+                        return escapeHtml(value || '');
+                    },
+                    escapeUrl: function (value) {
+                        return escapeHtml(value || '#');
+                    }
+                });
+            },
+
+            _render: function (member) {
+                const statusChip = document.getElementById('member-detail-status-chip');
+                if (statusChip) {
+                    if (member.is_active === false) {
+                        statusChip.textContent = '退籍';
+                        statusChip.className = 'chip small border';
+                    } else {
+                        statusChip.textContent = '在籍';
+                        statusChip.className = 'chip small primary';
+                    }
+                }
+
+                const setVal = function (id, val) {
+                    const el = document.getElementById(id);
+                    if (el) el.value = val || '';
+                };
+
+                const members = App.state.data.members || [];
+                const findDisplayName = function (memberId) {
+                    if (!memberId) return '';
+                    const found = members.find(function (item) { return item.id === memberId; });
+                    return found ? (found.display_name || found.name || found.email || '') : '不明';
+                };
+
+                setVal('member-detail-name-input', member.name);
+                setVal('member-detail-display-name-input', member.display_name);
+                setVal('member-detail-email-input', member.email);
+                setVal('member-detail-name-yomi-input', member.name_yomi);
+                setVal('member-detail-display-name-yomi-input', member.display_name_yomi);
+                setVal('member-detail-phone-number-input', member.phone_number);
+                setVal('member-detail-birthday-input', member.birthday);
+                setVal('member-detail-title-input', member.title);
+                setVal('member-detail-website-url-input', member.website_url);
+                setVal('member-detail-slack-url-input', member.slack_profile_url);
+                setVal('member-detail-slack-tail-input', this._extractSlackProfileTail(member.slack_profile_url));
+                setVal('member-detail-photo-file-url-input', member.profile_photo_file_url);
+                setVal('member-detail-photo-url-input', member.profile_photo_url);
+                setVal('member-detail-system-role-key-input', member.system_role_key);
+                setVal('member-detail-remark-input', member.remark);
+                setVal('member-detail-created-by-input', findDisplayName(member.created_by));
+                setVal('member-detail-created-at-input', member.created_at ? formatDateTimeForDisplay(member.created_at) : '');
+                setVal('member-detail-updated-by-input', findDisplayName(member.updated_by));
+                setVal('member-detail-updated-at-input', member.updated_at ? formatDateTimeForDisplay(member.updated_at) : '');
+
+                if (this.quill) {
+                    App.utils.quill.setContent(this.quill, member.description || '');
+                }
+
+                const cb = document.getElementById('member-detail-is-active-input');
+                if (cb) cb.checked = member.is_active !== false;
+
+                const lastUpdatedEl = document.getElementById('member-detail-last-updated');
+                if (lastUpdatedEl) {
+                    if (member.updated_at) {
+                        const updatedByMember = (App.state.data.members || []).find(function (m) { return m.id === member.updated_by; });
+                        const updatedByName = updatedByMember ? updatedByMember.display_name : '';
+                        lastUpdatedEl.innerHTML = `<i>update</i><span>${formatDateTimeForDisplay(member.updated_at, 'MM/dd(E) HH:mm') || ''}<span>${updatedByName || ''}</span></span>`;
+                    } else {
+                        lastUpdatedEl.innerHTML = '';
+                    }
+                }
+
+                const errorEl = document.getElementById('member-detail-error');
+                if (errorEl) errorEl.style.display = 'none';
+
+                this._setupDirtyWatchers();
+                this._setDirty(false);
+            },
+
+            _setupDirtyWatchers: function () {
+                const self = this;
+                const watchIds = [
+                    'member-detail-name-input',
+                    'member-detail-display-name-input',
+                    'member-detail-name-yomi-input',
+                    'member-detail-display-name-yomi-input',
+                    'member-detail-email-input',
+                    'member-detail-phone-number-input',
+                    'member-detail-birthday-input',
+                    'member-detail-title-input',
+                    'member-detail-website-url-input',
+                    'member-detail-slack-url-input',
+                    'member-detail-photo-file-url-input',
+                    'member-detail-photo-url-input',
+                    'member-detail-system-role-key-input',
+                    'member-detail-remark-input',
+                    'member-detail-is-active-input'
+                ];
+
+                watchIds.forEach(function (wid) {
+                    const el = document.getElementById(wid);
+                    if (!el || el.dataset.memberDetailBound === '1') return;
+                    el.addEventListener('input', function () { self._setDirty(true); });
+                    el.addEventListener('change', function () { self._setDirty(true); });
+                    el.dataset.memberDetailBound = '1';
+                });
+
+                const slackInput = document.getElementById('member-detail-slack-url-input');
+                if (slackInput && slackInput.dataset.memberDetailSlackTailBound !== '1') {
+                    const updateTail = function () {
+                        const tailEl = document.getElementById('member-detail-slack-tail-input');
+                        if (!tailEl) return;
+                        tailEl.value = self._extractSlackProfileTail(slackInput.value || '');
+                    };
+                    slackInput.addEventListener('input', updateTail);
+                    slackInput.addEventListener('change', updateTail);
+                    slackInput.dataset.memberDetailSlackTailBound = '1';
+                }
+
+                if (this.quill && this.quill.__memberDetailDirtyBound !== true) {
+                    this.quill.on('text-change', function () {
+                        self._setDirty(true);
+                    });
+                    this.quill.__memberDetailDirtyBound = true;
+                }
+            },
+
+            _renderDirectories: function (memberId) {
+                const container = document.getElementById('member-detail-directories-list');
+                if (!container) return;
+
+                const self = this;
+                const directories = App.state.data.directories || [];
+                
+                // 現在表示すべき所属組織を計算（一時保存の変更を反映）
+                const currentDirectories = [];
+                
+                // 既存の所属から開始
+                this.originalDirectories.forEach(function (orig) {
+                    // 削除予定リストに無ければ追加
+                    if (!self.pendingDirectoryChanges.toRemove.includes(orig.directory_id)) {
+                        const dir = Object.assign({}, orig);
+                        // 更新があれば反映
+                        const update = self.pendingDirectoryChanges.toUpdate.find(function (u) {
+                            return u.directory_id === orig.directory_id;
+                        });
+                        if (update) {
+                            dir.role = update.role;
+                        }
+                        currentDirectories.push(dir);
+                    }
+                });
+                
+                // 新規追加分を追加
+                this.pendingDirectoryChanges.toAdd.forEach(function (add) {
+                    currentDirectories.push(add);
+                });
+
+                if (currentDirectories.length === 0) {
+                    container.innerHTML = '<p class="secondary-text padding">所属組織はありません</p>';
+                    return;
+                }
+
+                container.innerHTML = currentDirectories.map(function (a) {
+                    const dir = directories.find(function (d) { return d.id === a.directory_id; });
+                    const dirName = dir ? dir.name : '（削除済み組織）';
+                    const role = a.role || '';
+                    const isActive = a.is_active !== false;
+                    const actionBtn = '<button class="small round border" onclick="App.modals.memberDetail.deactivateDirectoryAssignment(\'' + escapeHtmlAttribute(a.id || '') + '\', \'' + escapeHtmlAttribute(a.directory_id) + '\')">解除</button>';
+                    return '<div class="row padding small-space">' +
+                        '<i>account_tree</i>' +
+                        '<div class="max">' +
+                        '<p class="no-margin bold small">' + escapeHtml(dirName) + '</p>' +
+                        '<div class="field border label small top-margin no-margin">' +
+                        '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(role) + '" onchange="App.modals.memberDetail.updateDirectoryRole(\'' + escapeHtmlAttribute(a.id || '') + '\', \'' + escapeHtmlAttribute(a.directory_id) + '\', this.value)">' +
+                        '<label>役割</label>' +
+                        '</div>' +
+                        '</div>' +
+                        (!isActive ? '<span class="chip small border">退任済</span>' : actionBtn) +
+                        '</div>';
+                }).join('<hr class="small-margin">');
+            },
+
+            _renderSkills: function (memberId) {
+                const container = document.getElementById('member-detail-skills-list');
+                if (!container) return;
+
+                const self = this;
+                const skills = App.state.data.skills || [];
+                
+                // 現在表示すべきスキルを計算（一時保存の変更を反映）
+                const currentSkills = [];
+                
+                // 既存のスキルから開始
+                this.originalSkills.forEach(function (orig) {
+                    // 削除予定リストに無ければ追加
+                    if (!self.pendingSkillChanges.toRemove.includes(orig.skill_id)) {
+                        const sk = Object.assign({}, orig);
+                        // 更新があれば反映
+                        const update = self.pendingSkillChanges.toUpdate.find(function (u) {
+                            return u.skill_id === orig.skill_id;
+                        });
+                        if (update) {
+                            sk.skill_level_key = update.skill_level_key;
+                            sk.user_note = update.user_note;
+                        }
+                        currentSkills.push(sk);
+                    }
+                });
+                
+                // 新規追加分を追加
+                this.pendingSkillChanges.toAdd.forEach(function (add) {
+                    currentSkills.push(add);
+                });
+
+                if (currentSkills.length === 0) {
+                    container.innerHTML = '<p class="secondary-text padding">技能情報はありません</p>';
+                    return;
+                }
+
+                // KEY_LABELS.SKILL_LEVELを使用
+                const levelLabels = KEY_LABELS.SKILL_LEVEL;
+
+                const levelOptions = function (current) {
+                    return Object.keys(levelLabels).map(function (key) {
+                        const selected = current === key ? ' selected' : '';
+                        return '<option value="' + key + '"' + selected + '>' + levelLabels[key] + '</option>';
+                    }).join('');
+                };
+
+                container.innerHTML = currentSkills.map(function (sa) {
+                    const skill = skills.find(function (s) { return s.id === sa.skill_id; });
+                    const skillName = skill ? skill.title : '（削除済み技能）';
+                    const level = levelLabels[sa.skill_level_key] || sa.skill_level_key || '';
+                    const note = sa.user_note || sa.remark || '';
+                    const levelSelect = '<select class="small" onchange="App.modals.memberDetail.updateSkillLevel(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\', this.value)">' + levelOptions(sa.skill_level_key) + '</select>';
+                    const remarkInput = '<input type="text" placeholder="メモ" value="' + escapeHtmlAttribute(note) + '" onchange="App.modals.memberDetail.updateSkillRemark(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\', this.value)">';
+                    const deleteBtn = '<button class="circle small transparent" onclick="App.modals.memberDetail.removeSkillAssignment(\'' + escapeHtmlAttribute(sa.id || '') + '\', \'' + escapeHtmlAttribute(sa.skill_id) + '\')"><i>delete</i></button>';
+                    return '<div class="row padding small-space">' +
+                        '<i>psychology</i>' +
+                        '<div class="max">' +
+                        '<p class="no-margin bold small">' + escapeHtml(skillName) + '</p>' +
+                        '<div class="row small-space top-margin">' +
+                        levelSelect +
+                        '<div class="field border small max no-margin">' + remarkInput + '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        deleteBtn +
+                        '</div>';
+                }).join('<hr class="small-margin">');
+            },
+
+            _reset: function () {
+                this.currentId = null;
+                this.currentItem = null;
+                this.originalData = null;
+                this.isLoading = false;
+                this.isSaving = false;
+                this._setDirty(false);
+
+                const fields = [
+                    'member-detail-name-input',
+                    'member-detail-display-name-input',
+                    'member-detail-email-input',
+                    'member-detail-name-yomi-input',
+                    'member-detail-display-name-yomi-input',
+                    'member-detail-phone-number-input',
+                    'member-detail-birthday-input',
+                    'member-detail-title-input',
+                    'member-detail-website-url-input',
+                    'member-detail-slack-url-input',
+                    'member-detail-slack-tail-input',
+                    'member-detail-photo-file-url-input',
+                    'member-detail-photo-url-input',
+                    'member-detail-system-role-key-input',
+                    'member-detail-remark-input',
+                    'member-detail-created-by-input',
+                    'member-detail-created-at-input',
+                    'member-detail-updated-by-input',
+                    'member-detail-updated-at-input'
+                ];
+                fields.forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (el) el.value = '';
+                });
+
+                const statusChip = document.getElementById('member-detail-status-chip');
+                if (statusChip) {
+                    statusChip.textContent = '';
+                    statusChip.className = 'chip small';
+                }
+
+                const cb = document.getElementById('member-detail-is-active-input');
+                if (cb) cb.checked = true;
+
+                const comments = document.getElementById('member-comments-list');
+                if (comments) comments.innerHTML = '';
+
+                if (this.quill) {
+                    App.utils.quill.clear(this.quill);
+                }
+
+                appUi('#member-detail-tab-profile');
+            },
+
+            _extractSlackProfileTail: function (value) {
+                if (!value) return '';
+                const normalized = String(value).trim().replace(/\/+$/, '');
+                if (!normalized) return '';
+                const token = normalized.split(/[\/?#]/).filter(Boolean).pop() || '';
+                if (token.length <= 11) return token;
+                return token.slice(-11);
+            },
+
+            _bindEscClose: function () {
+                const dialog = document.getElementById('modal-detail-member');
+                if (!dialog || dialog.dataset.memberEscBound === '1') return;
+                const self = this;
+                dialog.addEventListener('keydown', function (event) {
+                    if (!event || event.key !== 'Escape') return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    self.close({ reason: 'escape' });
+                });
+                dialog.dataset.memberEscBound = '1';
+            }
+        };
+    })();
+</script>

@@ -1,0 +1,259 @@
+<!-- タスク詳細モーダル -->
+<dialog id="modal-detail-task" class="transparent bottom no-padding">
+  <div class="bottom-padding" onclick="App.modals.taskDetail.requestClose('header-click')" title="タスク詳細画面を閉じる">
+    <i class="center extra center" title="タスク詳細画面を閉じる">keyboard_arrow_down</i>
+  </div>
+
+  <div class="surface-container padding">
+    <!-- Header -->
+    <header class="fixed top-padding">
+      <div class="grid small-padding bottom-margin">
+        <div class="s3">
+          <div class="field no-border max suffix no-wrap">
+            <select id="task-board-select">
+              <!-- 動的に生成 -->
+            </select>
+            <i>arrow_drop_down</i>
+          </div>
+        </div>
+        <div class="s6 field max no-wrap bold">
+          <input type="text" id="task-name-input" placeholder="タスク名">
+        </div>
+
+        <div class="s3">
+          <nav class="row right-align">
+            <button class="circle transparent" id="task-copy-link-btn">
+              <i>share</i>
+              <div class="tooltip bottom">共有</div>
+            </button>
+            <button class="circle transparent" id="task-duplicate-btn">
+              <i>content_copy</i>
+              <div class="tooltip bottom">複製</div>
+            </button>
+            <button class="circle transparent" id="task-delete-btn" onclick="App.modals.taskDetail.deleteTask()">
+              <i>delete</i>
+              <div class="tooltip bottom">削除</div>
+            </button>
+            <button class="circle transparent">
+              <i>info</i>
+              <menu class="left no-padding medium-width">
+                <div class="padding">
+                  <p class="small-text">
+                    タスク詳細画面では、タスクに関する詳細な情報の表示・編集をすることができます。<br>
+                    各担当者が「これはどのようなタスクで、自分は何をするべきなのか」が理解できるよう、各項目に丁寧に情報を記載しましょう。<br>
+                    リスト・関連・コメント機能は、必要に応じて使用してください。
+                  </p>
+                </div>
+              </menu>
+            </button>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid small-padding tiny-space no-margin">
+      <!-- Left Column: Status & Avatars -->
+      <div class="s12 m3">
+        <!-- Status -->
+        <div class="grid">
+          <div class="s6">
+            <div class="prefix field label border small">
+              <i id="task-status-icon" class="tiny circle"></i>
+              <select id="task-status-select" class="transparent"></select>
+              <label>ステータス</label>
+            </div>
+          </div>
+          <div class="s6">
+            <div class="prefix field label border small">
+              <i id="task-priority-icon"></i>
+              <select id="task-priority-select">
+                <option value="LOW">低</option>
+                <option value="MEDIUM">中</option>
+                <option value="HIGH">高</option>
+              </select>
+              <label>優先度</label>
+            </div>
+          </div>
+          <div class="s12" title="ステータスを「進行中」に変更する期限">
+            <div class="field suffix label border small">
+              <input type="datetime-local" id="task-starts-at-input" max="2099-12-31T23:59" placeholder=" ">
+              <label>開始日時<i class="tiny">info</i></label>
+              <i>edit</i>
+            </div>
+          </div>
+          <div class="s12" title="ステータスを「完了」に変更する期限">
+            <div class="field suffix label border small">
+              <input type="datetime-local" id="task-ends-at-input" max="2099-12-31T23:59" placeholder=" ">
+              <label>終了日時<i class="tiny">info</i></label>
+              <i>edit</i>
+            </div>
+          </div>
+
+          <!-- Avatars Flow -->
+          <div class="s12">
+            <fieldset>
+              <legend id="task-detail-label-assignee-section" class="small-text"></legend>
+              <!-- Created By -->
+              <div class="row">
+                <div class="" onclick="App.modals.taskDetail.selectMember('created_by')">
+                  <button id="avatar-created-by" class="no-margin circle transparent">
+                    <!-- ボタンのクラスとコンテンツ（画像またはアイコン）はrenderMemberAvatarで設定される -->
+                  </button>
+                </div>
+                <p class="no-line">
+                  <span class="small-text" title="このタスクを作成した人&#13;&#10;ステータスを「未着手」に変更する人"
+                    style="cursor: help;"><span id="task-detail-role-created-by"></span><br></span>
+                  <span class="middle-align">
+                    <span id="label-created-by"></span>
+                    <!-- <a onclick="App.modals.taskDetail.selectMember('created_by')"><i class="tiny">edit</i></a> -->
+                  </span>
+                </p>
+              </div>
+
+              <!-- Processed By -->
+              <div class="row">
+                <div class="" onclick="App.modals.taskDetail.selectMember('processed_by')">
+                  <button id="avatar-processed-by" class="no-margin circle transparent">
+                  </button>
+                </div>
+                <p class="no-line">
+                  <span class="small-text" title="このタスクを進行する人&#13;&#10;ステータスを「進行中」「確認中」に変更する人"
+                    style="cursor: help;"><span id="task-detail-role-processed-by"></span><br></span>
+                  <span class="middle-align">
+                    <span id="label-processed-by"></span>
+                    <a onclick="App.modals.taskDetail.selectMember('processed_by')"><i class="tiny">edit</i></a>
+                  </span>
+                </p>
+              </div>
+
+              <!-- Reviewed By -->
+              <div class="row">
+                <div class="" onclick="App.modals.taskDetail.selectMember('reviewed_by')">
+                  <button id="avatar-reviewed-by" class="no-margin circle transparent">
+                  </button>
+                </div>
+                <p class="no-line">
+                  <span class="small-text" title="このタスクが要件通り完了されたかを確認する人&#13;&#10;ステータスを「完了」に変更する人"
+                    style="cursor: help;"><span id="task-detail-role-reviewed-by"></span><br></span>
+                  <span class="middle-align">
+                    <span id="label-reviewed-by"></span>
+                    <a onclick="App.modals.taskDetail.selectMember('reviewed_by')"><i class="tiny">edit</i></a>
+                  </span>
+                </p>
+              </div>
+
+              <!-- Received By -->
+              <div class="row">
+                <div class="" onclick="App.modals.taskDetail.selectMember('received_by')">
+                  <button id="avatar-received-by" class="no-margin circle transparent">
+                  </button>
+                </div>
+                <p class="no-line">
+                  <span class="small-text" title="このタスクに関連して成果物などが発生した際に、&#13;&#10;その成果物を受け取る人"
+                    style="cursor: help;"><span id="task-detail-role-received-by"></span><br></span>
+                  <span class="middle-align">
+                    <span id="label-received-by"></span>
+                    <a onclick="App.modals.taskDetail.selectMember('received_by')"><i class="tiny">edit</i></a>
+                  </span>
+                </p>
+              </div>
+            </fieldset>
+          </div>
+
+          <div class="s12">
+            <div class="center-align row tiny-space secondary-text" title="最終更新">
+              <i>update</i>
+              <span id="task-last-updated-at"></span>
+              <span id="task-last-updated-by"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle Column -->
+      <div class="s12 m6 small-round background padding">
+        <nav class="center-align max tiny-space  bottom-margin">
+          <nav class="tabbed small max" id="task-detail-tabs">
+            <a data-ui="#task-detail-description">
+              <span>説明</span>
+            </a>
+            <a data-ui="#task-detail-list">
+              <span>リスト</span>
+              <div class="badge l font-number none primary" id="task-list-badge" style="display: none;">0</div>
+            </a>
+            <a data-ui="#task-detail-related">
+              <span>関連</span>
+              <div class="badge l font-number none primary" id="task-related-badge" style="display: none;">0</div>
+            </a>
+            <a data-ui="#task-detail-history" style="display: none;">
+              <span>更新</span>
+              <div class="badge l font-number none secondary" id="task-history-badge" style="display: none;">0</div>
+            </a>
+          </nav>
+
+        </nav>
+        <div class="page medium-height active" id="task-detail-description">
+          <div class="border quill-editor" id="task-description-editor"></div>
+        </div>
+        <div class="page medium-height scroll" id="task-detail-list">
+          <div id="task-list-items"></div>
+        </div>
+        <div class="page medium-height scroll" id="task-detail-related">
+          <!-- 親タスク -->
+          <fieldset class="border bottom-margin">
+            <legend>
+              <span class="small-text">親タスク</span>
+              <button class="circle transparent small no-margin" onclick="App.modals.taskDetail.editParentTask()" title="親タスクを設定・変更">
+                <i class="tiny">edit</i>
+              </button>
+            </legend>
+            <div id="parent-task-container">
+            </div>
+          </fieldset>
+
+          <!-- 子タスク -->
+          <fieldset class="border">
+            <legend>
+              <span class="small-text">子タスク</span>
+              <button class="circle transparent small no-margin" onclick="App.modals.taskDetail.addChildTask()" title="子タスクを追加">
+                <i class="tiny">add</i>
+              </button>
+            </legend>
+            <div id="child-tasks-container">
+            </div>
+          </fieldset>
+        </div>
+        <div class="page medium-height scroll" id="task-detail-history">
+          <div id="task-history-list">
+            <div class="small-padding center row small-space">
+              <progress class="circle indeterminate small"></progress>
+              <span class="small-text">読み込み中</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Comments -->
+      <div class="s12 m3 background small-round padding">
+        <div class="bottom-margin">
+          <button class="no-margin responsive large fill round max" onclick="App.modals.taskDetail.openNewComment()">
+            <i>add_comment</i>
+            <span>新しいコメントを作成</span>
+          </button>
+        </div>
+        <div class="scroll medium-height" id="task-comments-list"></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="fixed bottom-padding">
+      <nav class="small-padding no-margin">
+        <h5 id="task-display-id" class="font-number"></h5>
+        <div class="max"></div>
+        <button id="task-discard-btn" class="border large round error-text" onclick="App.modals.taskDetail.discard()">変更を破棄</button>
+        <button id="task-primary-action-btn" class="primary large round" onclick="App.modals.taskDetail.onPrimaryAction()">閉じる</button>
+      </nav>
+    </footer>
+  </div>
+</dialog>
+

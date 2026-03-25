@@ -1,0 +1,138 @@
+<script>
+    (function () {
+        App.modals.selectBoards = {
+            callback: null,
+            selectedIds: [],
+            allBoards: [],
+            filteredBoards: [],
+            multiSelect: false,
+
+            open: async function (options = {}) {
+                this.callback = options.callback || null;
+                this.multiSelect = options.multiSelect || false;
+                this.selectedIds = options.preSelected || [];
+
+                // App.state.data.boards から直接ロード
+                this.allBoards = App.state.data.boards || [];
+                // Reset filteredBoards
+                this.filteredBoards = [];
+                this.render();
+                await appUi('#modal-select-boards', true);
+
+                // 共通処理を使用
+                App.utils.modal.focusInput('#board-search-input');
+            },
+
+            render: function () {
+                this.filterResults();
+            },
+
+            filterResults: function () {
+                const searchInput = document.getElementById('board-search-input');
+                const container = document.getElementById('board-results-container');
+                const selectAllContainer = document.getElementById('board-select-all-container');
+                const selectAllCheckbox = document.getElementById('board-select-all-checkbox');
+
+                if (!container) return;
+
+                const searchTerm = searchInput ? searchInput.value : '';
+
+                // 共通フィルタリング処理を使用
+                this.filteredBoards = App.utils.modal.filterData(
+                    this.allBoards,
+                    searchTerm,
+                    ['name'], // 検索対象フィールド
+                    true // activeOnly
+                );
+
+                // 全選択チェックボックスの表示制御
+                if (this.multiSelect && selectAllContainer) {
+                    selectAllContainer.style.display = '';
+
+                    // 全選択状態の更新
+                    if (this.filteredBoards.length > 0 && selectAllCheckbox) {
+                        const allSelected = this.filteredBoards.every(b => this.selectedIds.includes(b.id));
+                        selectAllCheckbox.checked = allSelected;
+                        selectAllCheckbox.disabled = false;
+                    } else if (selectAllCheckbox) {
+                        selectAllCheckbox.checked = false;
+                        selectAllCheckbox.disabled = true;
+                    }
+                } else if (selectAllContainer) {
+                    selectAllContainer.style.display = 'none';
+                }
+
+                // 表示
+                if (this.filteredBoards.length === 0) {
+                    container.innerHTML = '<p class="padding">該当するボードが見つかりません</p>';
+                    return;
+                }
+
+                container.innerHTML = this.filteredBoards.map(board => {
+                    const isSelected = this.selectedIds.includes(board.id);
+                    const safeBoardName = escapeHtml(board.name);
+                    const safeBoardId = escapeHtmlAttribute(board.id);
+
+                    return `
+                        <div><label class="${this.multiSelect ? 'checkbox' : 'radio'} left-align small-space">
+                            <input type="${this.multiSelect ? 'checkbox' : 'radio'}" 
+                                name="board-select" 
+                                value="${safeBoardId}" 
+                                ${isSelected ? 'checked' : ''}
+                                onchange="App.modals.selectBoards.toggleSelection('${safeBoardId}', this.checked)">
+                            <span class="small-margin">
+                                <strong>${safeBoardName}</strong>
+                            </span>
+                        </label></div>
+                    `;
+                }).join('');
+            },
+
+            toggleSelectAll: function (checked) {
+                if (!this.multiSelect) return;
+
+                if (checked) {
+                    // 表示されているボードをすべて選択
+                    this.filteredBoards.forEach(board => {
+                        if (!this.selectedIds.includes(board.id)) {
+                            this.selectedIds.push(board.id);
+                        }
+                    });
+                } else {
+                    // 表示されているボードの選択を解除
+                    const filteredIds = this.filteredBoards.map(b => b.id);
+                    this.selectedIds = this.selectedIds.filter(id => !filteredIds.includes(id));
+                }
+                this.render();
+            },
+
+            toggleSelection: function (id, checked) {
+                if (this.multiSelect) {
+                    if (checked && !this.selectedIds.includes(id)) {
+                        this.selectedIds.push(id);
+                    } else if (!checked) {
+                        this.selectedIds = this.selectedIds.filter(sid => sid !== id);
+                    }
+                    this.render();
+                } else {
+                    this.selectedIds = checked ? [id] : [];
+                }
+            },
+
+            confirm: function () {
+                // 共通処理を使用
+                this.selectedIds = App.utils.modal.getSelectedIds(
+                    '#board-results-container',
+                    'board-select',
+                    this.multiSelect
+                );
+
+                if (this.callback && typeof this.callback === 'function') {
+                    this.callback(this.selectedIds);
+                }
+
+                appUi('#modal-select-boards', false);
+            }
+        };
+    })();
+</script>

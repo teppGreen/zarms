@@ -1,0 +1,480 @@
+<script>
+    (function () {
+        document.addEventListener('DOMContentLoaded', function () {
+            const helpLink = document.getElementById('help-link');
+            if (helpLink) {
+                helpLink.href = `${EXTERNAL_URLS.PORTAL_SITE}/help`;
+            }
+            const termsLink = document.getElementById('terms-link');
+            if (termsLink) {
+                termsLink.href = `${EXTERNAL_URLS.PORTAL_SITE}/terms`;
+            }
+            const privacyLink = document.getElementById('privacy-link');
+            if (privacyLink) {
+                privacyLink.href = `${EXTERNAL_URLS.PORTAL_SITE}/privacy`;
+            }
+        });
+
+        App.utils.header = {
+            isSafeExternalUrl: function (url) {
+                try {
+                    if (!url) return false;
+                    const parsed = new URL(url, window.location.origin);
+                    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+                } catch (error) {
+                    return false;
+                }
+            },
+
+            openExternalUrl: function (url) {
+                if (!this.isSafeExternalUrl(url)) {
+                    showSnackbar('不正なURLのため開けませんでした', 'error');
+                    return;
+                }
+                window.open(url, '_blank', 'noopener,noreferrer');
+            },
+
+            shortcuts: {
+                open: function () {
+                    const dialog = document.getElementById('modal-shortcuts-help');
+                    if (!dialog) return;
+                    this.render();
+                    appUi('modal-shortcuts-help', true);
+                },
+
+                close: function () {
+                    appUi('modal-shortcuts-help',false);
+                },
+
+                render: function () {
+                    const container = document.getElementById('shortcuts-help-list');
+                    if (!container) return;
+                    const defs = (App.utils.shortcuts && App.utils.shortcuts.getDefinitions)
+                        ? App.utils.shortcuts.getDefinitions()
+                        : [];
+                    if (!defs.length) {
+                        container.innerHTML = '<div class="secondary-text small-text">ショートカット定義がありません</div>';
+                        return;
+                    }
+                    container.innerHTML = defs.map(function (item) {
+                        const keyText = escapeHtml(item.keys || '');
+                        const actionText = escapeHtml(item.action || '');
+                        return '' +
+                            '<div class="row wrap tiny-space middle-align small-margin">' +
+                            '<span class="chip border small"><b>' + keyText + '</b></span>' +
+                            '<span class="small-text">' + actionText + '</span>' +
+                            '</div>';
+                    }).join('');
+                }
+            },
+
+            /**
+             * appsテーブルのデータからアプリリンクを動的に生成します
+             */
+            renderApps: function () {
+                const appsGrid = document.getElementById('apps-grid');
+                if (!appsGrid) {
+                    console.warn('apps-grid element not found');
+                    return;
+                }
+
+                // App.state.data.appsからデータを取得
+                const apps = App.state.data.apps || [];
+
+                if (apps.length === 0) {
+                    appsGrid.innerHTML = '<div class="padding center-align row tiny-space secondary-text"><i>info</i><span>リンクがありません</span></div>';
+                    return;
+                }
+
+                // リンクボタンを生成
+                const appsHtml = apps.map(app => {
+                    const appUrl = String(app.url || '');
+                    const encodedUrl = encodeURIComponent(appUrl);
+                    const safeName = escapeHtml(app.name || '');
+                    const safeAttrUrl = escapeHtml(appUrl);
+
+                    return `
+                        <article class="background no-elevate small-round small-margin row" data-app-url="${safeAttrUrl}" style="cursor: pointer;">
+                            <img class="square tiny small-round" src="https:\/\/t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodedUrl}&size=128"
+                                alt="${safeName}">
+                            <span class="no-wrap">${safeName}</span>
+                        </article>
+                    `;
+                }).join('');
+
+                appsGrid.innerHTML = appsHtml;
+
+                const appItems = appsGrid.querySelectorAll('[data-app-url]');
+                appItems.forEach((el) => {
+                    el.addEventListener('click', () => {
+                        const url = el.getAttribute('data-app-url') || '';
+                        App.utils.header.openExternalUrl(url);
+                    });
+                });
+            },
+
+            /**
+             * コメント既読状態を同期し、右上ボタンのバッジ表示を更新します
+             * @param {Array} comments - 表示対象コメント
+             * @param {Object|null} statusOverride - 既読状態の上書きデータ
+             */
+            syncCommentReadStatusAndBadge: function (comments, statusOverride = null) {
+                const oldStatus = statusOverride || App.state.getUserProperty('comment_read_status', {});
+                const newStatus = {};
+                const targetComments = comments || [];
+
+                targetComments.forEach(function (comment) {
+                    newStatus[comment.id] = (comment.id in oldStatus) ? oldStatus[comment.id] : false;
+                });
+
+                App.state.saveUserProperty('comment_read_status', newStatus);
+
+                const totalUnreadCount = Object.values(newStatus).filter(function (v) {
+                    return v === false;
+                }).length;
+                const badge = document.getElementById('comments-badge');
+                if (badge) {
+                    badge.textContent = totalUnreadCount;
+                    badge.style.display = totalUnreadCount > 0 ? '' : 'none';
+                }
+            }
+        };
+
+        // ============================================
+        // システムアップデート通知機能
+        // ============================================
+        App.utils.header.systemUpdates = {
+            /** キャッシュされたアップデートデータ */
+            cachedUpdates: null,
+            /** 最終更新日時 */
+            lastUpdatedAt: null,
+            /** 初回ロード済みフラグ */
+            isLoaded: false,
+            /** 1時間更新用のインターバルID */
+            autoRefreshInterval: null,
+
+            /**
+             * メニューの表示切替（キャッシュデータの即時描画のみ）
+             */
+            toggle: function () {
+                const container = document.getElementById('system-info-list');
+                if (!container) return;
+
+                if (this.isLoaded && this.cachedUpdates) {
+                    // ロード済み: キャッシュデータを即時描画（都度更新はしない）
+                    this.render(this.cachedUpdates);
+                } else {
+                    // 未ロード: シマーを表示してデータ取得
+                    this.showShimmer(container);
+                    this.loadData();
+                }
+            },
+
+            /**
+             * シマーエフェクトを表示
+             */
+            showShimmer: function (container) {
+                container.innerHTML = `
+                    <div class="center padding center-align row small-space">
+                        <progress class="circle indeterminate small"></progress>
+                        <span>読み込み中...</span>
+                    </div>
+                `;
+            },
+
+            /**
+             * データを取得して描画（常にキャッシュを無視して最新データを取得）
+             * @returns {Promise}
+             */
+            loadData: async function () {
+                try {
+                    console.log('[SystemUpdates] Loading data...');
+                    const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SYSTEM_UPDATES, 'select', {
+                        orderBy: { created_at: 'desc' }
+                    }, null, true);
+
+                    const updates = result?.data || result || [];
+
+                    if (this.cachedUpdates && this.isLoaded) {
+                        if (this.hasDataChanged(this.cachedUpdates, updates)) {
+                            console.log('[SystemUpdates] データ変更を検出。更新モーダルを表示します。');
+                            this.showUpdateModal();
+                            return; // モーダル表示後はデータ更新・描画をスキップ
+                        }
+                    }
+
+                    this.cachedUpdates = updates;
+                    this.isLoaded = true;
+                    this.lastUpdatedAt = new Date();
+
+                    // 描画
+                    this.render(updates);
+                } catch (error) {
+                    console.error('[SystemUpdates] Error loading data:', error);
+                    const container = document.getElementById('system-info-list');
+                    if (container && !this.cachedUpdates) {
+                        container.innerHTML = '<div class="padding center-align error-text"><i>error_outline</i><span>アップデート情報の読み込みに失敗しました</span></div>';
+                    }
+                }
+            },
+
+            /**
+             * 前回と今回のデータを比較して変更があるかどうかを判定
+             * @param {Array} oldData - 前回取得したデータ
+             * @param {Array} newData - 今回取得したデータ
+             * @returns {boolean} 変更がある場合true
+             */
+            hasDataChanged: function (oldData, newData) {
+                if (!oldData || !newData) return false;
+                return oldData.length !== newData.length;
+            },
+
+            /**
+             * システムアップデートモーダルを表示
+             */
+            showUpdateModal: function () {
+                const modal = document.getElementById('modal-system-update');
+                if (modal) {
+                    appUi('modal-system-update',true);
+                }
+            },
+
+            /**
+             * ページをリロード（register.htmlのreloadPageと同じ処理）
+             * @param {HTMLElement} btn - クリックされたボタン要素
+             */
+            reloadPage: function (btn) {
+                if (btn) {
+                    const icon = btn.querySelector('i');
+                    if (icon) {
+                        icon.outerHTML = '<progress class="circle indeterminate small"></progress>';
+                    }
+                    btn.disabled = true;
+                }
+                window.open(scriptUrl, '_top');
+            },
+
+            /**
+             * アップデート一覧を描画
+             * @param {Array} updates - アップデートデータ
+             */
+            render: function (updates) {
+                const container = document.getElementById('system-info-list');
+                if (!container) return;
+
+                // ZARMSの基本説明をトップに表示
+                let html = `
+                    <div class="padding">
+                        <div class="row tiny-space">
+                            <i class="small">info</i>
+                            <span class="bold">ZARMSについて</span>
+                        </div>
+                        <p class="small-text">${UI_TEXT.APP_DESCRIPTION}</p>
+                    </div>
+                `;
+
+                if (!updates || updates.length === 0) {
+                    html += '<div class="padding center-align row tiny-space secondary-text"><i>info</i><span>アップデート情報はありません</span></div>';
+                } else {
+                    html += updates.map(update => {
+                        // アップデート日時のフォーマット
+                        const createdAt = update.created_at
+                            ? formatDateTimeForDisplay(update.created_at, 'yyyy/MM/dd(E)')
+                            : '';
+
+                        // 説明文の改行を反映
+                        const note = update.user_note || update.description || '';
+                        const description = note
+                            ? escapeHtml(note).replace(/\n/g, '<br>')
+                            : '';
+
+                        return `
+                            <article class="no-elevate padding top-align small-margin small-round background">
+                                <div>
+                                    <div class="row no-margin tiny-space">
+                                        <span class="small-text secondary-text">${createdAt}</span>
+                                    </div>
+                                    <div class="row bold no-margin tiny-space small-text">
+                                        <span class="font-number">${escapeHtml(update.version || '')}</span>
+                                        <span>${escapeHtml(update.title || '')}</span>
+                                    </div>
+                                    <div class="tiny-space"></div>
+                                    <div class="small-text">${description}</div>
+                                </div>
+                            </article>
+                        `;
+                    }).join('');
+                }
+
+                // 最終更新日時の追加
+                if (this.lastUpdatedAt) {
+                    const timeStr = formatDateTimeForDisplay(this.lastUpdatedAt, 'yyyy/MM/dd(E) HH:mm');
+                    html += `<div class="row padding no-margin center-align secondary-text small-text tiny-space"><span>最終更新: ${timeStr}</span></div>`;
+                }
+
+                container.innerHTML = html;
+            },
+
+            /**
+             * 1時間ごとの自動更新を開始
+             */
+            startAutoRefresh: function () {
+                if (this.autoRefreshInterval) {
+                    clearInterval(this.autoRefreshInterval);
+                }
+                // 1時間 = 3600000ms
+                this.autoRefreshInterval = setInterval(() => {
+                    console.log('[SystemUpdates] Auto-refreshing...');
+                    this.loadData();
+                }, 3600000);
+            },
+
+            // ============================================
+            // テスト用: コンソールから実行可能
+            // App.utils.header.systemUpdates.simulateUpdate()
+            // ============================================
+            /**
+             * [テスト用] キャッシュデータを改変してloadDataを呼び出し、
+             * 変更検出→モーダル表示の挙動をテストします。
+             * ブラウザの開発者コンソールから以下のコマンドで実行:
+             *   App.utils.header.systemUpdates.simulateUpdate()
+             */
+            simulateUpdate: function () {
+                if (!this.cachedUpdates || !this.isLoaded) {
+                    console.warn('[SystemUpdates:TEST] まだデータがロードされていません。先にinfoボタンをクリックしてデータをロードしてください。');
+                    return;
+                }
+                console.log('[SystemUpdates:TEST] キャッシュデータを改変してloadDataを呼び出します...');
+                // キャッシュに存在しないダミーレコードを追加して、loadDataで差分を検出させる
+                this.cachedUpdates = [...this.cachedUpdates, { id: 'test-dummy', title: 'テスト用更新', version: '0.0.0', created_at: new Date().toISOString() }];
+                this.loadData();
+            }
+        };
+    })();
+
+    (function () {
+        // 検索機能用の名前空間を初期化
+        if (!App.utils) App.utils = {};
+
+        if (!App.utils.search) App.utils.search = {};
+
+        Object.assign(App.utils.search, {
+            /**
+             * キーダウンハンドラー（Enter検索）
+             */
+            handleSearchKeydown: function (event) {
+                if (event.key === 'Enter' && !event.isComposing) {
+                    event.preventDefault();
+                    App.utils.search.handleSearchClick();
+                }
+            },
+
+            /**
+             * ブラーハンドラー（少し遅延してメニューを閉じる）
+             */
+            handleSearchBlur: function (event) {
+                setTimeout(() => {
+                    const resultsMenu = document.getElementById('search-results-menu');
+                    if (resultsMenu) {
+                        resultsMenu.style.display = 'none';
+                    }
+                }, 200);
+            },
+
+            /**
+             * 検索ボタンクリック / Enterキー押下時の検索実行
+             */
+            handleSearchClick: async function () {
+                const input = document.getElementById('search-input');
+                const searchValue = input.value.trim();
+                input.blur();
+
+                if (!searchValue) return;
+
+                // 検索中はアイコンをスピナーに切り替え
+                const searchIcon = document.getElementById('search-icon');
+                const setLoading = (loading) => {
+                    if (!searchIcon) return;
+                    if (loading) {
+                        searchIcon.outerHTML = '<progress id="search-icon" class="circle indeterminate small"></progress>';
+                    } else {
+                        const el = document.getElementById('search-icon');
+                        if (el) el.outerHTML = '<i id="search-icon" class="front" style="cursor: pointer;" onclick="App.utils.search.handleSearchClick()">search</i>';
+                    }
+                };
+                setLoading(true);
+
+                try {
+                    // 全角数字を半角に変換してから数値チェック（共通ユーティリティを使用）
+                    const { normalizedValue, numericValue, isNumericInput } = App.utils.search.getNormalizedSearchInfo(searchValue);
+
+                    const switchToMyBoardTab = async () => {
+                        if (App.utils.navigation && App.utils.navigation.switchTab) {
+                            await App.utils.navigation.switchTab('board-my-board', false, false, true);
+                        }
+                    };
+
+                    if (isNumericInput) {
+                        // 数値入力の場合: display_id でタスクを特定する
+                        let foundTask = null;
+                        try {
+                            const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
+                                where: { display_id: ['=', numericValue] }
+                            }, null, true);
+                            const tasks = result?.data || result || [];
+                            if (tasks.length > 0) {
+                                foundTask = tasks[0];
+                            }
+                        } catch (e) {
+                            console.error('[Search] display_id 検索エラー:', e);
+                        }
+
+                        // display_id 検索完了後にマイボードへ移動
+                        await switchToMyBoardTab();
+
+                        if (foundTask && App.pages.boards) {
+                            // 2. 特定したタスク名でマイボードフィルタを適用
+                            App.pages.boards.initializeMyBoardFilters(false);
+                            App.pages.boards.myBoardFilters.title = foundTask.name;
+                            App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
+
+                            // 3. 検索（データ再読み込み）
+                            await App.pages.boards.loadData('my-board', false);
+
+                            // 4. 特定したタスクの詳細画面を開く
+                            if (App.modals.taskDetail) {
+                                App.modals.taskDetail.open(foundTask.id);
+                                return;
+                            }
+                        } else if (App.pages.boards) {
+                            // タスクが見つからなかった場合は数値をそのままタイトル検索にフォールバック
+                            App.pages.boards.initializeMyBoardFilters(false);
+                            App.pages.boards.myBoardFilters.title = searchValue;
+                            App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
+                            await App.pages.boards.loadData('my-board', false);
+                        }
+                    } else {
+                        // 通常の文字列検索
+                        await switchToMyBoardTab();
+                        if (App.pages.boards) {
+                            App.pages.boards.initializeMyBoardFilters(false);
+                            App.pages.boards.myBoardFilters.title = searchValue;
+                            App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
+
+                            // 検索（データ再読み込み）
+                            await App.pages.boards.loadData('my-board', false);
+                        }
+                    }
+                    // ヒットが1件のみの場合はタスク詳細を自動で開く
+                    const resultTasks = App.pages.boards.cachedBoardTasks['my-board'] || [];
+                    if (resultTasks.length === 1 && App.modals.taskDetail) {
+                        App.modals.taskDetail.open(resultTasks[0].id);
+                    }
+                } finally {
+                    // 検索完了後（エラー時も含む）アイコンを戻す
+                    setLoading(false);
+                }
+            }
+        });
+    })();
+</script>

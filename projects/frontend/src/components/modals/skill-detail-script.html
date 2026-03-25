@@ -1,0 +1,573 @@
+<script>
+    (function () {
+        App.modals.skillDetail = {
+            currentId: null,
+            currentItem: null,
+            originalData: null,
+            isDirty: false,
+
+            open: function (skillId, skipUrlUpdate = false) {
+                if (!skillId) return;
+
+                const skill = (App.state.data.skills || []).find(function (s) { return s.id === skillId; });
+                if (!skill) {
+                    console.error('[SkillDetail] Skill not found:', skillId);
+                    return;
+                }
+
+                this.currentId = skillId;
+                this.currentItem = Object.assign({}, skill);
+                this.originalData = Object.assign({}, skill);
+                this.isDirty = false;
+                this._renderLevelOptions();
+
+                appUi('#modal-detail-skill', true);
+
+                this._render(skill);
+                this._renderMembers(skillId);
+                this.loadComments(skillId);
+                this._updateUrlOnOpen(skillId, skipUrlUpdate);
+                this._bindDirtyWatchers();
+                this._bindEscClose();
+            },
+
+            _renderLevelOptions: function () {
+                const levelSelect = document.getElementById('skill-detail-level-select');
+                if (!levelSelect) return;
+
+                const fallbackLevel = 'INTERMEDIATE';
+                const currentLevel = levelSelect.value || fallbackLevel;
+                levelSelect.innerHTML = Object.keys(KEY_LABELS.SKILL_LEVEL).map(function (key) {
+                    return '<option value="' + key + '">' + KEY_LABELS.SKILL_LEVEL[key] + '</option>';
+                }).join('');
+                levelSelect.value = KEY_LABELS.SKILL_LEVEL[currentLevel] ? currentLevel : fallbackLevel;
+            },
+
+            close: function (options = {}) {
+                const skipDirtyCheck = options.skipDirtyCheck === true;
+                const skipUrlUpdate = options.skipUrlUpdate === true;
+                const reason = options.reason || 'user';
+
+                if (!skipDirtyCheck && this.isDirty) {
+                    const message = reason === 'escape'
+                        ? '未保存の変更があります。変更を破棄して閉じますか？'
+                        : '変更を破棄して閉じますか？';
+                    const proceed = confirm(message);
+                    if (!proceed) return false;
+                }
+                appUi('#modal-detail-skill', false);
+                this._updateUrlOnClose(skipUrlUpdate);
+                this._reset();
+                return true;
+            },
+
+            save: async function () {
+                if (!this.currentId) return;
+
+                const saveBtn = document.getElementById('skill-detail-save-btn');
+                const title = (document.getElementById('skill-detail-title-input')?.value || '').trim();
+                const typeKey = (document.getElementById('skill-detail-type-input')?.value || '').trim() || null;
+                const userNote = (document.getElementById('skill-detail-user-note-input')?.value || '').trim() || null;
+                const remark = (document.getElementById('skill-detail-remark-input')?.value || '').trim() || null;
+                const errorEl = document.getElementById('skill-detail-error');
+
+                if (!title) {
+                    if (errorEl) {
+                        errorEl.textContent = 'タイトルは必須です';
+                        errorEl.style.display = '';
+                    }
+                    return;
+                }
+                if (errorEl) errorEl.style.display = 'none';
+                if (saveBtn) saveBtn.disabled = true;
+                showSnackbar('技能を保存しています...', 'info', 'top', 0);
+
+                const updates = {
+                    title: title,
+                    skill_type_key: typeKey,
+                    user_note: userNote,
+                    remark: remark
+                };
+
+                const orig = this.originalData || {};
+                let hasChanges = false;
+                Object.keys(updates).forEach(function (key) {
+                    if (String(updates[key] || '') !== String(orig[key] || '')) {
+                        hasChanges = true;
+                    }
+                });
+                if (!hasChanges) {
+                    this.close();
+                    return;
+                }
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILLS, 'update', {
+                        where: { id: ['=', this.currentId] },
+                        set: updates
+                    }, '技能を更新');
+
+                    const target = (App.state.data.skills || []).find(function (item) {
+                        return item.id === App.modals.skillDetail.currentId;
+                    });
+                    if (target) {
+                        Object.assign(target, updates);
+                    }
+
+                    showSnackbar('技能を更新しました', 'success');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+
+                    const latest = (App.state.data.skills || []).find(function (item) {
+                        return item.id === App.modals.skillDetail.currentId;
+                    });
+                    if (latest) {
+                        this.currentItem = Object.assign({}, latest);
+                        this.originalData = Object.assign({}, latest);
+                        this.isDirty = false;
+                        this._render(latest);
+                    }
+                } catch (err) {
+                    console.error('[SkillDetail] save failed:', err);
+                    showSnackbar('技能の更新に失敗しました', 'error');
+                    if (errorEl) {
+                        errorEl.textContent = '更新に失敗しました';
+                        errorEl.style.display = '';
+                    }
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+                } finally {
+                    if (saveBtn) saveBtn.disabled = false;
+                }
+            },
+
+            openNewComment: function () {
+                if (!this.currentId) return;
+                if (!App.modals.newComment) return;
+
+                if (App.modals.newComment.openFor) {
+                    App.modals.newComment.openFor('skills', this.currentId);
+                    return;
+                }
+
+                App.modals.newComment.open(this.currentId);
+            },
+
+            loadComments: function (skillId, skipLoadingCache = false) {
+                App.utils.commentManager.loadComments({
+                    relatedTable: 'skills',
+                    relatedId: skillId,
+                    containerId: 'skill-comments-list',
+                    skipLoadingCache: skipLoadingCache,
+                    isCurrent: () => this.currentId === skillId,
+                    onRender: (comments) => this.renderComments(comments),
+                    logPrefix: 'SkillDetail'
+                });
+            },
+
+            renderComments: function (comments) {
+                App.utils.commentManager.renderComments({
+                    containerId: 'skill-comments-list',
+                    comments: comments,
+                    escapeText: function (value) {
+                        return escapeHtml(value || '');
+                    },
+                    escapeUrl: function (value) {
+                        return escapeHtml(value || '#');
+                    }
+                });
+            },
+
+            // コメントを即座にUIに追加（Optimistic UI Update）
+            appendCommentToUI: function (comment) {
+                App.utils.commentManager.appendCommentToUI({
+                    containerId: 'skill-comments-list',
+                    comment: comment,
+                    escapeText: function (value) {
+                        return escapeHtml(value || '');
+                    },
+                    escapeUrl: function (value) {
+                        return escapeHtml(value || '#');
+                    }
+                });
+            },
+
+            _render: function (skill) {
+                const lastUpdatedEl = document.getElementById('skill-detail-last-updated');
+
+                const titleInput = document.getElementById('skill-detail-title-input');
+                if (titleInput) titleInput.value = skill.title || '';
+                const typeInput = document.getElementById('skill-detail-type-input');
+                if (typeInput) {
+                    const knownTypes = (App.state.data.skills || []).reduce(function (result, item) {
+                        const key = (item.skill_type_key || '').trim();
+                        if (key && result.indexOf(key) === -1) {
+                            result.push(key);
+                        }
+                        return result;
+                    }, []).sort(function (left, right) {
+                        return left.localeCompare(right);
+                    });
+
+                    typeInput.innerHTML = '<option value="">（未設定）</option>' + knownTypes.map(function (key) {
+                        const escaped = escapeHtmlAttribute(key);
+                        return '<option value="' + escaped + '">' + escapeHtml(key) + '</option>';
+                    }).join('');
+                    typeInput.value = skill.skill_type_key || '';
+                }
+                const userNoteInput = document.getElementById('skill-detail-user-note-input');
+                if (userNoteInput) userNoteInput.value = skill.user_note || skill.description || '';
+                const remarkInput = document.getElementById('skill-detail-remark-input');
+                if (remarkInput) remarkInput.value = skill.remark || '';
+
+                const members = App.state.data.members || [];
+                const findDisplayName = function (memberId) {
+                    if (!memberId) return '';
+                    const member = members.find(function (item) { return item.id === memberId; });
+                    return member ? (member.display_name || member.name || member.email || '') : '不明';
+                };
+                const createdByInput = document.getElementById('skill-detail-created-by-input');
+                if (createdByInput) createdByInput.value = findDisplayName(skill.created_by);
+                const createdAtInput = document.getElementById('skill-detail-created-at-input');
+                if (createdAtInput) createdAtInput.value = skill.created_at ? formatDateTimeForDisplay(skill.created_at) : '';
+                const updatedByInput = document.getElementById('skill-detail-updated-by-input');
+                if (updatedByInput) updatedByInput.value = findDisplayName(skill.updated_by);
+                const updatedAtInput = document.getElementById('skill-detail-updated-at-input');
+                if (updatedAtInput) updatedAtInput.value = skill.updated_at ? formatDateTimeForDisplay(skill.updated_at) : '';
+                const errorEl = document.getElementById('skill-detail-error');
+                if (errorEl) errorEl.style.display = 'none';
+                this.isDirty = false;
+
+                if (lastUpdatedEl) {
+                    if (skill.updated_at) {
+                        const updatedByMember = (App.state.data.members || []).find(function (m) { return m.id === skill.updated_by; });
+                        const updatedByName = updatedByMember ? updatedByMember.display_name : '';
+                        lastUpdatedEl.innerHTML = '<i>update</i><span>' + formatDateTimeForDisplay(skill.updated_at) + (updatedByName ? '  ' + updatedByName : '') + '</span>';
+                    } else {
+                        lastUpdatedEl.innerHTML = '';
+                    }
+                }
+            },
+
+            _renderMembers: function (skillId) {
+                const container = document.getElementById('skill-detail-members-list');
+                if (!container) return;
+
+                const assignments = (App.state.data.skillAssignments || []).filter(function (sa) {
+                    return sa.skill_id === skillId;
+                });
+                const members = App.state.data.members || [];
+
+                if (assignments.length === 0) {
+                    container.innerHTML = '<p class="secondary-text padding">この技能を保有している人物はいません</p>';
+                    return;
+                }
+
+                // KEY_LABELS.SKILL_LEVELを使用
+                const levelLabels = KEY_LABELS.SKILL_LEVEL;
+
+                const levelOptions = function (current) {
+                    return Object.keys(levelLabels).map(function (key) {
+                        const selected = current === key ? ' selected' : '';
+                        return '<option value="' + key + '"' + selected + '>' + levelLabels[key] + '</option>';
+                    }).join('');
+                };
+
+                container.innerHTML = assignments.map(function (sa) {
+                    const member = members.find(function (m) { return m.id === sa.member_id; });
+                    const name = member ? member.display_name || member.name || member.email || '不明' : '不明';
+                    const memberId = member ? member.id : '';
+                    const assignmentId = sa.id || '';
+                    const remark = sa.user_note || sa.remark || '';
+
+                    const levelSelect = assignmentId
+                        ? '<select class="small" onchange="App.modals.skillDetail.updateMemberLevel(\'' + assignmentId + '\', this.value)">' + levelOptions(sa.skill_level_key) + '</select>'
+                        : '<span class="small-text secondary-text">-</span>';
+
+                    const openBtn = memberId
+                        ? '<button class="small round border" onclick="App.modals.skillDetail.openMemberDetail(\'' + memberId + '\')">開く</button>'
+                        : '';
+
+                    const removeBtn = assignmentId
+                        ? '<button class="small round border" onclick="App.modals.skillDetail.removeAssignment(\'' + assignmentId + '\')">解除</button>'
+                        : '';
+
+                    return '' +
+                        '<div class="row tiny-space padding">' +
+                        '<i>person</i>' +
+                        '<div class="max">' +
+                        '<p class="no-margin bold small">' + escapeHtml(name) + '</p>' +
+                        '<div class="row tiny-space">' + levelSelect + '</div>' +
+                        '<div class="field border label small top-margin no-margin">' +
+                        '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(remark) + '" onchange="App.modals.skillDetail.updateMemberRemark(\'' + escapeHtmlAttribute(assignmentId) + '\', this.value)">' +
+                        '<label>備考</label>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="row tiny-space">' + openBtn + removeBtn + '</div>' +
+                        '</div>';
+                }).join('<hr class="small-margin">');
+            },
+
+            openAddMembers: function () {
+                if (!this.currentId) return;
+                if (!App.modals.selectMembers || !App.modals.selectMembers.open) return;
+
+                const levelSelect = document.getElementById('skill-detail-level-select');
+                const levelKey = levelSelect ? levelSelect.value : 'INTERMEDIATE';
+
+                App.modals.selectMembers.open({
+                    multiSelect: true,
+                    callback: function (selectedIds) {
+                        App.modals.skillDetail.applyMembersSelection(selectedIds, levelKey);
+                    }
+                });
+            },
+
+            applyMembersSelection: async function (memberIds, levelKey) {
+                if (!this.currentId) return;
+                if (!memberIds || memberIds.length === 0) return;
+
+                const skillId = this.currentId;
+                const assignments = App.state.data.skillAssignments || [];
+
+                try {
+                    for (let i = 0; i < memberIds.length; i++) {
+                        const memberId = memberIds[i];
+                        const existing = assignments.find(function (sa) { return sa.skill_id === skillId && sa.member_id === memberId; });
+
+                        if (existing) {
+                            if (existing.skill_level_key !== levelKey) {
+                                await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
+                                    where: { id: ['=', existing.id] },
+                                    set: { skill_level_key: levelKey }
+                                }, '技能レベルを更新');
+                                existing.skill_level_key = levelKey;
+                            }
+                            continue;
+                        }
+
+                        const record = {
+                            member_id: memberId,
+                            skill_id: skillId,
+                            skill_level_key: levelKey
+                        };
+
+                        const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'insert', record, '技能を追加');
+                        if (inserted && inserted.data && inserted.data.id) {
+                            record.id = inserted.data.id;
+                        }
+                        assignments.push(record);
+                    }
+                } catch (err) {
+                    console.error('[SkillDetail] 追加エラー:', err);
+                    showSnackbar('技能の登録に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+                }
+
+                this._renderMembers(skillId);
+                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                    App.utils.modalFlow.refreshMembersDataInBackground(false);
+                } else if (App.pages.members && App.pages.members.loadData) {
+                    App.pages.members.loadData(false);
+                }
+            },
+
+            updateMemberLevel: async function (assignmentId, levelKey) {
+                if (!assignmentId) return;
+
+                const assignments = App.state.data.skillAssignments || [];
+                const target = assignments.find(function (sa) { return sa.id === assignmentId; });
+                if (!target || target.skill_level_key === levelKey) return;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', assignmentId] },
+                        set: { skill_level_key: levelKey }
+                    }, '技能レベルを更新');
+
+                    target.skill_level_key = levelKey;
+                } catch (err) {
+                    console.error('[SkillDetail] 更新エラー:', err);
+                    showSnackbar('更新に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+                }
+            },
+
+            updateMemberRemark: async function (assignmentId, remarkValue) {
+                if (!assignmentId) return;
+
+                const assignments = App.state.data.skillAssignments || [];
+                const target = assignments.find(function (sa) { return sa.id === assignmentId; });
+                if (!target) return;
+
+                const normalizedRemark = (remarkValue || '').trim() || null;
+                const prevRemark = target.user_note || target.remark || null;
+                if (normalizedRemark === prevRemark) return;
+
+                target.user_note = normalizedRemark;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', assignmentId] },
+                        set: { user_note: normalizedRemark }
+                    }, '人物・技能メモを更新');
+                } catch (err) {
+                    console.error('[SkillDetail] メモ更新エラー:', err);
+                    target.user_note = prevRemark;
+                    showSnackbar('メモの更新に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+                }
+
+                this._renderMembers(this.currentId);
+            },
+
+            removeAssignment: async function (assignmentId) {
+                if (!assignmentId) return;
+
+                const assignments = App.state.data.skillAssignments || [];
+                const targetIndex = assignments.findIndex(function (sa) { return sa.id === assignmentId; });
+                if (targetIndex === -1) return;
+
+                try {
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILL_ASSIGNMENTS, 'remove', {
+                        where: { id: ['=', assignmentId] }
+                    }, '技能割り当てを解除');
+                    assignments.splice(targetIndex, 1);
+                } catch (err) {
+                    console.error('[SkillDetail] 解除エラー:', err);
+                    showSnackbar('解除に失敗しました', 'error');
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    } else if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(true);
+                    }
+                }
+
+                this._renderMembers(this.currentId);
+                if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                    App.utils.modalFlow.refreshMembersDataInBackground(false);
+                } else if (App.pages.members && App.pages.members.loadData) {
+                    App.pages.members.loadData(false);
+                }
+            },
+
+            openMemberDetail: function (memberId) {
+                if (!memberId) return;
+                if (App.modals.memberDetail && App.modals.memberDetail.open) {
+                    App.modals.memberDetail.open(memberId);
+                }
+            },
+
+            _reset: function () {
+                this.currentId = null;
+                this.currentItem = null;
+                this.originalData = null;
+                this.isDirty = false;
+
+                const container = document.getElementById('skill-detail-members-list');
+                if (container) container.innerHTML = '';
+                const lastUpdatedEl = document.getElementById('skill-detail-last-updated');
+
+                if (lastUpdatedEl) lastUpdatedEl.innerHTML = '';
+
+                const titleInput = document.getElementById('skill-detail-title-input');
+                const typeInput = document.getElementById('skill-detail-type-input');
+                const userNoteInput = document.getElementById('skill-detail-user-note-input');
+                const remarkInput = document.getElementById('skill-detail-remark-input');
+                const errorEl = document.getElementById('skill-detail-error');
+                const createdByInput = document.getElementById('skill-detail-created-by-input');
+                const createdAtInput = document.getElementById('skill-detail-created-at-input');
+                const updatedByInput = document.getElementById('skill-detail-updated-by-input');
+                const updatedAtInput = document.getElementById('skill-detail-updated-at-input');
+                const comments = document.getElementById('skill-comments-list');
+
+                if (titleInput) titleInput.value = '';
+                if (typeInput) typeInput.value = '';
+                if (userNoteInput) userNoteInput.value = '';
+                if (remarkInput) remarkInput.value = '';
+                if (createdByInput) createdByInput.value = '';
+                if (createdAtInput) createdAtInput.value = '';
+                if (updatedByInput) updatedByInput.value = '';
+                if (updatedAtInput) updatedAtInput.value = '';
+                if (comments) comments.innerHTML = '';
+                if (errorEl) errorEl.style.display = 'none';
+            },
+
+            _bindDirtyWatchers: function () {
+                const self = this;
+                const watchIds = [
+                    'skill-detail-title-input',
+                    'skill-detail-type-input',
+                    'skill-detail-user-note-input',
+                    'skill-detail-remark-input'
+                ];
+                watchIds.forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (!el || el.dataset.skillDetailDirtyBound === '1') return;
+                    el.addEventListener('input', function () { self.isDirty = true; });
+                    el.addEventListener('change', function () { self.isDirty = true; });
+                    el.dataset.skillDetailDirtyBound = '1';
+                });
+            },
+
+            _buildBaseUrlParams: function () {
+                const currentParams = App.utils.url.getParams();
+                const nextParams = {
+                    tab: currentParams.tab || 'home'
+                };
+                if (nextParams.tab === 'board' && currentParams.board_id) {
+                    nextParams.board_id = currentParams.board_id;
+                }
+                if (nextParams.tab === 'catalog' && currentParams.table) {
+                    nextParams.table = currentParams.table;
+                }
+                return nextParams;
+            },
+
+            _updateUrlOnOpen: function (skillId, skipUrlUpdate) {
+                if (skipUrlUpdate || !skillId || !App.utils.url || !App.utils.url.updateParams) return;
+                const nextParams = this._buildBaseUrlParams();
+                nextParams.modal = 'skill-detail';
+                nextParams.skill_id = skillId;
+                App.utils.url.updateParams(nextParams, false);
+            },
+
+            _updateUrlOnClose: function (skipUrlUpdate) {
+                if (skipUrlUpdate || !App.utils.url || !App.utils.url.updateParams) return;
+                const nextParams = this._buildBaseUrlParams();
+                App.utils.url.updateParams(nextParams, false);
+            },
+
+            _bindEscClose: function () {
+                const dialog = document.getElementById('modal-detail-skill');
+                if (!dialog || dialog.dataset.skillEscBound === '1') return;
+                const self = this;
+                dialog.addEventListener('keydown', function (event) {
+                    if (!event || event.key !== 'Escape') return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    self.close({ reason: 'escape' });
+                });
+                dialog.dataset.skillEscBound = '1';
+            }
+        };
+    })();
+</script>

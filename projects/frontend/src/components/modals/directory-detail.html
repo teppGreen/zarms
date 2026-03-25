@@ -1,0 +1,133 @@
+<dialog id="modal-detail-directory" class="surface-container modal padding max">
+
+        <div class="grid small-padding bottom-margin middle-align">
+            <div class="s12 m8">
+                <h5 class="bold no-margin">組織詳細</h5>
+            </div>
+            <div class="s12 m4">
+                <nav class="row right-align">
+                    <span id="directory-detail-status-chip" class="chip small border" style="display: none;"></span>
+                    <button class="circle transparent" onclick="App.modals.directoryDetail.openNewComment()" title="コメントを作成">
+                        <i>add_comment</i>
+                    </button>
+                    <button class="circle transparent" onclick="App.modals.directoryDetail.close()" title="閉じる">
+                        <i>close</i>
+                    </button>
+                </nav>
+            </div>
+        </div>
+
+        <div class="grid small-padding tiny-space no-margin">
+            <div class="s12 m3 background small-round padding">
+                <h6 class="bold small bottom-margin">基本情報</h6>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="directory-detail-name-input" maxlength="80" required>
+                    <label>組織名</label>
+                </div>
+                <p class="small-text secondary-text top-margin bottom-margin">組織名は必須です。検索しやすい表記で入力してください。</p>
+
+                <div class="field border suffix no-wrap label small bottom-margin">
+                    <select id="directory-detail-type-select"></select>
+                    <label>種別</label>
+                    <i>arrow_drop_down</i>
+                </div>
+
+                <div class="field border suffix no-wrap label small bottom-margin">
+                    <select id="directory-detail-parent-select"></select>
+                    <label>親組織</label>
+                    <i>arrow_drop_down</i>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="url" id="directory-detail-slack-url-input" inputmode="url">
+                    <label>SlackチャンネルURL</label>
+                </div>
+                <nav class="tiny-margin bottom-margin">
+                    <button class="small border round" type="button" onclick="App.modals.directoryDetail.normalizeSlackUrl()">
+                        <i>link</i>
+                        <span>URLを整える</span>
+                    </button>
+                </nav>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="directory-detail-gfolder-id-input" maxlength="128" spellcheck="false">
+                    <label>Google DriveフォルダID</label>
+                </div>
+                <nav class="tiny-margin bottom-margin">
+                    <button class="small border round" type="button" onclick="App.modals.directoryDetail.extractGfolderId()">
+                        <i>folder_open</i>
+                        <span>URLからID抽出</span>
+                    </button>
+                </nav>
+
+                <label class="row padding no-margin bottom-margin">
+                    <input type="checkbox" id="directory-detail-is-active-input">
+                    <span>有効</span>
+                </label>
+
+                <div class="field border label small bottom-margin">
+                    <textarea placeholder=" " id="directory-detail-remark-input" rows="2" maxlength="500"></textarea>
+                    <label>備考</label>
+                </div>
+
+                <p id="directory-detail-validation-hint" class="small-text secondary-text top-margin bottom-margin">変更後に保存を押すと反映されます</p>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="directory-detail-created-by-input" readonly>
+                    <label>作成者</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="directory-detail-created-at-input" readonly>
+                    <label>作成日時</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="directory-detail-updated-by-input" readonly>
+                    <label>最終更新者</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="directory-detail-updated-at-input" readonly>
+                    <label>最終更新日時</label>
+                </div>
+
+                <p id="directory-detail-error" class="error-text small-text" style="display: none;"></p>
+            </div>
+
+            <div class="s12 m6 background small-round padding">
+                <div class="row tiny-space bottom-margin">
+                    <h6 class="bold small max">所属人物</h6>
+                    <span id="directory-detail-member-count" class="chip small"></span>
+                    <button class="small border round" onclick="App.modals.directoryDetail.openAddMembers()">
+                        <i>person_add</i>
+                        <span>人物追加</span>
+                    </button>
+                </div>
+                <div id="directory-detail-members" class="scroll" style="min-height: 420px;"></div>
+            </div>
+
+            <div class="s12 m3 background small-round padding">
+                <h6 class="bold small bottom-margin">コメント</h6>
+                <div class="bottom-margin">
+                    <button class="no-margin responsive large fill round max" onclick="App.modals.directoryDetail.openNewComment()">
+                        <i>add_comment</i>
+                        <span>コメントを作成</span>
+                    </button>
+                </div>
+                <div class="scroll medium-height" id="directory-comments-list"></div>
+            </div>
+        </div>
+
+        <nav class="small-padding no-margin">
+            <span id="directory-detail-footer-status" class="small-text secondary-text max">未保存の変更は保存ボタンで反映されます</span>
+            <div class="max"></div>
+            <button class="border large round" onclick="App.modals.directoryDetail.close()">
+                <span>閉じる</span>
+            </button>
+            <button id="directory-detail-save-btn" class="primary large round" onclick="App.modals.directoryDetail.save()">
+                <span>保存</span>
+            </button>
+        </nav>
+</dialog>

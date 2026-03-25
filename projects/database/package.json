@@ -1,0 +1,13 @@
+{
+    "name": "zarms-database",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "generate-clasp:dev": "node ../../scripts/generate-clasp-from-1password.js database dev",
+        "generate-clasp:prod": "node ../../scripts/generate-clasp-from-1password.js database prod",
+        "cleanup-clasp": "node ../../scripts/cleanup-clasp.js database",
+        "deploy:dev": "npm run generate-clasp:dev && clasp push --force && npm run cleanup-clasp",
+        "deploy:prod": "npm run generate-clasp:prod && clasp push --force && npm run cleanup-clasp",
+        "watch:dev": "npm run generate-clasp:dev && clasp push --watch"
+    }
+}

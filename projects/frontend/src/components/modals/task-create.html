@@ -1,0 +1,133 @@
+<dialog id="modal-new-task" class="modal medium-width large-height padding">
+    <nav class="small-padding bottom-margin">
+        <h5 class="max bold">新規タスク作成</h5>
+        <label class="switch icon">
+            <input type="checkbox" id="new-task-assistant-toggle"
+                onchange="App.modals.newTask.switchTab(this.checked ? 'assistant' : 'simple')">
+            <span>
+                <i>auto_awesome</i>
+            </span>
+            <div class="tooltip bottom">AIアシスタント</div>
+        </label>
+        <button class="circle transparent" onclick="App.modals.newTask.close()">
+            <i>close</i>
+        </button>
+    </nav>
+
+    <!-- ===== 通常のタスク作成 ===== -->
+    <div id="new-task-page-simple" class="page left active small-padding">
+        <!-- ボード選択 -->
+        <div class="field border large suffix no-wrap label">
+            <select placeholder=" " id="new-task-simple-board-select" required></select>
+            <label>ボード</label>
+            <i>arrow_drop_down</i>
+            <output>タスクを作成するボードを選択してください。</output>
+        </div>
+
+        <!-- タスク名入力 -->
+        <div class="field border large label">
+            <input placeholder=" " type="text" id="new-task-simple-name-input"
+                onkeydown="App.modals.newTask.handleSimpleKeydown(event)">
+            <label>タスク名</label>
+            <output>タスクの名前を入力してください。</output>
+        </div>
+
+        <div class="margin center-align">
+            <i class="extra">arrow_downward</i>
+        </div>
+
+        <!-- 作成ボタン -->
+        <div>
+            <button id="new-task-simple-create-btn" class="responsive primary extra"
+                onclick="App.modals.newTask.createSimpleTask()">
+                <i>add_task</i>
+                <span>タスクを作成する</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== タスク作成アシスタント ===== -->
+    <div id="new-task-page-assistant" class="page right active small-padding">
+
+        <!-- 入力画面 -->
+        <div id="new-task-assistant-input">
+            <!-- ボード選択 -->
+            <div class="field border large suffix no-wrap label">
+                <select id="new-task-board-select" required></select>
+                <label>ボード</label>
+                <i>arrow_drop_down</i>
+                <output>タスクを作成するボードを選択してください。</output>
+            </div>
+
+            <!-- Gemini Custom Gemsへのリンク -->
+            <div class="top-margin">
+                <h6 class="bold">タスクを下書きする</h6>
+                <p>
+                    <a id="gemini-gems-task-add-link" href="" target="_blank" rel="noopener noreferrer" class="link">
+                        Gemini Gem<i class="tiny">open_in_new</i>
+                    </a>
+                    を開いて、タスク名・タスク説明・開始日時・終了日時・優先度を決めてください。<br>
+                    <span class="secondary-text small-text no-line">
+                        各タスクの担当者は一律あなたに設定されます。必要があれば、タスク作成後に変更してください。
+                    </span>
+                </p>
+            </div>
+
+            <div class="margin center-align">
+                <i class="extra">arrow_downward</i>
+            </div>
+
+            <!-- ペーストボタン -->
+            <div>
+                <button class="responsive extra primary" onclick="App.modals.newTask.readFromClipboard()">
+                    <i>content_paste</i>
+                    <span>Canvasの内容をペースト</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</dialog>
+
+<!-- ===== プレビューモーダル（ペースト後に新しいモーダルとして開く） ===== -->
+<dialog id="modal-new-task-preview" class="modal large padding no-scroll">
+    <header class="fixed">
+        <nav class="small-padding top-margin">
+            <h5 class="bold">タスクプレビュー</h5>
+            <div class="max"></div>
+            <button class="border small" onclick="App.modals.newTask.readFromClipboard()">
+                <i>content_paste</i>
+                <span>再ペースト</span>
+            </button>
+            <button class="circle transparent" onclick="App.modals.newTask.closePreview()">
+                <i>close</i>
+            </button>
+        </nav>
+    </header>
+    <div class="padding top-margin">
+        <div class="scroll background medium-height small-round">
+            <table id="new-task-preview-table" class="border">
+                <thead>
+                    <tr>
+                        <th>タスク名</th>
+                        <th>タスク説明</th>
+                        <th>開始日時</th>
+                        <th>終了日時</th>
+                        <th>優先度</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 作成ボタン -->
+        <div class="top-margin">
+            <button id="new-task-create-btn" class="responsive primary extra slow-ripple"
+                onclick="App.modals.newTask.createTasks()" disabled>
+                <i>add_task</i>
+                <span>タスクを作成</span>
+            </button>
+        </div>
+    </div>
+</dialog>
+

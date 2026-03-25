@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <?!= include('css'); ?>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.bubble.css" integrity="sha512-M4MnXUIUNxrSVaIonML/fbjmK8/i1LW/4OdyZ06FXfsI3l5q/7YUAsITFSSGIfR9KYmLc9itY/owdWn8gwc6sg==" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js" integrity="sha512-h66qm/vNf7RbVCPqWl1izn6Lo00gS/qDPgxsa53uJH01GiAbwKG8uiPbuFODAZrsa7+SPqcErWSsmhRO4VPK4A==" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" integrity="sha512-Eezs+g9Lq4TCCq0wae01s9PuNWzHYoCMkE97e2qdkYthpI0pzC3UGB03lgEHn2XM85hDOUF6qgqqszs+iXU4UA==" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://apis.google.com/js/picker.js"></script>
+  <script>
+    window.App = {
+      pages: {},
+      overlays: {},
+      utils: {},
+      constants: {},
+      modals: {},
+      state: {
+        data: {}
+      }
+    };
+  </script>
+</head>
+
+<body class="light">
+  <script>
+    const templateVariables = <?!= JSON.stringify(templateVariables) ?>;
+  </script>
+  <?!= include('js') ?>
+  <?!= include('components/popups/error'); ?>
+  <?!= include('components/popups/error-script'); ?>
+
+  <div>
+    <?!= include('components/headers/navigation-left'); ?>
+    <?!= include('components/headers/navigation-left-script'); ?>
+    <?!= include('components/headers/navigation-top'); ?>
+    <?!= include('components/headers/navigation-top-script'); ?>
+    <?!= include('components/modals/comments-hub'); ?>
+    <?!= include('components/modals/comments-hub-script'); ?>
+    <?!= include('components/utils/form-metadata-script'); ?>
+    <?!= include('components/utils/modal-flow-script'); ?>
+    <?!= include('components/utils/comment-manager-script'); ?>
+    <?!= include('components/utils/history-manager-script'); ?>
+
+    <main class="surface-container round padding right-margin bottom-margin">
+      <?!= include('pages/init-loading'); ?>
+      <?!= include('pages/init-loading-script'); ?>
+      <?!= include('pages/home'); ?>
+      <?!= include('pages/home-script'); ?>
+      <?!= include('pages/members'); ?>
+      <?!= include('pages/members-script'); ?>
+      <?!= include('pages/boards'); ?>
+      <?!= include('pages/boards-script'); ?>
+      <?!= include('pages/board'); ?>
+      <?!= include('pages/board-script'); ?>
+      <?!= include('pages/calendar'); ?>
+      <?!= include('pages/calendar-script'); ?>
+      <?!= include('pages/notices'); ?>
+      <?!= include('pages/notices-script'); ?>
+      <?!= include('pages/insights'); ?>
+      <?!= include('pages/insights-script'); ?>
+
+      <?!= include('components/modals/task-detail'); ?>
+      <?!= include('components/modals/task-detail-script'); ?>
+      <?!= include('components/modals/member-detail'); ?>
+      <?!= include('components/modals/member-detail-script'); ?>
+      <?!= include('components/modals/skill-detail'); ?>
+      <?!= include('components/modals/skill-detail-script'); ?>
+      <?!= include('components/modals/plan-detail'); ?>
+      <?!= include('components/modals/plan-detail-script'); ?>
+      <?!= include('components/modals/directory-detail'); ?>
+      <?!= include('components/modals/directory-detail-script'); ?>
+      <?!= include('components/modals/task-create'); ?>
+      <?!= include('components/modals/task-create-script'); ?>
+      <?!= include('components/modals/member-create'); ?>
+      <?!= include('components/modals/member-create-script'); ?>
+      <?!= include('components/modals/directory-create'); ?>
+      <?!= include('components/modals/directory-create-script'); ?>
+      <?!= include('components/modals/skill-create'); ?>
+      <?!= include('components/modals/task-filter'); ?>
+      <?!= include('components/modals/task-filter-script'); ?>
+      <?!= include('components/modals/skill-create-script'); ?>
+      <?!= include('components/modals/plan-create'); ?>
+      <?!= include('components/modals/plan-create-script'); ?>
+      <?!= include('components/modals/comment-create'); ?>
+      <?!= include('components/modals/comment-create-script'); ?>
+      <?!= include('components/modals/directories-select'); ?>
+      <?!= include('components/modals/directories-select-script'); ?>
+      <?!= include('components/modals/members-select'); ?>
+      <?!= include('components/modals/members-select-script'); ?>
+      <?!= include('components/modals/skills-select'); ?>
+      <?!= include('components/modals/skills-select-script'); ?>
+      <?!= include('components/modals/board-select'); ?>
+      <?!= include('components/modals/board-select-script'); ?>
+      <?!= include('components/modals/task-select'); ?>
+      <?!= include('components/modals/task-select-script'); ?>
+    </main>
+  </div>
+  <div id="global-snackbar" class="snackbar top"></div>
+</body>
+
+</html>

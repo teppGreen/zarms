@@ -1,0 +1,32 @@
+<dialog id="modal-select-skills" class="modal padding no-scroll">
+    <nav class="small-padding bottom-margin">
+        <h5 class="bold max">技能を選択</h5>
+        <button class="circle transparent" onclick="appUi('#modal-select-skills',false)">
+            <i>close</i>
+        </button>
+    </nav>
+
+    <div class="field small-round border prefix bottom-margin top-margin">
+        <i>search</i>
+        <input type="text" id="skill-search-input" placeholder="タイトルで検索..." oninput="App.modals.selectSkills.filterResults()">
+    </div>
+
+    <div class="field label border bottom-margin">
+        <select id="skill-level-select" onchange="App.modals.selectSkills.updateLevel()"></select>
+        <label>技能レベル</label>
+    </div>
+
+    <div id="skill-select-all-container" class="row left-align margin" style="display: none;">
+        <label class="checkbox">
+            <input type="checkbox" id="skill-select-all-checkbox" onchange="App.modals.selectSkills.toggleSelectAll(this.checked)">
+            <span>すべて選択</span>
+        </label>
+    </div>
+
+    <div id="skill-results-container" class="scroll large-width medium-height small-padding small-round extra-line background"></div>
+
+    <nav class="right-align small-padding">
+        <button class="border" onclick="appUi('#modal-select-skills')">キャンセル</button>
+        <button onclick="App.modals.selectSkills.confirm()">適用</button>
+    </nav>
+</dialog>

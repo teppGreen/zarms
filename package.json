@@ -1,10 +1,22 @@
 {
-    "name": "zarms",
+    "name": "zarms-monorepo",
     "version": "1.0.0",
+    "private": true,
+    "description": "ZARMS Monorepo",
+    "workspaces": [
+        "projects/*"
+    ],
     "scripts": {
-        "deploy:dev": "cd src && cp .clasp-dev.json .clasp.json && clasp push",
-        "deploy:prod": "cd src && cp .clasp-prod.json .clasp.json && clasp push",
-        "watch:dev": "cd src && cp .clasp-dev.json .clasp.json && clasp push --watch"
+        "deploy:database:dev": "npm run deploy:dev -w projects/database",
+        "deploy:database:prod": "npm run deploy:prod -w projects/database",
+        "deploy:frontend:dev": "npm run deploy:dev -w projects/frontend",
+        "deploy:frontend:prod": "npm run deploy:prod -w projects/frontend",
+        "deploy:all:dev": "npm run deploy:database:dev && npm run deploy:frontend:dev",
+        "deploy:all:prod": "npm run deploy:database:prod && npm run deploy:frontend:prod",
+        "watch:database:dev": "npm run watch:dev -w projects/database",
+        "watch:frontend:dev": "npm run watch:dev -w projects/frontend",
+        "check:frontend:utils-reassign": "node scripts/check-app-utils-reassign.js",
+        "update:ui-deps": "node scripts/update-ui-deps.js"
     },
     "devDependencies": {
         "@google/clasp": "^2.4.2"

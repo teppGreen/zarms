@@ -1,0 +1,90 @@
+<!-- 新規組織作成モーダル -->
+<dialog id="modal-new-directory" class="modal medium-width padding">
+    <nav class="small-padding bottom-margin">
+        <h5 class="max bold">新規組織登録</h5>
+        <span id="new-directory-status-chip" class="chip small border" style="display: none;"></span>
+        <button class="circle transparent" onclick="App.modals.newDirectory.close()">
+            <i>close</i>
+        </button>
+    </nav>
+
+    <div class="small-padding">
+        <!-- 組織名 -->
+        <div class="field border large label bottom-margin">
+            <input placeholder=" " type="text" id="new-directory-name-input" maxlength="80" required>
+            <label>組織名 <span class="error-text">*</span></label>
+        </div>
+        <p class="small-text secondary-text top-margin bottom-margin">まず組織名を入力し、必要に応じて種別・親組織を設定してください。</p>
+
+        <!-- 種別 -->
+        <div class="field border large suffix no-wrap label bottom-margin">
+            <select id="new-directory-type-select">
+                <!-- 動的に生成 -->
+            </select>
+            <label>種別</label>
+            <i>arrow_drop_down</i>
+        </div>
+
+        <!-- 親組織 -->
+        <div class="field border large suffix no-wrap label bottom-margin">
+            <select id="new-directory-parent-select">
+                <option value="">（なし）</option>
+            </select>
+            <label>親組織</label>
+            <i>arrow_drop_down</i>
+        </div>
+
+        <!-- SlackチャンネルURL -->
+        <div class="field border large label bottom-margin">
+            <input placeholder=" " type="url" id="new-directory-slack-url-input" inputmode="url">
+            <label>SlackチャンネルURL</label>
+        </div>
+        <nav class="tiny-margin bottom-margin">
+            <button class="small border round" type="button" onclick="App.modals.newDirectory.normalizeSlackUrl()">
+                <i>link</i>
+                <span>URLを整える</span>
+            </button>
+        </nav>
+
+        <!-- フォルダID -->
+        <div class="field border large label bottom-margin">
+            <input placeholder=" " type="text" id="new-directory-gfolder-id-input" maxlength="128" spellcheck="false">
+            <label>Google DriveフォルダID</label>
+        </div>
+        <nav class="tiny-margin bottom-margin">
+            <button class="small border round" type="button" onclick="App.modals.newDirectory.extractGfolderId()">
+                <i>folder_open</i>
+                <span>URLからID抽出</span>
+            </button>
+        </nav>
+
+        <!-- 有効フラグ -->
+        <label class="row padding no-margin bottom-margin">
+            <input type="checkbox" id="new-directory-is-active-input" checked>
+            <span>有効</span>
+        </label>
+
+        <!-- 備考 -->
+        <div class="field border large label bottom-margin">
+            <textarea placeholder=" " id="new-directory-remark-input" rows="2" maxlength="500"></textarea>
+            <label>備考</label>
+        </div>
+
+        <p id="new-directory-validation-hint" class="small-text secondary-text top-margin bottom-margin">必須項目を入力すると登録できます</p>
+
+        <!-- エラー表示 -->
+        <p id="new-directory-error" class="error-text small-text" style="display: none;"></p>
+
+        <!-- 登録ボタン -->
+        <nav class="right-align top-margin">
+            <span id="new-directory-form-hint" class="small-text secondary-text max">登録後、一覧は自動で更新されます</span>
+            <button id="new-directory-cancel-btn" class="border" onclick="App.modals.newDirectory.close()">
+                <span>キャンセル</span>
+            </button>
+            <button id="new-directory-create-btn" class="primary" onclick="App.modals.newDirectory.create()">
+                <i>account_tree</i>
+                <span>登録する</span>
+            </button>
+        </nav>
+    </div>
+</dialog>

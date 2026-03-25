@@ -1,0 +1,347 @@
+<!-- 企画詳細モーダル -->
+<dialog id="modal-detail-plan" class="surface-container padding max">
+
+        <div class="grid small-padding bottom-margin">
+            <div class="s12 m9">
+                <div class="row tiny-space middle-align">
+                    <h5 class="bold no-margin">企画詳細</h5>
+                    <span id="plan-detail-status-chip" class="chip small"></span>
+                </div>
+            </div>
+            <div class="s12 m3">
+                <nav class="row right-align">
+                    <button id="plan-detail-new-comment-header-button" class="circle transparent" onclick="App.modals.planDetail.openNewComment()" title="コメントを作成">
+                        <i>add_comment</i>
+                    </button>
+                    <button id="plan-detail-request-delete-button" class="circle transparent" onclick="App.modals.planDetail.requestDelete()" title="削除を予約">
+                        <i>delete</i>
+                    </button>
+                    <button id="plan-detail-close-button" class="circle transparent" onclick="App.modals.planDetail.close()" title="閉じる">
+                        <i>close</i>
+                    </button>
+                </nav>
+            </div>
+        </div>
+
+        <div class="grid small-padding tiny-space no-margin">
+            <div class="s12 m3 background small-round padding">
+                <div class="row tiny-space middle-align bottom-margin">
+                    <h6 class="bold small no-margin">基本情報</h6>
+                    <span id="plan-detail-unsaved-indicator" class="chip small">保存済み</span>
+                    <span id="plan-detail-save-readiness-chip" class="chip small">保存不要</span>
+                </div>
+                <div id="plan-detail-operation-state" class="small-text secondary-text bottom-margin">編集すると「未保存の変更あり」に変わります</div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="plan-detail-plan-number-input">
+                    <label>企画番号</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="plan-detail-zarms-code-input">
+                    <label>ZARMSコード</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="plan-detail-parent-plan-number-input">
+                    <label>親企画番号</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="number" id="plan-detail-plan-type-sequence-number-input">
+                    <label>企画種別内連番</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="plan-detail-name-input">
+                    <label>企画名 <span class="error-text">*</span></label>
+                </div>
+
+                <div class="field border label small bottom-margin suffix no-wrap">
+                    <select id="plan-detail-status-input">
+                        <option value="SUBMITTED">応募済み</option>
+                        <option value="IN_REVIEW1">一次審査中</option>
+                        <option value="IN_REVIEW2">二次審査中（最終）</option>
+                        <option value="APPROVED">審査通過</option>
+                        <option value="RETURNED">審査差戻</option>
+                        <option value="REJECTED">審査落選</option>
+                        <option value="IN_PREPARATION">準備中</option>
+                        <option value="READY">準備完了</option>
+                        <option value="PUBLISHED">公開中</option>
+                        <option value="CLOSED">公開終了</option>
+                        <option value="MERGED">統合済み</option>
+                        <option value="DISCARDED">取り下げ</option>
+                    </select>
+                    <label>状態</label>
+                    <i>arrow_drop_down</i>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="plan-detail-type-input">
+                    <label>企画種別</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="plan-detail-summary-input">
+                    <label>企画概要</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <textarea id="plan-detail-remark-input" rows="2" placeholder=" "></textarea>
+                    <label>備考</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="plan-detail-applied-by-input" readonly>
+                    <label>応募者</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="plan-detail-applied-at-input" readonly>
+                    <label>応募日時</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="plan-detail-created-by-input" readonly>
+                    <label>作成者</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="plan-detail-created-at-input" readonly>
+                    <label>作成日時</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="plan-detail-updated-by-input" readonly>
+                    <label>最終更新者</label>
+                </div>
+
+                <div class="field border label small bottom-margin">
+                    <input placeholder=" " type="text" id="plan-detail-updated-at-input" readonly>
+                    <label>最終更新日時</label>
+                </div>
+
+                <article id="plan-detail-error-container" class="small-round padding top-margin" style="display: none;">
+                    <div class="row tiny-space middle-align">
+                        <i id="plan-detail-error-icon" class="small">error</i>
+                        <p id="plan-detail-error" class="small-text no-margin"></p>
+                    </div>
+                </article>
+                <div class="center-align row tiny-space secondary-text small-text top-margin" id="plan-detail-last-updated"></div>
+            </div>
+
+            <div class="s12 m6 background small-round padding">
+                <nav class="center-align max tiny-space bottom-margin">
+                    <nav class="tabbed small max" id="plan-detail-tabs">
+                        <a class="active" data-ui="#plan-detail-tab-description">
+                            <span>説明</span>
+                        </a>
+                        <a data-ui="#plan-detail-tab-meta">
+                            <span>追加項目</span>
+                        </a>
+                        <a data-ui="#plan-detail-tab-members">
+                            <span>関係者</span>
+                        </a>
+                    </nav>
+                </nav>
+
+                <div id="plan-detail-tab-description" class="page medium-height active">
+                    <div class="field border label small bottom-margin">
+                        <div id="plan-description-editor" class="quill-editor"></div>
+                        <label>企画説明</label>
+                    </div>
+                    <div class="field border label small bottom-margin">
+                        <textarea id="plan-detail-plan-tags-input" rows="2" placeholder=" "></textarea>
+                        <label>企画タグ</label>
+                    </div>
+                    <div class="field border label small bottom-margin">
+                        <textarea id="plan-detail-plan-categories-input" rows="2" placeholder=" "></textarea>
+                        <label>企画カテゴリー</label>
+                    </div>
+                    <div class="field border label small bottom-margin">
+                        <textarea id="plan-detail-selection-application-text-input" rows="3" placeholder=" "></textarea>
+                        <label>選考応募文</label>
+                    </div>
+                    <div class="field border label small bottom-margin">
+                        <textarea id="plan-detail-first-selection-comment-input" rows="2" placeholder=" "></textarea>
+                        <label>一次選考コメント</label>
+                    </div>
+                    <div class="field border label small bottom-margin">
+                        <textarea id="plan-detail-second-selection-comment-input" rows="2" placeholder=" "></textarea>
+                        <label>二次選考コメント</label>
+                    </div>
+                </div>
+
+                <div id="plan-detail-tab-meta" class="page medium-height scroll">
+                    <h6 class="small bold">見積・実績</h6>
+                    <div class="grid tiny-space no-margin">
+                        <div class="s12 m6 field border label small">
+                            <input placeholder=" " type="number" id="plan-detail-estimated-staff-count-input">
+                            <label>推定運営者数</label>
+                        </div>
+                        <div class="s12 m6 field border label small">
+                            <input placeholder=" " type="number" id="plan-detail-estimated-participant-count-input">
+                            <label>推定参加者数</label>
+                        </div>
+                        <div class="s12 m6 field border label small">
+                            <input placeholder=" " type="number" id="plan-detail-estimated-total-cost-input">
+                            <label>推定合計費用</label>
+                        </div>
+                        <div class="s12 m6 field border label small">
+                            <input placeholder=" " type="number" id="plan-detail-actual-staff-count-input">
+                            <label>実績運営者数</label>
+                        </div>
+                        <div class="s12 m6 field border label small">
+                            <input placeholder=" " type="number" id="plan-detail-actual-participant-count-input">
+                            <label>実績参加者数</label>
+                        </div>
+                        <div class="s12 m6 field border label small">
+                            <input placeholder=" " type="number" id="plan-detail-actual-total-cost-input">
+                            <label>実績合計費用</label>
+                        </div>
+                    </div>
+
+                    <label class="row padding no-margin bottom-margin">
+                        <input type="checkbox" id="plan-detail-has-collaborators-input">
+                        <span>学外連携組織情報あり</span>
+                    </label>
+                    <label class="row padding no-margin bottom-margin">
+                        <input type="checkbox" id="plan-detail-has-guests-input">
+                        <span>ゲスト情報あり</span>
+                    </label>
+                    <label class="row padding no-margin bottom-margin">
+                        <input type="checkbox" id="plan-detail-has-recruitment-input">
+                        <span>募集情報あり</span>
+                    </label>
+                    <label class="row padding no-margin bottom-margin">
+                        <input type="checkbox" id="plan-detail-has-live-input">
+                        <span>生放送あり</span>
+                    </label>
+
+                    <h6 class="small bold top-margin">関連リンク</h6>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="text" id="plan-detail-online-media-type-input"><label>オンライン媒体種別</label></div>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="url" id="plan-detail-online-media-url-input"><label>オンライン媒体URL</label></div>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="url" id="plan-detail-selection-presentation-url-input"><label>選考プレゼン動画URL</label></div>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="url" id="plan-detail-website-url-input"><label>特設サイトURL</label></div>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="url" id="plan-detail-sheet-url-input"><label>シートURL</label></div>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="url" id="plan-detail-folder-url-input"><label>フォルダURL</label></div>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="url" id="plan-detail-document-url-input"><label>ドキュメントURL</label></div>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="url" id="plan-detail-slide-url-input"><label>スライドURL</label></div>
+                     <div class="field border label small bottom-margin"><input placeholder=" " type="url" id="plan-detail-script-url-input"><label>台本URL</label></div>
+                      <div class="field border label small no-margin"><input placeholder=" " type="url" id="plan-detail-thumbnail-url-input"><label>サムネイルURL（保存時はURL文字列のみ保存）</label></div>
+                       <nav class="row tiny-space middle-align bottom-margin">
+                          <button id="plan-detail-thumbnail-normalize-button" class="small round border" type="button" onclick="App.modals.planDetail.normalizeThumbnailUrlInput()">
+                              <i>auto_fix_high</i>
+                              <span>Drive URLを整形</span>
+                          </button>
+                          <button id="plan-detail-thumbnail-normalize-refresh-button" class="small round border" type="button" onclick="App.modals.planDetail.normalizeAndRefreshThumbnailPreview()">
+                              <i>bolt</i>
+                              <span>整形して確認</span>
+                          </button>
+                          <button id="plan-detail-thumbnail-refresh-button" class="small round border" type="button" onclick="App.modals.planDetail.manualRefreshThumbnailPreview()">
+                              <i>visibility</i>
+                              <span>入力内容で確認</span>
+                          </button>
+                          <button id="plan-detail-thumbnail-next-action-button" class="small round border" type="button" onclick="App.modals.planDetail.runThumbnailNextAction()" disabled>
+                              <i>arrow_forward</i>
+                              <span>次アクション</span>
+                          </button>
+                          <div id="plan-detail-thumbnail-input-hint" class="small-text secondary-text">迷ったら「Drive URLを整形」→「入力内容で確認」。表示できたらURL文字列のまま保存できます</div>
+                       </nav>
+                      <article id="plan-detail-thumbnail-preview" class="small-round border padding bottom-margin">
+                         <div class="row tiny-space middle-align bottom-margin">
+                            <span id="plan-detail-thumbnail-preview-chip" class="chip small">未設定</span>
+                            <div class="max"></div>
+                            <button id="plan-detail-thumbnail-preview-open" class="small round border" type="button" onclick="App.modals.planDetail.openThumbnailSource()" disabled>
+                                <i>open_in_new</i>
+                                <span>URLを開く</span>
+                            </button>
+                             <button id="plan-detail-thumbnail-preview-retry" class="small round border" type="button" onclick="App.modals.planDetail.retryThumbnailPreview()">
+                                 <i>refresh</i>
+                                 <span>再読込</span>
+                             </button>
+                         </div>
+                         <div class="row tiny-space middle-align bottom-margin">
+                             <button id="plan-detail-thumbnail-copy-url-button" class="small round border" type="button" onclick="App.modals.planDetail.copyThumbnailUrl()">
+                                 <i>content_copy</i>
+                                 <span>URLをコピー</span>
+                             </button>
+                              <button id="plan-detail-thumbnail-copy-note-button" class="small round border" type="button" onclick="App.modals.planDetail.copyThumbnailShareNote()">
+                                  <i>assignment</i>
+                                  <span>引き継ぎ情報をコピー</span>
+                              </button>
+                             <div id="plan-detail-thumbnail-copy-feedback" class="small-text secondary-text">URL入力後にコピー導線が有効になります</div>
+                         </div>
+                          <div id="plan-detail-thumbnail-preview-state" class="small-text secondary-text">サムネイルURLを入力するとプレビューを表示します</div>
+                          <div id="plan-detail-thumbnail-diagnostics" class="small-text secondary-text top-margin">
+                              <div><span class="bold">診断コード:</span> <span id="plan-detail-thumbnail-diagnostic-code">なし</span></div>
+                              <div><span class="bold">意味:</span> <span id="plan-detail-thumbnail-diagnostic-meaning">URL入力後に判定します</span></div>
+                              <div><span class="bold">推奨アクション:</span> <span id="plan-detail-thumbnail-diagnostic-action">入力内容で確認</span></div>
+                          </div>
+                          <div id="plan-detail-thumbnail-initial-triage" class="small-text secondary-text top-margin">
+                              <div class="bold">判定結果（先にここを確認）</div>
+                              <div class="bold">いまの判定: <span id="plan-detail-thumbnail-quick-judgement">未確認</span></div>
+                              <div>判定: <span id="plan-detail-thumbnail-initial-status">未確認</span> / 診断コード: <span id="plan-detail-thumbnail-initial-code">none</span></div>
+                              <div>次アクション: <span id="plan-detail-thumbnail-initial-next-action">入力内容で確認</span></div>
+                              <div id="plan-detail-thumbnail-initial-hint" class="small-text tertiary-text">まず「いまの判定」を確認し、失敗時は「次アクション」→「入力内容で確認」→「引き継ぎ情報をコピー」の順で進めます</div>
+                          </div>
+                          <div id="plan-detail-thumbnail-recovery-flow" class="small-text tertiary-text top-margin">
+                              <div class="bold">失敗時の最短復旧順</div>
+                              <nav class="row tiny-space middle-align top-margin">
+                                  <button id="plan-detail-thumbnail-recovery-step1-button" class="small round border" type="button" onclick="App.modals.planDetail.runThumbnailNextAction()" disabled>
+                                      <i>looks_one</i>
+                                      <span>1. 次アクション</span>
+                                  </button>
+                                  <button id="plan-detail-thumbnail-recovery-step2-button" class="small round border" type="button" onclick="App.modals.planDetail.manualRefreshThumbnailPreview()" disabled>
+                                      <i>looks_two</i>
+                                      <span>2. 入力内容で確認</span>
+                                  </button>
+                                  <button id="plan-detail-thumbnail-recovery-step3-button" class="small round border" type="button" onclick="App.modals.planDetail.copyThumbnailShareNote()" disabled>
+                                      <i>looks_3</i>
+                                      <span>3. 引き継ぎ情報をコピー</span>
+                                  </button>
+                              </nav>
+                              <div id="plan-detail-thumbnail-recovery-hint" class="small-text tertiary-text top-margin">失敗したら 1 → 2 → 3 の順で押すと最短で復旧・引き継ぎできます</div>
+                          </div>
+                          <div id="plan-detail-thumbnail-preview-guide" class="small-text secondary-text top-margin">1. Drive共有URLを貼り付け 2. 「Drive URLを整形」 3. 「入力内容で確認」 4. 表示できたら保存（保存値はURL）</div>
+                          <img id="plan-detail-thumbnail-preview-image" class="responsive round" alt="企画サムネイルプレビュー" style="display: none;">
+                      </article>
+                    <h6 class="small bold top-margin">担当情報</h6>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="text" id="plan-detail-exhibitor-type-input"><label>出展者種別</label></div>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="text" id="plan-detail-exhibitor-member-input"><label>出展代表者</label></div>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="text" id="plan-detail-exhibitor-directory-input"><label>出展団体</label></div>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="text" id="plan-detail-manager-committee-student-input"><label>管理代表者</label></div>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="text" id="plan-detail-manager-committee-staff-input"><label>管理団体</label></div>
+                    <div class="field border label small bottom-margin"><input placeholder=" " type="url" id="plan-detail-slack-channel-url-input"><label>SlackチャンネルURL</label></div>
+                </div>
+
+                <div id="plan-detail-tab-members" class="page medium-height scroll">
+                    <div class="row tiny-space bottom-margin">
+                        <h6 class="bold small max">関係者名簿</h6>
+                        <button id="plan-detail-open-members-button" class="small round border" onclick="App.modals.planDetail.openAddMembers()">
+                            <i>group_add</i>
+                            <span>関係者を編集</span>
+                        </button>
+                    </div>
+                    <div id="plan-detail-assignments-list" class="scroll" style="min-height: 420px;"></div>
+                </div>
+            </div>
+
+            <div class="s12 m3 background small-round padding">
+                <div class="bottom-margin">
+                    <button id="plan-detail-new-comment-side-button" class="no-margin responsive large fill round max" onclick="App.modals.planDetail.openNewComment()">
+                        <i>add_comment</i>
+                        <span>コメントを作成</span>
+                    </button>
+                </div>
+                <div class="scroll medium-height" id="plan-comments-list"></div>
+            </div>
+        </div>
+
+        <nav class="small-padding no-margin">
+            <h5 id="plan-detail-display-id" class="font-number"></h5>
+            <div class="max"></div>
+             <button id="plan-detail-discard-button" class="border large round error-text" onclick="App.modals.planDetail.discard()">変更を破棄</button>
+             <button id="plan-detail-save-button" class="primary large round" onclick="App.modals.planDetail.save()">変更を保存</button>
+         </nav>
+ </dialog>

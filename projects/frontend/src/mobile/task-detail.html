@@ -1,0 +1,495 @@
+<!-- モバイル版タスク詳細モーダル -->
+<dialog id="modal-mobile-detail-task" class="modal max">
+  <div class="surface padding small-round">
+    <!-- ヘッダー -->
+    <nav class="row">
+      <button class="circle transparent" onclick="App.modals.mobileTaskDetail.close()">
+        <i>arrow_back</i>
+      </button>
+      <h6 class="max" id="mobile-task-title">タスク詳細</h6>
+      <button class="circle transparent" id="mobile-task-delete-btn">
+        <i>delete</i>
+      </button>
+    </nav>
+
+    <!-- タスク詳細コンテンツ -->
+    <div id="mobile-task-detail-content" class="top-margin">
+      <!-- JavaScriptで動的に生成 -->
+    </div>
+  </div>
+</dialog>
+
+<script>
+  (function () {
+    App.modals.mobileTaskDetail = {
+      currentTask: null,
+      currentId: null,
+      hasUnsavedChanges: false,
+
+      /**
+       * タスク詳細モーダルを開く
+       * @param {string} taskId - タスクID
+       * @param {boolean} skipUrlUpdate - trueの場合、URL更新をスキップ（履歴操作時に使用）
+       */
+      create: async function (promptTempValue = '') {
+        const promptValue = prompt('新しいタスクの名前', promptTempValue);
+
+        if (!promptValue) {
+          return;
+        } else if (promptValue === '') {
+          alert('タスク名を入力してください');
+          return;
+        }
+
+        await delay(100);
+
+        const userId = App.state.userId;
+        const taskId = crypto.randomUUID();
+        let boardId = 'my-board';
+
+        const defaultTask = {
+          id: taskId,
+          display_id: '#', // サーバーレスポンス待ち
+          name: promptValue,
+          description: '',
+          task_status_key: 'TODO',
+          priority_key: 'MEDIUM',
+          board_id: boardId,
+          starts_at: formatDateTimeForInput(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 1, 10, 0)),
+          ends_at: formatDateTimeForInput(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 2, 18, 0)),
+          created_by: activeUser.id,
+          processed_by: activeUser.id, // 作成者がデフォルト
+          reviewed_by: activeUser.id, // 作成者がデフォルト
+          received_by: activeUser.id, // 作成者がデフォルト
+          // Display fields for UI
+          created_by_display_name: activeUser.display_name,
+          created_by_profile_photo_url: activeUser.profile_photo_url,
+          reviewed_by_display_name: activeUser.display_name,
+          reviewed_by_profile_photo_url: activeUser.profile_photo_url,
+          received_by_display_name: activeUser.display_name,
+          received_by_profile_photo_url: activeUser.profile_photo_url,
+          processed_by_display_name: activeUser.display_name,
+          processed_by_profile_photo_url: activeUser.profile_photo_url
+        };
+
+        // ローカルデータに追加
+        if (!App.state.data.tasks) {
+          App.state.data.tasks = [];
+        }
+        App.state.data.tasks.push(defaultTask);
+
+        // カレントボードタスクにも追加
+        if (App.pages.mobileBoard && App.pages.mobileBoard.cachedTasks) {
+          const cache = App.pages.mobileBoard.cachedTasks;
+          if (Array.isArray(cache)) {
+            cache.push(defaultTask);
+            App.pages.mobileBoard.renderTasks(cache);
+          }
+        }
+
+        // モーダルを開く
+        this.open(taskId, false, true);
+
+        // サーバーに保存
+        callGAS('handleDatabaseProcess', userId, TABLE_NAMES.TASKS, 'insert', defaultTask)
+          .then(result => {
+            if (result && result.data && result.data.display_id) {
+              // サーバー生成のdisplay_idで更新
+              defaultTask.display_id = result.data.display_id;
+
+              // モーダルが開いていればUI更新
+              if (this.currentId === taskId) {
+                const displayIdEl = document.getElementById('task-display-id');
+                if (displayIdEl) displayIdEl.textContent = `#${defaultTask.display_id}`;
+                // オリジナルデータも更新（dirtyチェック用）
+                if (this.originalData) {
+                  this.originalData.display_id = result.data.display_id;
+                }
+              }
+            }
+          })
+          .catch(err => {
+            console.error('Failed to create task on server:', err);
+            showSnackbar('タスクの作成に失敗しました', 'error');
+          });
+      },
+
+      /**
+       * タスク詳細モーダルを開く
+       * @param {string} taskId - タスクID
+       */
+      open: async function (taskId) {
+        console.log('[MobileTaskDetail] Opening task:', taskId);
+
+        if (!taskId) {
+          console.error('[MobileTaskDetail] Invalid task ID');
+          return;
+        }
+
+        const dialog = document.getElementById('modal-mobile-detail-task');
+        if (!dialog) {
+          console.error('[MobileTaskDetail] Dialog not found');
+          return;
+        }
+
+        const content = document.getElementById('mobile-task-detail-content');
+
+        // 1. まずボードのキャッシュから検索（デスクトップ版と同様の即時描画パターン）
+        let task = (App.pages.mobileBoard?.cachedTasks || []).find(t => t.id === taskId);
+
+        // 2. キャッシュに見つからない場合はグローバルデータから検索
+        if (!task && App.state.data.tasks) {
+          task = App.state.data.tasks.find(t => t.id === taskId);
+        }
+
+        if (task) {
+          // キャッシュヒット: 即座に描画
+          this.currentTask = task;
+          this.currentId = task.id;
+          ui(dialog);
+          this.renderTaskDetail(task);
+
+          // バックグラウンドで最新データを取得して再描画（キャッシュが古い場合の対策）
+          callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
+            where: { id: ['=', taskId] }
+          }, null, true)
+            .then(result => {
+              if (this.currentId !== taskId) return; // 別のタスクが開かれた場合はスキップ
+              const tasks = result?.data || result || [];
+              if (tasks.length > 0) {
+                this.currentTask = tasks[0];
+                this.renderTaskDetail(this.currentTask);
+              }
+            })
+            .catch(err => console.warn('[MobileTaskDetail] Background refresh failed:', err));
+
+        } else {
+          // キャッシュミス: ローディング表示してGASから取得
+          content.innerHTML = `
+            <div class="center-align large-padding">
+              <progress class="circle large"></progress>
+            </div>
+          `;
+          ui(dialog);
+
+          try {
+            const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
+              where: { id: ['=', taskId] }
+            }, null, true);
+
+            const tasks = result?.data || result || [];
+            if (tasks.length === 0) {
+              throw new Error('タスクが見つかりません');
+            }
+
+            this.currentTask = tasks[0];
+            this.currentId = tasks[0].id;
+            this.renderTaskDetail(this.currentTask);
+
+          } catch (error) {
+            console.error('[MobileTaskDetail] Error:', error);
+            content.innerHTML = `
+              <article class="no-elevate padding center-align">
+                <i class="extra error-text">error</i>
+                <p class="error-text">タスクの読み込みに失敗しました</p>
+              </article>
+            `;
+          }
+        }
+      },
+
+
+      /**
+       * タスク詳細を描画
+       */
+      renderTaskDetail: function (task) {
+        const content = document.getElementById('mobile-task-detail-content');
+        if (!content) return;
+
+        // ボード名を取得
+        const boards = [{ id: 'my-board', name: 'マイボード' }, ...App.state.data.boards] || [];
+        const board = boards.find(b => b.id === task.board_id);
+        const boardName = board ? escapeHtml(board.name) : '未設定';
+
+        // メンバー名を取得
+        const members = App.state.data.members || [];
+
+        const getMemberHtml = (memberId, roleName) => {
+          const m = members.find(m => m.id === memberId);
+          const name = m ? escapeHtml(m.display_name) : '未設定';
+          let avatarHtml = '';
+          if (m && m.profile_photo_url) {
+            avatarHtml = `<img src="${escapeHtml(m.profile_photo_url)}" class="responsive" alt="${name}">`;
+          } else {
+            const initial = name !== '未設定' ? name.charAt(0).toUpperCase() : '?';
+            avatarHtml = `<i>person</i>`;
+          }
+          return `
+            <div class="s3 center-align no-space">
+              <div class="bottom-margin">
+                <button class="circle no-border transparent" onclick="showSnackbar('モバイル版では担当者を変更できません。デスクトップ版をご利用ください。')">${avatarHtml}</button>
+              </div>
+              <div class="vertical">
+                <span class="small-text no-margin">${name}</span>
+                <span class="small-text secondary-text no-margin">${roleName}</span>
+              </div>
+            </div>
+          `;
+        };
+
+        // descriptionのプレビュー（HTMLタグを除去）
+        const descriptionPreview = this.stripHtmlTags(task.description || '');
+
+        content.innerHTML = `
+          <div class="grid">
+            <!-- タスク名 -->
+            <div class="field small label border s12">
+              <input type="text" placeholder="" id="mobile-task-name" value="${escapeHtml(task.name)}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+              <label>タスク名</label>
+            </div>
+
+            <!-- ボード -->
+            <div class="field small label border s12">
+              <select id="mobile-task-board" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+                ${boards.map(b => `<option value="${escapeHtml(b.id)}" ${b.id === task.board_id ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('')}
+              </select>
+              <label>ボード</label>
+              <i class="right">arrow_drop_down</i>
+            </div>
+
+            <!-- ステータス -->
+            <div class="field small label border s6">
+              <select id="mobile-task-status" placeholder="" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+                <option value="TODO" ${task.task_status_key === 'TODO' ? 'selected' : ''}>${KEY_LABELS.TASK_STATUS.TODO}</option>
+                <option value="IN_PROGRESS" ${task.task_status_key === 'IN_PROGRESS' ? 'selected' : ''}>${KEY_LABELS.TASK_STATUS.IN_PROGRESS}</option>
+                <option value="IN_REVIEW" ${task.task_status_key === 'IN_REVIEW' ? 'selected' : ''}>${KEY_LABELS.TASK_STATUS.IN_REVIEW}</option>
+                <option value="DONE" ${task.task_status_key === 'DONE' ? 'selected' : ''}>${KEY_LABELS.TASK_STATUS.DONE}</option>
+              </select>
+              <label>ステータス</label>
+            </div>
+
+            <!-- 優先度 -->
+            <div class="field small label border s6">
+              <select id="mobile-task-priority" placeholder="" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+                <option value="LOW" ${task.priority_key === 'LOW' ? 'selected' : ''}>低</option>
+                <option value="MEDIUM" ${task.priority_key === 'MEDIUM' ? 'selected' : ''}>中</option>
+                <option value="HIGH" ${task.priority_key === 'HIGH' ? 'selected' : ''}>高</option>
+              </select>
+              <label>優先度</label>
+            </div>
+
+            <!-- 開始日時 -->
+            <div class="field small label border s12">
+              <input type="datetime-local" placeholder="" id="mobile-task-starts-at" value="${formatDateTimeForInput(task.starts_at)}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+              <label>開始日時</label>
+            </div>
+
+            <!-- 終了日時 -->
+            <div class="field small label border s12">
+              <input type="datetime-local" placeholder="" id="mobile-task-ends-at" value="${formatDateTimeForInput(task.ends_at)}" onchange="App.modals.mobileTaskDetail.markAsChanged()">
+              <label>終了日時</label>
+            </div>
+
+            <!-- 担当者一覧 -->
+            <div class="field border padding s12">
+              <div class="grid">
+                ${getMemberHtml(task.created_by, KEY_LABELS.ASIGNEE_TYPE.CREATED_BY)}
+                ${getMemberHtml(task.processed_by, KEY_LABELS.ASIGNEE_TYPE.PROCESSED_BY)}
+                ${getMemberHtml(task.reviewed_by, KEY_LABELS.ASIGNEE_TYPE.REVIEWED_BY)}
+                ${getMemberHtml(task.received_by, KEY_LABELS.ASIGNEE_TYPE.RECEIVED_BY)}
+              </div>
+            </div>
+
+            <!-- 説明（プレビュー） -->
+            <div class="field small label border s12" onclick="App.modals.mobileTaskDetail.openQuillEditor()">
+              <textarea placeholder="" readonly rows="4">${descriptionPreview}</textarea>
+              <label>説明</label>
+            </div>
+
+            <!-- 保存ボタン -->
+            <div class="top-margin s12">
+              <button class="responsive primary large" onclick="App.modals.mobileTaskDetail.save()">
+                <span>変更を保存</span>
+              </button>
+              <button class="responsive top-margin transparent error-text large" onclick="App.modals.mobileTaskDetail.discard()">
+                <span>変更を破棄</span>
+              </button>
+            </div>
+          </div>
+        `;
+
+        // 削除ボタンのイベント設定
+        const deleteBtn = document.getElementById('mobile-task-delete-btn');
+        if (deleteBtn) {
+          deleteBtn.onclick = () => this.deleteTask();
+        }
+      },
+
+      /**
+       * Quillエディタを開く
+       */
+      openQuillEditor: function () {
+        // URLパラメータを更新
+        const url = new URL(window.location.href);
+        url.searchParams.set('editor', 'description');
+        window.history.pushState({ editor: 'description', task: this.currentTask.id }, '', url.toString());
+
+        // Quillエディタモーダルを開く
+        App.modals.mobileQuillEditor.open(this.currentTask.description || '');
+      },
+
+      /**
+       * HTMLタグを除去
+       */
+      stripHtmlTags: function (html) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        return tmp.textContent || tmp.innerText || '';
+      },
+
+
+
+      /**
+       * 変更フラグを立てる
+       */
+      markAsChanged: function () {
+        this.hasUnsavedChanges = true;
+      },
+
+      /**
+       * 変更を破棄
+       */
+      discard: function () {
+        if (!this.currentTask) return;
+        if (this.hasUnsavedChanges) {
+          if (!confirm(`タスク「${this.currentTask.name}」の変更を破棄しますか？`)) {
+            return;
+          }
+        }
+        return this.close(true);
+      },
+
+      /**
+       * 保存
+       */
+      save: async function () {
+        if (!this.currentTask) return;
+
+        const currentTaskId = this.currentTask.id;
+        const name = document.getElementById('mobile-task-name')?.value;
+        const status = document.getElementById('mobile-task-status')?.value;
+        const priority = document.getElementById('mobile-task-priority')?.value;
+        const startsAt = document.getElementById('mobile-task-starts-at')?.value
+          ? new Date(document.getElementById('mobile-task-starts-at').value).toISOString()
+          : null;
+        const endsAt = document.getElementById('mobile-task-ends-at')?.value
+          ? new Date(document.getElementById('mobile-task-ends-at').value).toISOString()
+          : null;
+        const boardId = document.getElementById('mobile-task-board')?.value;
+
+        if (!name || !name.trim()) {
+          showSnackbar('タスク名を入力してください');
+          return;
+        }
+
+        const updates = {
+          name: name,
+          task_status_key: status,
+          priority_key: priority,
+          starts_at: startsAt,
+          ends_at: endsAt,
+          description: this.currentTask.description,
+          board_id: boardId || this.currentTask.board_id,
+          created_by: this.currentTask.created_by,
+          processed_by: this.currentTask.processed_by,
+          reviewed_by: this.currentTask.reviewed_by,
+          received_by: this.currentTask.received_by
+        };
+
+        // Optimistic UI: ローカルキャッシュを即時更新
+        Object.assign(this.currentTask, updates);
+        // cachedTasks の該当レコードも更新
+        const cached = App.pages.mobileBoard?.cachedTasks || [];
+        const cachedTask = cached.find(t => t.id === this.currentTask.id);
+        if (cachedTask) Object.assign(cachedTask, updates);
+        // グローバルタスクも更新
+        const globalTask = (App.state.data.tasks || []).find(t => t.id === this.currentTask.id);
+        if (globalTask) Object.assign(globalTask, updates);
+
+        this.hasUnsavedChanges = false;
+        this.close(true);
+        showSnackbar('保存しました');
+
+        try {
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
+            set: updates,
+            where: { id: ['=', currentTaskId] }
+          }, `タスク「${name}」を更新しました`);
+
+          // バックグラウンドでボード一覧を最新化
+          App.pages.mobileBoard.loadData(true);
+
+        } catch (error) {
+          console.error('[MobileTaskDetail] Save error:', error);
+          showSnackbar('保存に失敗しました: ' + error.message);
+        }
+      },
+
+
+      /**
+       * タスクを削除
+       */
+      deleteTask: async function () {
+        if (!this.currentTask) return;
+
+        const currentTaskId = this.currentTask.id;
+
+        if (!confirm(`タスクを削除しますか？`)) {
+          return;
+        }
+
+        // モーダルを閉じる
+        this.close(true);
+
+        try {
+          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'remove', {
+            where: { id: ['=', currentTaskId] }
+          }, `タスクを削除しました`);
+          showSnackbar('削除しました');
+          // データを再読み込み
+          await App.pages.mobileBoard.loadData(true);
+        } catch (error) {
+          console.error('[MobileTaskDetail] Delete error:', error);
+          showSnackbar('削除に失敗しました');
+        }
+      },
+
+      /**
+       * モーダルを閉じる
+       */
+      close: function (skipConfirm = false) {
+        if (!skipConfirm && this.hasUnsavedChanges) {
+          if (confirm('変更を保存しますか？')) {
+            return this.save();
+          }
+        }
+
+        const dialog = document.getElementById('modal-mobile-detail-task');
+        if (dialog) {
+          ui(dialog);
+        }
+
+        // URLパラメータから削除
+        const url = new URL(window.location.href);
+        url.searchParams.delete('task');
+        window.history.pushState({}, '', url.toString());
+
+        this.currentTask = null;
+        this.currentId = null;
+        this.hasUnsavedChanges = false;
+
+        return true;
+      }
+    };
+  })();
+</script>

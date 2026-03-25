@@ -1,0 +1,224 @@
+<!-- モバイル版Quillエディタモーダル -->
+<dialog id="modal-mobile-quill-editor" class="modal max">
+  <div class="surface padding small-round">
+    <!-- ヘッダー -->
+    <nav class="row">
+      <button class="circle transparent" onclick="App.modals.mobileQuillEditor.save()">
+        <i>arrow_back</i>
+      </button>
+      <h6 class="max">説明を編集</h6>
+    </nav>
+
+    <!-- エディタエリア -->
+    <div id="mobile-quill-editor" class="top-margin border large-height">
+      <!-- Quillエディタがここに描画される -->
+    </div>
+  </div>
+</dialog>
+
+<script>
+  (function () {
+    App.modals.mobileQuillEditor = {
+      quillInstance: null,
+      originalContent: '',
+
+      sanitizeContentHtml: function (html) {
+        if (!html) return '';
+        const container = document.createElement('div');
+        container.innerHTML = String(html);
+
+        // 危険な要素（script/style）を除去
+        container.querySelectorAll('script, style').forEach(function (el) {
+          el.parentNode.removeChild(el);
+        });
+
+        container.querySelectorAll('*').forEach(function (element) {
+          // on* イベント属性を除去（XSS防止）
+          Array.from(element.attributes).forEach(function (attr) {
+            if (/^on\w+/i.test(attr.name)) {
+              element.removeAttribute(attr.name);
+            }
+          });
+
+          // href / src / action 等の危険なURLスキームを除去（URLパーサによる allowlist 検証）
+          ['href', 'src', 'action', 'formaction', 'data', 'xlink:href'].forEach(function (attrName) {
+            var rawVal = element.getAttribute(attrName);
+            if (!rawVal) {
+              return;
+            }
+            // 属性値を正規化: ASCII制御文字（U+0000-U+001F）および Latin-1補助制御文字（U+007F-U+009F）を除去
+            // ブラウザによる制御文字入りURLの正規化で javascript: 等を迂回されるのを防ぐ
+            var normalizedVal = String(rawVal).replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim();
+            if (!normalizedVal) {
+              element.removeAttribute(attrName);
+              return;
+            }
+            try {
+              var url = new URL(normalizedVal, window.location.origin);
+              // XSSリスクのあるスキームを除外し、安全なプロトコルのみ許可
+              // blob: / ftp: 等は Quill エディタの用途外のため許可しない
+              var allowedProtocols = ['http:', 'https:', 'mailto:', 'tel:'];
+              if (allowedProtocols.indexOf(url.protocol) === -1) {
+                element.removeAttribute(attrName);
+              }
+            } catch (e) {
+              // 不正なURL形式の場合は属性を除去
+              element.removeAttribute(attrName);
+            }
+          });
+
+          element.removeAttribute('color');
+          element.removeAttribute('bgcolor');
+          element.removeAttribute('face');
+
+          if (element.hasAttribute('style')) {
+            const retained = element.getAttribute('style').split(';').map(function (item) {
+              return item.trim();
+            }).filter(function (decl) {
+              if (!decl) return false;
+              const pair = decl.split(':');
+              const prop = (pair[0] || '').trim().toLowerCase();
+              return prop !== 'color' && prop !== 'background' && prop !== 'background-color' && prop !== 'font' && prop !== 'font-family';
+            });
+            if (retained.length) {
+              element.setAttribute('style', retained.join('; '));
+            } else {
+              element.removeAttribute('style');
+            }
+          }
+
+          if (element.className && typeof element.className === 'string') {
+            const classes = element.className.split(/\s+/).filter(function (className) {
+              return className && !/^ql-(color|bg|font)-/.test(className);
+            });
+            if (classes.length) {
+              element.className = classes.join(' ');
+            } else {
+              element.removeAttribute('class');
+            }
+          }
+        });
+
+        return container.innerHTML;
+      },
+
+      /**
+       * Quillエディタモーダルを開く
+       */
+      open: function (content) {
+        console.log('[MobileQuillEditor] Opening editor');
+
+        const dialog = document.getElementById('modal-mobile-quill-editor');
+        if (!dialog) {
+          console.error('[MobileQuillEditor] Dialog not found');
+          return;
+        }
+
+        this.originalContent = content || '';
+
+        ui(dialog);
+
+        // Quillエディタの初期化（少し遅延させて確実にDOMに追加されてから）
+        setTimeout(() => {
+          this.initQuill();
+        }, 100);
+      },
+
+      /**
+       * Quillエディタを初期化
+       */
+      initQuill: function () {
+        const container = document.getElementById('mobile-quill-editor');
+        if (!container) {
+          console.error('[MobileQuillEditor] Container not found');
+          return;
+        }
+
+        // 既存のエディタをクリア
+        container.innerHTML = '';
+
+        // Quillエディタを作成
+        this.quillInstance = new Quill('#mobile-quill-editor', {
+          theme: 'bubble',
+          placeholder: 'タスクの説明を入力してください...',
+          modules: {
+            clipboard: {
+              matchers: [
+                [Node.ELEMENT_NODE, function (node, delta) {
+                  (delta.ops || []).forEach(function (op) {
+                    if (!op || !op.attributes) return;
+                    delete op.attributes.color;
+                    delete op.attributes.background;
+                    delete op.attributes.font;
+                  });
+                  return delta;
+                }]
+              ]
+            },
+            toolbar: [
+              ['bold', 'italic', 'underline', 'strike'],
+              [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+              ['link', 'clean']
+            ]
+          }
+        });
+
+        // コンテンツを設定
+        if (this.originalContent) {
+          this.quillInstance.root.innerHTML = this.sanitizeContentHtml(this.originalContent);
+        }
+
+        console.log('[MobileQuillEditor] Quill initialized');
+      },
+
+      /**
+       * 保存
+       */
+      save: function () {
+        if (!this.quillInstance) {
+          console.error('[MobileQuillEditor] Quill instance not found');
+          return;
+        }
+
+        // HTMLコンテンツを取得
+        const newContent = this.sanitizeContentHtml(this.quillInstance.root.innerHTML);
+
+        // タスク詳細の description を更新
+        if (App.modals.mobileTaskDetail.currentTask) {
+          App.modals.mobileTaskDetail.currentTask.description = newContent;
+          App.modals.mobileTaskDetail.markAsChanged();
+        }
+
+        // モーダルを閉じる
+        this.close();
+      },
+
+      /**
+       * モーダルを閉じる
+       */
+      close: function () {
+        const dialog = document.getElementById('modal-mobile-quill-editor');
+        if (dialog) {
+          ui(dialog);
+        }
+
+        // URLパラメータから削除
+        const url = new URL(window.location.href);
+        url.searchParams.delete('editor');
+        window.history.pushState({ task: App.modals.mobileTaskDetail.currentTask?.id }, '', url.toString());
+
+        // Quillインスタンスをクリーンアップ
+        if (this.quillInstance) {
+          this.quillInstance = null;
+        }
+
+        // タスク詳細を再描画
+        if (App.modals.mobileTaskDetail.currentTask) {
+          App.modals.mobileTaskDetail.renderTaskDetail(App.modals.mobileTaskDetail.currentTask);
+        }
+
+        return true;
+      }
+    };
+  })();
+</script>

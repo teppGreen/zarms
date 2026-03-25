@@ -1,0 +1,97 @@
+<script>
+    (function () {
+        App.modals.newSkill = {
+            open: function () {
+                this._resetForm();
+                const dialog = document.getElementById('modal-new-skill');
+                if (dialog) {
+                    appUi(dialog, true);
+                    setTimeout(function () {
+                        const titleInput = document.getElementById('new-skill-title-input');
+                        if (titleInput) titleInput.focus();
+                    }, 80);
+                }
+            },
+
+            close: function () {
+                const dialog = document.getElementById('modal-new-skill');
+                if (dialog) appUi(dialog, false);
+            },
+
+            create: async function () {
+                const title = (document.getElementById('new-skill-title-input')?.value || '').trim();
+                const type = (document.getElementById('new-skill-type-input')?.value || '').trim() || null;
+                const userNote = (document.getElementById('new-skill-user-note-input')?.value || '').trim() || null;
+                const remark = (document.getElementById('new-skill-remark-input')?.value || '').trim() || null;
+
+                const errorEl = document.getElementById('new-skill-error');
+                const createBtn = document.getElementById('new-skill-create-btn');
+
+                if (!title) {
+                    if (errorEl) {
+                        errorEl.textContent = 'タイトルは必須です';
+                        errorEl.style.display = '';
+                    }
+                    return;
+                }
+
+                if (errorEl) errorEl.style.display = 'none';
+                if (createBtn) createBtn.disabled = true;
+
+                try {
+                    const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.SKILLS, 'insert', {
+                        title: title,
+                        skill_type_key: type,
+                        user_note: userNote,
+                        remark: remark
+                    }, '技能を登録');
+
+                    const newSkill = {
+                        id: inserted?.data?.id || null,
+                        title: title,
+                        skill_type_key: type,
+                        user_note: userNote,
+                        remark: remark,
+                        is_active: true
+                    };
+                    if (newSkill.id) {
+                        App.state.data.skills = (App.state.data.skills || []).concat([newSkill]);
+                    }
+
+                    if (App.pages.members && App.pages.members.loadData) {
+                        App.pages.members.loadData(false);
+                    }
+                    if (App.utils.modalFlow && App.utils.modalFlow.refreshMembersDataInBackground) {
+                        App.utils.modalFlow.refreshMembersDataInBackground(true);
+                    }
+
+                    showSnackbar('技能を登録しました', 'success');
+                    this.close();
+                } catch (err) {
+                    console.error('[newSkill] create failed', err);
+                    if (errorEl) {
+                        errorEl.textContent = '登録に失敗しました: ' + (err.message || err);
+                        errorEl.style.display = '';
+                    }
+                } finally {
+                    if (createBtn) createBtn.disabled = false;
+                }
+            },
+
+            _resetForm: function () {
+                const ids = [
+                    'new-skill-title-input',
+                    'new-skill-type-input',
+                    'new-skill-user-note-input',
+                    'new-skill-remark-input'
+                ];
+                ids.forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (el) el.value = '';
+                });
+                const err = document.getElementById('new-skill-error');
+                if (err) err.style.display = 'none';
+            }
+        };
+    })();
+</script>
