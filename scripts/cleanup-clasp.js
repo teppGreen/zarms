@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * .clasp.json をクリーンアップするスクリプト
+ * .clasp.json をプレースホルダへ戻すスクリプト
  * 
- * デプロイ後に実行して、生成された .clasp.json を削除します。
- * リポジトリに秘密情報が残らないようにするための処理です。
+ * デプロイ後に実行して、.clasp.json の scriptId を {SCRIPT_ID} へ戻します。
+ * 構造を保持しつつ、秘密情報がリポジトリに残らないようにするための処理です。
  * 
  * 用法:
  *   node scripts/cleanup-clasp.js <project>
@@ -33,16 +33,19 @@ if (!fs.existsSync(projectDir)) {
 }
 
 const claspJsonPath = path.join(projectDir, '.clasp.json');
+const placeholderConfig = {
+  scriptId: '{SCRIPT_ID}',
+  rootDir: 'src',
+  scriptExtensions: ['.js', '.gs'],
+  htmlExtensions: ['.html'],
+  jsonExtensions: ['.json']
+};
 
 try {
-  if (fs.existsSync(claspJsonPath)) {
-    fs.unlinkSync(claspJsonPath);
-    console.log(`✓ .clasp.json を削除しました: ${path.relative(process.cwd(), claspJsonPath)}`);
-  } else {
-    console.log(`ℹ .clasp.json は既に存在しません: ${path.relative(process.cwd(), claspJsonPath)}`);
-  }
+  fs.writeFileSync(claspJsonPath, JSON.stringify(placeholderConfig, null, 2) + '\n');
+  console.log(`✓ .clasp.json をプレースホルダへ戻しました: ${path.relative(process.cwd(), claspJsonPath)}`);
 } catch (error) {
-  console.error(`❌ .clasp.json の削除に失敗しました:`);
+  console.error(`❌ .clasp.json のプレースホルダ復元に失敗しました:`);
   console.error(`   ${error.message}`);
   process.exit(1);
 }
