@@ -1312,6 +1312,31 @@ function createBulkInsertLogs(userId, tableName, records, remark) {
 }
 
 /**
+ * 指定テーブルのlogsテーブル最新レコードのcreated_atを返します（差分チェック用）
+ * キャッシュを使わず常に最新値を取得します。
+ * @param {string} userId - ユーザーID（現在は未使用、将来の権限チェック用）
+ * @param {string} tableName - 対象テーブル名
+ * @returns {{ timestamp: string|null }} 最新ログのcreated_at（ISOString）またはnull
+ */
+function getLatestLogTimestamp(userId, tableName) {
+    try {
+        if (!tableName) return sanitizeForClient({ timestamp: null });
+        const records = select(TABLE_NAMES.LOGS, {
+            where: { table_name: ['=', tableName] },
+            orderBy: { created_at: 'desc' },
+            limit: 1
+        });
+        const ts = (records && records.length > 0 && records[0].created_at)
+            ? records[0].created_at
+            : null;
+        return sanitizeForClient({ timestamp: ts });
+    } catch (error) {
+        console.error('[getLatestLogTimestamp] Error:', error);
+        return sanitizeForClient({ timestamp: null });
+    }
+}
+
+/**
  * テーブルキャッシュを無効化します
  * @param {string} tableName - テーブル名
  */

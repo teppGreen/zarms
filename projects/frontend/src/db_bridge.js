@@ -132,6 +132,21 @@ function getInsightsTabData(...args) {
   return ZARMS_DB.getInsightsTabData(...cleanArgs);
 }
 
+/**
+ * 指定テーブルのlogsテーブル最新レコードのcreated_atを返します（差分チェック用）
+ * @param {string} userId - ユーザーID
+ * @param {string} tableName - 対象テーブル名
+ * @param {boolean} [useApiMode] - APIモードフラグ
+ * @returns {{ timestamp: string|null }}
+ */
+function getLatestLogTimestamp(userId, tableName, useApiMode = false) {
+  if (useApiMode) {
+    // APIモード（未認証ユーザー）では差分チェックを行わない
+    return { timestamp: null };
+  }
+  return ZARMS_DB.getLatestLogTimestamp(userId, tableName);
+}
+
 // 必要に応じて他の外部公開関数を追加してください
 
 // ============================================

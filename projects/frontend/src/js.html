@@ -37,6 +37,7 @@
       userProperties: templateVariables.userProperties || {}, // ユーザープロパティ
       previousTab: null,
       isDevelopment: templateVariables.isDevelopment,
+      lastFetchTimestamps: {}, // テーブルごとの最終取得時刻 { tableName: ISO string }
 
       get: function (tableName) {
         return this.data[tableName];
@@ -169,9 +170,11 @@
       openModalFromParams(urlParams);
     }
 
-    // 自動更新を開始
-    // TODO: 本番デプロイ時にコメントアウトを外すこと
-    startAutoRefresh();
+    // 差分チェックを開始（3分ごとにlogsテーブルを軽量チェックして更新ボタンを有効化）
+    App.utils.dataSync.startDiffCheck();
+
+    // 最終更新時刻の表示を初期化
+    App.utils.dataSync.updateLastUpdatedDisplay();
 
     // システムアップデートの1時間ごとの自動更新を開始
     if (App.utils.header.systemUpdates) {
@@ -524,6 +527,12 @@
       App.state.data.systemUpdates = systemUpdates;
       App.state.data.tasks = tasks;
 
+      // 初回ロード時の取得時刻を記録（差分チェックの基準）
+      const _initNow = new Date().toISOString();
+      App.state.lastFetchTimestamps[TABLE_NAMES.TASKS] = _initNow;
+      App.state.lastFetchTimestamps[TABLE_NAMES.NOTICES] = _initNow;
+      App.state.lastFetchTimestamps[TABLE_NAMES.MEMBERS] = _initNow;
+
       // ── Step 3: 即座にUIを描画（Render-First） ──────────────────────────────────────────
       App.utils.navigation.renderBoardsNavigation();
       App.pages.boards.initialize();
@@ -540,6 +549,11 @@
         App.utils.header.comments.loadData(false).catch(e =>
           console.warn('[Comments] Background initial load failed:', e)
         );
+      }
+
+      // 初期ロードの最終更新時刻を表示
+      if (App.utils.dataSync) {
+        App.utils.dataSync.updateLastUpdatedDisplay();
       }
 
       // ── Step 4: バックグラウンドで最新データを取得（常に実行） ─────────────────────────────
@@ -642,41 +656,124 @@
   }
 
 
-  // 自動データ更新
-  let autoRefreshInterval = null;
+
+  // ============================================
+  // データ差分チェック & 手動更新モジュール
+  // 旧: 2分ごとの自動更新 → 新: 3分ごとの軽量差分チェック + 更新ボタン
+  // ============================================
   let refreshDataAbortController = null;
-  let autoRefreshResumeTimeout = null;
+  let _diffCheckResumeTimeout = null;
 
-  function startAutoRefresh() {
-    // 既存のインターバルがあればクリア
-    if (autoRefreshInterval) {
-      clearInterval(autoRefreshInterval);
+  App.utils.dataSync = {
+    diffCheckInterval: null,
+
+    /**
+     * テーブルの取得時刻を記録し、最終更新表示を更新します
+     * @param {string} tableName - テーブル名
+     */
+    recordFetch: function (tableName) {
+      App.state.lastFetchTimestamps[tableName] = new Date().toISOString();
+      this.updateLastUpdatedDisplay();
+    },
+
+    /**
+     * 最終更新時刻の表示を更新します
+     */
+    updateLastUpdatedDisplay: function () {
+      const text = document.getElementById('last-updated-text');
+      if (!text) return;
+      text.textContent = '最終更新: ' + formatDateTimeForDisplay(new Date(), 'HH:mm');
+    },
+
+    /**
+     * 更新ありボタンを表示します
+     */
+    showUpdateButton: function () {
+      const btn = document.getElementById('data-update-button');
+      if (btn) btn.style.display = '';
+    },
+
+    /**
+     * 更新ありボタンを非表示にします
+     */
+    hideUpdateButton: function () {
+      const btn = document.getElementById('data-update-button');
+      if (btn) btn.style.display = 'none';
+    },
+
+    /**
+     * 現在のタブに対応する主要テーブル名を返します
+     * @returns {string|null}
+     */
+    getCurrentTabTable: function () {
+      const currentTab = document.querySelector('main > div[style*="display: block"]');
+      if (!currentTab) return null;
+      const tabTableMap = {
+        'tab-board': TABLE_NAMES.TASKS,
+        'tab-home': TABLE_NAMES.TASKS,
+        'tab-catalog': TABLE_NAMES.MEMBERS,
+        'tab-boards': TABLE_NAMES.TASKS,
+        'tab-notices': TABLE_NAMES.NOTICES,
+        'tab-insights': TABLE_NAMES.TASKS,
+        'tab-calendar': TABLE_NAMES.TASKS
+      };
+      return tabTableMap[currentTab.id] || null;
+    },
+
+    /**
+     * logsテーブルの最新レコードと最終取得時刻を比較して差分があれば更新ボタンを表示します
+     */
+    checkForUpdates: async function () {
+      try {
+        const tableName = this.getCurrentTabTable();
+        if (!tableName) return;
+
+        const lastFetch = App.state.lastFetchTimestamps[tableName];
+        if (!lastFetch) return;
+
+        const result = await callGAS('getLatestLogTimestamp', App.state.userId, tableName);
+        const latestLogTime = result && result.timestamp;
+
+        if (latestLogTime && new Date(latestLogTime) > new Date(lastFetch)) {
+          console.log('[dataSync] 差分検出:', tableName, '最新ログ:', latestLogTime, '最終取得:', lastFetch);
+          this.showUpdateButton();
+        }
+      } catch (error) {
+        console.warn('[dataSync] checkForUpdates 失敗:', error);
+      }
+    },
+
+    /**
+     * 3分ごとの差分チェックを開始します
+     */
+    startDiffCheck: function () {
+      if (this.diffCheckInterval) {
+        clearInterval(this.diffCheckInterval);
+      }
+      // 3分 = 180000ms ごとに差分チェック
+      this.diffCheckInterval = setInterval(() => this.checkForUpdates(), 180000);
+    },
+
+    /**
+     * 差分チェックを停止します
+     */
+    stopDiffCheck: function () {
+      if (this.diffCheckInterval) {
+        clearInterval(this.diffCheckInterval);
+        this.diffCheckInterval = null;
+      }
+      if (refreshDataAbortController) {
+        refreshDataAbortController.aborted = true;
+      }
     }
+  };
 
-    // 既存の再開予約があればクリア
-    if (autoRefreshResumeTimeout) {
-      clearTimeout(autoRefreshResumeTimeout);
-      autoRefreshResumeTimeout = null;
-    }
-
-    // 2分ごとにデータを更新
-    autoRefreshInterval = setInterval(refreshData, 120000);
-  }
-
-  function stopAutoRefresh() {
-    if (autoRefreshInterval) {
-      clearInterval(autoRefreshInterval);
-      autoRefreshInterval = null;
-    }
-
-    if (refreshDataAbortController) {
-      refreshDataAbortController.aborted = true;
-    }
-
-    if (autoRefreshResumeTimeout) {
-      clearTimeout(autoRefreshResumeTimeout);
-      autoRefreshResumeTimeout = null;
-    }
+  /**
+   * 更新ボタンから呼び出される手動データ更新
+   */
+  async function manualRefreshData() {
+    App.utils.dataSync.hideUpdateButton();
+    await refreshData();
   }
 
   async function refreshData() {
@@ -685,7 +782,7 @@
     const currentController = refreshDataAbortController;
 
     try {
-      console.log('[refreshData] 自動更新開始 (コンテキスト対応)');
+      console.log('[refreshData] データ更新開始 (コンテキスト対応)');
 
       // タスク詳細が開いている場合は実行しない
       if (document.getElementById('modal-detail-task')?.classList.contains('active')) {
@@ -763,6 +860,7 @@
           }
           if (App.pages.boards && App.pages.boards.loadData) {
             await App.pages.boards.loadData(boardId, true); // isRefresh = true
+            App.utils.dataSync.recordFetch(TABLE_NAMES.TASKS);
           }
         }
       }
@@ -789,26 +887,32 @@
           App.state.data.planAssignments = r.planAssignments?.data || r.planAssignments || [];
 
           await App.pages.catalog.loadData(true);
+          App.utils.dataSync.recordFetch(TABLE_NAMES.MEMBERS);
         }
       }
       if (tabId === 'tab-boards') {
         if (App.pages.boardsList && App.pages.boardsList.loadData) {
           await App.pages.boardsList.loadData(true);
+          App.utils.dataSync.recordFetch(TABLE_NAMES.TASKS);
         }
       }
       if (tabId === 'tab-home') {
         if (App.pages.home && App.pages.home.loadData) {
           await App.pages.home.loadData(true);
+          App.utils.dataSync.recordFetch(TABLE_NAMES.TASKS);
+          App.utils.dataSync.recordFetch(TABLE_NAMES.NOTICES);
         }
       }
       if (tabId === 'tab-notices') {
         if (App.pages.notices && App.pages.notices.loadData) {
           await App.pages.notices.loadData(true);
+          App.utils.dataSync.recordFetch(TABLE_NAMES.NOTICES);
         }
       }
       if (tabId === 'tab-insights') {
         if (App.pages.insights && App.pages.insights.loadData) {
           await App.pages.insights.loadData(true);
+          App.utils.dataSync.recordFetch(TABLE_NAMES.TASKS);
         }
       }
 
@@ -818,11 +922,11 @@
         return;
       }
 
-      console.log('[refreshData] データ自動更新完了 (コンテキスト対応)');
+      console.log('[refreshData] データ更新完了 (コンテキスト対応)');
     } catch (error) {
       // 中止された場合はエラーログを出力しない
       if (!currentController.aborted) {
-        console.error('[refreshData] データ自動更新エラー:', error);
+        console.error('[refreshData] データ更新エラー:', error);
       }
     } finally {
       // 完了したらコントローラーをクリア
@@ -958,7 +1062,7 @@
 
       if (e.code === 'KeyR') {
         e.preventDefault();
-        refreshData();
+        manualRefreshData();
       }
     });
   }
@@ -2399,33 +2503,38 @@
       },
 
       /**
-       * autoRefreshを一時停止します
-       * @param {number} durationMs - 停止時間（ms）。0以下の場合は明示的にresumeAutoRefreshを呼ぶまで停止
+       * 差分チェックを一時停止します（旧autoRefreshの代替）
+       * @param {number} durationMs - 停止時間（ms）。0以下の場合は明示的にresumeDiffCheckを呼ぶまで停止
        */
       pauseAutoRefresh: function (durationMs = 0) {
-        stopAutoRefresh();
+        App.utils.dataSync.stopDiffCheck();
+
+        if (_diffCheckResumeTimeout) {
+          clearTimeout(_diffCheckResumeTimeout);
+          _diffCheckResumeTimeout = null;
+        }
 
         const waitMs = Number(durationMs);
         if (Number.isFinite(waitMs) && waitMs > 0) {
-          autoRefreshResumeTimeout = setTimeout(function () {
-            autoRefreshResumeTimeout = null;
-            startAutoRefresh();
-            console.log('[App.test] Auto refresh resumed');
+          _diffCheckResumeTimeout = setTimeout(function () {
+            _diffCheckResumeTimeout = null;
+            App.utils.dataSync.startDiffCheck();
+            console.log('[App.test] Diff check resumed');
           }, waitMs);
-          console.log('[App.test] Auto refresh paused for', waitMs, 'ms');
+          console.log('[App.test] Diff check paused for', waitMs, 'ms');
           return waitMs;
         }
 
-        console.log('[App.test] Auto refresh paused until resumeAutoRefresh()');
+        console.log('[App.test] Diff check paused until resumeAutoRefresh()');
         return 0;
       },
 
       /**
-       * 停止中のautoRefreshを再開します
+       * 停止中の差分チェックを再開します（旧autoRefreshの代替）
        */
       resumeAutoRefresh: function () {
-        startAutoRefresh();
-        console.log('[App.test] Auto refresh resumed manually');
+        App.utils.dataSync.startDiffCheck();
+        console.log('[App.test] Diff check resumed manually');
       }
     };
 
