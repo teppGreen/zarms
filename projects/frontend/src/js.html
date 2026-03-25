@@ -677,12 +677,16 @@
     },
 
     /**
-     * 最終更新時刻の表示を更新します
+     * 最終更新時刻の表示を更新します（lastFetchTimestampsの最新値を使用）
      */
     updateLastUpdatedDisplay: function () {
       const text = document.getElementById('last-updated-text');
       if (!text) return;
-      text.textContent = '最終更新: ' + formatDateTimeForDisplay(new Date(), 'HH:mm');
+      const timestamps = Object.values(App.state.lastFetchTimestamps || {});
+      const latestTime = timestamps.length > 0
+        ? new Date(Math.max(...timestamps.map(t => new Date(t).getTime())))
+        : new Date();
+      text.textContent = '最終更新: ' + formatDateTimeForDisplay(latestTime, 'HH:mm');
     },
 
     /**
@@ -744,12 +748,14 @@
     },
 
     /**
-     * 3分ごとの差分チェックを開始します
+     * 3分ごとの差分チェックを開始します（起動直後にも1回チェックします）
      */
     startDiffCheck: function () {
       if (this.diffCheckInterval) {
         clearInterval(this.diffCheckInterval);
       }
+      // 起動直後に1回チェック（初期ロード完了後に即座に差分を確認）
+      setTimeout(() => this.checkForUpdates(), 5000);
       // 3分 = 180000ms ごとに差分チェック
       this.diffCheckInterval = setInterval(() => this.checkForUpdates(), 180000);
     },

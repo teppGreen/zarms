@@ -1314,7 +1314,7 @@ function createBulkInsertLogs(userId, tableName, records, remark) {
 /**
  * 指定テーブルのlogsテーブル最新レコードのcreated_atを返します（差分チェック用）
  * キャッシュを使わず常に最新値を取得します。
- * @param {string} userId - ユーザーID（現在は未使用、将来の権限チェック用）
+ * @param {string} userId - ユーザーID（将来のテーブル別アクセス権限チェックで使用予定）
  * @param {string} tableName - 対象テーブル名
  * @returns {{ timestamp: string|null }} 最新ログのcreated_at（ISOString）またはnull
  */
