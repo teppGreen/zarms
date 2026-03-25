@@ -14,7 +14,7 @@ run_deploy() {
       npm run deploy:frontend:dev
       ;;
     database)
-      npm run deploy:db:dev
+      npm run deploy:database:dev
       ;;
     all)
       npm run deploy:all:dev

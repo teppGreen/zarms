@@ -113,29 +113,7 @@ zarms/
 ### 前提条件
 - Google Account (権限のあるアカウント)
 - Node.js 環境
+- **1PasswordCLI** (`op` コマンド) がインストールされ、認証済みであること
 
 ### 環境設定
-開発モードと本番モードの切り替えは、URLパラメータ `use_prod_db=true` またはユーザープロパティによって制御されます。
-各プロジェクトの `src/.clasp-dev.json` と `src/.clasp-prod.json` に正しい `scriptId` を設定してください。
-
-### デプロイ手順
-
-ワークスペースにより、DBとフロントエンドを個別に、または一括でデプロイできます。
-フロントエンドのデプロイ時には、自動的にDBプロジェクトのスクリプトIDが `appsscript.json` に書き込まれます。
-
-```bash
-# 全プロジェクトを開発環境へデプロイ
-npm run deploy:all:dev
-
-# 全プロジェクトを本番環境へデプロイ
-npm run deploy:all:prod
-
-# データベースのみデプロイ
-npm run deploy:db:dev
-
-# フロントエンドのみデプロイ
-npm run deploy:frontend:dev
-
-# 開発環境で自動プッシュ（監視モード）
-npm run watch:frontend:dev
-```
+[セットアップガイド](docs/setup-guide.md) を参照してください。

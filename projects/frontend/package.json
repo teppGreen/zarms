@@ -5,8 +5,11 @@
     "scripts": {
         "update-lib-id:dev": "node ../../scripts/update-library-id.js dev",
         "update-lib-id:prod": "node ../../scripts/update-library-id.js prod",
-        "deploy:dev": "npm run update-lib-id:dev && cp .clasp-dev.json .clasp.json && clasp push",
-        "deploy:prod": "npm run update-lib-id:prod && cp .clasp-prod.json .clasp.json && clasp push",
-        "watch:dev": "npm run update-lib-id:dev && cp .clasp-dev.json .clasp.json && clasp push --watch"
+        "generate-clasp:dev": "node ../../scripts/generate-clasp-from-1password.js frontend dev",
+        "generate-clasp:prod": "node ../../scripts/generate-clasp-from-1password.js frontend prod",
+        "cleanup-clasp": "node ../../scripts/cleanup-clasp.js frontend",
+        "deploy:dev": "npm run update-lib-id:dev && npm run generate-clasp:dev && clasp push && npm run cleanup-clasp",
+        "deploy:prod": "npm run update-lib-id:prod && npm run generate-clasp:prod && clasp push && npm run cleanup-clasp",
+        "watch:dev": "npm run update-lib-id:dev && npm run generate-clasp:dev && clasp push --watch"
     }
 }
