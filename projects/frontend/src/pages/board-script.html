@@ -1021,11 +1021,23 @@
                     return;
                 }
 
-                // Optimistic UI update
-                // 1. ボード固有のデータを直接更新
+                // ── Optimistic UI: 即座にUI更新＆描画、callGAS前に実行 ──
                 task.task_status_key = newStatusKey;
-                // 2. グローバルデータもあれば更新
                 updateLocalData(TABLE_NAMES.TASKS, taskId, { task_status_key: newStatusKey });
+
+                // my-boardキャッシュも更新
+                if (this.cachedBoardTasks['my-board']) {
+                    const myBoardTask = this.cachedBoardTasks['my-board'].find(t => t.id === taskId);
+                    if (myBoardTask) {
+                        myBoardTask.task_status_key = newStatusKey;
+                    }
+                }
+
+                // 即座に描画（Optimistic UI）
+                this.renderKanban(boardId);
+                if (this.currentBoardId === 'my-board') {
+                    this.renderKanban('my-board');
+                }
 
                 // DB更新
                 callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
@@ -1037,17 +1049,47 @@
                             // ロールバック
                             task.task_status_key = oldStatusKey;
                             updateLocalData(TABLE_NAMES.TASKS, taskId, { task_status_key: oldStatusKey });
-                            if (typeof rollback === 'function') rollback();
+
+                            // my-boardロールバック
+                            if (this.cachedBoardTasks['my-board']) {
+                                const myBoardTask = this.cachedBoardTasks['my-board'].find(t => t.id === taskId);
+                                if (myBoardTask) {
+                                    myBoardTask.task_status_key = oldStatusKey;
+                                }
+                            }
+
+                            // 再描画してロールバック
+                            this.renderKanban(boardId);
+                            if (this.currentBoardId === 'my-board') {
+                                this.renderKanban('my-board');
+                            }
                             alert('ステータスの更新に失敗しました');
                         } else {
+                            // バックグラウンドで最新データ同期（JOIN情報の更新など）
                             this.loadData(boardId, true);
+                            if (this.currentBoardId === 'my-board') {
+                                this.loadData('my-board', true);
+                            }
                         }
                     })
                     .catch(error => {
                         // ロールバック
                         task.task_status_key = oldStatusKey;
                         updateLocalData(TABLE_NAMES.TASKS, taskId, { task_status_key: oldStatusKey });
-                        if (typeof rollback === 'function') rollback();
+
+                        // my-boardロールバック
+                        if (this.cachedBoardTasks['my-board']) {
+                            const myBoardTask = this.cachedBoardTasks['my-board'].find(t => t.id === taskId);
+                            if (myBoardTask) {
+                                myBoardTask.task_status_key = oldStatusKey;
+                            }
+                        }
+
+                        // 再描画してロールバック
+                        this.renderKanban(boardId);
+                        if (this.currentBoardId === 'my-board') {
+                            this.renderKanban('my-board');
+                        }
                         App.utils.error.handle(error);
                     });
             },
