@@ -480,8 +480,10 @@
 
                 this.applyColumnHeights(boardId);
 
+                // 描画直後に毎回イベントを再設定して取りこぼしを防ぐ
+                this.bindCardEvents(container);
+
                 if (!isLoading) {
-                    this.bindCardEvents(container);
                     this.setupSortable(boardId);
                 }
             },
@@ -756,9 +758,8 @@
 
                 this.applyListHeight(boardId);
 
-                if (!isLoading) {
-                    this.bindCardEvents(container);
-                }
+                // 描画直後に毎回イベントを再設定して取りこぼしを防ぐ
+                this.bindCardEvents(container);
             },
 
             /**
@@ -880,6 +881,7 @@
 
                 const containerId = container.id;
                 const boardId = containerId.replace(/^(kanban|list)-canvas-/, '');
+                const listenerOptions = { capture: true };
 
                 // containerにIDがない場合は処理をスキップ
                 if (!containerId) {
@@ -889,10 +891,14 @@
 
                 // 既存のハンドラーがあれば削除
                 if (this.clickHandlers[containerId]) {
+                    // 過去実装との差分を吸収するため、通常/キャプチャの両方で解除する
                     container.removeEventListener('click', this.clickHandlers[containerId]);
+                    container.removeEventListener('click', this.clickHandlers[containerId], listenerOptions);
                 }
                 if (this.contextMenuHandlers[containerId]) {
+                    // 過去実装との差分を吸収するため、通常/キャプチャの両方で解除する
                     container.removeEventListener('contextmenu', this.contextMenuHandlers[containerId]);
+                    container.removeEventListener('contextmenu', this.contextMenuHandlers[containerId], listenerOptions);
                 }
 
                 // 新しいハンドラーを作成
@@ -978,8 +984,9 @@
                 this.clickHandlers[containerId] = clickHandler;
                 this.contextMenuHandlers[containerId] = contextMenuHandler; // 保存
 
-                container.addEventListener('click', clickHandler);
-                container.addEventListener('contextmenu', contextMenuHandler);
+                // 子要素でstopPropagationされても捕捉できるようキャプチャ段階で登録
+                container.addEventListener('click', clickHandler, listenerOptions);
+                container.addEventListener('contextmenu', contextMenuHandler, listenerOptions);
             },
 
             /**
