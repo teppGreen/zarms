@@ -170,8 +170,10 @@
       openModalFromParams(urlParams);
     }
 
-    // 差分チェックを開始（3分ごとにlogsテーブルを軽量チェックして更新ボタンを有効化）
-    App.utils.dataSync.startDiffCheck();
+    // 差分チェック or 自動更新を開始（ユーザー設定に従う）
+    App.utils.dataSync.autoRefreshEnabled = App.state.getUserProperty('autoRefreshEnabled') === 'true';
+    App.utils.dataSync.applyRefreshMode();
+    App.utils.dataSync._updateToggleButton();
 
     // 最終更新時刻の表示を初期化
     App.utils.dataSync.updateLastUpdatedDisplay();
@@ -658,14 +660,17 @@
 
 
   // ============================================
-  // データ差分チェック & 手動更新モジュール
-  // 旧: 2分ごとの自動更新 → 新: 3分ごとの軽量差分チェック + 更新ボタン
+  // データ差分チェック & 更新モジュール
+  // 通常: 3分ごとの軽量差分チェック + 更新ボタン（差分検出時のみ表示）
+  // 自動更新ON時: 旧来の2分ごとの全量更新
   // ============================================
   let refreshDataAbortController = null;
   let _diffCheckResumeTimeout = null;
 
   App.utils.dataSync = {
     diffCheckInterval: null,
+    autoRefreshInterval: null,
+    autoRefreshEnabled: false, // ユーザー設定: true=自動更新, false=差分チェック
 
     /**
      * テーブルの取得時刻を記録し、最終更新表示を更新します
@@ -726,6 +731,7 @@
 
     /**
      * logsテーブルの最新レコードと最終取得時刻を比較して差分があれば更新ボタンを表示します
+     * 自分自身の更新とシステム自動書き込みは除外します
      */
     checkForUpdates: async function () {
       try {
@@ -735,7 +741,9 @@
         const lastFetch = App.state.lastFetchTimestamps[tableName];
         if (!lastFetch) return;
 
-        const result = await callGAS('getLatestLogTimestamp', App.state.userId, tableName);
+        // 自分自身のIDと'system'は除外（自分の更新・自動書き込みで「更新あり」を出さない）
+        const excludeUserIds = [App.state.userId, 'system'].filter(Boolean);
+        const result = await callGAS('getLatestLogTimestamp', App.state.userId, tableName, excludeUserIds);
         const latestLogTime = result && result.timestamp;
 
         if (latestLogTime && new Date(latestLogTime) > new Date(lastFetch)) {
@@ -770,6 +778,60 @@
       }
       if (refreshDataAbortController) {
         refreshDataAbortController.aborted = true;
+      }
+    },
+
+    /**
+     * 自動更新インターバルを停止します
+     */
+    stopAutoRefresh: function () {
+      if (this.autoRefreshInterval) {
+        clearInterval(this.autoRefreshInterval);
+        this.autoRefreshInterval = null;
+      }
+    },
+
+    /**
+     * 現在のモード設定（autoRefreshEnabled）を適用します
+     * ON: 2分ごとの全量自動更新 / OFF: 3分ごとの差分チェック
+     */
+    applyRefreshMode: function () {
+      this.stopDiffCheck();
+      this.stopAutoRefresh();
+      if (this.autoRefreshEnabled) {
+        // 自動更新モード: 2分ごとに全量データを取得（旧autoRefreshと同等）
+        this.autoRefreshInterval = setInterval(refreshData, 120000);
+        console.log('[dataSync] 自動更新モード開始（2分ごと）');
+      } else {
+        // 差分チェックモード: 3分ごとに軽量チェックして差分があれば更新ボタンを表示
+        this.startDiffCheck();
+        console.log('[dataSync] 差分チェックモード開始（3分ごと）');
+      }
+    },
+
+    /**
+     * 自動更新のON/OFFをトグルし、ユーザープロパティに保存します
+     */
+    toggleAutoRefresh: async function () {
+      this.autoRefreshEnabled = !this.autoRefreshEnabled;
+      this.applyRefreshMode();
+      this._updateToggleButton();
+      await App.state.saveUserProperty('autoRefreshEnabled', this.autoRefreshEnabled ? 'true' : 'false');
+      console.log('[dataSync] 自動更新:', this.autoRefreshEnabled ? 'ON' : 'OFF');
+    },
+
+    /**
+     * 自動更新トグルボタンの表示を現在の状態に合わせて更新します
+     */
+    _updateToggleButton: function () {
+      const btn = document.getElementById('auto-refresh-toggle');
+      if (!btn) return;
+      if (this.autoRefreshEnabled) {
+        btn.classList.add('primary');
+        btn.title = '自動更新: ON（クリックでOFF）';
+      } else {
+        btn.classList.remove('primary');
+        btn.title = '自動更新: OFF（クリックでON）';
       }
     }
   };
@@ -2509,11 +2571,12 @@
       },
 
       /**
-       * 差分チェックを一時停止します（旧autoRefreshの代替）
-       * @param {number} durationMs - 停止時間（ms）。0以下の場合は明示的にresumeDiffCheckを呼ぶまで停止
+       * 差分チェック・自動更新を一時停止します
+       * @param {number} durationMs - 停止時間（ms）。0以下の場合は明示的にresumeAutoRefreshを呼ぶまで停止
        */
       pauseAutoRefresh: function (durationMs = 0) {
         App.utils.dataSync.stopDiffCheck();
+        App.utils.dataSync.stopAutoRefresh();
 
         if (_diffCheckResumeTimeout) {
           clearTimeout(_diffCheckResumeTimeout);
@@ -2524,23 +2587,23 @@
         if (Number.isFinite(waitMs) && waitMs > 0) {
           _diffCheckResumeTimeout = setTimeout(function () {
             _diffCheckResumeTimeout = null;
-            App.utils.dataSync.startDiffCheck();
-            console.log('[App.test] Diff check resumed');
+            App.utils.dataSync.applyRefreshMode();
+            console.log('[App.test] 更新再開');
           }, waitMs);
-          console.log('[App.test] Diff check paused for', waitMs, 'ms');
+          console.log('[App.test] 更新停止:', waitMs, 'ms');
           return waitMs;
         }
 
-        console.log('[App.test] Diff check paused until resumeAutoRefresh()');
+        console.log('[App.test] 更新停止: resumeAutoRefresh()まで停止');
         return 0;
       },
 
       /**
-       * 停止中の差分チェックを再開します（旧autoRefreshの代替）
+       * 停止中の差分チェック・自動更新を再開します
        */
       resumeAutoRefresh: function () {
-        App.utils.dataSync.startDiffCheck();
-        console.log('[App.test] Diff check resumed manually');
+        App.utils.dataSync.applyRefreshMode();
+        console.log('[App.test] 更新再開');
       }
     };
 

@@ -1314,21 +1314,30 @@ function createBulkInsertLogs(userId, tableName, records, remark) {
 /**
  * 指定テーブルのlogsテーブル最新レコードのcreated_atを返します（差分チェック用）
  * キャッシュを使わず常に最新値を取得します。
- * @param {string} userId - ユーザーID（将来のテーブル別アクセス権限チェックで使用予定）
+ * @param {string} userId - ユーザーID
  * @param {string} tableName - 対象テーブル名
+ * @param {string[]} [excludeUserIds=[]] - 除外するcreated_byの値（自分自身のIDや'system'を渡すことで自動書き込みを除外）
  * @returns {{ timestamp: string|null }} 最新ログのcreated_at（ISOString）またはnull
  */
-function getLatestLogTimestamp(userId, tableName) {
+function getLatestLogTimestamp(userId, tableName, excludeUserIds = []) {
     try {
         if (!tableName) return sanitizeForClient({ timestamp: null });
+        // 自動書き込みが毎分発生するケースを考慮し、チェック間隔（3分）以上の余裕を持たせた件数を取得
+        const FETCH_LIMIT_FOR_FILTER = 20;
+        const fetchLimit = (Array.isArray(excludeUserIds) && excludeUserIds.length > 0) ? FETCH_LIMIT_FOR_FILTER : 1;
         const records = select(TABLE_NAMES.LOGS, {
             where: { table_name: ['=', tableName] },
             orderBy: { created_at: 'desc' },
-            limit: 1
+            limit: fetchLimit
         });
-        const ts = (records && records.length > 0 && records[0].created_at)
-            ? records[0].created_at
-            : null;
+        if (!records || records.length === 0) return sanitizeForClient({ timestamp: null });
+
+        const exclude = Array.isArray(excludeUserIds) ? excludeUserIds : [];
+        const filtered = exclude.length > 0
+            ? records.filter(function (r) { return !exclude.includes(r.created_by); })
+            : records;
+
+        const ts = filtered.length > 0 ? filtered[0].created_at : null;
         return sanitizeForClient({ timestamp: ts });
     } catch (error) {
         console.error('[getLatestLogTimestamp] Error:', error);
