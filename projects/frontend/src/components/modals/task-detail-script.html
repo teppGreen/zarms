@@ -714,40 +714,34 @@
             }
           }
 
-          // メンバーフィールドが更新された場合はボードデータを再読み込み（JOINデータを更新するため）
-          const memberFieldsUpdated = ['processed_by', 'reviewed_by', 'received_by'].some(role => updates.hasOwnProperty(role));
-
-          if (memberFieldsUpdated && boardId && App.pages.boards && App.pages.boards.loadData) {
-            App.pages.boards.loadData(boardId, true).then(() => {
-              if (this.currentId === id) {
-                const updatedTask = App.pages.boards.cachedBoardTasks[boardId]?.find(t => t.id === id);
-                if (updatedTask) {
-                  this.currentItem = updatedTask;
-                  this.originalData = { ...updatedTask };
-                  // アバターを再描画
-                  const members = App.state.data.members || [];
-                  const getMember = (memberId) => members.find(m => m.id === memberId);
-                  ['created_by', 'processed_by', 'reviewed_by', 'received_by'].forEach(role => {
-                    const member = getMember(updatedTask[role]);
-                    this.renderMemberAvatar(role, member?.display_name, member?.profile_photo_url);
-                  });
-                }
-              }
-            });
-            if (App.pages.boards.currentBoardId === 'my-board') {
-              App.pages.boards.loadData('my-board', true);
-            }
-          } else if (boardId && App.pages.boards && App.pages.boards.renderKanban) {
-            // メンバーフィールド以外の更新はカンバンを再描画（Optimistic UIの反映）
+          // カンバン／リストをローカルキャッシュから即座に再描画（Optimistic UI）
+          if (boardId && App.pages.boards) {
             if (App.pages.boards.viewMode === 'list') {
-              this.renderList(boardId, false);
+              App.pages.boards.renderList(boardId, false);
               if (App.pages.boards.currentBoardId === 'my-board') {
-                App.pages.boards.renderList('my-board');
+                App.pages.boards.renderList('my-board', false);
               }
             } else {
               App.pages.boards.renderKanban(boardId);
               if (App.pages.boards.currentBoardId === 'my-board') {
                 App.pages.boards.renderKanban('my-board');
+              }
+            }
+
+            // メンバーフィールドが更新された場合はバックグラウンドでDBから最新データを再取得（JOIN情報を同期）
+            const memberFieldsUpdated = ['processed_by', 'reviewed_by', 'received_by'].some(role => updates.hasOwnProperty(role));
+            if (memberFieldsUpdated && App.pages.boards.loadData) {
+              App.pages.boards.loadData(boardId, true).then(() => {
+                if (this.currentId === id) {
+                  const updatedTask = App.pages.boards.cachedBoardTasks[boardId]?.find(t => t.id === id);
+                  if (updatedTask) {
+                    this.currentItem = updatedTask;
+                    this.originalData = { ...updatedTask };
+                  }
+                }
+              });
+              if (App.pages.boards.currentBoardId === 'my-board') {
+                App.pages.boards.loadData('my-board', true);
               }
             }
           }
@@ -1667,29 +1661,31 @@
       },
 
       /**
-       * リストの変更を保存
+       * リストの変更を保存（バッチ処理で1往復に最適化）
        * @param {Object} listChanges - 変更内容
        */
       saveListChanges: async function (listChanges) {
         const { toInsert, toUpdate, toDelete } = listChanges;
+        const queries = [];
 
-        // 挿入
-        await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LISTS, 'bulkinsert', toInsert);
-
-        // 削除
-        for (const listId of toDelete) {
-          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LISTS, 'remove', {
-            where: { id: ["=", listId] }
-          });
+        // 挿入（bulkinsert）
+        if (toInsert && toInsert.length > 0) {
+          queries.push({ key: 'insert_0', tableName: TABLE_NAMES.LISTS, operation: 'bulkinsert', dataObject: toInsert });
         }
 
+        // 削除
+        toDelete.forEach((listId, i) => {
+          queries.push({ key: `remove_${i}`, tableName: TABLE_NAMES.LISTS, operation: 'remove', dataObject: { where: { id: ["=", listId] } } });
+        });
+
         // 更新
-        for (const list of toUpdate) {
+        toUpdate.forEach((list, i) => {
           const { id, task_id, ...updates } = list;
-          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LISTS, 'update', {
-            where: { id: ["=", list.id] },
-            set: updates
-          });
+          queries.push({ key: `update_${i}`, tableName: TABLE_NAMES.LISTS, operation: 'update', dataObject: { where: { id: ["=", list.id] }, set: updates } });
+        });
+
+        if (queries.length > 0) {
+          await callGAS('handleBatchDatabaseProcess', App.state.userId, queries);
         }
 
         console.log('[TaskDetail] List changes saved');
@@ -1715,38 +1711,43 @@
       },
 
       /**
-       * 関連タスクの変更を保存
+       * 関連タスクの変更を保存（バッチ処理で1往復に最適化）
        */
       saveRelatedTaskChanges: async function (currentTaskId, relatedChanges) {
         const { childTasksToAdd, childTasksToRemove } = relatedChanges;
         console.log(`[saveRelatedTaskChanges] ${JSON.stringify(relatedChanges)}`);
 
-        // すべての現在の子タスクのparent_task_idをcurrentIdに設定
-        for (const childTaskId of childTasksToAdd) {
-          const updateResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
+        const queries = [];
+
+        childTasksToAdd.forEach((childTaskId, i) => {
+          queries.push({ key: `add_${i}`, tableName: TABLE_NAMES.TASKS, operation: 'update', dataObject: {
             where: { id: ["=", childTaskId] },
             set: { parent_task_id: currentTaskId }
-          });
+          }});
+        });
 
-          if (!updateResult || (Array.isArray(updateResult) && updateResult.length === 0)) {
-            throw new Error(`Failed to assign parent_task_id for child task: ${childTaskId}`);
-          }
-
-          updateLocalData(TABLE_NAMES.TASKS, childTaskId, { parent_task_id: currentTaskId });
-        }
-
-        // 削除された子タスクのparent_task_idをnullに設定
-        for (const childTaskId of childTasksToRemove) {
-          const updateResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
+        childTasksToRemove.forEach((childTaskId, i) => {
+          queries.push({ key: `remove_${i}`, tableName: TABLE_NAMES.TASKS, operation: 'update', dataObject: {
             where: { id: ["=", childTaskId] },
             set: { parent_task_id: '' }
-          });
+          }});
+        });
 
-          if (!updateResult || (Array.isArray(updateResult) && updateResult.length === 0)) {
-            throw new Error(`Failed to clear parent_task_id for child task: ${childTaskId}`);
+        if (queries.length > 0) {
+          const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, queries);
+          const results = batchResult?.results || {};
+          // エラーチェック
+          for (const key of Object.keys(results)) {
+            const r = results[key];
+            if (r && r.error) throw new Error(`子タスクの更新に失敗しました (${key}): ${r.error}`);
           }
-
-          updateLocalData(TABLE_NAMES.TASKS, childTaskId, { parent_task_id: '' });
+          // ローカルキャッシュを更新
+          childTasksToAdd.forEach(childTaskId => {
+            updateLocalData(TABLE_NAMES.TASKS, childTaskId, { parent_task_id: currentTaskId });
+          });
+          childTasksToRemove.forEach(childTaskId => {
+            updateLocalData(TABLE_NAMES.TASKS, childTaskId, { parent_task_id: '' });
+          });
         }
 
         this.addedChildTaskIds = [];
@@ -1803,12 +1804,20 @@
           }
         };
 
-        let parentTask;
-        // 親タスクを取得
+        // 親タスクと子タスクを1回のバッチ呼び出しで取得
+        const relatedQueries = [];
         if (parentTaskId) {
-          parentTask = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_parent);
-          if (this.currentId !== taskId) return;
-          this.currentParentTask = parentTask ? parentTask.data[0] : null;
+          relatedQueries.push({ key: 'parent', tableName: TABLE_NAMES.TASKS, operation: 'select', dataObject: query_parent, forceRefresh: false });
+        }
+        relatedQueries.push({ key: 'children', tableName: TABLE_NAMES.TASKS, operation: 'select', dataObject: query_child, forceRefresh: false });
+
+        const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, relatedQueries);
+        if (this.currentId !== taskId) return;
+        const batchResults = batchResult?.results || {};
+
+        if (parentTaskId) {
+          const parentData = batchResults.parent?.data || batchResults.parent || [];
+          this.currentParentTask = parentData[0] || null;
         } else {
           this.currentParentTask = null;
         }
@@ -1816,12 +1825,10 @@
         this.originalParentTaskId = parentTaskId || null;
         this.renderParentTask();
 
-        // 子タスクを取得
-        const childTasks = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_child);
-        if (this.currentId !== taskId) return;
-
-        this.currentChildTasks = childTasks ? childTasks.data : [];
-        this.originalChildTaskIds = (childTasks ? childTasks.data : []).map(t => t.id);
+        const childTasksResult = batchResults.children;
+        const childTasksData = childTasksResult?.data || childTasksResult || [];
+        this.currentChildTasks = childTasksData;
+        this.originalChildTaskIds = childTasksData.map(t => t.id);
         this.addedChildTaskIds = [];
         this.deletedChildTaskIds = [];
 
@@ -1829,25 +1836,34 @@
         this.updateRelatedBadge();
         this.syncDirtyState('loadRelatedTasks:initial');
 
-        if (parentTask?.isCached) {
-          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_parent, null, true)
-            .then(results => {
-              if (this.currentId !== taskId) return;
-              this.currentParentTask = results ? results?.data[0] : null;
+        // キャッシュ利用時はバックグラウンドでまとめて最新データを再取得
+        const needsParentRefresh = parentTaskId && batchResults.parent?.isCached;
+        const needsChildrenRefresh = childTasksResult?.isCached;
+        if (needsParentRefresh || needsChildrenRefresh) {
+          const refreshQueries = [];
+          if (needsParentRefresh) {
+            refreshQueries.push({ key: 'parent', tableName: TABLE_NAMES.TASKS, operation: 'select', dataObject: query_parent, forceRefresh: true });
+          }
+          if (needsChildrenRefresh) {
+            refreshQueries.push({ key: 'children', tableName: TABLE_NAMES.TASKS, operation: 'select', dataObject: query_child, forceRefresh: true });
+          }
+          callGAS('handleBatchDatabaseProcess', App.state.userId, refreshQueries).then(refreshBatch => {
+            if (this.currentId !== taskId) return;
+            const rr = refreshBatch?.results || {};
+            if (needsParentRefresh) {
+              const pd = rr.parent?.data || rr.parent || [];
+              this.currentParentTask = pd[0] || null;
               this.renderParentTask();
               this.syncDirtyState('loadRelatedTasks:parentRefetch');
-            })
-        }
-
-        if (childTasks?.isCached) {
-          await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', query_child, null, true)
-            .then(results => {
-              if (this.currentId !== taskId) return;
-              this.currentChildTasks = results ? results?.data : [];
-              this.originalChildTaskIds = (results ? results?.data : []).map(t => t.id);
+            }
+            if (needsChildrenRefresh) {
+              const cd = rr.children?.data || rr.children || [];
+              this.currentChildTasks = cd;
+              this.originalChildTaskIds = cd.map(t => t.id);
               this.renderChildTasks();
               this.syncDirtyState('loadRelatedTasks:childRefetch');
-            })
+            }
+          });
         }
 
         this.updateRelatedBadge();
