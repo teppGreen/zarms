@@ -72,101 +72,55 @@ function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false
 /**
  * アプリ起動に必要な全情報を一括取得します（高速化）
  * register.htmlからの複数回のgoogle.script.run呼び出しを1回にまとめます。
- * スコープ権限チェック・メンバー取得・初期データ取得をすべてこの1関数で実施します。
  * @param {string} email - 現在のユーザーのメールアドレス
  * @param {Object} urlParams - URLパラメータ
  * @param {boolean} isMobile - モバイル版かどうか
  * @returns {Object} {
- *   status: 'ok' | 'unauthorized' | 'not_registered' | 'scope_required',
+ *   status: 'ok' | 'unauthorized' | 'not_registered',
  *   activeUser: Object|null,     // 認証済みメンバー情報
  *   appHtml: string|null,        // アプリケーションHTML
  *   error: string|null,
- *   members: Array|null,         // not_registered 時：クライアント側Slack URL検索用の全メンバー一覧
  *   userAgreementData: Object,   // ユーザーの利用規約・プライバシーポリシー同意情報
  *   policyUpdateDates: Object,   // 利用規約・プライバシーポリシーの更新日時（ISO8601形式）
  *   requiresReAgreement: Object  // 再同意が必要な規約・ポリシー（terms, privacy）
  * }
  */
 function getInitialAppData(email, urlParams, isMobile = false) {
-  // 1. スコープ権限を確認（checkAppAuthorization() を別途呼び出す必要をなくす）
-  //    ScriptApp.getAuthorizationInfo() は追加認証なしで呼び出せる
-  const authInfo = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
-  if (authInfo.getAuthorizationStatus() === ScriptApp.AuthorizationStatus.REQUIRED) {
-    return {
-      status: 'scope_required',
-      url: authInfo.getAuthorizationUrl()
-    };
-  }
-
   let useApiMode = false;
   try {
-    // 2. スプレッドシートへの直接アクセス確認（失敗時はAPIモードへフォールバック）
+    // 1. スプレッドシートへのアクセス権限確認（throws if no access）
     getSpreadsheet();
   } catch (e) {
     console.warn('Direct spreadsheet access failed, switching to API mode:', e.message);
     useApiMode = true;
   }
 
-  // 3. scriptProperties から利用規約・プライバシーポリシーの更新日時を取得（not_registered でも返すため先に取得）
-  let policyUpdateDates = { termsUpdatedAt: null, privacyUpdatedAt: null };
   try {
-    const scriptProperties = PropertiesService.getScriptProperties().getProperties();
-    policyUpdateDates = {
-      termsUpdatedAt: scriptProperties['termsUpdatedAt'] || null,
-      privacyUpdatedAt: scriptProperties['privacyUpdatedAt'] || null
-    };
-  } catch (e) {
-    console.warn('Failed to load policy dates:', e.message);
-  }
+    // 2. メールアドレスからメンバー情報を取得（APIモードなら db_bridge が自動で API を呼ぶ）
+    const activeUser = getMemberByEmail(email, useApiMode);
 
-  // 4. メンバー全件取得（getMemberByEmail の代わりにキャッシュ可能な全件取得を使用）
-  //    - 登録確認と not_registered 時のクライアント側 Slack URL 検索を兼ねる
-  let allMembers = [];
-  try {
-    const membersResult = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {}, null, false, useApiMode);
-    // handleDatabaseProcess はキャッシュ有無で {data: [...]} または [...] を返す
-    allMembers = Array.isArray(membersResult?.data) ? membersResult.data : (Array.isArray(membersResult) ? membersResult : []);
-  } catch (e) {
-    console.error('Failed to load members:', e.message);
-    // メンバー取得失敗時はフォールバックとして単独メール検索を試みる
-    try {
-      const fallback = getMemberByEmail(email, useApiMode);
-      if (fallback) allMembers = [fallback];
-    } catch (fe) {
-      console.error('Fallback getMemberByEmail also failed:', fe.message);
+    if (!activeUser) {
+      throw new Error('User info not found');
     }
-  }
 
-  // 5. メールアドレスで現在ユーザーを検索
-  const activeUser = allMembers.find(function (m) {
-    return typeof m.email === 'string' && m.email.toLowerCase() === String(email || '').toLowerCase();
-  }) || null;
-
-  if (!activeUser) {
-    // 未登録の場合: メンバー一覧もレスポンスに含め、クライアント側でのSlack URL検索を可能にする
-    return {
-      status: 'not_registered',
-      activeUser: null,
-      appHtml: null,
-      error: null,
-      useApiMode: useApiMode,
-      members: allMembers,
-      policyUpdateDates: policyUpdateDates
-    };
-  }
-
-  try {
-    // 6. ユーザープロパティから利用規約・プライバシーポリシーの同意情報を取得
+    // 3. ユーザープロパティから利用規約・プライバシーポリシーの同意情報を取得
     const userProperties = PropertiesService.getUserProperties().getProperties();
     const userAgreementData = {
       termsAgreedAt: userProperties['termsAgreedAt'] || null,
       privacyAgreedAt: userProperties['privacyAgreedAt'] || null
     };
 
-    // 7. 再同意が必要かどうかを判定
+    // 4. scriptPropertiesから利用規約・プライバシーポリシーの更新日時を取得
+    const scriptProperties = PropertiesService.getScriptProperties().getProperties();
+    const policyUpdateDates = {
+      termsUpdatedAt: scriptProperties['termsUpdatedAt'] || null,
+      privacyUpdatedAt: scriptProperties['privacyUpdatedAt'] || null
+    };
+
+    // 5. 再同意が必要かどうかを判定
     const requiresReAgreement = _checkRequiresReAgreement(userAgreementData, policyUpdateDates);
 
-    // 8. アプリのHTMLを生成
+    // 6. アプリのHTMLを生成
     const appHtml = loadAppHtml(activeUser, urlParams, isMobile, useApiMode);
 
     return {
@@ -180,6 +134,11 @@ function getInitialAppData(email, urlParams, isMobile = false) {
       requiresReAgreement: requiresReAgreement
     };
   } catch (e) {
+    // ユーザーが見つからない場合はサインアップ画面へ
+    const isNotFound = e.name === 'ValidationError' || (e.message && e.message.includes('not found'));
+    if (isNotFound) {
+      return { status: 'not_registered', activeUser: null, appHtml: null, error: null };
+    }
     return { status: 'unauthorized', useApiMode: useApiMode, activeUser: null, appHtml: null, error: e.message };
   }
 }
