@@ -580,9 +580,10 @@
 
             // ロールバック: my-boardキャッシュに復元
             if (deletedTaskData && App.pages.boards && App.pages.boards.cachedBoardTasks) {
+            if (deletedTaskData && App.pages.boards && App.pages.boards.cachedBoardTasks) {
               const myBoardCache = App.pages.boards.cachedBoardTasks['my-board'];
-              if (Array.isArray(myBoardCache)) {
-                myBoardCache.push(deletedTaskData);
+              if (Array.isArray(myBoardCache) && deletedMyBoardIndex > -1) {
+                myBoardCache.splice(deletedMyBoardIndex, 0, deletedTaskData);
               }
               // my-boardが表示中なら再描画
               if (App.pages.boards.currentBoardId === 'my-board') {
