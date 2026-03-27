@@ -1042,7 +1042,7 @@
 
                 // 即座に描画（Optimistic UI）
                 this.renderKanban(boardId);
-                if (this.currentBoardId === 'my-board') {
+                if (this.currentBoardId === 'my-board' && boardId !== 'my-board') {
                     this.renderKanban('my-board');
                 }
 
@@ -1067,14 +1067,15 @@
 
                             // 再描画してロールバック
                             this.renderKanban(boardId);
-                            if (this.currentBoardId === 'my-board') {
+                            if (this.currentBoardId === 'my-board' && boardId !== 'my-board') {
                                 this.renderKanban('my-board');
                             }
                             alert('ステータスの更新に失敗しました');
                         } else {
                             // バックグラウンドで最新データ同期（JOIN情報の更新など）
                             this.loadData(boardId, true);
-                            if (this.currentBoardId === 'my-board') {
+                            // 同一ボードIDに対して二重にロードしないようにする
+                            if (this.currentBoardId === 'my-board' && boardId !== 'my-board') {
                                 this.loadData('my-board', true);
                             }
                         }
@@ -1094,7 +1095,7 @@
 
                         // 再描画してロールバック
                         this.renderKanban(boardId);
-                        if (this.currentBoardId === 'my-board') {
+                        if (this.currentBoardId === 'my-board' && boardId !== 'my-board') {
                             this.renderKanban('my-board');
                         }
                         App.utils.error.handle(error);
