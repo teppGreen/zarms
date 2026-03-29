@@ -87,20 +87,37 @@ function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false
  */
 function getInitialAppData(email, urlParams, isMobile = false) {
   let useApiMode = false;
+  let activeUser = null;
+
   try {
-    // 1. スプレッドシートへのアクセス権限確認（throws if no access）
-    getSpreadsheet();
+    // 1. まず通常モード（スプレッドシート直接アクセス）でメンバー取得を試みる
+    activeUser = getMemberByEmail(email, false);
+    useApiMode = false;
   } catch (e) {
-    console.warn('Direct spreadsheet access failed, switching to API mode:', e.message);
-    useApiMode = true;
+    // 権限エラー（スプレッドシートにアクセスできない）等の場合、APIモードに切り替えて再試行
+    console.warn('Direct access failed (likely permission error), switching to API mode:', e.message);
+    try {
+      activeUser = getMemberByEmail(email, true);
+      useApiMode = true;
+    } catch (apiError) {
+      // APIモードでも失敗（ネットワークエラーやAPIの設定不備など）
+      console.error('API mode also failed:', apiError.message);
+      return { status: 'unauthorized', useApiMode: true, activeUser: null, appHtml: null, error: apiError.message };
+    }
   }
 
   try {
-    // 2. メールアドレスからメンバー情報を取得（APIモードなら db_bridge が自動で API を呼ぶ）
-    const activeUser = getMemberByEmail(email, useApiMode);
-
+    // 2. ユーザーが見つからない（DBに存在しない）場合はサインアップ画面へ
     if (!activeUser) {
-      throw new Error('User info not found');
+      const policyUpdateDates = getPolicyUpdateDates();
+      return {
+        status: 'not_registered',
+        activeUser: null,
+        appHtml: null,
+        error: null,
+        useApiMode: useApiMode,
+        policyUpdateDates: policyUpdateDates
+      };
     }
 
     // 3. ユーザープロパティから利用規約・プライバシーポリシーの同意情報を取得
@@ -111,11 +128,7 @@ function getInitialAppData(email, urlParams, isMobile = false) {
     };
 
     // 4. scriptPropertiesから利用規約・プライバシーポリシーの更新日時を取得
-    const scriptProperties = PropertiesService.getScriptProperties().getProperties();
-    const policyUpdateDates = {
-      termsUpdatedAt: scriptProperties['termsUpdatedAt'] || null,
-      privacyUpdatedAt: scriptProperties['privacyUpdatedAt'] || null
-    };
+    const policyUpdateDates = getPolicyUpdateDates();
 
     // 5. 再同意が必要かどうかを判定
     const requiresReAgreement = _checkRequiresReAgreement(userAgreementData, policyUpdateDates);
@@ -134,11 +147,6 @@ function getInitialAppData(email, urlParams, isMobile = false) {
       requiresReAgreement: requiresReAgreement
     };
   } catch (e) {
-    // ユーザーが見つからない場合はサインアップ画面へ
-    const isNotFound = e.name === 'ValidationError' || (e.message && e.message.includes('not found'));
-    if (isNotFound) {
-      return { status: 'not_registered', activeUser: null, appHtml: null, error: null };
-    }
     return { status: 'unauthorized', useApiMode: useApiMode, activeUser: null, appHtml: null, error: e.message };
   }
 }
