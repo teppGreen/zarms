@@ -156,10 +156,10 @@
                         <div class="row no-margin no-padding">
                             <h2 id="home-greeting" class="small bold"></h2>
                             <div class="max"></div>
-                            <div class="row no-margin no-padding tiny-space secondary-text" title="このページの最終更新">
-                                <i>update</i>
-                                <span id="home-last-updated" class="font-number"></span>
-                            </div>
+                            <span id="last-updated-home" class="small-text secondary-text"></span>
+                            <button class="transparent border" onclick="refreshCurrentTab()">
+                                <i>refresh</i><span>更新</span>
+                            </button>
                         </div>
                         <div class="large-text">
                             <p id="home-event-countdown"></p>
@@ -218,15 +218,12 @@
 
             updateHeader: function () {
                 const greeting = this.getGreeting();
-                const formattedDate = formatDateTimeForDisplay(new Date(), 'yyyy年MM月dd日(E) HH:mm');
                 const daysUntilEvent = calculateDaysUntil(EVENT_CONFIG.FESTIVAL_DATE);
 
                 const greetingEl = document.getElementById('home-greeting');
-                const lastUpdatedEl = document.getElementById('home-last-updated');
                 const countdownEl = document.getElementById('home-event-countdown');
 
                 if (greetingEl) greetingEl.textContent = `${greeting}、${activeUser.display_name}さん｡`;
-                if (lastUpdatedEl) lastUpdatedEl.textContent = formattedDate;
                 if (countdownEl) countdownEl.textContent = `リアル会場0日目(準備日)まで、残り${daysUntilEvent}日です。`;
             },
 

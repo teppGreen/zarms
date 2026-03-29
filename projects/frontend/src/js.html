@@ -169,9 +169,8 @@
       openModalFromParams(urlParams);
     }
 
-    // 自動更新を開始
-    // TODO: 本番デプロイ時にコメントアウトを外すこと
-    startAutoRefresh();
+    // タブごとの最終更新日時を初期化
+    App.state.tabLastUpdated = {};
 
     // システムアップデートの1時間ごとの自動更新を開始
     if (App.utils.header.systemUpdates) {
@@ -642,193 +641,118 @@
   }
 
 
-  // 自動データ更新
-  let autoRefreshInterval = null;
-  let refreshDataAbortController = null;
-  let autoRefreshResumeTimeout = null;
+  /**
+   * 現在表示中のタブのデータを強制再取得して再描画します（手動更新ボタン用）
+   * @returns {Promise<void>}
+   */
+  async function refreshCurrentTab() {
+    console.log('[refreshCurrentTab] 手動更新開始');
 
-  function startAutoRefresh() {
-    // 既存のインターバルがあればクリア
-    if (autoRefreshInterval) {
-      clearInterval(autoRefreshInterval);
+    // 現在表示中のタブを特定
+    const currentTab = document.querySelector('main > div[style*="display: block"]');
+    if (!currentTab) {
+      console.log('[refreshCurrentTab] アクティブなタブが見つかりません');
+      return;
     }
 
-    // 既存の再開予約があればクリア
-    if (autoRefreshResumeTimeout) {
-      clearTimeout(autoRefreshResumeTimeout);
-      autoRefreshResumeTimeout = null;
-    }
+    const tabId = currentTab.id; // 例: 'tab-home', 'tab-catalog', 'tab-board'
+    console.log('[refreshCurrentTab] 現在のタブ:', tabId);
 
-    // 2分ごとにデータを更新
-    autoRefreshInterval = setInterval(refreshData, 120000);
-  }
-
-  function stopAutoRefresh() {
-    if (autoRefreshInterval) {
-      clearInterval(autoRefreshInterval);
-      autoRefreshInterval = null;
-    }
-
-    if (refreshDataAbortController) {
-      refreshDataAbortController.aborted = true;
-    }
-
-    if (autoRefreshResumeTimeout) {
-      clearTimeout(autoRefreshResumeTimeout);
-      autoRefreshResumeTimeout = null;
-    }
-  }
-
-  async function refreshData() {
-    // 新しいAbortControllerを作成
-    refreshDataAbortController = { aborted: false };
-    const currentController = refreshDataAbortController;
+    // 更新ボタンをローディング状態に
+    setRefreshButtonLoading(true);
 
     try {
-      console.log('[refreshData] 自動更新開始 (コンテキスト対応)');
-
-      // タスク詳細が開いている場合は実行しない
-      if (document.getElementById('modal-detail-task')?.classList.contains('active')) {
-        console.log('[refreshData] タスク詳細が開いているため、自動更新をスキップします');
-        return;
-      }
-
-      // 中止チェック
-      if (currentController.aborted) {
-        console.log('[refreshData] 処理が中止されました');
-        return;
-      }
-
-      const boardsResult = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {
-        columns: ['id', 'display_id', 'name', 'user_note', 'is_active'],
-        orderBy: { name: 'asc' }
-      }, null, true);
-
-      // 中止チェック
-      if (currentController.aborted) {
-        console.log('[refreshData] 処理が中止されました');
-        return;
-      }
-
-      App.state.set('boards', boardsResult?.data || []);
-
-      // ボード定義を更新（新しいボードのタブなどが生成されるようにする）
-      // 現在のタブに関わらず実行
-      App.pages.boards.initialize();
-
-      // ナビゲーションを更新
-      if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
-        // 現在のアクティブなボードIDを取得
-        const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#board-nav a.active');
-        const activeBoardId = activeLink ? activeLink.dataset.boardId : null;
-
-        App.utils.navigation.renderBoardsNavigation();
-
-        // アクティブ状態を復元
-        if (activeBoardId) {
-          const newActiveLink = document.querySelector(`a[data-board-id="${activeBoardId}"]`);
-          if (newActiveLink) {
-            newActiveLink.classList.add('active');
-          }
-        }
-      }
-
-      // 中止チェック
-      if (currentController.aborted) {
-        console.log('[refreshData] 処理が中止されました');
-        return;
-      }
-
-      // 現在表示中のタブを特定
-      const currentTab = document.querySelector('main > div[style*="display: block"]');
-      if (!currentTab) {
-        console.log('[refreshData] アクティブなタブが見つかりません');
-        return;
-      }
-
-      const tabId = currentTab.id; // 例: 'tab-home', 'tab-catalog', 'tab-board'
-      console.log('[refreshData] 現在のタブ:', tabId);
-
-      // タブ種別に応じて必要なデータのみを取得
       if (tabId === 'tab-board') {
-        // ボードページ: 表示中のボードのタスクのみを取得
+        // ボードページ: 表示中のボードのタスクのみを強制取得
         const activeBoardDiv = document.querySelector('#tab-board > div[style*="display: block"]');
         if (activeBoardDiv && activeBoardDiv.id) {
           const boardId = activeBoardDiv.id.replace('tab-board-', '');
-          console.log('[refreshData] ボードページのデータを更新中 (boardId:', boardId, ')');
-          // 中止チェック
-          if (currentController.aborted) {
-            console.log('[refreshData] 処理が中止されました');
-            return;
-          }
           if (App.pages.boards && App.pages.boards.loadData) {
-            await App.pages.boards.loadData(boardId, true); // isRefresh = true
+            await App.pages.boards.loadData(boardId, true);
           }
+          // 最終更新日時を更新
+          updateTabLastUpdated('board-' + boardId);
         }
-      }
-
-      if (tabId === 'tab-catalog') {
+      } else if (tabId === 'tab-catalog') {
         if (App.pages.catalog && App.pages.catalog.loadData) {
-          const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, [
-            { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: true },
-            { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: true },
-            { key: 'directoryAssignments', tableName: TABLE_NAMES.DIRECTORY_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true },
-            { key: 'skills', tableName: TABLE_NAMES.SKILLS, operation: 'select', dataObject: {}, forceRefresh: true },
-            { key: 'skillAssignments', tableName: TABLE_NAMES.SKILL_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true },
-            { key: 'plans', tableName: TABLE_NAMES.PLANS, operation: 'select', dataObject: {}, forceRefresh: true },
-            { key: 'planAssignments', tableName: TABLE_NAMES.PLAN_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true }
-          ]);
-
-          const r = batchResult?.results || {};
-          App.state.data.members = r.members?.data || r.members || [];
-          App.state.data.directories = r.directories?.data || r.directories || [];
-          App.state.data.directoryAssignments = r.directoryAssignments?.data || r.directoryAssignments || [];
-          App.state.data.skills = r.skills?.data || r.skills || [];
-          App.state.data.skillAssignments = r.skillAssignments?.data || r.skillAssignments || [];
-          App.state.data.plans = r.plans?.data || r.plans || [];
-          App.state.data.planAssignments = r.planAssignments?.data || r.planAssignments || [];
-
           await App.pages.catalog.loadData(true);
         }
-      }
-      if (tabId === 'tab-boards') {
+        updateTabLastUpdated('catalog');
+      } else if (tabId === 'tab-boards') {
         if (App.pages.boardsList && App.pages.boardsList.loadData) {
           await App.pages.boardsList.loadData(true);
         }
-      }
-      if (tabId === 'tab-home') {
+        updateTabLastUpdated('boards');
+      } else if (tabId === 'tab-home') {
         if (App.pages.home && App.pages.home.loadData) {
           await App.pages.home.loadData(true);
         }
-      }
-      if (tabId === 'tab-notices') {
+        updateTabLastUpdated('home');
+      } else if (tabId === 'tab-notices') {
         if (App.pages.notices && App.pages.notices.loadData) {
           await App.pages.notices.loadData(true);
         }
-      }
-      if (tabId === 'tab-insights') {
+        updateTabLastUpdated('notices');
+      } else if (tabId === 'tab-insights') {
         if (App.pages.insights && App.pages.insights.loadData) {
           await App.pages.insights.loadData(true);
         }
+        updateTabLastUpdated('insights');
       }
 
-      // 中止チェック
-      if (currentController.aborted) {
-        console.log('[refreshData] 処理が中止されました');
-        return;
-      }
-
-      console.log('[refreshData] データ自動更新完了 (コンテキスト対応)');
+      console.log('[refreshCurrentTab] 手動更新完了');
     } catch (error) {
-      // 中止された場合はエラーログを出力しない
-      if (!currentController.aborted) {
-        console.error('[refreshData] データ自動更新エラー:', error);
-      }
+      console.error('[refreshCurrentTab] 手動更新エラー:', error);
     } finally {
-      // 完了したらコントローラーをクリア
-      if (refreshDataAbortController === currentController) {
-        refreshDataAbortController = null;
-      }
+      // 更新ボタンをリセット
+      setRefreshButtonLoading(false);
+    }
+  }
+
+  /**
+   * 現在表示中のタブの更新ボタンアイコンをローディング／通常状態に切り替えます
+   * @param {boolean} isLoading
+   */
+  function setRefreshButtonLoading(isLoading) {
+    // 現在表示中のタブを特定してボタンを探す
+    const currentTab = document.querySelector('main > div[style*="display: block"]');
+    if (!currentTab) return;
+
+    // ボードタブの場合は内側の表示中ボードを対象に
+    let searchRoot = currentTab;
+    if (currentTab.id === 'tab-board') {
+      const activeBoard = currentTab.querySelector(':scope > div[style*="display: block"]');
+      if (activeBoard) searchRoot = activeBoard;
+    }
+
+    // 対象のrefreshボタンを探す
+    const btn = searchRoot.querySelector('button[onclick="refreshCurrentTab()"], button[title="更新"]');
+    if (!btn) return;
+
+    const iconEl = btn.querySelector('i');
+    if (!iconEl) return;
+
+    if (isLoading) {
+      iconEl.innerHTML = '<progress class="circle indeterminate small"></progress>';
+    } else {
+      iconEl.textContent = 'refresh';
+    }
+  }
+
+  /**
+   * 指定タブの最終更新日時をApp.stateに保存し、UI表示を更新します
+   * @param {string} tabKey - タブキー（例: 'home', 'notices', 'board-UUID'）
+   */
+  function updateTabLastUpdated(tabKey) {
+    if (!App.state.tabLastUpdated) App.state.tabLastUpdated = {};
+    const now = new Date();
+    App.state.tabLastUpdated[tabKey] = now;
+
+    // UI要素に反映
+    const el = document.getElementById('last-updated-' + tabKey);
+    if (el) {
+      const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      el.textContent = '最終更新: ' + timeStr;
     }
   }
 
@@ -958,7 +882,7 @@
 
       if (e.code === 'KeyR') {
         e.preventDefault();
-        refreshData();
+        refreshCurrentTab();
       }
     });
   }
