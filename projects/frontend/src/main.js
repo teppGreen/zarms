@@ -196,7 +196,7 @@ function _checkRequiresReAgreement(userAgreementData, policyUpdateDates) {
  * ホーム画面の初回表示に必要なデータを事前取得（最小限）
  * 初回ローディング高速化のため、home で実際に使用するデータのみを取得
  * @param {string} userId - ユーザーID
- * @returns {Object} { tasks, notices, isCached }
+ * @returns {Object} { tasks, isCached }
  */
 function _prefetchHomeInitialData(userId, useApiMode = false) {
   const sevenDaysAgo = new Date();
@@ -211,15 +211,6 @@ function _prefetchHomeInitialData(userId, useApiMode = false) {
       dataObject: {
         where: { task_status_key: ['!=', 'DONE'] },
         columns: ['id', 'display_id', 'name', 'board_id', 'task_status_key']
-      },
-      forceRefresh: false
-    },
-    {
-      key: 'notices',
-      tableName: TABLE_NAMES.NOTICES,
-      operation: 'select',
-      dataObject: {
-        orderBy: { starts_at: 'desc' }
       },
       forceRefresh: false
     },
@@ -250,7 +241,6 @@ function _prefetchHomeInitialData(userId, useApiMode = false) {
 
   return {
     tasks: (r.tasks?.data || r.tasks || []),
-    notices: (r.notices?.data || r.notices || []),
     logs: (r.logs?.data || r.logs || []),
     systemUpdates: (r.systemUpdates?.data || r.systemUpdates || []),
     isCached: !batchResult.hasAnyUncached

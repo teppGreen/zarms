@@ -23,7 +23,6 @@
         plans: [],
         tasks: [],
         apps: [],
-        notices: [],
         links: [],
         systemUpdates: [],
         directoryAssignments: [],
@@ -111,8 +110,8 @@
       App.state.userId = activeUser.id;
     }
 
-    // 全データを読み込み（バックグラウンド更新のPromiseを受け取る）
-    const backgroundUpdatePromise = await loadAllData();
+    // 必要最小限のデータを読み込み（バックグラウンド更新のPromiseを受け取る）
+    const backgroundUpdatePromise = await loadInitialData();
     App.utils.navigation.changeH1();
 
     console.log('[initializeApp] URL params:', urlParams);
@@ -142,10 +141,8 @@
         await App.utils.navigation.switchTab('board-' + targetBoard.id, true);
       } else {
         console.warn('[initializeApp] Board not found:', targetBoardId);
-        // ブラウザのアラートで通知
         alert('ボードが見つかりませんでした\nID: ' + targetBoardId);
-        // ボードが見つからない場合はHomeを表示
-        App.pages.home.loadData();
+        // ホーム画面にフォールバック（データはswitchTab内で読み込み）
         await App.utils.navigation.switchTab('home', true);
       }
 
@@ -154,8 +151,7 @@
       const requestedTab = urlParams.tab === 'members' ? 'catalog' : urlParams.tab;
       await App.utils.navigation.switchTab(requestedTab, true);
     } else {
-      // タブ指定がない、またはhomeの場合
-      App.pages.home.loadData();
+      // タブ指定がない、またはhomeの場合（データはswitchTab内で読み込み）
       await App.utils.navigation.switchTab('home', true);
     }
 
@@ -422,108 +418,57 @@
   }
 
   /**
-   * 全データを読み込みます（初回ロード用）
-   * サーバーサイドで埋め込まれた initialData がある場合はそれを即座に反映します。
-   * データがキャッシュ由来の場合のみ、バックグラウンドで最新データを取得します。
+   * 初回ロード時に必要な最小限のデータを読み込みます。
+   * - navigation用マスタデータ（boards/apps/members）のみ取得
+   * - directories/plans/skills はタブ切り替え時に遅延ロード
+   * - tab-homeのデータはswitchTab経由の通常タブ読み込みで取得
    * @returns {Promise<Promise|null>} バックグラウンド更新のPromise（なければnull）
    */
-  async function loadAllData() {
+  async function loadInitialData() {
     try {
-      // ── Step 1: サーバー埋め込みデータを即座に反映（GAS呼び出しなし）───────────────────
+      // ── Step 1: サーバー埋め込みデータを即座に反映（GAS呼び出しなし）─────────────────────
       const embedded = (typeof initialData !== 'undefined') ? initialData : null;
 
       let boards = [];
       let apps = [];
-      let notices = [];
-      let links = [];
       let members = [];
-      let directories = [];
-      let directoryAssignments = [];
-      let plans = [];
-      let planAssignments = [];
-      let skills = [];
-      let skillAssignments = [];
       let systemUpdates = [];
-      let tasks = [];
-      let logs = [];
-      let wasCached = false;
       let needsBackgroundMasterDataRefresh = false;
 
       if (embedded) {
-        // ホーム画面用の最小初期データ（task, notices, logs）が埋め込まれている
-        tasks = embedded.tasks || [];
-        notices = embedded.notices || [];
-        logs = embedded.logs || [];
-        
-        // その他のマスタデータは後でバックグラウンドで取得
+        // ナビゲーション必須のマスタデータのみ反映
         boards = embedded.boards || [];
         apps = embedded.apps || [];
-        links = embedded.links || [];
         members = embedded.members || [];
-        directories = embedded.directories || [];
-        directoryAssignments = embedded.directoryAssignments || [];
-        plans = embedded.plans || [];
-        planAssignments = embedded.planAssignments || embedded.plan_assignments || [];
-        skills = embedded.skills || [];
-        skillAssignments = embedded.skillAssignments || [];
         systemUpdates = embedded.systemUpdates || [];
-        
-        wasCached = embedded.isCached || false;
-        // 埋め込みデータがホーム用（tasks, notices, logsのみ）の場合、マスタデータが不足している
-        needsBackgroundMasterDataRefresh = !embedded.boards || !embedded.members || !embedded.skills;
-        
-        console.log('[loadAllData] Server-embedded initialData (isCached:', wasCached, ', isHomeOnly:', needsBackgroundMasterDataRefresh, ')');
+
+        // マスタデータが不足している場合バックグラウンドで取得する
+        needsBackgroundMasterDataRefresh = !embedded.boards || !embedded.members;
+
+        console.log('[loadInitialData] Server-embedded initialData (needsMasterRefresh:', needsBackgroundMasterDataRefresh, ')');
       } else {
-        // フォールバック: initialData が埋め込まれていない場合（旧来どおり並列GAS呼び出し）
-        console.log('[loadAllData] No embedded initialData. Fetching via GAS...');
+        // フォールバック: initialData が埋め込まれていない場合
+        console.log('[loadInitialData] No embedded initialData. Fetching master data via GAS...');
         const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, [
           { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: false },
           { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh: false },
-          { key: 'notices', tableName: TABLE_NAMES.NOTICES, operation: 'select', dataObject: { orderBy: { starts_at: 'desc' } }, forceRefresh: false },
-          { key: 'links', tableName: TABLE_NAMES.LINKS, operation: 'select', dataObject: { orderBy: { label: 'asc' } }, forceRefresh: false },
           { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: false },
-          { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: false },
-          { key: 'directoryAssignments', tableName: TABLE_NAMES.DIRECTORY_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: false },
-          { key: 'plans', tableName: TABLE_NAMES.PLANS, operation: 'select', dataObject: {}, forceRefresh: false },
-          { key: 'planAssignments', tableName: TABLE_NAMES.PLAN_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: false },
-          { key: 'skills', tableName: TABLE_NAMES.SKILLS, operation: 'select', dataObject: {}, forceRefresh: false },
-          { key: 'skillAssignments', tableName: TABLE_NAMES.SKILL_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: false },
-          { key: 'systemUpdates', tableName: TABLE_NAMES.SYSTEM_UPDATES, operation: 'select', dataObject: { orderBy: { created_at: 'desc' } }, forceRefresh: true },
-          { key: 'tasks', tableName: TABLE_NAMES.TASKS, operation: 'select', dataObject: { columns: ['id', 'display_id', 'name', 'board_id', 'task_status_key', 'is_active'], where: { is_active: ['!=', false] }, orderBy: { display_id: 'desc' } }, forceRefresh: false }
+          { key: 'systemUpdates', tableName: TABLE_NAMES.SYSTEM_UPDATES, operation: 'select', dataObject: { orderBy: { created_at: 'desc' } }, forceRefresh: true }
         ]);
         const r = batchResult?.results || {};
         boards = r.boards?.data || r.boards || [];
         apps = r.apps?.data || r.apps || [];
-        notices = r.notices?.data || r.notices || [];
-        links = r.links?.data || r.links || [];
         members = r.members?.data || r.members || [];
-        directories = r.directories?.data || r.directories || [];
-        directoryAssignments = r.directoryAssignments?.data || r.directoryAssignments || [];
-        plans = r.plans?.data || r.plans || [];
-        planAssignments = r.planAssignments?.data || r.planAssignments || [];
-        skills = r.skills?.data || r.skills || [];
-        skillAssignments = r.skillAssignments?.data || r.skillAssignments || [];
         systemUpdates = r.systemUpdates?.data || r.systemUpdates || [];
-        tasks = r.tasks?.data || r.tasks || [];
-        wasCached = !batchResult?.hasAnyUncached;
       }
 
-      // ── Step 2: App.state に反映 ──────────────────────────────────────────────────────
+      // ── Step 2: App.stateにマスタデータを反映 ──────────────────────────────────────────
       App.state.data.boards = boards;
       App.state.data.apps = apps;
-      App.state.data.notices = notices;
-      App.state.data.links = links;
       App.state.data.members = members;
-      App.state.data.directories = directories;
-      App.state.data.directoryAssignments = directoryAssignments;
-      App.state.data.plans = plans;
-      App.state.data.planAssignments = planAssignments;
-      App.state.data.skills = skills;
-      App.state.data.skillAssignments = skillAssignments;
       App.state.data.systemUpdates = systemUpdates;
-      App.state.data.tasks = tasks;
 
-      // ── Step 3: 即座にUIを描画（Render-First） ──────────────────────────────────────────
+      // ── Step 3: 即座にUIを描画（Render-First） ──────────────────────────────────────
       App.utils.navigation.renderBoardsNavigation();
       App.pages.boards.initialize();
       App.pages.boards.initializeMyBoardFilters();
@@ -535,78 +480,28 @@
         App.utils.header.systemUpdates.lastUpdatedAt = new Date();
       }
 
+      // commentsはバックグラウンドロードを継続
       if (App.utils.header.comments) {
         App.utils.header.comments.loadData(false).catch(e =>
           console.warn('[Comments] Background initial load failed:', e)
         );
       }
 
-      // ── Step 4: バックグラウンドで最新データを取得（常に実行） ─────────────────────────────
-      // ユーザー要望により、キャッシュの有無に関わらず、初期描画後に必ず最新データを再取得して更新する
-      let backgroundUpdatePromise = null;
-
-      console.log('[loadAllData] 初期表示完了。バックグラウンドでマスタデータを全取得します...');
-
-      backgroundUpdatePromise = new Promise((resolve) => {
+      // ── Step 4: バックグラウンドでboards/apps/membersを最新化 ───────────────────────
+      const backgroundUpdatePromise = new Promise((resolve) => {
         setTimeout(async () => {
           try {
-            // ホーム専用初期データの場合は、不足しているマスタデータを今ここで取得
-            let queryList = [];
-            
-            if (needsBackgroundMasterDataRefresh) {
-              // マスタデータが不足している場合は、すぐに取得（優先度高）
-              queryList = [
-                { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: false },
-                { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh: false },
-                { key: 'links', tableName: TABLE_NAMES.LINKS, operation: 'select', dataObject: { orderBy: { label: 'asc' } }, forceRefresh: false },
-                { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: false },
-                { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: false },
-                { key: 'directoryAssignments', tableName: TABLE_NAMES.DIRECTORY_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: false },
-                { key: 'plans', tableName: TABLE_NAMES.PLANS, operation: 'select', dataObject: {}, forceRefresh: false },
-                { key: 'planAssignments', tableName: TABLE_NAMES.PLAN_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: false },
-                { key: 'skills', tableName: TABLE_NAMES.SKILLS, operation: 'select', dataObject: {}, forceRefresh: false },
-                { key: 'skillAssignments', tableName: TABLE_NAMES.SKILL_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: false }
-              ];
-            } else {
-              // マスタデータは既に利用可能なため、最新データのrefreshのみ
-              queryList = [
-                { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: true },
-                { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh: true },
-                { key: 'links', tableName: TABLE_NAMES.LINKS, operation: 'select', dataObject: { orderBy: { label: 'asc' } }, forceRefresh: true },
-                { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: true },
-                { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: true },
-                { key: 'directoryAssignments', tableName: TABLE_NAMES.DIRECTORY_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true },
-                { key: 'plans', tableName: TABLE_NAMES.PLANS, operation: 'select', dataObject: {}, forceRefresh: true },
-                { key: 'planAssignments', tableName: TABLE_NAMES.PLAN_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true },
-                { key: 'skills', tableName: TABLE_NAMES.SKILLS, operation: 'select', dataObject: {}, forceRefresh: true },
-                { key: 'skillAssignments', tableName: TABLE_NAMES.SKILL_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: true }
-              ];
-            }
-
-            // 1回のGAS呼び出しにバッチ化
-            const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, queryList);
+            const forceRefresh = !needsBackgroundMasterDataRefresh;
+            const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, [
+              { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh },
+              { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh },
+              { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh }
+            ]);
             const r = batchResult?.results || {};
-            const freshBoards = r.boards?.data || r.boards || [];
-            const freshApps = r.apps?.data || r.apps || [];
-            const freshLinks = r.links?.data || r.links || [];
-            const freshMembers = r.members?.data || r.members || [];
-            const freshDirectories = r.directories?.data || r.directories || [];
-            const freshDirectoryAssignments = r.directoryAssignments?.data || r.directoryAssignments || [];
-            const freshPlans = r.plans?.data || r.plans || [];
-            const freshPlanAssignments = r.planAssignments?.data || r.planAssignments || [];
-            const freshSkills = r.skills?.data || r.skills || [];
-            const freshSkillAssignments = r.skillAssignments?.data || r.skillAssignments || [];
 
-            App.state.data.boards = freshBoards;
-            App.state.data.apps = freshApps;
-            App.state.data.links = freshLinks;
-            App.state.data.members = freshMembers;
-            App.state.data.directories = freshDirectories;
-            App.state.data.directoryAssignments = freshDirectoryAssignments;
-            App.state.data.plans = freshPlans;
-            App.state.data.planAssignments = freshPlanAssignments;
-            App.state.data.skills = freshSkills;
-            App.state.data.skillAssignments = freshSkillAssignments;
+            App.state.data.boards = r.boards?.data || r.boards || boards;
+            App.state.data.apps = r.apps?.data || r.apps || apps;
+            App.state.data.members = r.members?.data || r.members || members;
 
             // ナビゲーションを更新（アクティブ状態を保持）
             const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#board-nav a.active');
@@ -616,25 +511,22 @@
               const newActiveLink = document.querySelector(`a[data-board-id="${activeBoardId}"]`);
               if (newActiveLink) newActiveLink.classList.add('active');
             }
-
-            // ボードUI定義を再初期化（新しいボードが追加された場合などのため）
             App.pages.boards.initialize();
-
             App.utils.header.renderApps();
 
-            console.log('[loadAllData] バックグラウンド更新完了');
+            console.log('[loadInitialData] バックグラウンド更新完了');
           } catch (error) {
-            console.error('[loadAllData] バックグラウンド更新エラー:', error);
+            console.error('[loadInitialData] バックグラウンド更新エラー:', error);
           } finally {
             resolve();
           }
-        }, 100); // 100ms後に実行（メインUIの表示を優先）
+        }, 100);
       });
 
       return backgroundUpdatePromise;
 
     } catch (error) {
-      console.error('[loadAllData] データ読み込みエラー:', error);
+      console.error('[loadInitialData] データ読み込みエラー:', error);
       App.utils.error.handle(error);
       return null;
     }
@@ -688,11 +580,6 @@
           await App.pages.home.loadData(true);
         }
         updateTabLastUpdated('home');
-      } else if (tabId === 'tab-notices') {
-        if (App.pages.notices && App.pages.notices.loadData) {
-          await App.pages.notices.loadData(true);
-        }
-        updateTabLastUpdated('notices');
       } else if (tabId === 'tab-insights') {
         if (App.pages.insights && App.pages.insights.loadData) {
           await App.pages.insights.loadData(true);
@@ -741,7 +628,7 @@
 
   /**
    * 指定タブの最終更新日時をApp.stateに保存し、UI表示を更新します
-   * @param {string} tabKey - タブキー（例: 'home', 'notices', 'board-UUID'）
+   * @param {string} tabKey - タブキー（例: 'home', 'board-UUID'）
    */
   function updateTabLastUpdated(tabKey) {
     if (!App.state.tabLastUpdated) App.state.tabLastUpdated = {};
@@ -850,7 +737,7 @@
         return;
       }
 
-      if (e.code === 'Digit4' && App.utils.navigation && App.utils.navigation.switchTab) {
+      if (e.code === 'Digit5' && App.utils.navigation && App.utils.navigation.switchTab) {
         e.preventDefault();
         App.utils.navigation.switchTab('boards');
         return;
@@ -862,19 +749,13 @@
         return;
       }
 
-      if (e.code === 'Digit5' && App.utils.navigation && App.utils.navigation.switchTab) {
+      if (e.code === 'Digit6' && App.utils.navigation && App.utils.navigation.switchTab) {
         e.preventDefault();
         App.utils.navigation.switchTab('board-my-board');
         return;
       }
 
-      if (e.code === 'Digit6' && App.utils.navigation && App.utils.navigation.switchTab) {
-        e.preventDefault();
-        App.utils.navigation.switchTab('notices');
-        return;
-      }
-
-      if (e.code === 'Digit7' && App.utils.navigation && App.utils.navigation.switchTab) {
+      if (e.code === 'Digit4' && App.utils.navigation && App.utils.navigation.switchTab) {
         e.preventDefault();
         App.utils.navigation.switchTab('insights');
         return;
