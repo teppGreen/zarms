@@ -616,13 +616,15 @@
     const btn = searchRoot.querySelector('button[onclick="refreshCurrentTab()"], button[title="更新"]');
     if (!btn) return;
 
-    const iconEl = btn.querySelector('i');
-    if (!iconEl) return;
+    const spanEl = btn.querySelector('span');
+    if (!spanEl) return;
 
     if (isLoading) {
-      iconEl.innerHTML = '<progress class="circle indeterminate small"></progress>';
+      spanEl.textContent = '更新中…';
+      btn.disabled = true;
     } else {
-      iconEl.textContent = 'refresh';
+      spanEl.textContent = '更新する';
+      btn.disabled = false;
     }
   }
 
