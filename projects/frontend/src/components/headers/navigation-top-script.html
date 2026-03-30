@@ -43,7 +43,7 @@
                 },
 
                 close: function () {
-                    appUi('modal-shortcuts-help',false);
+                    appUi('modal-shortcuts-help', false);
                 },
 
                 render: function () {
@@ -82,7 +82,10 @@
                 const apps = App.state.data.apps || [];
 
                 if (apps.length === 0) {
-                    appsGrid.innerHTML = '<div class="padding center-align row tiny-space secondary-text"><i>info</i><span>リンクがありません</span></div>';
+                    // refreshApps()内でシマーまたはエラーが表示されるため、ここでは「リンクなし」のみを考慮
+                    if (!this.isAppsLoading) {
+                      appsGrid.innerHTML = '<div class="padding center-align row tiny-space secondary-text"><i>info</i><span>リンクがありません</span></div>';
+                    }
                     return;
                 }
 
@@ -112,6 +115,50 @@
                     });
                 });
             },
+
+            /**
+             * 最新のアプリリンク一覧を取得し、再描画します
+             * メニューを開いた際の onclick ハンドラとして使用されます
+             */
+            refreshApps: async function () {
+                const appsGrid = document.getElementById('apps-grid');
+                if (!appsGrid) return;
+
+                // 既に読み込み中なら何もしない
+                if (this.isAppsLoading) return;
+
+                // キャッシュがある場合はそのまま描画、ない場合はシマー
+                const apps = App.state.data.apps || [];
+                if (apps.length === 0) {
+                    appsGrid.innerHTML = `
+                        <div class="center padding center-align row small-space secondary-text">
+                            <progress class="circle indeterminate small"></progress>
+                            <span>リンクを読み込み中...</span>
+                        </div>
+                    `;
+                }
+
+                this.isAppsLoading = true;
+                try {
+                    console.log('[Apps] Fetching latest links...');
+                    const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.APPS, 'select', {}, null, true);
+                    const freshApps = result?.data || result || [];
+                    
+                    // 取得データが空なら「リンクなし」を表示
+                    App.state.data.apps = freshApps;
+                    this.renderApps();
+                } catch (error) {
+                    console.error('[Apps] Failed to refresh apps:', error);
+                    // エラー時、データが空ならエラーを表示
+                    if (App.state.data.apps.length === 0) {
+                        appsGrid.innerHTML = '<div class="padding center-align secondary-text error-text"><i>error</i><span>リンクの読み込みに失敗しました</span></div>';
+                    }
+                } finally {
+                    this.isAppsLoading = false;
+                }
+            },
+
+            isAppsLoading: false,
 
             /**
              * コメント既読状態を同期し、右上ボタンのバッジ表示を更新します
@@ -235,7 +282,7 @@
             showUpdateModal: function () {
                 const modal = document.getElementById('modal-system-update');
                 if (modal) {
-                    appUi('modal-system-update',true);
+                    appUi('modal-system-update', true);
                 }
             },
 
@@ -316,17 +363,23 @@
             },
 
             /**
-             * 1時間ごとの自動更新を開始
+             * 自動更新を開始
              */
             startAutoRefresh: function () {
                 if (this.autoRefreshInterval) {
                     clearInterval(this.autoRefreshInterval);
                 }
-                // 1時間 = 3600000ms
+                // 30分ごとにシステムアップデートとコメントを同時に再取得
                 this.autoRefreshInterval = setInterval(() => {
                     console.log('[SystemUpdates] Auto-refreshing...');
                     this.loadData();
-                }, 3600000);
+                    if (App.utils.header.comments && App.utils.header.comments.loadData) {
+                        console.log('[Comments] Auto-refreshing with system updates...');
+                        App.utils.header.comments.loadData(false).catch(e =>
+                            console.warn('[Comments] Auto-refresh failed:', e)
+                        );
+                    }
+                }, 1800000);
             },
 
             // ============================================
