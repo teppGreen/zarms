@@ -55,9 +55,8 @@ function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false
     userProperties: PropertiesService.getUserProperties().getProperties()
   };
 
-  // デスクトップ版の場合のみHome画面用の初期データを事前取得（最小限）
   if (!isMobile) {
-    templateVariables.initialData = _prefetchHomeInitialData(activeUser.id, useApiMode);
+    templateVariables.initialData = _prefetchMasterData(activeUser.id, useApiMode);
   }
 
   template.templateVariables = templateVariables;
@@ -193,16 +192,15 @@ function _checkRequiresReAgreement(userAgreementData, policyUpdateDates) {
 }
 
 /**
- * ホーム画面の初回表示に必要なデータを事前取得（最小限）
- * 初回ローディング高速化のため、home で実際に使用するデータのみを取得
+ * Homeタブデータ・マスタデータ一括取得
  * @param {string} userId - ユーザーID
- * @returns {Object} { tasks, isCached }
+ * @returns {Object} { tasks, logs, boards, members, isCached }
  */
-function _prefetchHomeInitialData(userId, useApiMode = false) {
+function _prefetchMasterData(userId, useApiMode = false) {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const isoDate = sevenDaysAgo.toISOString();
-
+  
   const queries = [
     {
       key: 'tasks',
@@ -226,11 +224,25 @@ function _prefetchHomeInitialData(userId, useApiMode = false) {
       forceRefresh: false
     },
     {
+      key: 'boards',
+      tableName: TABLE_NAMES.BOARDS,
+      operation: 'select',
+      dataObject: {},
+      forceRefresh: false
+    },
+    {
+      key: 'members',
+      tableName: TABLE_NAMES.MEMBERS,
+      operation: 'select',
+      dataObject: {},
+      forceRefresh: false
+    },
+    {
       key: 'systemUpdates',
       tableName: TABLE_NAMES.SYSTEM_UPDATES,
       operation: 'select',
       dataObject: { orderBy: { created_at: 'desc' } },
-      forceRefresh: true  // 常に最新を取得（top-navigation で必要）
+      forceRefresh: true
     }
   ];
 
@@ -242,97 +254,12 @@ function _prefetchHomeInitialData(userId, useApiMode = false) {
   return {
     tasks: (r.tasks?.data || r.tasks || []),
     logs: (r.logs?.data || r.logs || []),
+    boards: (r.boards?.data || r.boards || []),
+    members: (r.members?.data || r.members || []),
     systemUpdates: (r.systemUpdates?.data || r.systemUpdates || []),
     isCached: !batchResult.hasAnyUncached
   };
 }
-
-/**
- * マスタデータ一括取得（遅延ロード用）
- * 初回ページロードの高速化のため、home 画面以外で必要になるまで取得を遅延させます
- * @param {string} userId - ユーザーID
- * @returns {Object} { boards, apps, members, directories, directoryAssignments, skills, skillAssignments, isCached }
- */
-function _prefetchMasterData(userId, useApiMode = false) {
-  const queries = [
-    {
-      key: 'boards',
-      tableName: TABLE_NAMES.BOARDS,
-      operation: 'select',
-      dataObject: { orderBy: { name: 'asc' } },
-      forceRefresh: false
-    },
-    {
-      key: 'apps',
-      tableName: TABLE_NAMES.APPS,
-      operation: 'select',
-      dataObject: {},
-      forceRefresh: false
-    },
-    {
-      key: 'links',
-      tableName: TABLE_NAMES.LINKS,
-      operation: 'select',
-      dataObject: {
-        orderBy: { label: 'asc' }
-      },
-      forceRefresh: false
-    },
-    {
-      key: 'members',
-      tableName: TABLE_NAMES.MEMBERS,
-      operation: 'select',
-      dataObject: {},
-      forceRefresh: false
-    },
-    {
-      key: 'directories',
-      tableName: TABLE_NAMES.DIRECTORIES,
-      operation: 'select',
-      dataObject: {},
-      forceRefresh: false
-    },
-    {
-      key: 'directoryAssignments',
-      tableName: TABLE_NAMES.DIRECTORY_ASSIGNMENTS,
-      operation: 'select',
-      dataObject: {},
-      forceRefresh: false
-    },
-    {
-      key: 'skills',
-      tableName: TABLE_NAMES.SKILLS,
-      operation: 'select',
-      dataObject: {},
-      forceRefresh: false
-    },
-    {
-      key: 'skillAssignments',
-      tableName: TABLE_NAMES.SKILL_ASSIGNMENTS,
-      operation: 'select',
-      dataObject: {},
-      forceRefresh: false
-    }
-  ];
-
-  const batchResult = useApiMode
-    ? handleBatchDatabaseProcessViaApi(queries)
-    : handleBatchDatabaseProcess(userId, queries);
-  const r = batchResult.results || {};
-
-  return {
-    boards: (r.boards?.data || r.boards || []),
-    apps: (r.apps?.data || r.apps || []),
-    links: (r.links?.data || r.links || []),
-    members: (r.members?.data || r.members || []),
-    directories: (r.directories?.data || r.directories || []),
-    directoryAssignments: (r.directoryAssignments?.data || r.directoryAssignments || []),
-    skills: (r.skills?.data || r.skills || []),
-    skillAssignments: (r.skillAssignments?.data || r.skillAssignments || []),
-    isCached: !batchResult.hasAnyUncached
-  };
-}
-
 
 /**
  * ユーザープロパティを保存します

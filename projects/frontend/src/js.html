@@ -111,10 +111,17 @@
     }
 
     // 必要最小限のデータを読み込み（バックグラウンド更新のPromiseを受け取る）
+    let needsBackgroundMasterDataRefresh = true;
     const backgroundUpdatePromise = await loadInitialData();
     App.utils.navigation.changeH1();
 
     console.log('[initializeApp] URL params:', urlParams);
+
+    // 初期ローディングを削除
+    const initialLoading = document.getElementById('initial-loading');
+    if (initialLoading) {
+      initialLoading.style.display = 'none';
+    }
 
     // URLパラメータに基づいて遷移判定
     if (urlParams.tab === 'board' && urlParams.board_id) {
@@ -168,15 +175,14 @@
     // タブごとの最終更新日時を初期化
     App.state.tabLastUpdated = {};
 
-    // システムアップデートの1時間ごとの自動更新を開始
-    if (App.utils.header.systemUpdates) {
-      App.utils.header.systemUpdates.startAutoRefresh();
+    // バックグラウンド更新が残っている場合は継続
+    if (needsBackgroundMasterDataRefresh) {
+      backgroundUpdatePromise;
     }
 
-    // 初期ローディングを削除
-    const initialLoading = document.getElementById('initial-loading');
-    if (initialLoading) {
-      initialLoading.style.display = 'none';
+    // システムアップデートの自動更新を開始
+    if (App.utils.header.systemUpdates) {
+      App.utils.header.systemUpdates.startAutoRefresh();
     }
   }
 
@@ -427,44 +433,21 @@
   async function loadInitialData() {
     try {
       // ── Step 1: サーバー埋め込みデータを即座に反映（GAS呼び出しなし）─────────────────────
-      const embedded = (typeof initialData !== 'undefined') ? initialData : null;
 
       let boards = [];
-      let apps = [];
       let members = [];
       let systemUpdates = [];
-      let needsBackgroundMasterDataRefresh = false;
 
-      if (embedded) {
+      if (initialData) {
         // ナビゲーション必須のマスタデータのみ反映
-        boards = embedded.boards || [];
-        apps = embedded.apps || [];
-        members = embedded.members || [];
-        systemUpdates = embedded.systemUpdates || [];
-
-        // マスタデータが不足している場合バックグラウンドで取得する
-        needsBackgroundMasterDataRefresh = !embedded.boards || !embedded.members;
-
-        console.log('[loadInitialData] Server-embedded initialData (needsMasterRefresh:', needsBackgroundMasterDataRefresh, ')');
-      } else {
-        // フォールバック: initialData が埋め込まれていない場合
-        console.log('[loadInitialData] No embedded initialData. Fetching master data via GAS...');
-        const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, [
-          { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: false },
-          { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh: false },
-          { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: false },
-          { key: 'systemUpdates', tableName: TABLE_NAMES.SYSTEM_UPDATES, operation: 'select', dataObject: { orderBy: { created_at: 'desc' } }, forceRefresh: true }
-        ]);
-        const r = batchResult?.results || {};
-        boards = r.boards?.data || r.boards || [];
-        apps = r.apps?.data || r.apps || [];
-        members = r.members?.data || r.members || [];
-        systemUpdates = r.systemUpdates?.data || r.systemUpdates || [];
+        boards = initialData.boards || [];
+        members = initialData.members || [];
+        systemUpdates = initialData.systemUpdates || [];
+        console.log('[loadInitialData] Server-embedded initialData');
       }
 
       // ── Step 2: App.stateにマスタデータを反映 ──────────────────────────────────────────
       App.state.data.boards = boards;
-      App.state.data.apps = apps;
       App.state.data.members = members;
       App.state.data.systemUpdates = systemUpdates;
 
@@ -472,7 +455,6 @@
       App.utils.navigation.renderBoardsNavigation();
       App.pages.boards.initialize();
       App.pages.boards.initializeMyBoardFilters();
-      App.utils.header.renderApps();
 
       if (App.utils.header.systemUpdates) {
         App.utils.header.systemUpdates.cachedUpdates = systemUpdates;
@@ -487,33 +469,28 @@
         );
       }
 
-      // ── Step 4: バックグラウンドでboards/apps/membersを最新化 ───────────────────────
+      // appsはバックグラウンドロードを継続
+      if (App.utils.header.apps) {
+        App.utils.header.refreshApps().catch(e =>
+          console.warn('[Apps] Background initial load failed:', e)
+        );
+      }
+
+      // ── Step 4: バックグラウンドでboards/membersを最新化 ───────────────────────
       const backgroundUpdatePromise = new Promise((resolve) => {
-        setTimeout(async () => {
+        setTimeout(async (needsBackgroundMasterDataRefresh) => {
           try {
-            const forceRefresh = !needsBackgroundMasterDataRefresh;
             const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, [
-              { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh },
-              { key: 'apps', tableName: TABLE_NAMES.APPS, operation: 'select', dataObject: {}, forceRefresh },
-              { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh }
+              { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: true },
+              { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: true }
             ]);
             const r = batchResult?.results || {};
 
             App.state.data.boards = r.boards?.data || r.boards || boards;
-            App.state.data.apps = r.apps?.data || r.apps || apps;
             App.state.data.members = r.members?.data || r.members || members;
-
-            // ナビゲーションを更新（アクティブ状態を保持）
-            const activeLink = document.querySelector('#left-nav a.active') || document.querySelector('#board-nav a.active');
-            const activeBoardId = activeLink ? activeLink.dataset.boardId : null;
             App.utils.navigation.renderBoardsNavigation();
-            if (activeBoardId) {
-              const newActiveLink = document.querySelector(`a[data-board-id="${activeBoardId}"]`);
-              if (newActiveLink) newActiveLink.classList.add('active');
-            }
             App.pages.boards.initialize();
-            App.utils.header.renderApps();
-
+            needsBackgroundMasterDataRefresh = false;
             console.log('[loadInitialData] バックグラウンド更新完了');
           } catch (error) {
             console.error('[loadInitialData] バックグラウンド更新エラー:', error);
