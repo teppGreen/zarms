@@ -68,6 +68,9 @@ function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false
 // GAS呼び出し1回で 認証チェック + ユーザー取得 + 初期データ取得 を行う
 // ============================================
 
+const USER_CACHE_KEY_PREFIX_INITIAL_APP_DATA = '#sym:getInitialAppData';
+const USER_CACHE_TTL_SECONDS_DEFAULT = 21600;
+
 /**
  * アプリ起動に必要な全情報を一括取得します（高速化）
  * register.htmlからの複数回のgoogle.script.run呼び出しを1回にまとめます。
@@ -75,16 +78,35 @@ function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false
  * @param {Object} urlParams - URLパラメータ
  * @param {boolean} isMobile - モバイル版かどうか
  * @returns {Object} {
- *   status: 'ok' | 'unauthorized' | 'not_registered',
+ *   status: 'ok' | 'unauthorized' | 'not_registered' | 'scope_required',
  *   activeUser: Object|null,     // 認証済みメンバー情報
  *   appHtml: string|null,        // アプリケーションHTML
  *   error: string|null,
+ *   authUrl: string|null,
  *   userAgreementData: Object,   // ユーザーの利用規約・プライバシーポリシー同意情報
  *   policyUpdateDates: Object,   // 利用規約・プライバシーポリシーの更新日時（ISO8601形式）
  *   requiresReAgreement: Object  // 再同意が必要な規約・ポリシー（terms, privacy）
  * }
  */
 function getInitialAppData(email, urlParams, isMobile = false) {
+  const authInfo = checkAppAuthorization();
+  if (authInfo.status === 'REQUIRED') {
+    return {
+      status: 'scope_required',
+      activeUser: null,
+      appHtml: null,
+      error: null,
+      authUrl: authInfo.url || null,
+      useApiMode: false
+    };
+  }
+
+  const cacheKey = _buildUserCacheKeyForInitialLoad(email, urlParams, isMobile);
+  const cachedResult = _readUserCacheJson(cacheKey);
+  if (cachedResult) {
+    return cachedResult;
+  }
+
   let useApiMode = false;
   let activeUser = null;
 
@@ -109,14 +131,17 @@ function getInitialAppData(email, urlParams, isMobile = false) {
     // 2. ユーザーが見つからない（DBに存在しない）場合はサインアップ画面へ
     if (!activeUser) {
       const policyUpdateDates = getPolicyUpdateDates();
-      return {
+      const result = {
         status: 'not_registered',
         activeUser: null,
         appHtml: null,
         error: null,
+        authUrl: null,
         useApiMode: useApiMode,
         policyUpdateDates: policyUpdateDates
       };
+      _writeUserCacheJson(cacheKey, result, USER_CACHE_TTL_SECONDS_DEFAULT);
+      return result;
     }
 
     // 3. ユーザープロパティから利用規約・プライバシーポリシーの同意情報を取得
@@ -135,18 +160,22 @@ function getInitialAppData(email, urlParams, isMobile = false) {
     // 6. アプリのHTMLを生成
     const appHtml = loadAppHtml(activeUser, urlParams, isMobile, useApiMode);
 
-    return {
+    const result = {
       status: 'ok',
       activeUser: activeUser,
       appHtml: appHtml,
       error: null,
+      authUrl: null,
       useApiMode: useApiMode,
       userAgreementData: userAgreementData,
       policyUpdateDates: policyUpdateDates,
       requiresReAgreement: requiresReAgreement
     };
+
+    _writeUserCacheJson(cacheKey, result, USER_CACHE_TTL_SECONDS_DEFAULT);
+    return result;
   } catch (e) {
-    return { status: 'unauthorized', useApiMode: useApiMode, activeUser: null, appHtml: null, error: e.message };
+    return { status: 'unauthorized', useApiMode: useApiMode, activeUser: null, appHtml: null, error: e.message, authUrl: null };
   }
 }
 
@@ -242,7 +271,7 @@ function _prefetchMasterData(userId, useApiMode = false) {
       tableName: TABLE_NAMES.SYSTEM_UPDATES,
       operation: 'select',
       dataObject: { orderBy: { created_at: 'desc' } },
-      forceRefresh: true
+      forceRefresh: false
     }
   ];
 
@@ -287,6 +316,7 @@ function setPolicyUpdateDate(type, dateString) {
     }
     const key = type === 'terms' ? 'termsUpdatedAt' : 'privacyUpdatedAt';
     PropertiesService.getScriptProperties().setProperty(key, dateString);
+    _clearInitialLoadCacheForCurrentUser();
     return true;
   } catch (error) {
     console.error('setPolicyUpdateDate error:', error);
@@ -330,6 +360,8 @@ function recordAgreement(type) {
     if (type === 'privacy' || type === 'both') {
       userProperties.setProperty('privacyAgreedAt', now);
     }
+
+    _clearInitialLoadCacheForCurrentUser();
 
     return true;
   } catch (error) {
@@ -419,6 +451,76 @@ function checkAppAuthorization() {
     status: authInfo.getAuthorizationStatus() === ScriptApp.AuthorizationStatus.REQUIRED ? 'REQUIRED' : 'OK',
     url: authInfo.getAuthorizationUrl()
   };
+}
+
+function _buildUserCacheKeyForInitialLoad(email, urlParams, isMobile) {
+  const safeEmail = String(email || '').trim().toLowerCase() || 'anonymous';
+  const mode = isMobile ? 'mobile' : 'desktop';
+  const env = isDevelopment(urlParams) ? 'dev' : 'prod';
+  const policyDates = getPolicyUpdateDates();
+  const policySignature = [policyDates.termsUpdatedAt || 'none', policyDates.privacyUpdatedAt || 'none'].join('|');
+  return [USER_CACHE_KEY_PREFIX_INITIAL_APP_DATA, safeEmail, mode, env, policySignature].join(':');
+}
+
+function _readUserCacheJson(cacheKey) {
+  try {
+    const raw = CacheService.getUserCache().get(cacheKey);
+    if (!raw) return null;
+    const json = _decodeUserCachePayload(raw);
+    return JSON.parse(json);
+  } catch (error) {
+    console.warn('Failed to read user cache JSON:', error);
+    return null;
+  }
+}
+
+function _writeUserCacheJson(cacheKey, value, ttlSeconds) {
+  try {
+    const json = JSON.stringify(value);
+    const payload = _encodeUserCachePayload(json);
+    CacheService.getUserCache().put(cacheKey, payload, ttlSeconds || USER_CACHE_TTL_SECONDS_DEFAULT);
+  } catch (error) {
+    console.warn('Failed to write user cache JSON:', error);
+  }
+}
+
+function _encodeUserCachePayload(text) {
+  try {
+    const gzippedBlob = Utilities.gzip(Utilities.newBlob(text, 'application/json'));
+    return 'gz:' + Utilities.base64Encode(gzippedBlob.getBytes());
+  } catch (error) {
+    return 'raw:' + text;
+  }
+}
+
+function _decodeUserCachePayload(payload) {
+  if (payload.indexOf('gz:') === 0) {
+    const bytes = Utilities.base64Decode(payload.substring(3));
+    const blob = Utilities.newBlob(bytes, 'application/gzip');
+    return Utilities.ungzip(blob).getDataAsString();
+  }
+  if (payload.indexOf('raw:') === 0) {
+    return payload.substring(4);
+  }
+  return payload;
+}
+
+function _clearInitialLoadCacheForCurrentUser() {
+  try {
+    const email = Session.getActiveUser().getEmail();
+    if (!email) return;
+
+    const keys = [
+      _buildUserCacheKeyForInitialLoad(email, { use_prod_db: 'true' }, false),
+      _buildUserCacheKeyForInitialLoad(email, { use_prod_db: 'true' }, true),
+      _buildUserCacheKeyForInitialLoad(email, {}, false),
+      _buildUserCacheKeyForInitialLoad(email, {}, true)
+    ];
+    const cache = CacheService.getUserCache();
+    keys.forEach(key => cache.remove(key));
+  } catch (error) {
+    console.warn('Failed to clear initial load cache:', error);
+  }
 }
 
 /**

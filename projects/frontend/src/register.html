@@ -405,31 +405,10 @@
         if (checkMaintenance()) {
             showMaintenanceStep();
         } else {
-            checkScopesFirst();
+            checkAccess();
         }
 
         let authUrl = null;
-
-        /**
-         * アプリのスコープ権限が許可されているか確認します
-         */
-        function checkScopesFirst() {
-            showStep('step-loading');
-            google.script.run
-                .withSuccessHandler(function (authInfo) {
-                    if (authInfo.status === 'REQUIRED') {
-                        authUrl = authInfo.url;
-                        showAgreementStep('scope');
-                    } else {
-                        checkAccess();
-                    }
-                })
-                .withFailureHandler(function (error) {
-                    console.error('checkScopesFirst failed:', error);
-                    checkAccess(); // failure fallback
-                })
-                .checkAppAuthorization();
-        }
 
         function showAgreementStep(nextAction, requiresReAgreement) {
             if (hasAgreed) {
@@ -507,12 +486,19 @@
          */
         function checkAccess() {
             const isMobile = isMobileDevice();
+            showStep('step-loading');
 
             google.script.run
                 .withSuccessHandler(function (result) {
                     if (!result) {
                         console.error('checkAccess: 結果が空です');
                         showAccessErrorStep();
+                        return;
+                    }
+
+                    if (result.status === 'scope_required') {
+                        authUrl = result.authUrl || null;
+                        showAgreementStep('scope');
                         return;
                     }
 

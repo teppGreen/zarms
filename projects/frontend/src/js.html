@@ -436,41 +436,36 @@
 
       let boards = [];
       let members = [];
-      let systemUpdates = [];
 
       if (initialData) {
         // ナビゲーション必須のマスタデータのみ反映
         boards = initialData.boards || [];
         members = initialData.members || [];
-        systemUpdates = initialData.systemUpdates || [];
         console.log('[loadInitialData] Server-embedded initialData');
       }
 
       // ── Step 2: App.stateにマスタデータを反映 ──────────────────────────────────────────
       App.state.data.boards = boards;
       App.state.data.members = members;
-      App.state.data.systemUpdates = systemUpdates;
 
       // ── Step 3: 即座にUIを描画（Render-First） ──────────────────────────────────────
       App.utils.navigation.renderBoardsNavigation();
       App.pages.boards.initialize();
       App.pages.boards.initializeMyBoardFilters();
 
-      if (App.utils.header.systemUpdates) {
-        App.utils.header.systemUpdates.cachedUpdates = systemUpdates;
-        App.utils.header.systemUpdates.isLoaded = true;
-        App.utils.header.systemUpdates.lastUpdatedAt = new Date();
-      }
-
-      // commentsはバックグラウンドロードを継続
       if (App.utils.header.comments) {
-        App.utils.header.comments.loadData(false).catch(e =>
+        App.utils.header.comments.loadData().catch(e =>
           console.warn('[Comments] Background initial load failed:', e)
         );
       }
 
-      // appsはバックグラウンドロードを継続
-      if (App.utils.header.apps) {
+      if (App.utils.header.systemUpdates) {
+        App.utils.header.systemUpdates.loadData().catch(e =>
+          console.warn('[SystemUpdates] Background initial load failed:', e)
+        );
+      }
+
+      if (App.utils.header) {
         App.utils.header.refreshApps().catch(e =>
           console.warn('[Apps] Background initial load failed:', e)
         );
