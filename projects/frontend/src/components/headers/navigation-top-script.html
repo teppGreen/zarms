@@ -459,7 +459,7 @@
 
                 try {
                     // 全角数字を半角に変換してから数値チェック（共通ユーティリティを使用）
-                    const { normalizedValue, numericValue, isNumericInput } = App.utils.search.getNormalizedSearchInfo(searchValue);
+                    const { numericValue, isNumericInput } = App.utils.search.getNormalizedSearchInfo(searchValue);
 
                     const switchToMyBoardTab = async () => {
                         if (App.utils.navigation && App.utils.navigation.switchTab) {
@@ -468,7 +468,6 @@
                     };
 
                     if (isNumericInput) {
-                        // 数値入力の場合: display_id でタスクを特定する
                         let foundTask = null;
                         try {
                             const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
@@ -482,30 +481,43 @@
                             console.error('[Search] display_id 検索エラー:', e);
                         }
 
-                        // display_id 検索完了後にマイボードへ移動
-                        await switchToMyBoardTab();
-
+                        // モーダル描画で参照できるよう、my-boardキャッシュにタスク本体を先に反映
                         if (foundTask && App.pages.boards) {
-                            // 2. 特定したタスク名でマイボードフィルタを適用
-                            App.pages.boards.initializeMyBoardFilters(false);
-                            App.pages.boards.myBoardFilters.title = foundTask.name;
-                            App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
-
-                            // 3. 検索（データ再読み込み）
-                            await App.pages.boards.loadData('my-board', false);
-
-                            // 4. 特定したタスクの詳細画面を開く
-                            if (App.modals.taskDetail) {
-                                App.modals.taskDetail.open(foundTask.id);
-                                return;
+                            const myBoardTasks = Array.isArray(App.pages.boards.cachedBoardTasks['my-board'])
+                                ? App.pages.boards.cachedBoardTasks['my-board']
+                                : [];
+                            const existingIndex = myBoardTasks.findIndex(task => task.id === foundTask.id);
+                            if (existingIndex >= 0) {
+                                myBoardTasks[existingIndex] = foundTask;
+                            } else {
+                                myBoardTasks.unshift(foundTask);
                             }
-                        } else if (App.pages.boards) {
-                            // タスクが見つからなかった場合は数値をそのままタイトル検索にフォールバック
-                            App.pages.boards.initializeMyBoardFilters(false);
-                            App.pages.boards.myBoardFilters.title = searchValue;
-                            App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
-                            await App.pages.boards.loadData('my-board', false);
+                            App.pages.boards.cachedBoardTasks['my-board'] = myBoardTasks;
                         }
+
+                        await switchToMyBoardTab();
+                        
+                        // display_id ヒット時は即時に詳細モーダルを表示
+                        if (foundTask && App.modals.taskDetail) {    
+                            App.modals.taskDetail.open(foundTask.id);
+                        }
+
+                        // その後はバックグラウンドでタイトル検索を継続し、マイボードへ描画
+                        const titleQuery = foundTask ? foundTask.name : searchValue;
+                        if (App.pages.boards) {
+                            void (async () => {
+                                try {
+                                    App.pages.boards.initializeMyBoardFilters(false);
+                                    App.pages.boards.myBoardFilters.title = titleQuery;
+                                    App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
+                                    await App.pages.boards.loadData('my-board', false);
+                                } catch (e) {
+                                    console.error('[Search] バックグラウンドタイトル検索エラー:', e);
+                                }
+                            })();
+                        }
+
+                        return;
                     } else {
                         // 通常の文字列検索
                         await switchToMyBoardTab();
