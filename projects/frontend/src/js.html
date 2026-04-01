@@ -585,17 +585,17 @@
     }
 
     // 対象のrefreshボタンを探す
-    const btn = searchRoot.querySelector('button[onclick="refreshCurrentTab()"], button[title="更新"]');
+    const btn = searchRoot.querySelector('button[onclick="refreshCurrentTab()"]');
     if (!btn) return;
 
-    const spanEl = btn.querySelector('span');
-    if (!spanEl) return;
+    const iconEl = btn.querySelector('i > i');
+    if (!iconEl) return;
 
     if (isLoading) {
-      spanEl.textContent = '更新中…';
+      iconEl.classList.add('fast-rotate');
       btn.disabled = true;
     } else {
-      spanEl.textContent = '更新する';
+      iconEl.classList.remove('fast-rotate');
       btn.disabled = false;
     }
   }
@@ -796,6 +796,7 @@
    */
   function callGAS(functionName, ...args) {
     return new Promise((resolve, reject) => {
+      setRefreshButtonLoading(true);
       const useApiMode = !!(App.state && App.state.useApiMode);
       const callArgs = [...args, useApiMode];
 
@@ -808,9 +809,11 @@
       google.script.run
         .withSuccessHandler(function (result) {
           resolve(result);
+          setRefreshButtonLoading(false);
         })
         .withFailureHandler(function (error) {
           reject(error);
+          setRefreshButtonLoading(false);
         })
       [functionName](...callArgs);
     });
