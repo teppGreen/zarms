@@ -28,6 +28,20 @@
     const templateVariables = <?!= JSON.stringify(templateVariables) ?>;
   </script>
   <?!= include('js') ?>
+    <script>
+      // 更新ボタンのHTMLを定義（全ページで共有）
+      window.refreshButtonHTML = `<button class="transparent small border slow-ripple" onclick="refreshCurrentTab()" title="このタブの内容を更新する">
+          <i><i class="shape transparent">cached</i></i>
+          <span>更新</span>
+      </button>`;
+    
+      // DOMReady後に全ボタンを初期化
+      document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('[data-refresh-button]').forEach(el => {
+          el.innerHTML = window.refreshButtonHTML;
+        });
+      });
+    </script>
   <?!= include('components/popups/error'); ?>
   <?!= include('components/popups/error-script'); ?>
 
