@@ -1,0 +1,509 @@
+<script>
+  // ============================================
+  // Optimistic UI: データ同期ロジック
+  // ============================================
+
+  /**
+   * グローバル変数内の該当オブジェクトを直接更新します (Optimistic UI)
+   * @param {string} tableName - テーブル名
+   */
+  function getDataArray(tableName) {
+    return App.state.data[tableName];
+  }
+
+  /**
+   * グローバル変数内の該当オブジェクトを直接更新します (Optimistic UI)
+   * @param {string} tableName - テーブル名
+   * @param {string} id - レコードID
+   * @param {Object} updates - 更新する値のオブジェクト
+   * @returns {Object|null} 更新されたアイテム、または見つからない場合はnull
+   */
+  function updateLocalData(tableName, id, updates) {
+    const dataArray = getDataArray(tableName);
+    if (!dataArray) {
+      console.warn(`updateLocalData: テーブル ${tableName} が見つかりません`);
+      return null;
+    }
+
+    const item = dataArray.find(d => d.id === id);
+    if (!item) {
+      console.warn(`updateLocalData: ID ${id} が ${tableName} に見つかりません`);
+      return null;
+    }
+
+    Object.keys(updates).forEach(key => {
+      item[key] = updates[key];
+    });
+
+    return item;
+  }
+
+  /**
+   * データをロールバックします (エラー時)
+   * @param {string} tableName - テーブル名
+   * @param {string} id - レコードID
+   * @param {Object} oldData - 以前のデータ
+   */
+  function rollbackLocalData(tableName, id, oldData) {
+    const dataArray = getDataArray(tableName);
+    if (!dataArray) {
+      console.warn(`rollbackLocalData: テーブル ${tableName} が見つかりません`);
+      return;
+    }
+
+    const item = dataArray.find(d => d.id === id);
+    if (!item) {
+      console.warn(`rollbackLocalData: ID ${id} が ${tableName} に見つかりません`);
+      return;
+    }
+
+    Object.keys(oldData).forEach(key => {
+      item[key] = oldData[key];
+    });
+  }
+
+  async function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * 指定日までの残り日数を計算します
+   * @param {string} to - 目標日（YYYY-MM-DD形式）
+   * @returns {number} 残り日数
+   */
+  function calculateDaysUntil(to) {
+    const eventDate = new Date(to);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    eventDate.setHours(0, 0, 0, 0);
+
+    const diffTime = eventDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    return diffDays;
+  }
+
+  // ============================================
+  // Testing Utilities (開発環境のみ)
+  // ============================================
+
+  if (App.state.isDevelopment) {
+    /**
+     * テスト用のヘルパー関数
+     */
+    App.test = {
+      /**
+       * モックデータを生成します
+       * @param {string} type - データタイプ（'member', 'task', 'board'など）
+       * @param {Object} overrides - 上書きするプロパティ
+       * @returns {Object} モックデータ
+       */
+      createMockData: function (type, overrides = {}) {
+        const defaults = {
+          member: {
+            id: generateUuid(),
+            email: 'test@student.zen.ac.jp',
+            display_name: 'テストユーザー',
+            name: 'テスト 太郎',
+            is_active: true,
+            created_at: new Date().toISOString()
+          },
+          task: {
+            id: generateUuid(),
+            display_id: 1,
+            name: 'テストタスク',
+            description: 'テスト用のタスクです',
+            task_status_key: 'TODO',
+            priority_key: 'MEDIUM',
+            is_active: true,
+            created_at: new Date().toISOString()
+          },
+          board: {
+            id: generateUuid(),
+            display_id: 1,
+            name: 'テストボード',
+            description: 'テスト用のボードです',
+            is_active: true,
+            created_at: new Date().toISOString()
+          }
+        };
+
+        return Object.assign({}, defaults[type] || {}, overrides);
+      },
+
+      /**
+       * App.stateをリセットします
+       */
+      resetState: function () {
+        App.state.data = {
+          boards: [],
+          directories: [],
+          members: [],
+          tasks: [],
+          apps: []
+        };
+        console.log('[App.test] State reset');
+      },
+
+      /**
+       * すべてのモーダルを閉じます
+       */
+      closeAllModals: async function () {
+        const modals = document.querySelectorAll('dialog[open]');
+        for (const modal of modals) {
+          await appUi(modal.id, false);
+        }
+        console.log('[App.test] All modals closed');
+      },
+
+      /**
+       * autoRefreshを一時停止します
+       * @param {number} durationMs - 停止時間（ms）。0以下の場合は明示的にresumeAutoRefreshを呼ぶまで停止
+       */
+      pauseAutoRefresh: function (durationMs = 0) {
+        stopAutoRefresh();
+
+        const waitMs = Number(durationMs);
+        if (Number.isFinite(waitMs) && waitMs > 0) {
+          autoRefreshResumeTimeout = setTimeout(function () {
+            autoRefreshResumeTimeout = null;
+            startAutoRefresh();
+            console.log('[App.test] Auto refresh resumed');
+          }, waitMs);
+          console.log('[App.test] Auto refresh paused for', waitMs, 'ms');
+          return waitMs;
+        }
+
+        console.log('[App.test] Auto refresh paused until resumeAutoRefresh()');
+        return 0;
+      },
+
+      /**
+       * 停止中のautoRefreshを再開します
+       */
+      resumeAutoRefresh: function () {
+        startAutoRefresh();
+        console.log('[App.test] Auto refresh resumed manually');
+      }
+    };
+
+    console.log('[App.test] Testing utilities loaded');
+  }
+
+  // ============================================
+  // Quill Rich Text Editor Module
+  // リッチテキストエディタの共通モジュール
+  // ============================================
+
+  App.utils.quill = {
+    // 登録済みフラグ（1回のみ登録）
+    _registered: false,
+
+    /**
+     * カスタムBlotを登録（アプリ起動時に1回だけ呼ぶ）
+     */
+    registerCustomBlots: function () {
+      if (this._registered || typeof Quill === 'undefined') return;
+
+      const Embed = Quill.import('blots/embed');
+      class SoftBreakBlot extends Embed {
+        static blotName = 'softbreak';
+        static tagName = 'BR';
+      }
+      Quill.register(SoftBreakBlot);
+      this._registered = true;
+      console.log('[App.utils.quill] Custom blots registered');
+    },
+
+    /**
+     * Quillエディタを初期化
+     * @param {string} selector - エディタのセレクタ（例: '#my-editor'）
+     * @param {Object} options - オプション設定
+     * @param {string} options.placeholder - プレースホルダー
+     * @param {Array} options.toolbar - ツールバー設定（デフォルト: 標準ツールバー）
+     * @returns {Quill} Quillインスタンス
+     */
+    init: function (selector, options = {}) {
+      // カスタムBlotを登録
+      this.registerCustomBlots();
+
+      // デフォルトツールバー
+      const defaultToolbar = [
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+        ['link', 'clean']
+      ];
+
+      // デフォルトプレースホルダー
+      const defaultPlaceholder = 'テキストを入力...\nShift+Enterで改行 / Enterで段落区切り';
+      const clipboardMatchers = [
+        [Node.ELEMENT_NODE, function (node, delta) {
+          (delta.ops || []).forEach(function (op) {
+            if (!op || !op.attributes) return;
+            delete op.attributes.color;
+            delete op.attributes.background;
+            delete op.attributes.font;
+          });
+          return delta;
+        }]
+      ];
+
+      // Quillインスタンスを作成
+      const quill = new Quill(selector, {
+        theme: 'bubble',
+        placeholder: options.placeholder || defaultPlaceholder,
+        modules: {
+          toolbar: options.toolbar || defaultToolbar,
+          clipboard: {
+            matchers: clipboardMatchers
+          },
+          keyboard: {
+            bindings: {
+              // Shift+Enterでbrタグを挿入
+              linebreak: {
+                key: 'Enter',
+                shiftKey: true,
+                handler: function (range) {
+                  // BRタグを挿入
+                  this.quill.insertEmbed(range.index, 'softbreak', true, 'user');
+                  // BRの直後にゼロ幅スペースを挿入してカーソル位置を確保
+                  this.quill.insertText(range.index + 1, '\u200B', 'user');
+                  // カーソルをゼロ幅スペースの後に移動
+                  this.quill.setSelection(range.index + 2, 'user');
+                  return false;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // イベントハンドラを設定
+      this._setupEventHandlers(quill);
+
+      return quill;
+    },
+
+    /**
+     * イベントハンドラを設定（リンク永続性、自動リンク化、空コンテンツクリーンアップ）
+     * @param {Quill} quill - Quillインスタンス
+     */
+    _setupEventHandlers: function (quill) {
+      // テキスト変更時の処理
+      quill.on('text-change', (delta, oldDelta, source) => {
+        if (source !== 'user') return;
+
+        // 1. リンクの永続性（リンク内での編集時にリンクを維持）
+        this._handleLinkPersistence(quill, delta);
+
+        // 2. 自動リンク化（URL入力後にスペース/改行で確定）
+        this._handleAutoLink(quill, delta, oldDelta);
+
+        // 3. 空コンテンツのクリーンアップ
+        this._handleEmptyCleanup(quill);
+      });
+
+      // リンククリック時に新しいタブで開く（安全なスキームのみ許可）
+      quill.root.addEventListener('click', (e) => {
+        const link = e.target.closest('a');
+        if (!link || !link.href) {
+          return;
+        }
+        const safeUrl = sanitizeUrl(link.href);
+        if (!safeUrl) {
+          // 不正なスキームのURLは開かない
+          e.preventDefault();
+          return;
+        }
+        e.preventDefault();
+        window.open(safeUrl, '_blank', 'noopener,noreferrer');
+      });
+    },
+    /**
+     * リンクの永続性を処理
+     * @param {Quill} quill - Quillインスタンス
+     * @param {Object} delta - 変更Delta
+     */
+    _handleLinkPersistence: function (quill, delta) {
+      let index = 0;
+      delta.ops.forEach(op => {
+        if (op.retain) {
+          index += op.retain;
+        } else if (op.insert) {
+          if (typeof op.insert === 'string') {
+            const len = op.insert.length;
+            // スペース、改行の場合はリンクを継承しない
+            if (op.insert !== ' ' && op.insert !== '\n') {
+              // 挿入箇所の前後両方のリンクを確認（index は現在の挿入位置、index + len は挿入された文字列の直後の位置）
+              const formatBefore = index > 0 ? quill.getFormat(index - 1, 1) : {};
+              const formatAfter = quill.getFormat(index + len, 1);
+              // 両端が同じリンクである（＝リンクの途中に挿入された）場合のみリンクを継承し、境界では付与しない
+              const linkUrl = (formatBefore.link && formatBefore.link === formatAfter.link) ? formatBefore.link : null;
+              if (linkUrl) {
+                quill.formatText(index, len, 'link', linkUrl, 'silent');
+              }
+            }
+            index += len;
+          } else if (typeof op.insert === 'object') {
+            // softbreak等のEmbed要素の場合はリンクを継承しない
+            index += 1;
+          }
+        }
+      });
+    },
+
+    /**
+     * URL自動リンク化を処理
+     * @param {Quill} quill - Quillインスタンス
+     * @param {Object} delta - 変更Delta
+     * @param {Object} oldDelta - 変更前のDelta
+     */
+    _handleAutoLink: function (quill, delta, oldDelta) {
+      const hasSpaceOrNewline = delta.ops.some(op =>
+        op.insert && typeof op.insert === 'string' && (op.insert.includes(' ') || op.insert.includes('\n'))
+      );
+
+      if (!hasSpaceOrNewline) return;
+
+      // oldDeltaからテキストを取得（変更前の状態）
+      let oldText = '';
+      oldDelta.ops.forEach(op => {
+        if (typeof op.insert === 'string') {
+          oldText += op.insert;
+        } else if (typeof op.insert === 'object') {
+          oldText += ' ';
+        }
+      });
+
+      // delta操作から挿入位置を特定
+      let insertPos = 0;
+      for (const op of delta.ops) {
+        if (op.retain) {
+          insertPos += op.retain;
+        } else if (op.insert) {
+          break;
+        }
+      }
+
+      // 挿入位置の直前のテキストを取得
+      const beforeInsert = oldText.substring(0, insertPos);
+
+      // 最後の単語を抽出
+      const words = beforeInsert.split(/[\s\n\u00a0]+/);
+      const lastWord = words[words.length - 1];
+
+      // URLパターンにマッチするかチェック
+      const urlRegex = /^https?:\/\/[^\s\n\u00a0]+$/;
+      if (urlRegex.test(lastWord)) {
+        const urlStart = insertPos - lastWord.length;
+        const existingFormat = quill.getFormat(urlStart, lastWord.length);
+        if (!existingFormat.link) {
+          quill.formatText(urlStart, lastWord.length, 'link', lastWord, 'silent');
+        }
+      }
+    },
+
+    /**
+     * 空コンテンツのクリーンアップを処理
+     * @param {Quill} quill - Quillインスタンス
+     */
+    _handleEmptyCleanup: function (quill) {
+      const textContent = quill.getText().trim();
+      const hasEmbeds = quill.root.querySelector('img, iframe, video');
+      if (textContent === '' && !hasEmbeds) {
+        if (quill.root.innerHTML !== '') {
+          quill.root.innerHTML = '';
+        }
+      }
+    },
+
+    /**
+     * エディタの内容を取得（実質空の場合は空文字を返す）
+     * @param {Quill} quill - Quillインスタンス
+     * @returns {string} HTML文字列または空文字
+     */
+    getContent: function (quill) {
+      if (!quill) return '';
+      const text = quill.getText().trim();
+      const html = this._sanitizeHtml(quill.root.innerHTML);
+      // 実質的なテキストがなく、かつ画像等もない場合は空文字を返す
+      if (text === '' && !quill.root.querySelector('img, iframe, video')) {
+        return '';
+      }
+      return html;
+    },
+
+    /**
+     * エディタに内容を設定
+     * @param {Quill} quill - Quillインスタンス
+     * @param {string} html - 設定するHTML
+     */
+    setContent: function (quill, html) {
+      if (!quill) return;
+      if (html) {
+        quill.root.innerHTML = this._sanitizeHtml(html);
+      } else {
+        quill.root.innerHTML = '';
+      }
+    },
+
+    /**
+     * HTMLから色指定関連を除去
+     * @param {string} html - 元HTML
+     * @returns {string} 色指定除去後HTML
+     */
+    _sanitizeHtml: function (html) {
+      if (!html) return '';
+      const container = document.createElement('div');
+      container.innerHTML = String(html);
+
+      container.querySelectorAll('*').forEach(function (element) {
+        element.removeAttribute('color');
+        element.removeAttribute('bgcolor');
+        element.removeAttribute('face');
+
+        if (element.hasAttribute('style')) {
+          const retained = element.getAttribute('style').split(';').map(function (item) {
+            return item.trim();
+          }).filter(function (decl) {
+            if (!decl) return false;
+            const pair = decl.split(':');
+            const prop = (pair[0] || '').trim().toLowerCase();
+            return prop !== 'color' && prop !== 'background' && prop !== 'background-color' && prop !== 'font' && prop !== 'font-family';
+          });
+          if (retained.length) {
+            element.setAttribute('style', retained.join('; '));
+          } else {
+            element.removeAttribute('style');
+          }
+        }
+
+        if (element.className && typeof element.className === 'string') {
+          const classes = element.className.split(/\s+/).filter(function (className) {
+            return className && !/^ql-(color|bg|font)-/.test(className);
+          });
+          if (classes.length) {
+            element.className = classes.join(' ');
+          } else {
+            element.removeAttribute('class');
+          }
+        }
+      });
+
+      return container.innerHTML;
+    },
+
+    /**
+     * エディタをクリア
+     * @param {Quill} quill - Quillインスタンス
+     */
+    clear: function (quill) {
+      if (!quill) return;
+      quill.root.innerHTML = '';
+    }
+  };
+
+  console.log('[App.utils.quill] Quill module loaded');
+
+
+</script>

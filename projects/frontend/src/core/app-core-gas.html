@@ -1,0 +1,226 @@
+<script>
+  // ============================================
+  // GAS Call Management
+  // App.utilsにGAS呼び出し管理を追加
+  // ============================================
+
+  App.utils.gas = {
+    lastInvocation: null,
+    lastCallback: null,  // 関数参照を直接保存（文字列ではなく）
+    retryState: {
+      isRetrying: false,
+      progressInterval: null
+    },
+
+    /**
+     * コールバック関数を登録します
+     * @param {Function|string} callback - コールバック関数または関数パス
+     */
+    registerCallback: function (callback) {
+      if (typeof callback === 'function') {
+        this.lastCallback = callback;
+      } else if (typeof callback === 'string') {
+        // 文字列の場合は安全に解決
+        this.lastCallback = resolveFunctionSafely(callback);
+      } else {
+        this.lastCallback = null;
+      }
+    },
+
+    /**
+     * 登録されたコールバックを実行します
+     * @param {...any} args - コールバックの引数
+     * @returns {boolean} 実行成功した場合true
+     */
+    executeCallback: function (...args) {
+      if (this.lastCallback && typeof this.lastCallback === 'function') {
+        try {
+          this.lastCallback(...args);
+          return true;
+        } catch (e) {
+          console.error('[executeCallback] Failed to execute callback:', e);
+          return false;
+        }
+      }
+      return false;
+    }
+  };
+
+  /**
+   * Google Apps Script関数を呼び出します
+   * @param {string} functionName - 呼び出す関数名
+   * @param {...any} args - 関数の引数
+   * @returns {Promise} 実行結果のPromise
+   */
+  function callGAS(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      setRefreshButtonLoading(true);
+      const useApiMode = !!(App.state && App.state.useApiMode);
+      const callArgs = [...args, useApiMode];
+
+      // 最後の呼び出しを記録
+      App.utils.gas.lastInvocation = {
+        functionName: functionName,
+        args: callArgs,
+        timestamp: new Date().toISOString()
+      };
+      google.script.run
+        .withSuccessHandler(function (result) {
+          resolve(result);
+          setRefreshButtonLoading(false);
+        })
+        .withFailureHandler(function (error) {
+          reject(error);
+          setRefreshButtonLoading(false);
+        })
+      [functionName](...callArgs);
+    });
+  }
+
+  /**
+   * コールバック付きでGAS関数を呼び出します
+   * @param {string} functionName - 呼び出す関数名
+   * @param {Array} args - 関数の引数配列
+   * @param {Function} callback - 成功時のコールバック
+   */
+  function callGASWithCallback(functionName, args, callback) {
+    // コールバックを安全に登録
+    App.utils.gas.registerCallback(callback);
+
+    return callGAS(functionName, ...args)
+      .then(result => {
+        if (callback && typeof callback === 'function') {
+          callback(result);
+        }
+        return result;
+      });
+  }
+
+  // JavaScript関数呼び出しを記録するヘルパー関数（下位互換性のため残す）
+  function recordJSInvocation(functionName, ...args) {
+    App.utils.gas.registerCallback(function () {
+      if (typeof window[functionName] === 'function') {
+        window[functionName](...args);
+      }
+    });
+  }
+
+  /**
+   * 複数のテーブルからデータを並列で取得します（バッチ処理）
+   * @param {Array<Object>} queries - クエリ配列 [{tableName, operation, dataObject}, ...]
+   * @returns {Promise<Array>} 結果の配列
+   */
+  async function batchDatabaseOperations(queries) {
+    if (!queries || queries.length === 0) {
+      return [];
+    }
+
+    // 並列実行
+    const promises = queries.map(query => {
+      return callGAS(
+        'handleDatabaseProcess',
+        App.state.userId,
+        query.tableName,
+        query.operation || 'select',
+        query.dataObject || {},
+        query.remark || null,
+        query.forceRefresh || false
+      );
+    });
+
+    try {
+      const results = await Promise.all(promises);
+      console.log('[batchDatabaseOperations] Completed', results.length, 'operations');
+      return results;
+    } catch (error) {
+      console.error('[batchDatabaseOperations] Error:', error);
+      throw error;
+    }
+  }
+
+  let loadingTimeout = null;
+
+  /**
+   * ローディング表示を表示します
+   */
+  function showLoading() {
+    if (loadingTimeout) clearTimeout(loadingTimeout);
+    document.body.style.cursor = 'progress';
+  }
+
+  /**
+   * ローディング表示を非表示にします
+   */
+  function hideLoading() {
+    document.body.style.cursor = 'auto';
+  }
+
+  /**
+   * スナックバーを表示します
+   * @param {string} text - 表示メッセージ
+   * @param {string} [color=''] - メッセージタイプ（'error', 'primary'など）
+   * @param {string} [position='top'] - 表示位置（'top'または'bottom'）
+   * @param {number} [seconds=5] - 表示時間（秒、0の場合は自動で消えない）
+   */
+  function showSnackbar(text, color = '', position = 'top', seconds = 5) {
+    const snackbar = document.getElementById('global-snackbar');
+    if (!snackbar) return;
+    // クラスをリセット (snackbarクラスは必須、activeは後で追加)
+    // 色と位置のクラスを追加
+    if (color === 'success') color = 'green';
+    snackbar.className = `snackbar ${position} ${color}`;
+    // テキストを設定
+    snackbar.textContent = text;
+    // 表示 (activeクラスを追加)
+    snackbar.classList.add('active');
+    // 既存のタイマーがあればクリア
+    if (snackbar.dataset.timerId) {
+      clearTimeout(parseInt(snackbar.dataset.timerId));
+    }
+    // 指定時間後に非表示
+    if (seconds > 0) {
+      const timerId = setTimeout(() => {
+        snackbar.classList.remove('active');
+        snackbar.dataset.timerId = '';
+      }, seconds * 1000);
+      snackbar.dataset.timerId = timerId;
+    }
+  }
+
+  /**
+   * BeerCSSのui()を上書きせずに呼び出すための独自ヘルパー
+   * モーダルはApp.utils.modalで制御し、それ以外はwindow.uiへ委譲します
+   * @param {string|HTMLElement} target - UIターゲット
+   * @param {boolean} [forceState] - true: 開く, false: 閉じる, 未指定: トグル
+   * @returns {Promise<HTMLElement|null>|any} 実行結果
+   */
+  function appUi(target, forceState) {
+    const modalUtils = App && App.utils && App.utils.modal;
+    if (modalUtils) {
+      const modalId = modalUtils.getModalId(target);
+      const isModalSelector = typeof modalId === 'string' && modalId.startsWith('modal-');
+
+      if (isModalSelector) {
+        if (forceState === true) {
+          modalUtils.open(modalId);
+          return Promise.resolve(modalUtils.getModalElement(modalId));
+        }
+
+        if (forceState === false) {
+          modalUtils.close(modalId);
+          return Promise.resolve(modalUtils.getModalElement(modalId));
+        }
+
+        modalUtils.toggle(modalId);
+        return Promise.resolve(modalUtils.getModalElement(modalId));
+      }
+    }
+    
+    if (typeof window.ui === 'function') {
+      return window.ui(target, forceState);
+    }
+
+    return Promise.resolve(null);
+  }
+
+</script>
