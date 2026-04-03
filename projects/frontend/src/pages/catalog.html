@@ -31,8 +31,9 @@
                 <div class="row tiny-space center-align">
                     <i>groups</i>
                     <div>
-                        <div class="small-text secondary-text">件数</div>
+                        <div class="small-text secondary-text">表示件数</div>
                         <h5 id="members-summary-count" class="no-margin">0</h5>
+                        <div id="members-summary-total" class="small-text secondary-text">全 0 件</div>
                     </div>
                 </div>
                 <div class="row tiny-space center-align">
@@ -40,6 +41,22 @@
                     <span class="small-text secondary-text">有効条件</span>
                     <span id="members-filter-count" class="badge">0</span>
                 </div>
+                <div class="field border label small no-margin" style="min-width: 14rem; flex: 1 1 16rem;">
+                    <input id="catalog-quick-search-input" type="search" placeholder=" " oninput="App.pages.catalog.setQuickSearch(this.value)" autocomplete="off">
+                    <label>クイック検索（現在のテーブル全体）</label>
+                    <i>search</i>
+                </div>
+                <div class="field border label small no-margin" style="min-width: 12rem; flex: 0 1 14rem;">
+                    <select id="catalog-sort-select" onchange="App.pages.catalog.setSortPreset(this.value)"></select>
+                    <label>並び替え</label>
+                    <i>sort</i>
+                </div>
+                <button class="border" type="button" onclick="App.pages.catalog.toggleSortDirection()" title="並び順を反転">
+                    <i>swap_vert</i>
+                    <span>昇順/降順</span>
+                </button>
+                <div class="max"></div>
+                <div id="catalog-quick-filter-chips" class="row wrap tiny-space"></div>
                 <div class="max"></div>
                 <button class="border" type="button" onclick="App.pages.catalog.resetFilters(App.pages.catalog.getCurrentTab())">
                     <i>filter_alt_off</i>

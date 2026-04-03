@@ -77,6 +77,9 @@ App.test.resumeAutoRefresh();
 - [ ] 列の非表示・再表示が正しく動作する
 - [ ] 「列表示をリセット」で全列表示に戻る
 - [ ] 「CSV出力」で現在タブのCSVを取得できる
+- [ ] iframe `srcdoc` 生成後に `Unexpected token` / `Unexpected end of input` が発生しない
+- [ ] `components/utils/tabulator-foundation-script.html` の `buildFrameSrcdoc` で、文字列連結時に正規表現リテラルの `\` が不足していない（例: `^https?:\/\/` は生成後に必ず `\/\/` の形になる）
+- [ ] ヘッダメニュー生成式が `}).filter(...)` で閉じており、`})}. filter(...)` のような不正連結がない
 
 ### APIセキュリティ
 - [ ] HMAC署名エラー時に操作が拒否される
@@ -160,6 +163,16 @@ resetDatabaseDependencies();
 - HTMLテンプレートに `<\\/dialog>` のような誤エスケープがないか確認してください
 - 閉じタグ（`</dialog>`, `</div>`, `</script>`）の `/` はエスケープしないでください
 - エスケープ対象は `//` のみで、単一 `/` は対象外です
+
+### iframe srcdoc の構文エラー
+- コンソールに `about:srcdoc` 起点の `Unexpected token` / `Unexpected end of input` が出ていないか確認してください
+- `components/utils/tabulator-foundation-script.html` の `buildFrameSrcdoc` 内で、以下の典型的な崩れを確認してください
+  - `:[;]` のような三項演算子の壊れ
+  - `})}. filter(...)` のような括弧の過不足
+  - 文字列内の関数閉じ忘れ（`}` / `)` / `;`）
+- 正規表現を文字列で埋め込む場合は、生成後の srcdoc で `^https?:\/\/` や `^\/+` のように意図した `\` が残っているか確認してください（`\` が欠けると `Unexpected end of input` の原因になります）
+- 変更後は `buildFrameSrcdoc` が返した文字列から `<script>...</script>` を取り出し、`new Function(...)` で構文チェックしてください（ブラウザ実行前に壊れを検知できます）
+- 変更後は catalog の全タブ（人物・組織・技能・企画）を順番に開いて、同一症状が再発しないことを確認してください
 
 ## 参考資料
 
