@@ -87,41 +87,8 @@
 
         if ((this.pendingComments || []).length > 0) return true;
 
-        const originalData = this.originalData;
-        const currentItem = this.currentItem;
-
-        const nameInput = document.getElementById('task-name-input');
-        const statusSelect = document.getElementById('task-status-select');
-        const prioritySelect = document.getElementById('task-priority-select');
-        const boardSelect = document.getElementById('task-board-select');
-        const startsAtInput = document.getElementById('task-starts-at-input');
-        const endsAtInput = document.getElementById('task-ends-at-input');
-
-        if (nameInput && nameInput.value !== (originalData.name || '')) return true;
-
-        const description = this.getDescription();
-        if (description !== (originalData.description || '')) return true;
-
-        if (statusSelect && statusSelect.value !== (originalData.task_status_key || '')) return true;
-        if (prioritySelect && prioritySelect.value !== (originalData.priority_key || '')) return true;
-        if (boardSelect && boardSelect.value !== (originalData.board_id || '')) return true;
-
-        if (startsAtInput) {
-          const newStartsAt = startsAtInput.value ? new Date(startsAtInput.value).toISOString() : '';
-          const oldStartsAt = originalData.starts_at || '';
-          if (newStartsAt !== oldStartsAt) return true;
-        }
-
-        if (endsAtInput) {
-          const newEndsAt = endsAtInput.value ? new Date(endsAtInput.value).toISOString() : '';
-          const oldEndsAt = originalData.ends_at || '';
-          if (newEndsAt !== oldEndsAt) return true;
-        }
-
-        const memberRoles = ['processed_by', 'reviewed_by', 'received_by'];
-        for (const role of memberRoles) {
-          if (currentItem[role] !== originalData[role]) return true;
-        }
+        const taskFieldChanges = this.getTaskFieldChanges();
+        if (taskFieldChanges.hasChanges) return true;
 
         const listChanges = this.getListChanges();
         if (listChanges.toInsert.length > 0 || listChanges.toUpdate.length > 0 || listChanges.toDelete.length > 0) return true;
@@ -130,6 +97,72 @@
         if (relatedChanges.hasParentChange || relatedChanges.childTasksToAdd.length > 0 || relatedChanges.childTasksToRemove.length > 0) return true;
 
         return false;
+      },
+
+      getTaskFieldChanges: function () {
+        if (!this.currentId || !this.originalData || !this.currentItem) {
+          return { updates: {}, hasChanges: false };
+        }
+
+        const originalData = this.originalData;
+        const currentItem = this.currentItem;
+        const updates = {};
+
+        const nameInput = document.getElementById('task-name-input');
+        const statusSelect = document.getElementById('task-status-select');
+        const prioritySelect = document.getElementById('task-priority-select');
+        const boardSelect = document.getElementById('task-board-select');
+        const startsAtInput = document.getElementById('task-starts-at-input');
+        const endsAtInput = document.getElementById('task-ends-at-input');
+
+        if (nameInput && nameInput.value !== (originalData.name || '')) {
+          updates.name = nameInput.value;
+        }
+
+        const description = this.getDescription();
+        if (description !== (originalData.description || '')) {
+          updates.description = description;
+        }
+
+        if (statusSelect && statusSelect.value !== (originalData.task_status_key || '')) {
+          updates.task_status_key = statusSelect.value;
+        }
+
+        if (prioritySelect && prioritySelect.value !== (originalData.priority_key || '')) {
+          updates.priority_key = prioritySelect.value;
+        }
+
+        if (boardSelect && boardSelect.value !== (originalData.board_id || '')) {
+          updates.board_id = boardSelect.value;
+        }
+
+        if (startsAtInput) {
+          const newStartsAt = startsAtInput.value ? new Date(startsAtInput.value).toISOString() : '';
+          const oldStartsAt = originalData.starts_at || '';
+          if (newStartsAt !== oldStartsAt) {
+            updates.starts_at = newStartsAt;
+          }
+        }
+
+        if (endsAtInput) {
+          const newEndsAt = endsAtInput.value ? new Date(endsAtInput.value).toISOString() : '';
+          const oldEndsAt = originalData.ends_at || '';
+          if (newEndsAt !== oldEndsAt) {
+            updates.ends_at = newEndsAt;
+          }
+        }
+
+        const memberRoles = ['created_by', 'processed_by', 'reviewed_by', 'received_by'];
+        for (const role of memberRoles) {
+          if (currentItem[role] !== originalData[role]) {
+            updates[role] = currentItem[role];
+          }
+        }
+
+        return {
+          updates,
+          hasChanges: Object.keys(updates).length > 0
+        };
       },
 
       queuePendingComment: function (content) {
@@ -618,73 +651,9 @@
         const currentItem = this.currentItem;
         const originalData = { ...this.originalData };
 
-        // フィールドから値を取得
-        const nameInput = document.getElementById('task-name-input');
-        const descInput = document.getElementById('task-description-input');
-        const statusSelect = document.getElementById('task-status-select');
-        const prioritySelect = document.getElementById('task-priority-select');
-        const boardSelect = document.getElementById('task-board-select');
-        const startsAtInput = document.getElementById('task-starts-at-input');
-        const endsAtInput = document.getElementById('task-ends-at-input');
-
-        const updates = {};
-        let hasChanges = false;
-
-        // 各フィールドの変更をチェック
-        if (nameInput && nameInput.value !== originalData.name) {
-          updates.name = nameInput.value;
-          hasChanges = true;
-        }
-
-        const description = this.getDescription();
-
-        if (description !== (originalData.description || '')) {
-          updates.description = description;
-          hasChanges = true;
-        }
-
-        if (statusSelect && statusSelect.value !== originalData.task_status_key) {
-          updates.task_status_key = statusSelect.value;
-          hasChanges = true;
-        }
-
-        if (prioritySelect && prioritySelect.value !== originalData.priority_key) {
-          updates.priority_key = prioritySelect.value;
-          hasChanges = true;
-        }
-
-        if (boardSelect && boardSelect.value !== originalData.board_id) {
-          updates.board_id = boardSelect.value;
-          hasChanges = true;
-        }
-
-        // 日付フィールドの処理
-        if (startsAtInput) {
-          const newStartsAt = startsAtInput.value ? new Date(startsAtInput.value).toISOString() : '';
-          const oldStartsAt = originalData.starts_at || '';
-          if (newStartsAt !== oldStartsAt) {
-            updates.starts_at = newStartsAt;
-            hasChanges = true;
-          }
-        }
-
-        if (endsAtInput) {
-          const newEndsAt = endsAtInput.value ? new Date(endsAtInput.value).toISOString() : '';
-          const oldEndsAt = originalData.ends_at || '';
-          if (newEndsAt !== oldEndsAt) {
-            updates.ends_at = newEndsAt;
-            hasChanges = true;
-          }
-        }
-
-        // メンバーフィールドの変更をチェック
-        const memberRoles = ['processed_by', 'reviewed_by', 'received_by'];
-        memberRoles.forEach(role => {
-          if (currentItem[role] !== originalData[role]) {
-            updates[role] = currentItem[role];
-            hasChanges = true;
-          }
-        });
+        const taskFieldChanges = this.getTaskFieldChanges();
+        const updates = { ...taskFieldChanges.updates };
+        let hasChanges = taskFieldChanges.hasChanges;
 
         // リストの変更をチェック
         const listChanges = this.getListChanges();
@@ -1356,12 +1325,6 @@
       selectMember: function (role) {
         if (!App.modals.selectMembers) {
           console.error('[TaskDetail] selectMembers modal not available');
-          return;
-        }
-
-        // CREATED_BYの担当者は変更不可
-        if (role === 'created_by') {
-          showSnackbar(`${KEY_LABELS.ASIGNEE_TYPE.CREATED_BY}は変更できません`, 'info');
           return;
         }
 
