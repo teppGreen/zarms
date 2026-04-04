@@ -716,30 +716,6 @@
     },
 
     /**
-     * 入力フィールドにフォーカスを設定します（リトライ機能付き）
-     * @param {string} selector - 入力フィールドのセレクタ
-     * @param {number} maxRetries - 最大リトライ回数
-     * @param {number} delay - リトライ間隔（ミリ秒）
-     */
-    focusInput: function (selector, maxRetries = UI_CONFIG.MODAL_FOCUS_MAX_RETRIES, delay = UI_CONFIG.MODAL_FOCUS_DELAY) {
-      const tryFocus = (count = 0) => {
-        const input = document.querySelector(selector);
-        if (input && input.offsetParent !== null) {
-          input.focus();
-          input.select();
-          return true;
-        } else if (count < maxRetries) {
-          setTimeout(() => tryFocus(count + 1), delay);
-          return false;
-        }
-        console.warn(`[focusInput] Failed to focus element: ${selector}`);
-        return false;
-      };
-
-      tryFocus();
-    },
-
-    /**
      * データをフィルタリングします（検索語による絞り込み）
      * @param {Array<Object>} data - データ配列
      * @param {string} searchTerm - 検索語

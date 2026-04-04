@@ -34,10 +34,13 @@
                 this.allDirectories = App.state.data.directories || [];
                 this.render();
                 await appUi('modal-select-directories', true);
-                App.utils.modal.focusInput('#directory-search-input');
                 this._attachKeyboardShortcuts();
                 this._updateSelectionFeedback();
                 this._syncActionStates();
+
+                setTimeout(() => {
+                    if (searchInput) searchInput.focus();
+                }, 200);
 
                 // 背景更新: モーダル表示後に最新化
                 this.refreshInBackground();
