@@ -145,7 +145,7 @@
                     let commentContent = comment.content ? comment.content : '';
                     // commentContent = commentContent.replace(/\r\n/g, ' ').replace(/\n/g, ' '); // 改行をスペースに置換（必要に応じて調整）
 
-                    const targetName = escapeHtml(comment.target_name || '');
+                    const targetName = escapeHtml(comment.target_name || '').substring(0, 20);
                     const targetSubtitle = escapeHtml(comment.target_subtitle || '');
                     const targetLabel = escapeHtml(comment.related_table_label || '') + (targetSubtitle);
 
@@ -166,7 +166,7 @@
                                         <span>${targetName}</span>
                                     </div>
                                     <div class="tiny-space"></div>
-                                    <div><span class="small-text wrap">${escapeHtml(commentContent)}</span></div>
+                                    <div><span class="small-text" style="overflow-wrap: anywhere;">${escapeHtml(commentContent)}</span></div>
                                 </div>
                                 <div>
                                     <button class="transparent circle small no-margin"
