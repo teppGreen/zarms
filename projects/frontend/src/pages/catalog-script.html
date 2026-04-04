@@ -536,7 +536,10 @@
                 const normalizedTab = this._normalizeTabName(tabName);
                 const quickSearchInput = document.getElementById('catalog-quick-search-input');
                 if (quickSearchInput) {
-                    quickSearchInput.value = _quickSearch[normalizedTab] || '';
+                    const nextSearchValue = _quickSearch[normalizedTab] || '';
+                    if (document.activeElement !== quickSearchInput && quickSearchInput.value !== nextSearchValue) {
+                        quickSearchInput.value = nextSearchValue;
+                    }
                 }
 
                 const sortSelect = document.getElementById('catalog-sort-select');
@@ -850,11 +853,31 @@
 
             setQuickSearch: function (value) {
                 const tabName = this._normalizeTabName(_currentTab);
-                _quickSearch[tabName] = String(value || '');
-                this._syncToolbarUi(tabName);
+                const nextValue = String(value || '');
+                if (_quickSearch[tabName] === nextValue) return;
+
+                const quickSearchInput = document.getElementById('catalog-quick-search-input');
+                const hadFocus = !!quickSearchInput && document.activeElement === quickSearchInput;
+                const selectionStart = hadFocus ? quickSearchInput.selectionStart : null;
+                const selectionEnd = hadFocus ? quickSearchInput.selectionEnd : null;
+
+                _quickSearch[tabName] = nextValue;
                 this._renderTable(tabName);
                 this._updateSummary();
+                this._updateQuickFilterChips();
                 this._applyTableHeight(tabName);
+
+                if (hadFocus && quickSearchInput) {
+                    requestAnimationFrame(function () {
+                        if (document.activeElement !== quickSearchInput) {
+                            quickSearchInput.focus({ preventScroll: true });
+                        }
+                        if (typeof selectionStart === 'number' && typeof selectionEnd === 'number' && quickSearchInput.setSelectionRange) {
+                            const maxLength = quickSearchInput.value.length;
+                            quickSearchInput.setSelectionRange(Math.min(selectionStart, maxLength), Math.min(selectionEnd, maxLength));
+                        }
+                    });
+                }
             },
 
             setSortPreset: function (presetValue) {
