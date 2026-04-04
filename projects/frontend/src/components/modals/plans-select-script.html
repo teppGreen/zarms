@@ -1,0 +1,191 @@
+<script>
+    (function () {
+        App.modals.selectPlans = {
+            callback: null,
+            selectedIds: [],
+            allPlans: [],
+            filteredPlans: [],
+            multiSelect: false,
+            searchTerm: '',
+            selectedStatus: '',
+            selectedType: '',
+
+            open: async function (options = {}) {
+                this.callback = options.callback || null;
+                this.multiSelect = options.multiSelect || false;
+                this.selectedIds = options.preSelected || [];
+                this.searchTerm = '';
+                this.selectedStatus = '';
+                this.selectedType = '';
+
+                // 状態フィルタのオプションを動的に生成
+                const statusFilter = document.getElementById('plan-status-filter');
+                if (statusFilter && KEY_LABELS && KEY_LABELS.PLAN_STATUS) {
+                    statusFilter.innerHTML = '<option value="">すべて</option>' + Object.keys(KEY_LABELS.PLAN_STATUS).map(function (key) {
+                        const label = KEY_LABELS.PLAN_STATUS[key];
+                        return '<option value="' + escapeHtmlAttribute(key) + '">' + escapeHtml(label) + '<\\/option>';
+                    }).join('');
+                }
+
+                // 種別フィルタのオプションを動的に生成
+                const typeFilter = document.getElementById('plan-type-filter');
+                if (typeFilter && KEY_LABELS && KEY_LABELS.PLAN_TYPE) {
+                    typeFilter.innerHTML = '<option value="">すべて</option>' + Object.keys(KEY_LABELS.PLAN_TYPE).map(function (key) {
+                        const label = KEY_LABELS.PLAN_TYPE[key];
+                        return '<option value="' + escapeHtmlAttribute(key) + '">' + escapeHtml(label) + '<\\/option>';
+                    }).join('');
+                }
+
+                // 検索入力をリセット
+                const searchInput = document.getElementById('plan-search-input');
+                if (searchInput) searchInput.value = '';
+
+                this.allPlans = App.state.data.plans || [];
+                this.filteredPlans = [];
+                this.render();
+                await appUi('#modal-select-plans', true);
+
+                App.utils.modal.focusInput('#plan-search-input');
+            },
+
+            render: function () {
+                this.filterResults();
+            },
+
+            filterResults: function () {
+                const searchInput = document.getElementById('plan-search-input');
+                const statusFilter = document.getElementById('plan-status-filter');
+                const typeFilter = document.getElementById('plan-type-filter');
+                const container = document.getElementById('plan-results-container');
+                const selectAllContainer = document.getElementById('plan-select-all-container');
+                const selectAllCheckbox = document.getElementById('plan-select-all-checkbox');
+
+                if (!container) return;
+
+                this.searchTerm = searchInput ? searchInput.value : '';
+                this.selectedStatus = statusFilter ? statusFilter.value : '';
+                this.selectedType = typeFilter ? typeFilter.value : '';
+
+                // 検索フィルタ適用
+                this.filteredPlans = App.utils.modal.filterData(
+                    this.allPlans,
+                    this.searchTerm,
+                    ['plan_number', 'name'],
+                    false
+                );
+
+                // 状態フィルタ適用
+                if (this.selectedStatus) {
+                    this.filteredPlans = this.filteredPlans.filter(function (p) {
+                        return p.plan_status_key === this.selectedStatus;
+                    }.bind(this));
+                }
+
+                // 種別フィルタ適用
+                if (this.selectedType) {
+                    this.filteredPlans = this.filteredPlans.filter(function (p) {
+                        return p.plan_type_key === this.selectedType;
+                    }.bind(this));
+                }
+
+                if (this.multiSelect && selectAllContainer) {
+                    selectAllContainer.style.display = '';
+                    if (this.filteredPlans.length > 0 && selectAllCheckbox) {
+                        const allSelected = this.filteredPlans.every(function (p) {
+                            return this.selectedIds.includes(p.id);
+                        }.bind(this));
+                        selectAllCheckbox.checked = allSelected;
+                        selectAllCheckbox.disabled = false;
+                    } else if (selectAllCheckbox) {
+                        selectAllCheckbox.checked = false;
+                        selectAllCheckbox.disabled = true;
+                    }
+                } else if (selectAllContainer) {
+                    selectAllContainer.style.display = 'none';
+                }
+
+                if (this.filteredPlans.length === 0) {
+                    container.innerHTML = '<p class="padding">該当する企画が見つかりません<\\/p>';
+                    return;
+                }
+
+                container.innerHTML = this.filteredPlans.map(function (plan) {
+                    const isSelected = this.selectedIds.includes(plan.id);
+                    const safePlanNumber = escapeHtml(plan.plan_number || '');
+                    const safeName = escapeHtml(plan.name || '無題');
+                    const safeStatus = escapeHtml(plan.plan_status_key || '');
+                    const safeType = escapeHtml(plan.plan_type_key || '');
+                    const safeId = escapeHtmlAttribute(plan.id);
+
+                    const statusLabel = (KEY_LABELS && KEY_LABELS.PLAN_STATUS && KEY_LABELS.PLAN_STATUS[plan.plan_status_key]) 
+                        ? KEY_LABELS.PLAN_STATUS[plan.plan_status_key] 
+                        : safeStatus;
+                    const typeLabel = (KEY_LABELS && KEY_LABELS.PLAN_TYPE && KEY_LABELS.PLAN_TYPE[plan.plan_type_key])
+                        ? KEY_LABELS.PLAN_TYPE[plan.plan_type_key]
+                        : safeType;
+
+                    return '<div><label class="' + (this.multiSelect ? 'checkbox' : 'radio') + ' left-align small-space">' +
+                        '<input type="' + (this.multiSelect ? 'checkbox' : 'radio') + '" ' +
+                        'name="plan-select" ' +
+                        'value="' + safeId + '" ' +
+                        (isSelected ? 'checked' : '') + ' ' +
+                        'onchange="App.modals.selectPlans.toggleSelection(\'' + safeId + '\', this.checked)">' +
+                        '<span class="small-margin">' +
+                        '<strong>' + safePlanNumber + ' ' + safeName + '<\\/strong> ' +
+                        '<span class="secondary-text small-text">' + escapeHtml(statusLabel) + ' \\/ ' + escapeHtml(typeLabel) + '<\\/span>' +
+                        '<\\/span>' +
+                        '<\\/label><\\/div>';
+                }.bind(this)).join('');
+            },
+
+            toggleSelectAll: function (checked) {
+                if (!this.multiSelect) return;
+
+                if (checked) {
+                    this.filteredPlans.forEach(function (plan) {
+                        if (!this.selectedIds.includes(plan.id)) {
+                            this.selectedIds.push(plan.id);
+                        }
+                    }.bind(this));
+                } else {
+                    const filteredIds = this.filteredPlans.map(function (p) { return p.id; });
+                    this.selectedIds = this.selectedIds.filter(function (id) {
+                        return !filteredIds.includes(id);
+                    });
+                }
+                this.render();
+            },
+
+            toggleSelection: function (id, checked) {
+                if (this.multiSelect) {
+                    if (checked && !this.selectedIds.includes(id)) {
+                        this.selectedIds.push(id);
+                    } else if (!checked) {
+                        this.selectedIds = this.selectedIds.filter(function (sid) {
+                            return sid !== id;
+                        });
+                    }
+                    this.render();
+                } else {
+                    this.selectedIds = checked ? [id] : [];
+                }
+            },
+
+            confirm: function () {
+                this.selectedIds = App.utils.modal.getSelectedIds(
+                    '#plan-results-container',
+                    'plan-select',
+                    this.multiSelect
+                );
+
+                if (this.callback && typeof this.callback === 'function') {
+                    this.callback({
+                        selectedIds: this.selectedIds
+                    });
+                }
+
+                appUi('#modal-select-plans', false);
+            }
+        };
+    })();
+</script>

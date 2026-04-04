@@ -1,0 +1,46 @@
+<dialog id="modal-select-plans" class="modal padding no-scroll">
+    <nav class="small-padding bottom-margin">
+        <h5 class="bold max">企画を選択</h5>
+        <button class="circle transparent" onclick="appUi('#modal-select-plans',false)">
+            <i>close</i>
+        </button>
+    </nav>
+
+    <div class="field small-round border prefix bottom-margin top-margin">
+        <i>search</i>
+        <input type="text" id="plan-search-input" placeholder="企画番号または企画名で検索..." oninput="App.modals.selectPlans.filterResults()">
+    </div>
+
+    <div class="grid bottom-margin">
+        <div class="s12 m6">
+            <div class="field label border small">
+                <select id="plan-status-filter" onchange="App.modals.selectPlans.filterResults()">
+                    <option value="">すべて</option>
+                </select>
+                <label>状態</label>
+            </div>
+        </div>
+        <div class="s12 m6">
+            <div class="field label border small">
+                <select id="plan-type-filter" onchange="App.modals.selectPlans.filterResults()">
+                    <option value="">すべて</option>
+                </select>
+                <label>種別</label>
+            </div>
+        </div>
+    </div>
+
+    <div id="plan-select-all-container" class="row left-align margin" style="display: none;">
+        <label class="checkbox">
+            <input type="checkbox" id="plan-select-all-checkbox" onchange="App.modals.selectPlans.toggleSelectAll(this.checked)">
+            <span>すべて選択</span>
+        </label>
+    </div>
+
+    <div id="plan-results-container" class="scroll large-width medium-height small-padding small-round extra-line background"></div>
+
+    <nav class="right-align small-padding">
+        <button class="border" onclick="appUi('#modal-select-plans')">キャンセル</button>
+        <button onclick="App.modals.selectPlans.confirm()">適用</button>
+    </nav>
+</dialog>

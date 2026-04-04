@@ -10,8 +10,10 @@
             quill: null,
             pendingDirectoryChanges: { toAdd: [], toRemove: [], toUpdate: [] },
             pendingSkillChanges: { toAdd: [], toRemove: [], toUpdate: [] },
+            pendingPlanChanges: { toAdd: [], toRemove: [], toUpdate: [] },
             originalDirectories: [],
             originalSkills: [],
+            originalPlans: [],
 
             open: function (memberId, skipUrlUpdate = false) {
                 if (!memberId) return;
@@ -37,14 +39,19 @@
                 // 一時保存用データをリセット
                 this.pendingDirectoryChanges = { toAdd: [], toRemove: [], toUpdate: [] };
                 this.pendingSkillChanges = { toAdd: [], toRemove: [], toUpdate: [] };
+                this.pendingPlanChanges = { toAdd: [], toRemove: [], toUpdate: [] };
                 
-                // 現在の所属・技能を取得して保持
+                // 現在の所属・技能・企画を取得して保持
                 const assignments = App.state.data.directoryAssignments || [];
                 const skillAssignments = App.state.data.skillAssignments || [];
+                const planAssignments = App.state.data.planAssignments || [];
                 this.originalDirectories = assignments
                     .filter(function (a) { return String(a.member_id) === String(memberKey) && a.is_active !== false; })
                     .map(function (a) { return Object.assign({}, a); });
                 this.originalSkills = skillAssignments
+                    .filter(function (a) { return String(a.member_id) === String(memberKey); })
+                    .map(function (a) { return Object.assign({}, a); });
+                this.originalPlans = planAssignments
                     .filter(function (a) { return String(a.member_id) === String(memberKey); })
                     .map(function (a) { return Object.assign({}, a); });
 
@@ -59,6 +66,7 @@
 
                 this._render(member);
                 this._renderDirectories(memberKey);
+                this._renderPlans(memberKey);
                 this._renderSkills(memberKey);
                 this.loadComments(memberKey);
                 appUi('#member-detail-tab-profile');
@@ -204,15 +212,18 @@
                     }
                 }
 
-                // 所属組織・技能の変更があるかチェック
+                // 所属組織・技能・企画の変更があるかチェック
                 const hasDirectoryChanges = this.pendingDirectoryChanges.toAdd.length > 0 ||
                     this.pendingDirectoryChanges.toRemove.length > 0 ||
                     this.pendingDirectoryChanges.toUpdate.length > 0;
                 const hasSkillChanges = this.pendingSkillChanges.toAdd.length > 0 ||
                     this.pendingSkillChanges.toRemove.length > 0 ||
                     this.pendingSkillChanges.toUpdate.length > 0;
+                const hasPlanChanges = this.pendingPlanChanges.toAdd.length > 0 ||
+                    this.pendingPlanChanges.toRemove.length > 0 ||
+                    this.pendingPlanChanges.toUpdate.length > 0;
 
-                if (!hasChanges && !hasDirectoryChanges && !hasSkillChanges) {
+                if (!hasChanges && !hasDirectoryChanges && !hasSkillChanges && !hasPlanChanges) {
                     this._setDirty(false);
                     this.close({ skipDirtyCheck: true, reason: 'save-no-change' });
                     return;
@@ -242,6 +253,11 @@
                     // スキルの変更を保存
                     if (hasSkillChanges) {
                         await this._saveSkillChanges(id);
+                    }
+
+                    // 企画の変更を保存
+                    if (hasPlanChanges) {
+                        await this._savePlanChanges(id);
                     }
 
                     showSnackbar('変更を保存しました', 'success');
@@ -766,6 +782,50 @@
                 }
             },
 
+            _savePlanChanges: async function (memberId) {
+                const assignments = App.state.data.planAssignments || [];
+
+                // 削除
+                for (let i = 0; i < this.pendingPlanChanges.toRemove.length; i++) {
+                    const planId = this.pendingPlanChanges.toRemove[i];
+                    const existing = assignments.find(function (a) {
+                        return a.member_id === memberId && a.plan_id === planId;
+                    });
+                    if (existing && existing.id) {
+                        await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLAN_ASSIGNMENTS, 'delete', {
+                            where: { id: ['=', existing.id] }
+                        }, '企画を削除');
+                        const index = assignments.findIndex(function (a) { return a.id === existing.id; });
+                        if (index >= 0) assignments.splice(index, 1);
+                    }
+                }
+
+                // 追加
+                for (let i = 0; i < this.pendingPlanChanges.toAdd.length; i++) {
+                    const record = this.pendingPlanChanges.toAdd[i];
+                    const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLAN_ASSIGNMENTS, 'insert', record, '企画を追加');
+                    if (inserted && inserted.data && inserted.data.id) {
+                        record.id = inserted.data.id;
+                        assignments.push(record);
+                    }
+                }
+
+                // 更新
+                for (let i = 0; i < this.pendingPlanChanges.toUpdate.length; i++) {
+                    const update = this.pendingPlanChanges.toUpdate[i];
+                    await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLAN_ASSIGNMENTS, 'update', {
+                        where: { id: ['=', update.id] },
+                        set: {
+                            role: update.role
+                        }
+                    }, '企画を更新');
+                    const target = assignments.find(function (a) { return a.id === update.id; });
+                    if (target) {
+                        target.role = update.role;
+                    }
+                }
+            },
+
             loadComments: function (memberId, skipLoadingCache = false) {
                 App.utils.commentManager.loadComments({
                     relatedTable: 'members',
@@ -1045,6 +1105,184 @@
                         deleteBtn +
                         '</div>';
                 }).join('<hr class="small-margin">');
+            },
+
+            _renderPlans: function (memberId) {
+                const container = document.getElementById('member-detail-plans-list');
+                if (!container) return;
+
+                const self = this;
+                const plans = App.state.data.plans || [];
+                
+                // 現在表示すべき企画を計算（一時保存の変更を反映）
+                const currentPlans = [];
+                
+                // 既存の企画から開始
+                this.originalPlans.forEach(function (orig) {
+                    // 削除予定リストに無ければ追加
+                    if (!self.pendingPlanChanges.toRemove.includes(orig.plan_id)) {
+                        const plan = Object.assign({}, orig);
+                        // 更新があれば反映
+                        const update = self.pendingPlanChanges.toUpdate.find(function (u) {
+                            return u.plan_id === orig.plan_id;
+                        });
+                        if (update) {
+                            plan.role = update.role;
+                        }
+                        currentPlans.push(plan);
+                    }
+                });
+                
+                // 新規追加分を追加
+                this.pendingPlanChanges.toAdd.forEach(function (add) {
+                    currentPlans.push(add);
+                });
+
+                if (currentPlans.length === 0) {
+                    container.innerHTML = '<p class="secondary-text padding">担当企画はありません</p>';
+                    return;
+                }
+
+                container.innerHTML = currentPlans.map(function (a) {
+                    const plan = plans.find(function (p) { return p.id === a.plan_id; });
+                    const planName = plan ? (plan.name || plan.plan_number || '') : '（削除済み企画）';
+                    const role = a.role || '';
+                    const isActive = a.is_active !== false;
+                    const actionBtn = '<button class="small round border" onclick="App.modals.memberDetail.deactivatePlanAssignment(\'' + escapeHtmlAttribute(a.id || '') + '\', \'' + escapeHtmlAttribute(a.plan_id) + '\')">解除</button>';
+                    return '<div class="row padding small-space">' +
+                        '<i>store</i>' +
+                        '<div class="max">' +
+                        '<p class="no-margin bold small">' + escapeHtml(planName) + '</p>' +
+                        '<div class="field border label small top-margin no-margin">' +
+                        '<input type="text" placeholder=" " value="' + escapeHtmlAttribute(role) + '" onchange="App.modals.memberDetail.updatePlanRole(\'' + escapeHtmlAttribute(a.id || '') + '\', \'' + escapeHtmlAttribute(a.plan_id) + '\', this.value)">' +
+                        '<label>役割</label>' +
+                        '</div>' +
+                        '</div>' +
+                        (!isActive ? '<span class="chip small border">退任済</span>' : actionBtn) +
+                        '</div>';
+                }).join('<hr class="small-margin">');
+            },
+
+            openAddPlan: function () {
+                if (!this.currentId) return;
+                if (!App.modals.selectPlans || !App.modals.selectPlans.open) {
+                    showSnackbar('企画選択モーダルが利用できません', 'error');
+                    return;
+                }
+
+                const memberId = this.currentId;
+                const preSelected = (App.state.data.planAssignments || [])
+                    .filter(function (a) { return a.member_id === memberId; })
+                    .map(function (a) { return a.plan_id; });
+
+                App.modals.selectPlans.open({
+                    multiSelect: true,
+                    preSelected: preSelected,
+                    callback: function (result) {
+                        const ids = result && result.selectedIds ? result.selectedIds : (Array.isArray(result) ? result : []);
+                        App.modals.memberDetail.applyPlanSelection(memberId, ids);
+                    }
+                });
+            },
+
+            applyPlanSelection: function (memberId, selectedIds) {
+                if (!memberId) return;
+                if (!selectedIds || selectedIds.length === 0) return;
+
+                const self = this;
+
+                // 一時保存リストに追加
+                selectedIds.forEach(function (planId) {
+                    const alreadyPending = self.pendingPlanChanges.toAdd.find(function (p) {
+                        return p.plan_id === planId;
+                    });
+                    if (alreadyPending) return;
+
+                    // 削除予定リストから除外
+                    self.pendingPlanChanges.toRemove = self.pendingPlanChanges.toRemove.filter(function (id) {
+                        return id !== planId;
+                    });
+
+                    // 既存の企画かチェック
+                    const existing = self.originalPlans.find(function (p) {
+                        return p.plan_id === planId;
+                    });
+
+                    if (!existing) {
+                        // 新規追加
+                        self.pendingPlanChanges.toAdd.push({
+                            member_id: memberId,
+                            plan_id: planId,
+                            role: null,
+                            is_active: true
+                        });
+                    }
+                });
+
+                this._setDirty(true);
+                this._renderPlans(memberId);
+                showSnackbar('担当企画を追加しました（保存ボタンで確定）', 'info');
+            },
+
+            deactivatePlanAssignment: function (assignmentId, planId) {
+                if (!planId) return;
+                if (!confirm('企画割り当てを解除しますか？')) return;
+
+                // 追加予定リストから削除
+                this.pendingPlanChanges.toAdd = this.pendingPlanChanges.toAdd.filter(function (p) {
+                    return p.plan_id !== planId;
+                });
+
+                // 削除予定リストに追加（既存のものの場合のみ）
+                const existing = this.originalPlans.find(function (p) {
+                    return p.plan_id === planId;
+                });
+                if (existing && !this.pendingPlanChanges.toRemove.includes(planId)) {
+                    this.pendingPlanChanges.toRemove.push(planId);
+                }
+
+                this._setDirty(true);
+                this._renderPlans(this.currentId);
+                showSnackbar('担当企画を解除しました（保存ボタンで確定）', 'info');
+            },
+
+            updatePlanRole: function (assignmentId, planId, roleValue) {
+                if (!planId) return;
+
+                const normalizedRole = (roleValue || '').trim() || null;
+
+                // 追加予定リスト内で更新
+                const pending = this.pendingPlanChanges.toAdd.find(function (p) {
+                    return p.plan_id === planId;
+                });
+                if (pending) {
+                    pending.role = normalizedRole;
+                    this._setDirty(true);
+                    showSnackbar('役割を変更しました（保存ボタンで確定）', 'info');
+                    return;
+                }
+
+                // 更新予定リストに追加
+                const updateIndex = this.pendingPlanChanges.toUpdate.findIndex(function (u) {
+                    return u.plan_id === planId;
+                });
+                if (updateIndex >= 0) {
+                    this.pendingPlanChanges.toUpdate[updateIndex].role = normalizedRole;
+                } else {
+                    const existing = this.originalPlans.find(function (p) {
+                        return p.plan_id === planId;
+                    });
+                    if (existing && existing.role !== normalizedRole) {
+                        this.pendingPlanChanges.toUpdate.push({
+                            id: existing.id,
+                            plan_id: planId,
+                            role: normalizedRole
+                        });
+                    }
+                }
+
+                this._setDirty(true);
+                showSnackbar('役割を変更しました（保存ボタンで確定）', 'info');
             },
 
             _reset: function () {

@@ -175,8 +175,8 @@
                     { key: 'name_yomi', label: '氏名ヨミ', width: '150px' },
                     { key: 'display_name_yomi', label: '表示名ヨミ', width: '150px' },
                     { key: 'email', label: 'メールアドレス', width: '220px' },
-                    { key: 'phone_number', label: '電話番号', width: '130px' },
-                    { key: 'birthday', label: '生年月日', width: '120px' },
+                    { key: 'phone_number', label: '電話番号', width: '130px', visible: false },
+                    { key: 'birthday', label: '生年月日', width: '120px', visible: false },
                     { key: 'title', label: '筆頭役職', width: '120px' },
                     { key: 'system_role_key', label: 'システム権限', width: '120px', headerFilter: 'listDynamicMemberRoles' },
                     { key: '_slackProfileTail', label: 'Slack', width: '110px' },
@@ -536,10 +536,7 @@
                 const normalizedTab = this._normalizeTabName(tabName);
                 const quickSearchInput = document.getElementById('catalog-quick-search-input');
                 if (quickSearchInput) {
-                    const nextSearchValue = _quickSearch[normalizedTab] || '';
-                    if (document.activeElement !== quickSearchInput && quickSearchInput.value !== nextSearchValue) {
-                        quickSearchInput.value = nextSearchValue;
-                    }
+                    quickSearchInput.value = _quickSearch[normalizedTab] || '';
                 }
 
                 const sortSelect = document.getElementById('catalog-sort-select');
@@ -853,31 +850,11 @@
 
             setQuickSearch: function (value) {
                 const tabName = this._normalizeTabName(_currentTab);
-                const nextValue = String(value || '');
-                if (_quickSearch[tabName] === nextValue) return;
-
-                const quickSearchInput = document.getElementById('catalog-quick-search-input');
-                const hadFocus = !!quickSearchInput && document.activeElement === quickSearchInput;
-                const selectionStart = hadFocus ? quickSearchInput.selectionStart : null;
-                const selectionEnd = hadFocus ? quickSearchInput.selectionEnd : null;
-
-                _quickSearch[tabName] = nextValue;
+                _quickSearch[tabName] = String(value || '');
+                this._syncToolbarUi(tabName);
                 this._renderTable(tabName);
                 this._updateSummary();
-                this._updateQuickFilterChips();
                 this._applyTableHeight(tabName);
-
-                if (hadFocus && quickSearchInput) {
-                    requestAnimationFrame(function () {
-                        if (document.activeElement !== quickSearchInput) {
-                            quickSearchInput.focus({ preventScroll: true });
-                        }
-                        if (typeof selectionStart === 'number' && typeof selectionEnd === 'number' && quickSearchInput.setSelectionRange) {
-                            const maxLength = quickSearchInput.value.length;
-                            quickSearchInput.setSelectionRange(Math.min(selectionStart, maxLength), Math.min(selectionEnd, maxLength));
-                        }
-                    });
-                }
             },
 
             setSortPreset: function (presetValue) {
