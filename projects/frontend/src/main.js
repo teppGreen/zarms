@@ -55,9 +55,8 @@ function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false
     userProperties: PropertiesService.getUserProperties().getProperties()
   };
 
-  // デスクトップ版の場合のみHome画面用の初期データを事前取得（最小限）
   if (!isMobile) {
-    templateVariables.initialData = _prefetchHomeInitialData(activeUser.id, useApiMode);
+    templateVariables.initialData = _prefetchMasterData(activeUser.id, useApiMode);
   }
 
   template.templateVariables = templateVariables;
@@ -69,6 +68,9 @@ function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false
 // GAS呼び出し1回で 認証チェック + ユーザー取得 + 初期データ取得 を行う
 // ============================================
 
+const USER_CACHE_KEY_PREFIX_INITIAL_APP_DATA = '#sym:getInitialAppData';
+const USER_CACHE_TTL_SECONDS_DEFAULT = 21600;
+
 /**
  * アプリ起動に必要な全情報を一括取得します（高速化）
  * register.htmlからの複数回のgoogle.script.run呼び出しを1回にまとめます。
@@ -76,31 +78,70 @@ function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false
  * @param {Object} urlParams - URLパラメータ
  * @param {boolean} isMobile - モバイル版かどうか
  * @returns {Object} {
- *   status: 'ok' | 'unauthorized' | 'not_registered',
+ *   status: 'ok' | 'unauthorized' | 'not_registered' | 'scope_required',
  *   activeUser: Object|null,     // 認証済みメンバー情報
  *   appHtml: string|null,        // アプリケーションHTML
  *   error: string|null,
+ *   authUrl: string|null,
  *   userAgreementData: Object,   // ユーザーの利用規約・プライバシーポリシー同意情報
  *   policyUpdateDates: Object,   // 利用規約・プライバシーポリシーの更新日時（ISO8601形式）
  *   requiresReAgreement: Object  // 再同意が必要な規約・ポリシー（terms, privacy）
  * }
  */
 function getInitialAppData(email, urlParams, isMobile = false) {
+  const authInfo = checkAppAuthorization();
+  if (authInfo.status === 'REQUIRED') {
+    return {
+      status: 'scope_required',
+      activeUser: null,
+      appHtml: null,
+      error: null,
+      authUrl: authInfo.url || null,
+      useApiMode: false
+    };
+  }
+
+  const cacheKey = _buildUserCacheKeyForInitialLoad(email, urlParams, isMobile);
+  const cachedResult = _readUserCacheJson(cacheKey);
+  if (cachedResult) {
+    return cachedResult;
+  }
+
   let useApiMode = false;
+  let activeUser = null;
+
   try {
-    // 1. スプレッドシートへのアクセス権限確認（throws if no access）
-    getSpreadsheet();
+    // 1. まず通常モード（スプレッドシート直接アクセス）でメンバー取得を試みる
+    activeUser = getMemberByEmail(email, false);
+    useApiMode = false;
   } catch (e) {
-    console.warn('Direct spreadsheet access failed, switching to API mode:', e.message);
-    useApiMode = true;
+    // 権限エラー（スプレッドシートにアクセスできない）等の場合、APIモードに切り替えて再試行
+    console.warn('Direct access failed (likely permission error), switching to API mode:', e.message);
+    try {
+      activeUser = getMemberByEmail(email, true);
+      useApiMode = true;
+    } catch (apiError) {
+      // APIモードでも失敗（ネットワークエラーやAPIの設定不備など）
+      console.error('API mode also failed:', apiError.message);
+      return { status: 'unauthorized', useApiMode: true, activeUser: null, appHtml: null, error: apiError.message };
+    }
   }
 
   try {
-    // 2. メールアドレスからメンバー情報を取得（APIモードなら db_bridge が自動で API を呼ぶ）
-    const activeUser = getMemberByEmail(email, useApiMode);
-
+    // 2. ユーザーが見つからない（DBに存在しない）場合はサインアップ画面へ
     if (!activeUser) {
-      throw new Error('User info not found');
+      const policyUpdateDates = getPolicyUpdateDates();
+      const result = {
+        status: 'not_registered',
+        activeUser: null,
+        appHtml: null,
+        error: null,
+        authUrl: null,
+        useApiMode: useApiMode,
+        policyUpdateDates: policyUpdateDates
+      };
+      _writeUserCacheJson(cacheKey, result, USER_CACHE_TTL_SECONDS_DEFAULT);
+      return result;
     }
 
     // 3. ユーザープロパティから利用規約・プライバシーポリシーの同意情報を取得
@@ -111,11 +152,7 @@ function getInitialAppData(email, urlParams, isMobile = false) {
     };
 
     // 4. scriptPropertiesから利用規約・プライバシーポリシーの更新日時を取得
-    const scriptProperties = PropertiesService.getScriptProperties().getProperties();
-    const policyUpdateDates = {
-      termsUpdatedAt: scriptProperties['termsUpdatedAt'] || null,
-      privacyUpdatedAt: scriptProperties['privacyUpdatedAt'] || null
-    };
+    const policyUpdateDates = getPolicyUpdateDates();
 
     // 5. 再同意が必要かどうかを判定
     const requiresReAgreement = _checkRequiresReAgreement(userAgreementData, policyUpdateDates);
@@ -123,23 +160,22 @@ function getInitialAppData(email, urlParams, isMobile = false) {
     // 6. アプリのHTMLを生成
     const appHtml = loadAppHtml(activeUser, urlParams, isMobile, useApiMode);
 
-    return {
+    const result = {
       status: 'ok',
       activeUser: activeUser,
       appHtml: appHtml,
       error: null,
+      authUrl: null,
       useApiMode: useApiMode,
       userAgreementData: userAgreementData,
       policyUpdateDates: policyUpdateDates,
       requiresReAgreement: requiresReAgreement
     };
+
+    _writeUserCacheJson(cacheKey, result, USER_CACHE_TTL_SECONDS_DEFAULT);
+    return result;
   } catch (e) {
-    // ユーザーが見つからない場合はサインアップ画面へ
-    const isNotFound = e.name === 'ValidationError' || (e.message && e.message.includes('not found'));
-    if (isNotFound) {
-      return { status: 'not_registered', activeUser: null, appHtml: null, error: null };
-    }
-    return { status: 'unauthorized', useApiMode: useApiMode, activeUser: null, appHtml: null, error: e.message };
+    return { status: 'unauthorized', useApiMode: useApiMode, activeUser: null, appHtml: null, error: e.message, authUrl: null };
   }
 }
 
@@ -185,16 +221,15 @@ function _checkRequiresReAgreement(userAgreementData, policyUpdateDates) {
 }
 
 /**
- * ホーム画面の初回表示に必要なデータを事前取得（最小限）
- * 初回ローディング高速化のため、home で実際に使用するデータのみを取得
+ * Homeタブデータ・マスタデータ一括取得
  * @param {string} userId - ユーザーID
- * @returns {Object} { tasks, notices, isCached }
+ * @returns {Object} { tasks, logs, boards, members, isCached }
  */
-function _prefetchHomeInitialData(userId, useApiMode = false) {
+function _prefetchMasterData(userId, useApiMode = false) {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const isoDate = sevenDaysAgo.toISOString();
-
+  
   const queries = [
     {
       key: 'tasks',
@@ -203,15 +238,6 @@ function _prefetchHomeInitialData(userId, useApiMode = false) {
       dataObject: {
         where: { task_status_key: ['!=', 'DONE'] },
         columns: ['id', 'display_id', 'name', 'board_id', 'task_status_key']
-      },
-      forceRefresh: false
-    },
-    {
-      key: 'notices',
-      tableName: TABLE_NAMES.NOTICES,
-      operation: 'select',
-      dataObject: {
-        orderBy: { starts_at: 'desc' }
       },
       forceRefresh: false
     },
@@ -227,57 +253,10 @@ function _prefetchHomeInitialData(userId, useApiMode = false) {
       forceRefresh: false
     },
     {
-      key: 'systemUpdates',
-      tableName: TABLE_NAMES.SYSTEM_UPDATES,
-      operation: 'select',
-      dataObject: { orderBy: { created_at: 'desc' } },
-      forceRefresh: true  // 常に最新を取得（top-navigation で必要）
-    }
-  ];
-
-  const batchResult = useApiMode
-    ? handleBatchDatabaseProcessViaApi(queries)
-    : handleBatchDatabaseProcess(userId, queries);
-  const r = batchResult.results || {};
-
-  return {
-    tasks: (r.tasks?.data || r.tasks || []),
-    notices: (r.notices?.data || r.notices || []),
-    logs: (r.logs?.data || r.logs || []),
-    systemUpdates: (r.systemUpdates?.data || r.systemUpdates || []),
-    isCached: !batchResult.hasAnyUncached
-  };
-}
-
-/**
- * マスタデータ一括取得（遅延ロード用）
- * 初回ページロードの高速化のため、home 画面以外で必要になるまで取得を遅延させます
- * @param {string} userId - ユーザーID
- * @returns {Object} { boards, apps, members, directories, directoryAssignments, skills, skillAssignments, isCached }
- */
-function _prefetchMasterData(userId, useApiMode = false) {
-  const queries = [
-    {
       key: 'boards',
       tableName: TABLE_NAMES.BOARDS,
       operation: 'select',
-      dataObject: { orderBy: { name: 'asc' } },
-      forceRefresh: false
-    },
-    {
-      key: 'apps',
-      tableName: TABLE_NAMES.APPS,
-      operation: 'select',
       dataObject: {},
-      forceRefresh: false
-    },
-    {
-      key: 'links',
-      tableName: TABLE_NAMES.LINKS,
-      operation: 'select',
-      dataObject: {
-        orderBy: { label: 'asc' }
-      },
       forceRefresh: false
     },
     {
@@ -288,31 +267,10 @@ function _prefetchMasterData(userId, useApiMode = false) {
       forceRefresh: false
     },
     {
-      key: 'directories',
-      tableName: TABLE_NAMES.DIRECTORIES,
+      key: 'systemUpdates',
+      tableName: TABLE_NAMES.SYSTEM_UPDATES,
       operation: 'select',
-      dataObject: {},
-      forceRefresh: false
-    },
-    {
-      key: 'directoryAssignments',
-      tableName: TABLE_NAMES.DIRECTORY_ASSIGNMENTS,
-      operation: 'select',
-      dataObject: {},
-      forceRefresh: false
-    },
-    {
-      key: 'skills',
-      tableName: TABLE_NAMES.SKILLS,
-      operation: 'select',
-      dataObject: {},
-      forceRefresh: false
-    },
-    {
-      key: 'skillAssignments',
-      tableName: TABLE_NAMES.SKILL_ASSIGNMENTS,
-      operation: 'select',
-      dataObject: {},
+      dataObject: { orderBy: { created_at: 'desc' } },
       forceRefresh: false
     }
   ];
@@ -323,18 +281,14 @@ function _prefetchMasterData(userId, useApiMode = false) {
   const r = batchResult.results || {};
 
   return {
+    tasks: (r.tasks?.data || r.tasks || []),
+    logs: (r.logs?.data || r.logs || []),
     boards: (r.boards?.data || r.boards || []),
-    apps: (r.apps?.data || r.apps || []),
-    links: (r.links?.data || r.links || []),
     members: (r.members?.data || r.members || []),
-    directories: (r.directories?.data || r.directories || []),
-    directoryAssignments: (r.directoryAssignments?.data || r.directoryAssignments || []),
-    skills: (r.skills?.data || r.skills || []),
-    skillAssignments: (r.skillAssignments?.data || r.skillAssignments || []),
+    systemUpdates: (r.systemUpdates?.data || r.systemUpdates || []),
     isCached: !batchResult.hasAnyUncached
   };
 }
-
 
 /**
  * ユーザープロパティを保存します
@@ -362,6 +316,7 @@ function setPolicyUpdateDate(type, dateString) {
     }
     const key = type === 'terms' ? 'termsUpdatedAt' : 'privacyUpdatedAt';
     PropertiesService.getScriptProperties().setProperty(key, dateString);
+    _clearInitialLoadCacheForCurrentUser();
     return true;
   } catch (error) {
     console.error('setPolicyUpdateDate error:', error);
@@ -405,6 +360,8 @@ function recordAgreement(type) {
     if (type === 'privacy' || type === 'both') {
       userProperties.setProperty('privacyAgreedAt', now);
     }
+
+    _clearInitialLoadCacheForCurrentUser();
 
     return true;
   } catch (error) {
@@ -494,6 +451,76 @@ function checkAppAuthorization() {
     status: authInfo.getAuthorizationStatus() === ScriptApp.AuthorizationStatus.REQUIRED ? 'REQUIRED' : 'OK',
     url: authInfo.getAuthorizationUrl()
   };
+}
+
+function _buildUserCacheKeyForInitialLoad(email, urlParams, isMobile) {
+  const safeEmail = String(email || '').trim().toLowerCase() || 'anonymous';
+  const mode = isMobile ? 'mobile' : 'desktop';
+  const env = isDevelopment(urlParams) ? 'dev' : 'prod';
+  const policyDates = getPolicyUpdateDates();
+  const policySignature = [policyDates.termsUpdatedAt || 'none', policyDates.privacyUpdatedAt || 'none'].join('|');
+  return [USER_CACHE_KEY_PREFIX_INITIAL_APP_DATA, safeEmail, mode, env, policySignature].join(':');
+}
+
+function _readUserCacheJson(cacheKey) {
+  try {
+    const raw = CacheService.getUserCache().get(cacheKey);
+    if (!raw) return null;
+    const json = _decodeUserCachePayload(raw);
+    return JSON.parse(json);
+  } catch (error) {
+    console.warn('Failed to read user cache JSON:', error);
+    return null;
+  }
+}
+
+function _writeUserCacheJson(cacheKey, value, ttlSeconds) {
+  try {
+    const json = JSON.stringify(value);
+    const payload = _encodeUserCachePayload(json);
+    CacheService.getUserCache().put(cacheKey, payload, ttlSeconds || USER_CACHE_TTL_SECONDS_DEFAULT);
+  } catch (error) {
+    console.warn('Failed to write user cache JSON:', error);
+  }
+}
+
+function _encodeUserCachePayload(text) {
+  try {
+    const gzippedBlob = Utilities.gzip(Utilities.newBlob(text, 'application/json'));
+    return 'gz:' + Utilities.base64Encode(gzippedBlob.getBytes());
+  } catch (error) {
+    return 'raw:' + text;
+  }
+}
+
+function _decodeUserCachePayload(payload) {
+  if (payload.indexOf('gz:') === 0) {
+    const bytes = Utilities.base64Decode(payload.substring(3));
+    const blob = Utilities.newBlob(bytes, 'application/gzip');
+    return Utilities.ungzip(blob).getDataAsString();
+  }
+  if (payload.indexOf('raw:') === 0) {
+    return payload.substring(4);
+  }
+  return payload;
+}
+
+function _clearInitialLoadCacheForCurrentUser() {
+  try {
+    const email = Session.getActiveUser().getEmail();
+    if (!email) return;
+
+    const keys = [
+      _buildUserCacheKeyForInitialLoad(email, { use_prod_db: 'true' }, false),
+      _buildUserCacheKeyForInitialLoad(email, { use_prod_db: 'true' }, true),
+      _buildUserCacheKeyForInitialLoad(email, {}, false),
+      _buildUserCacheKeyForInitialLoad(email, {}, true)
+    ];
+    const cache = CacheService.getUserCache();
+    keys.forEach(key => cache.remove(key));
+  } catch (error) {
+    console.warn('Failed to clear initial load cache:', error);
+  }
 }
 
 /**

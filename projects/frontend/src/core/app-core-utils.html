@@ -1,0 +1,1059 @@
+<script>
+  // ============================================
+  // ヘルパー関数
+  // ============================================
+
+  /**
+   * 日時を指定形式でフォーマットします
+   * @param {string} dateString - フォーマットする日時
+   * @param {string} [format='yyyy/MM/dd(E) HH:mm'] - フォーマット形式
+   * @returns {string} フォーマットされた日時文字列
+   */
+  function formatDateTimeForDisplay(dateString, format = 'yyyy/MM/dd(E) HH:mm') {
+    if (!dateString) return '';
+    try {
+      const dt = new Date(dateString);
+      const year = String(dt.getFullYear()).padStart(4, '0');
+      const month = String(dt.getMonth() + 1).padStart(2, '0');
+      const day = String(dt.getDate()).padStart(2, '0');
+      const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+      const weekday = weekdays[dt.getDay()];
+      const hours = String(dt.getHours()).padStart(2, '0');
+      const minutes = String(dt.getMinutes()).padStart(2, '0');
+      const seconds = String(dt.getSeconds()).padStart(2, '0');
+
+      return format
+        .replace(/yyyy/g, year)
+        .replace(/MM/g, month)
+        .replace(/dd/g, day)
+        .replace(/E/g, weekday)
+        .replace(/HH/g, hours)
+        .replace(/mm/g, minutes)
+        .replace(/ss/g, seconds);
+    } catch (e) {
+      return dateString;
+    }
+  }
+
+  function formatDateTimeForInput(dateString) {
+    if (!dateString) return '';
+    try {
+      const dt = new Date(dateString);
+      const offset = dt.getTimezoneOffset() * 60000;
+      const localDate = new Date(dt.getTime() - offset);
+      return localDate.toISOString().slice(0, 16);
+    } catch (e) {
+      return dateString;
+    }
+  }
+
+  /**
+   * HTML文字列をエスケープします（XSS対策）
+   * @param {string} text - エスケープする文字列
+   * @returns {string} エスケープされた文字列
+   */
+  function escapeHtml(text) {
+    if (text === null || text === undefined) {
+      return '';
+    }
+
+    const str = String(text);
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#x27;',
+      '/': '&#x2F;'
+    };
+
+    return str.replace(/[&<>"'/]/g, function (char) {
+      return map[char];
+    });
+  }
+
+  /**
+   * HTML属性値をエスケープします
+   * @param {string} text - エスケープする文字列
+   * @returns {string} エスケープされた文字列
+   */
+  function escapeHtmlAttribute(text) {
+    if (text === null || text === undefined) {
+      return '';
+    }
+
+    const str = String(text);
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#x27;',
+      '/': '&#x2F;',
+      '\n': '&#10;',
+      '\r': '&#13;',
+      '\t': '&#9;'
+    };
+
+    return str.replace(/[&<>"'/\n\r\t]/g, function (char) {
+      return map[char];
+    });
+  }
+
+  /**
+   * テキストをHTMLエスケープした後、改行を<br>タグに変換します
+   * @param {string} text - 変換する文字列
+   * @returns {string} エスケープされ、改行が<br>タグに変換された文字列
+   */
+  function escapeHtmlWithLineBreaks(text) {
+    if (text === null || text === undefined) {
+      return '';
+    }
+
+    // まずHTMLエスケープを実行
+    const escaped = escapeHtml(text);
+
+    // 改行文字を<br>タグに変換
+    // \r\nと\nの両方に対応
+    return escaped.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+  }
+
+  /**
+   * URLをサニタイズします。安全なスキーム（http, https, mailto, tel）と相対URLのみを許可します。
+   * @param {string} url - サニタイズするURL
+   * @returns {string} サニタイズされたURL。安全でない場合は空文字を返します。
+   */
+  function sanitizeUrl(url) {
+    if (!url || typeof url !== "string") {
+      return "";
+    }
+
+    const urlTrimmed = url.trim();
+
+    // 相対URL（/で始まる、またはプロトコルを含まない）は許可
+    if (
+      urlTrimmed.startsWith("/") ||
+      urlTrimmed.startsWith("./") ||
+      urlTrimmed.startsWith("../") ||
+      !urlTrimmed.includes(":")
+    ) {
+      return urlTrimmed;
+    }
+
+    try {
+      // 安全なスキームのみ許可する（new URLで確実にプロトコルを検証）
+      const parsed = new URL(urlTrimmed, window.location.origin);
+      const allowedProtocols = ["http:", "https:", "mailto:", "tel:"];
+
+      if (allowedProtocols.includes(parsed.protocol)) {
+        return parsed.href;
+      }
+
+      console.warn("[sanitizeUrl] Unsafe protocol detected:", urlTrimmed);
+      return "";
+    } catch (e) {
+      // 不正なURL形式の場合は許可しない
+      console.warn("[sanitizeUrl] Invalid URL format:", urlTrimmed);
+      return "";
+    }
+  }
+
+  /**
+   * 関数名から関数オブジェクトを安全に取得します
+   * evalを使用せず、予め定義されたパスから関数を探索します
+   * @param {string} functionPath - 関数のパス（例: 'App.pages.boards.loadData'）
+   * @returns {Function|null} 関数オブジェクト、見つからない場合はnull
+   */
+  function resolveFunctionSafely(functionPath) {
+    if (!functionPath || typeof functionPath !== 'string') {
+      return null;
+    }
+
+    // ドット区切りのパスを配列に分割
+    const parts = functionPath.split('.');
+    let current = window;
+
+    // パスを辿って関数を取得
+    for (let i = 0; i < parts.length; i++) {
+      if (current && typeof current === 'object' && Object.prototype.hasOwnProperty.call(current, parts[i])) {
+        current = current[parts[i]];
+      } else {
+        console.warn(`[resolveFunctionSafely] Cannot resolve path: ${functionPath} at ${parts[i]}`);
+        return null;
+      }
+    }
+
+    // 最終的に関数であることを確認
+    if (typeof current === 'function') {
+      return current;
+    }
+
+    console.warn(`[resolveFunctionSafely] Path does not resolve to a function: ${functionPath}`);
+    return null;
+  }
+
+  // ============================================
+  // URL Management Utilities
+  // ============================================
+  App.utils.url = {
+    _cachedParams: null,
+
+    /**
+     * URLパラメータを取得
+     * @returns {Object} パラメータオブジェクト
+     */
+    getParams: function () {
+      // キャッシュがあればそれを使用
+      if (this._cachedParams) {
+        return { ...this._cachedParams };
+      }
+
+      let params = {};
+
+      // 初回ロード時: templateVariablesからの取得を優先
+      if (typeof templateVariables !== 'undefined' && templateVariables.urlParams) {
+        params = { ...templateVariables.urlParams };
+      } else {
+        const urlParams = new URLSearchParams(window.location.search);
+        for (const [key, value] of urlParams) {
+          params[key] = value;
+        }
+      }
+
+      this._cachedParams = params;
+      return params;
+    },
+
+    /**
+     * キャッシュされたパラメータを強制的に設定（履歴変更時など）
+     * @param {Object} params 
+     */
+    setParams: function (params) {
+      this._cachedParams = { ...params };
+    },
+
+    /**
+     * URLパラメータを更新（ブラウザ履歴にpush）
+     * @param {Object} params - パラメータオブジェクト
+     * @param {boolean} replace - trueの場合はreplaceState、falseの場合はpushState
+     */
+    updateParams: function (params, replace = false) {
+      // null, undefined, 空文字をフィルタリング
+      const cleanParams = {};
+      Object.keys(params).forEach(key => {
+        if (params[key] !== null && params[key] !== undefined && params[key] !== '') {
+          cleanParams[key] = params[key];
+        }
+      });
+
+      // キャッシュを更新
+      this._cachedParams = cleanParams;
+
+      // google.script.history が利用可能な場合はそれを使用
+      if (typeof google !== 'undefined' && google.script && google.script.history) {
+        if (replace) {
+          google.script.history.replace(cleanParams, cleanParams);
+        } else {
+          google.script.history.push(cleanParams, cleanParams);
+        }
+        // return;
+      }
+    },
+
+    /**
+     * URLパラメータからタブIDを取得
+     * @param {Object} params - パラメータオブジェクト
+     * @returns {string|null} タブID（例: 'home', 'board-UUID'）またはnull
+     */
+    getTabIdFromParams: function (params) {
+      if (!params.tab) return null;
+
+      // boardタブの場合、board_idが有効な値であることを確認
+      if (params.tab === 'board') {
+        if (params.board_id && params.board_id !== '') {
+          return 'board-' + params.board_id;
+        }
+        // board_idが無効な場合はnullを返す
+        return null;
+      }
+
+      if (params.tab === 'members') return 'catalog';
+      return params.tab;
+    },
+
+    /**
+     * タブIDからURLパラメータを生成
+     * @param {string} tabId - タブID（例: 'home', 'board-UUID'）
+     * @returns {Object} パラメータオブジェクト
+     */
+    getParamsFromTabId: function (tabId) {
+      const params = {};
+
+      if (tabId.startsWith('board-')) {
+        params.tab = 'board';
+        params.board_id = tabId.replace('board-', '');
+      } else {
+        params.tab = tabId === 'members' ? 'catalog' : tabId;
+      }
+
+      return params;
+    }
+  };
+
+  // ============================================
+  // UI Utilities
+  // ============================================
+  App.utils.ui = {
+    /**
+     * Mainタグ内のすべてのインタラクティブ要素のReadonly/Disabled状態を切り替えます
+     * @param {boolean} readonly - trueで無効化、falseで有効化
+     */
+    setMainReadonly: function (readonly) {
+      const main = document.querySelector('main');
+
+      // fields (inputs wrappers) and buttons within main
+      // Also include inputs, selects, textareas directly
+      const selectors = [
+        '.field',
+        'button',
+        'input',
+        'select',
+        'textarea',
+        'a[onclick]',
+        'i[onclick]',
+        '.chip i'
+      ];
+
+      const elements = main.querySelectorAll(selectors.join(', '));
+
+      elements.forEach(el => {
+        // Toggle disabled attribute for form elements and buttons
+        if ('disabled' in el) {
+          el.disabled = readonly;
+        }
+
+        // Control pointer events and visual opacity
+        el.style.pointerEvents = readonly ? 'not-allowed' : '';
+        el.style.opacity = readonly ? '0.7' : '';
+      });
+    },
+
+    /**
+     * モーダルIDからApp.modals内の対応するオブジェクトを自動解決する
+     * 例: 'modal-new-task-preview' -> App.modals.newTaskPreview
+     *     'modal-detail-task' -> App.modals.taskDetail
+     *     'modal-new-task' -> App.modals.newTask
+     * @param {string} modalId - モーダルのID
+     * @returns {Object|null} 対応するApp.modalsオブジェクト
+     */
+    resolveModalHandler: function (modalId) {
+      if (!modalId || !modalId.startsWith('modal-')) return null;
+
+      // 'modal-' プレフィックスを除去
+      const rawName = modalId.replace(/^modal-/, '');
+
+      // IDパターンからApp.modalsのキーを解決するマッピング
+      // パターン: 'type-name(-suffix)' -> 対応するApp.modalsのキー
+      const patterns = [
+        // detail系: 'detail-task' -> 'taskDetail', 'detail-member' -> 'memberDetail'
+        { regex: /^detail-(.+)$/, transform: (m) => m[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase()) + 'Detail' },
+        // new系: 'new-task-preview' -> 'newTaskPreview', 'new-task' -> 'newTask', 'new-comment' -> 'newComment'
+        { regex: /^new-(.+)$/, transform: (m) => 'new' + m[1].split('-').map((s, i) => s.charAt(0).toUpperCase() + s.slice(1)).join('') },
+        // select系: 'select-members' -> 'selectMembers'
+        { regex: /^select-(.+)$/, transform: (m) => 'select' + m[1].split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('') },
+        // filter系: 'filter-task' -> 'filterTask'
+        { regex: /^filter-(.+)$/, transform: (m) => 'filter' + m[1].split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('') },
+      ];
+
+      for (const pattern of patterns) {
+        const match = rawName.match(pattern.regex);
+        if (match) {
+          const key = pattern.transform(match);
+          if (App.modals[key]) {
+            return App.modals[key];
+          }
+        }
+      }
+
+      return null;
+    },
+
+    /**
+     * 最も優先度の高いモーダルを1つ閉じる
+     * 優先順位: 'modal-select-' > 'modal-new-' > 'modal-detail-' > その他
+     * 同一優先度の場合はDOM内で後方に配置されたものから先に閉じる
+     * @param {boolean} skipUrlUpdate - URL更新をスキップするかどうか
+     * @returns {boolean} モーダルを閉じた場合はtrue
+     */
+    closeTopModal: function (skipUrlUpdate = false, reason = 'generic') {
+      const openModals = getOpenModals(true); // 優先順位でソート済み
+      if (openModals.length === 0) {
+        if (App.utils.modal && typeof App.utils.modal.syncOverlayWithManagedModals === 'function') {
+          App.utils.modal.syncOverlayWithManagedModals();
+        }
+        return true;
+      }
+
+      const targetModal = openModals[0];
+      const modalId = targetModal.id;
+      console.log(`[closeTopModal] Closing ${modalId}, skipUrlUpdate: ${skipUrlUpdate}`);
+
+      // App.modalsから対応するハンドラを自動解決
+      const handler = this.resolveModalHandler(modalId);
+
+      if (handler) {
+        // closePreview メソッドがある場合（プレビュー系モーダル）
+        if (typeof handler.closePreview === 'function' && modalId.includes('-preview')) {
+          handler.closePreview();
+          return true;
+        }
+
+        // requestClose がある場合は優先して使用（保存確認を含む共通導線）
+        if (typeof handler.requestClose === 'function') {
+          const result = handler.requestClose(reason, skipUrlUpdate);
+          return result !== false;
+        }
+
+        // close メソッドがある場合はそれを使う
+        if (typeof handler.close === 'function') {
+          const result = handler.close({
+            skipUrlUpdate: skipUrlUpdate,
+            reason: reason
+          });
+          return result !== false; // falseが返された場合のみfalse扱い
+        }
+      }
+
+      // ハンドラが見つからない場合は汎用的な閉じ処理
+      if (App.utils.modal && typeof App.utils.modal.close === 'function') {
+        App.utils.modal.close(modalId);
+      } else if (typeof appUi === 'function') {
+        appUi(modalId, false);
+      } else {
+        targetModal.classList.remove('active');
+        targetModal.removeAttribute('open');
+      }
+
+      if (App.utils.modal && typeof App.utils.modal.syncOverlayWithManagedModals === 'function') {
+        App.utils.modal.syncOverlayWithManagedModals();
+      }
+
+      return true;
+    }
+  };
+
+  // ============================================
+  // Modal Utilities
+  // 責任: モーダルの共通処理（フォーカス、フィルタリング、選択管理）
+  // ============================================
+
+  /**
+   * モーダル関連のユーティリティ関数
+   */
+  App.utils.modal = {
+    _overlayPrefix: 'overlay-for-',
+    _overlayRemoveDelayMs: 300,
+
+    /**
+     * モーダル参照（id/selector/element）からモーダルIDを解決します
+     * @param {string|HTMLElement} target - モーダル参照
+     * @returns {string|null} モーダルID
+     */
+    getModalId: function (target) {
+      if (!target) return null;
+
+      if (typeof target === 'string') {
+        if (target.startsWith('#')) {
+          return target.slice(1);
+        }
+        return target;
+      }
+
+      if (target.id) {
+        return target.id;
+      }
+
+      return null;
+    },
+
+    /**
+     * 対象がselect系モーダルか判定します
+     * @param {string|HTMLElement} target - モーダル参照
+     * @returns {boolean} select系ならtrue
+     */
+    isSelectModal: function (target) {
+      const modalId = this.getModalId(target);
+      return !!modalId && modalId.startsWith('modal-select-');
+    },
+
+    /**
+     * モーダル要素を取得します
+     * @param {string|HTMLElement} target - モーダル参照
+     * @returns {HTMLElement|null} モーダル要素
+     */
+    getModalElement: function (target) {
+      if (!target) return null;
+      if (target instanceof HTMLElement) return target;
+
+      const modalId = this.getModalId(target);
+      if (!modalId) return null;
+      return document.getElementById(modalId);
+    },
+
+    /**
+     * モーダルが開いているか判定します
+     * @param {string|HTMLElement} target - モーダル参照
+     * @returns {boolean} 開いている場合true
+     */
+    isOpen: function (target) {
+      const modal = this.getModalElement(target);
+      if (!modal) return false;
+
+      const hasOpenAttr = modal.hasAttribute('open') || modal.open === true;
+      const hasActiveClass = modal.classList.contains('active');
+
+      return hasOpenAttr || hasActiveClass;
+    },
+
+    /**
+     * モーダル専用overlay要素のIDを返します
+     * @param {string} modalId - モーダルID
+     * @returns {string} overlay要素ID
+     */
+    getOverlayId: function (modalId) {
+      return `${this._overlayPrefix}${modalId}`;
+    },
+
+    /**
+     * モーダルに紐づくoverlay要素を返します
+     * @param {string} modalId - モーダルID
+     * @returns {HTMLElement|null} overlay要素
+     */
+    getOverlayElement: function (modalId) {
+      if (!modalId) return null;
+      return document.getElementById(this.getOverlayId(modalId));
+    },
+
+    /**
+     * モーダル直前にoverlay要素を生成・配置します
+     * @param {string} modalId - モーダルID
+     * @param {HTMLElement} modal - モーダル要素
+     * @returns {HTMLElement|null} overlay要素
+     */
+    createOverlayForModal: function (modalId, modal) {
+      if (!modalId || !modal) return null;
+
+      let overlay = this.getOverlayElement(modalId);
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = this.getOverlayId(modalId);
+        overlay.className = 'overlay dark js-managed-modal-overlay';
+        overlay.dataset.modalId = modalId;
+        overlay.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          // 詳細モーダルなどで requestClose が定義されている場合は、
+          // 保存確認を含む共通クローズ導線を優先する
+          const handler = App.utils?.ui?.resolveModalHandler
+            ? App.utils.ui.resolveModalHandler(modalId)
+            : null;
+
+          if (handler && typeof handler.requestClose === 'function') {
+            // requestClose側で「閉じる」「保存して閉じる」「閉じない(キャンセル)」を判断する。
+            // ここでcloseへフォールバックすると、キャンセル時にも閉じてしまうため禁止。
+            handler.requestClose('overlay-click');
+            return;
+          }
+
+          this.close(modalId);
+        });
+      }
+
+      if (modal.parentNode) {
+        modal.parentNode.insertBefore(overlay, modal);
+      }
+
+      if (overlay.dataset.removeTimerId) {
+        clearTimeout(parseInt(overlay.dataset.removeTimerId, 10));
+        overlay.dataset.removeTimerId = '';
+      }
+
+      overlay.classList.remove('active');
+      overlay.style.display = '';
+      overlay.style.pointerEvents = 'auto';
+
+      // 挿入直後にactiveを付与して表示状態へ遷移させる
+      requestAnimationFrame(() => {
+        if (document.body.contains(overlay)) {
+          overlay.classList.add('active');
+        }
+      });
+
+      return overlay;
+    },
+
+    /**
+     * モーダルに紐づくoverlay要素を削除します
+     * @param {string} modalId - モーダルID
+     */
+    removeOverlayForModal: function (modalId) {
+      const overlay = this.getOverlayElement(modalId);
+      if (!overlay) return;
+
+      if (overlay.dataset.removeTimerId) {
+        clearTimeout(parseInt(overlay.dataset.removeTimerId, 10));
+      }
+
+      overlay.classList.remove('active');
+      overlay.style.pointerEvents = 'none';
+
+      const timerId = setTimeout(() => {
+        if (!document.body.contains(overlay)) return;
+        if (overlay.classList.contains('active')) return;
+        overlay.style.display = 'none';
+        overlay.remove();
+      }, this._overlayRemoveDelayMs);
+
+      overlay.dataset.removeTimerId = String(timerId);
+    },
+
+    /**
+     * 管理対象（全モーダル）のうち何かが開いているか判定します
+     * @returns {boolean} 開いている場合true
+     */
+    hasAnyManagedModalOpen: function () {
+      const openModals = getOpenModals(false);
+      return openModals.some(modal => {
+        return modal && modal.id && modal.id.startsWith('modal-');
+      });
+    },
+
+    /**
+     * 管理対象モーダルの状態に応じて #overlay を同期します
+     */
+    syncOverlayWithManagedModals: function () {
+      const openManagedModals = getOpenModals(false).filter(modal => {
+        return modal && modal.id && modal.id.startsWith('modal-');
+      });
+      const openManagedModalIds = new Set(openManagedModals.map(modal => modal.id));
+
+      openManagedModals.forEach(modal => {
+        this.createOverlayForModal(modal.id, modal);
+      });
+
+      const overlays = document.querySelectorAll('.js-managed-modal-overlay');
+      overlays.forEach(overlay => {
+        const modalId = overlay.dataset.modalId;
+        if (!openManagedModalIds.has(modalId)) {
+          this.removeOverlayForModal(modalId);
+        }
+      });
+    },
+
+    /**
+     * モーダル開閉時にBeerCSSが自動生成したoverlay要素を除去します
+     */
+    removeAutoGeneratedOverlays: function () {
+      const overlays = document.querySelectorAll('.overlay');
+      overlays.forEach(overlay => {
+        if (overlay && !overlay.classList.contains('js-managed-modal-overlay')) {
+          overlay.remove();
+        }
+      });
+    },
+
+    /**
+     * モーダルを開きます
+     * @param {string|HTMLElement} target - モーダル参照
+     */
+    open: function (target) {
+      const modalId = this.getModalId(target);
+      const modal = this.getModalElement(target);
+      if (!modalId || !modal) return;
+
+      if (!this.isOpen(modal)) {
+        // showModalはネイティブbackdropがoverlayクリックを阻害するため使わない
+        modal.setAttribute('open', '');
+        modal.classList.add('active');
+      }
+
+      this.createOverlayForModal(modalId, modal);
+
+      this.removeAutoGeneratedOverlays();
+    },
+
+    /**
+     * モーダルを閉じます
+     * @param {string|HTMLElement} target - モーダル参照
+     */
+    close: function (target) {
+      const modalId = this.getModalId(target);
+      const modal = this.getModalElement(target);
+      if (!modalId || !modal) return;
+
+      // 念のため明示的に閉じる（環境差異対策）
+      modal.classList.remove('active');
+      modal.removeAttribute('open');
+      modal.open = false;
+
+      this.removeOverlayForModal(modalId);
+      this.syncOverlayWithManagedModals();
+
+      this.removeAutoGeneratedOverlays();
+    },
+
+    /**
+     * モーダルをトグルします
+     * @param {string|HTMLElement} target - モーダル参照
+     */
+    toggle: function (target) {
+      if (this.isOpen(target)) {
+        this.close(target);
+      } else {
+        this.open(target);
+      }
+    },
+
+    /**
+     * 入力フィールドにフォーカスを設定します（リトライ機能付き）
+     * @param {string} selector - 入力フィールドのセレクタ
+     * @param {number} maxRetries - 最大リトライ回数
+     * @param {number} delay - リトライ間隔（ミリ秒）
+     */
+    focusInput: function (selector, maxRetries = UI_CONFIG.MODAL_FOCUS_MAX_RETRIES, delay = UI_CONFIG.MODAL_FOCUS_DELAY) {
+      const tryFocus = (count = 0) => {
+        const input = document.querySelector(selector);
+        if (input && input.offsetParent !== null) {
+          input.focus();
+          input.select();
+          return true;
+        } else if (count < maxRetries) {
+          setTimeout(() => tryFocus(count + 1), delay);
+          return false;
+        }
+        console.warn(`[focusInput] Failed to focus element: ${selector}`);
+        return false;
+      };
+
+      tryFocus();
+    },
+
+    /**
+     * データをフィルタリングします（検索語による絞り込み）
+     * @param {Array<Object>} data - データ配列
+     * @param {string} searchTerm - 検索語
+     * @param {Array<string>} searchFields - 検索対象フィールド名の配列
+     * @param {boolean} activeOnly - is_activeがtrueのみ対象とするか
+     * @returns {Array<Object>} フィルタリングされたデータ
+     */
+    filterData: function (data, searchTerm, searchFields, activeOnly = true) {
+      if (!data || !Array.isArray(data)) {
+        return [];
+      }
+
+      const term = searchTerm ? searchTerm.toLowerCase().trim() : '';
+
+      return data.filter(item => {
+        // アクティブフィルタ
+        if (activeOnly && item.is_active !== true) {
+          return false;
+        }
+
+        // 検索語が空の場合はアクティブフィルタのみ適用
+        if (!term) {
+          return true;
+        }
+
+        // 指定されたフィールドのいずれかに検索語が含まれているか
+        return searchFields.some(field => {
+          const value = item[field];
+          return value && String(value).toLowerCase().includes(term);
+        });
+      });
+    },
+
+    /**
+     * 選択状態を切り替えます
+     * @param {Array<string>} selectedIds - 選択中のID配列
+     * @param {string} id - 切り替えるID
+     * @param {boolean} multiSelect - 複数選択可能か
+     * @returns {Array<string>} 更新後の選択ID配列
+     */
+    toggleSelection: function (selectedIds, id, multiSelect) {
+      const newSelection = [...selectedIds];
+      const index = newSelection.indexOf(id);
+
+      if (multiSelect) {
+        // 複数選択: トグル動作
+        if (index > -1) {
+          newSelection.splice(index, 1);
+        } else {
+          newSelection.push(id);
+        }
+      } else {
+        // 単一選択: 置き換え
+        return [id];
+      }
+
+      return newSelection;
+    },
+
+    /**
+     * チェックボックス/ラジオボタンの選択状態を取得します
+     * @param {string} containerSelector - コンテナのセレクタ
+     * @param {string} inputName - input要素のname属性
+     * @param {boolean} multiSelect - 複数選択か
+     * @returns {Array<string>} 選択されたIDの配列
+     */
+    getSelectedIds: function (containerSelector, inputName, multiSelect) {
+      const container = document.querySelector(containerSelector);
+      if (!container) return [];
+
+      const inputs = container.querySelectorAll(`input[name="${inputName}"]:checked`);
+      return Array.from(inputs).map(input => input.value);
+    },
+
+    /**
+     * モーダルの検索入力欄をリセットします
+     * @param {string} selector - 検索入力欄のセレクタ
+     */
+    resetSearchInput: function (selector) {
+      const input = document.querySelector(selector);
+      if (input) {
+        input.value = '';
+      }
+    },
+
+    /**
+     * 選択結果をチップとして表示します
+     * @param {string} containerSelector - コンテナのセレクタ
+     * @param {Array<Object>} items - 選択されたアイテムの配列
+     * @param {Function} onRemove - チップ削除時のコールバック(itemId)
+     * @param {Function} labelFormatter - ラベル表示用のフォーマッタ(item) => string
+     */
+    renderSelectedChips: function (containerSelector, items, onRemove, labelFormatter) {
+      const container = document.querySelector(containerSelector);
+      if (!container) return;
+
+      if (!items || items.length === 0) {
+        container.innerHTML = '<span class="small-text secondary-text">なし</span>';
+        return;
+      }
+
+      let html = '';
+      items.forEach(item => {
+        const fallbackDisplayId = item && item.display_id !== undefined && item.display_id !== null && String(item.display_id).trim() !== ''
+          ? `#${item.display_id}`
+          : '';
+        const label = labelFormatter
+          ? labelFormatter(item)
+          : (item.name || item.display_name || item.title || item.plan_number || fallbackDisplayId || '未設定');
+        const safeLabel = escapeHtml(label);
+        const safeId = escapeHtmlAttribute(item.id);
+
+        html += `
+          <button class="chip" data-item-id="${safeId}">
+            <span>${safeLabel}</span>
+            <i>close</i>
+          </button>
+        `;
+      });
+
+      container.innerHTML = html;
+
+      // チップの削除イベントを設定
+      if (onRemove) {
+        container.querySelectorAll('.chip').forEach(chip => {
+          chip.addEventListener('click', () => {
+            const itemId = chip.dataset.itemId;
+            onRemove(itemId);
+          });
+        });
+      }
+    }
+  };
+
+  /**
+   * テキスト操作ユーティリティ
+   */
+  App.utils.text = {
+    /**
+     * テキストを正規化します（大文字・小文字、全角・半角の曖昧排除）
+     * @param {string} text - 正規化するテキスト
+     * @returns {string} 正規化されたテキスト
+     */
+    normalize: function (text) {
+      if (text === null || text === undefined) return '';
+      return String(text)
+        .normalize('NFKC')
+        .toLowerCase();
+    }
+  };
+
+  /**
+   * 検索ユーティリティ
+   */
+  App.utils.search = {
+    /**
+     * 検索の前提となる正規化と数値判定を一括して行います
+     * @param {string} searchValue - 検索文字列
+     * @returns {Object} { normalizedValue, numericValue, isNumericInput }
+     */
+    getNormalizedSearchInfo: function (searchValue) {
+      if (!searchValue) return { normalizedValue: '', numericValue: NaN, isNumericInput: false };
+      const normalizedValue = App.utils.text.normalize(searchValue);
+      const numericValue = Number(normalizedValue);
+      const isNumericInput = !isNaN(numericValue) && normalizedValue !== '' && Number.isInteger(numericValue);
+      return { normalizedValue, numericValue, isNumericInput };
+    },
+
+    /**
+     * 文字列からタスク検索用のクエリを構築します
+     * クライアント側ではカラムIDが不明なため、基本的には where 句を使用します。
+     * @param {string} searchValue - 検索文字列
+     * @returns {Object} クエリオブジェクト { where: Object }
+     */
+    buildTaskSearchQuery: function (searchValue) {
+      const { normalizedValue, numericValue, isNumericInput } = this.getNormalizedSearchInfo(searchValue);
+      if (!normalizedValue) return null;
+
+      if (isNumericInput) {
+        // 数値入力の場合: display_id が一致するものを優先
+        return {
+          where: { display_id: ['=', numericValue] }
+        };
+      } else {
+        // 通常の文字列検索
+        return {
+          where: { name: ['LIKE', `%${normalizedValue}%`] }
+        };
+      }
+    }
+  };
+
+  /**
+   * エンティティ横断検索ユーティリティ
+   * tasks / plans / directories / skills / members を共通方式で検索します。
+   */
+  App.utils.entitySearch = {
+    /**
+     * 検索対象の定義
+     * @returns {Object<string, Object>}
+     */
+    getConfigs: function () {
+      return {
+        tasks: { tableName: TABLE_NAMES.TASKS, nameField: 'name', label: 'タスク' },
+        plans: { tableName: TABLE_NAMES.PLANS, nameField: 'name', label: '企画' },
+        directories: { tableName: TABLE_NAMES.DIRECTORIES, nameField: 'name', label: '組織' },
+        skills: { tableName: TABLE_NAMES.SKILLS, nameField: 'title', label: '技能' },
+        members: { tableName: TABLE_NAMES.MEMBERS, nameField: 'display_name', label: '人物' }
+      };
+    },
+
+    /**
+     * テーブルラベルを返します
+     * @param {string} table - テーブル名
+     * @returns {string}
+     */
+    getLabel: function (table) {
+      const config = this.getConfigs()[table];
+      return config ? config.label : (table || '不明');
+    },
+
+    /**
+     * エンティティ横断検索
+     * @param {string} searchValue - 検索文字列
+     * @param {Object} options - 検索オプション
+     * @param {Array<string>} options.tables - 対象テーブル
+     * @param {boolean} options.forceRefresh - キャッシュ無視
+     * @param {number} options.limit - 返却件数上限
+     * @returns {Promise<Array<Object>>}
+     */
+    searchAcross: async function (searchValue, options = {}) {
+      const { normalizedValue, numericValue, isNumericInput } = App.utils.search.getNormalizedSearchInfo(searchValue);
+      if (!normalizedValue) return [];
+
+      const configs = this.getConfigs();
+      const tables = (Array.isArray(options.tables) && options.tables.length)
+        ? options.tables.filter(function (table) { return Boolean(configs[table]); })
+        : Object.keys(configs);
+      const forceRefresh = options.forceRefresh !== false;
+      const queries = [];
+
+      tables.forEach(table => {
+        const config = configs[table];
+        const keyPrefix = `entity_${table}`;
+        queries.push({
+          key: `${keyPrefix}_name`,
+          tableName: config.tableName,
+          operation: 'select',
+          dataObject: {
+            where: { [config.nameField]: ['LIKE', `%${normalizedValue}%`] },
+            orderBy: { display_id: 'desc' }
+          },
+          forceRefresh
+        });
+        queries.push({
+          key: `${keyPrefix}_id`,
+          tableName: config.tableName,
+          operation: 'select',
+          dataObject: {
+            where: { id: ['LIKE', `%${normalizedValue}%`] },
+            orderBy: { display_id: 'desc' }
+          },
+          forceRefresh
+        });
+        if (isNumericInput) {
+          queries.push({
+            key: `${keyPrefix}_display`,
+            tableName: config.tableName,
+            operation: 'select',
+            dataObject: {
+              where: { display_id: ['=', numericValue] },
+              orderBy: { display_id: 'desc' }
+            },
+            forceRefresh
+          });
+        }
+      });
+
+      const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, queries);
+      const resultsObj = batchResult?.results || {};
+      const merged = new Map();
+
+      tables.forEach(table => {
+        const config = configs[table];
+        const keyPrefix = `entity_${table}`;
+        const rawRows = []
+          .concat(resultsObj[`${keyPrefix}_name`]?.data || resultsObj[`${keyPrefix}_name`] || [])
+          .concat(resultsObj[`${keyPrefix}_id`]?.data || resultsObj[`${keyPrefix}_id`] || [])
+          .concat(resultsObj[`${keyPrefix}_display`]?.data || resultsObj[`${keyPrefix}_display`] || []);
+
+        rawRows.forEach(row => {
+          if (!row || !row.id) return;
+          const mapKey = `${table}:${row.id}`;
+          if (merged.has(mapKey)) return;
+          merged.set(mapKey, {
+            table: table,
+            id: row.id,
+            name: row[config.nameField] || '',
+            display_id: row.display_id || null
+          });
+        });
+      });
+
+      const list = Array.from(merged.values());
+      list.sort((a, b) => {
+        const aDisplay = (typeof a.display_id === 'number') ? a.display_id : -1;
+        const bDisplay = (typeof b.display_id === 'number') ? b.display_id : -1;
+        if (aDisplay !== bDisplay) return bDisplay - aDisplay;
+        return (a.name || '').localeCompare((b.name || ''), 'ja');
+      });
+
+      const limit = Number.isInteger(options.limit) ? options.limit : 100;
+      return list.slice(0, limit);
+    }
+  };
+
+</script>

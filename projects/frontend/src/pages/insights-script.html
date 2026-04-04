@@ -72,10 +72,10 @@
                                     <button class="chip" disabled>全期間</button>
                                 </nav>
                                 <span class="small-text secondary-text">自分が関わったタスクをボード別・ステータス別に可視化</span>
-                                <div id="insight-user-effort-charts" class="shimmer-loading scroll top-margin">
-                                    <p id="insight-user-effort-summary" class="no-margin"></p>
-                                    <div id="insight-user-status-chart" class="small-round top-margin padding"></div>
-                                    <div id="insight-user-board-chart" class="small-round top-margin padding"></div>
+                                <div id="insight-user-effort-charts" class="scroll top-margin">
+                                    <p id="insight-user-effort-summary" class="no-margin">集計中...</p>
+                                    <div id="insight-user-status-chart" class="shimmer-loading small-height small-round top-margin padding" style="background-color: #ffffff;"></div>
+                                    <div id="insight-user-board-chart" class="shimmer-loading small-height small-round top-margin padding" style="background-color: #ffffff;"></div>
                                 </div>
                             </article>
                         </div>
@@ -151,9 +151,6 @@
                 try {
                     // Google Chartsの読み込みを待つ（this.shimmer-loadingは続行）
                     await this.loadGoogleCharts();
-                    
-                    // ローディング表示を削除（Google Chartsの準備完了後）
-                    container.classList.remove('shimmer-loading');
                     
                     // グラフを描画
                     this.drawBoardPieChart(tasks, boardChartEl);
@@ -235,11 +232,11 @@
                     chart.draw(data, {
                         title: '自分が担当者のタスクがあるボード',
                         legend: { position: 'right' },
-                        // コンテナ側のBeerCSS背景色を活かすため、チャート背景を透過
                         backgroundColor: 'transparent',
-                        chartArea: { top: '24px', width: '100%', height: '80%', backgroundColor: 'transparent' },
+                        chartArea: { width: '100%', height: '80%', backgroundColor: 'transparent' },
                         pieSliceText: 'value'
                     });
+                    container.classList.remove('shimmer-loading');
                 } catch (error) {
                     console.error('[Insights] ボードPieChart描画エラー:', error);
                     container.innerHTML = '<div class="center-align error-text"><i>error</i><p class="small-text">グラフの描画に失敗しました</p></div>';
@@ -290,9 +287,8 @@
                         title: '自分が担当者のタスクのステータス',
                         isStacked: 'percent',
                         legend: { position: 'top', maxLines: 1 },
-                        // コンテナ側のBeerCSS背景色を活かすため、チャート背景を透過
                         backgroundColor: 'transparent',
-                        chartArea: { top: '24px', width: '100%', height: '80%', backgroundColor: 'transparent' },
+                        chartArea: { width: '100%', height: '80%', backgroundColor: 'transparent' },
                         hAxis: { textPosition: 'none' },
                         vAxis: { textPosition: 'none' },
                         series: {
@@ -303,6 +299,7 @@
                         },
                         colors: ['#f44336', '#ffc107', '#9c27b0', '#4caf50']
                     });
+                    container.classList.remove('shimmer-loading');
                 } catch (error) {
                     console.error('[Insights] ステータスBarChart描画エラー:', error);
                     container.innerHTML = '<div class="center-align error-text"><i>error</i><p class="small-text">グラフの描画に失敗しました</p></div>';

@@ -7,8 +7,8 @@
              * @returns {Promise<void>}
              */
             reloadMembersData: async function (forceRefresh) {
-                if (!App.pages.members || !App.pages.members.loadData) return;
-                await App.pages.members.loadData(forceRefresh === true);
+                if (!App.pages.catalog || !App.pages.catalog.loadData) return;
+                await App.pages.catalog.loadData(forceRefresh === true);
             },
 
             /**
@@ -16,9 +16,9 @@
              * @param {boolean} forceRefresh
              */
             refreshMembersDataInBackground: function (forceRefresh) {
-                if (!App.pages.members || !App.pages.members.loadData) return;
+                if (!App.pages.catalog || !App.pages.catalog.loadData) return;
                 Promise.resolve().then(function () {
-                    return App.pages.members.loadData(forceRefresh === true);
+                    return App.pages.catalog.loadData(forceRefresh === true);
                 }).catch(function (error) {
                     console.error('[modalFlow] background reload failed', error);
                 });

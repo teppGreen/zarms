@@ -53,10 +53,10 @@
 
                 App.state.data.plans = [optimisticPlan].concat(App.state.data.plans || []);
                 this.close();
-                if (App.pages.members && App.pages.members.loadData) {
-                    App.pages.members.loadData(false);
+                if (App.pages.catalog && App.pages.catalog.loadData) {
+                    App.pages.catalog.loadData(false);
                 }
-                showSnackbar('企画を作成しています...', 'info');
+                showSnackbar('企画を作成しています...', 'info', 'top', 0);
 
                 try {
                     const inserted = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.PLANS, 'insert', {
@@ -80,8 +80,8 @@
                     App.state.data.plans = plansResult?.data || [];
                     App.state.data.planAssignments = assignmentsResult?.data || [];
 
-                    if (App.pages.members && App.pages.members.loadData) {
-                        await App.pages.members.loadData(true);
+                    if (App.pages.catalog && App.pages.catalog.loadData) {
+                        await App.pages.catalog.loadData(true);
                     }
 
                     showSnackbar('企画を作成しました', 'success');
@@ -90,8 +90,8 @@
                     App.state.data.plans = (App.state.data.plans || []).filter(function (plan) {
                         return plan.id !== tempId;
                     });
-                    if (App.pages.members && App.pages.members.loadData) {
-                        App.pages.members.loadData(false);
+                    if (App.pages.catalog && App.pages.catalog.loadData) {
+                        App.pages.catalog.loadData(false);
                     }
                     if (errorEl) {
                         errorEl.textContent = '企画の作成に失敗しました';

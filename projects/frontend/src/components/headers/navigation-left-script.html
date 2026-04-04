@@ -19,8 +19,8 @@
                             return;
                         }
 
-                        if (tabName === 'catalog' && App.pages.members && typeof App.pages.members.applyCurrentLayoutHeight === 'function') {
-                            App.pages.members.applyCurrentLayoutHeight();
+                        if (tabName === 'catalog' && App.pages.catalog && typeof App.pages.catalog.applyCurrentLayoutHeight === 'function') {
+                            App.pages.catalog.applyCurrentLayoutHeight();
                             return;
                         }
 
@@ -213,6 +213,10 @@
                                 }
                                 await App.pages.boards.loadData(boardId, isRendered);
                             }
+                            // タブ切り替え時に最終更新日時を更新
+                            if (typeof updateTabLastUpdated === 'function') {
+                                updateTabLastUpdated('board-' + boardId);
+                            }
                         } else {
                             console.error('Target board page not found:', targetBoardPageId);
                         }
@@ -229,6 +233,11 @@
                         const isBackground = this.shouldUseBackgroundLoad(tabName, forceLoadData);
 
                         await this.loadTabData(tabName, isBackground);
+
+                        // タブ切り替え時に最終更新日時を更新
+                        if (typeof updateTabLastUpdated === 'function') {
+                            updateTabLastUpdated(tabName);
+                        }
                     } else {
                         alert(`開こうとしたページが見つかりません。削除された可能性があります。\nページID: ${targetPageId}`);
                         // フォールバック: Homeへ

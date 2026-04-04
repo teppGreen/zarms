@@ -405,31 +405,10 @@
         if (checkMaintenance()) {
             showMaintenanceStep();
         } else {
-            checkScopesFirst();
+            checkAccess();
         }
 
         let authUrl = null;
-
-        /**
-         * アプリのスコープ権限が許可されているか確認します
-         */
-        function checkScopesFirst() {
-            showStep('step-loading');
-            google.script.run
-                .withSuccessHandler(function (authInfo) {
-                    if (authInfo.status === 'REQUIRED') {
-                        authUrl = authInfo.url;
-                        showAgreementStep('scope');
-                    } else {
-                        checkAccess();
-                    }
-                })
-                .withFailureHandler(function (error) {
-                    console.error('checkScopesFirst failed:', error);
-                    checkAccess(); // failure fallback
-                })
-                .checkAppAuthorization();
-        }
 
         function showAgreementStep(nextAction, requiresReAgreement) {
             if (hasAgreed) {
@@ -507,6 +486,7 @@
          */
         function checkAccess() {
             const isMobile = isMobileDevice();
+            showStep('step-loading');
 
             google.script.run
                 .withSuccessHandler(function (result) {
@@ -516,17 +496,25 @@
                         return;
                     }
 
+                    if (result.status === 'scope_required') {
+                        authUrl = result.authUrl || null;
+                        showAgreementStep('scope');
+                        return;
+                    }
+
+                    useApiMode = !!result.useApiMode;
+                    
                     if (result.status === 'not_registered') {
                         // ユーザー未登録時も、scriptPropertiesから方針更新日時を取得
                         if (result.policyUpdateDates) {
                             policyUpdateDates = result.policyUpdateDates;
                         }
+                        
                         showAgreementStep('input');
                         return;
                     }
 
                     if (result.status === 'ok') {
-                        useApiMode = !!result.useApiMode;
                         // ユーザープロパティと方針更新日時を保存
                         if (result.userAgreementData) {
                             userAgreementData = result.userAgreementData;

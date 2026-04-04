@@ -9,7 +9,6 @@
         App.pages.home = {
             // データのキャッシュ
             cachedTasks: [],
-            cachedNotices: [],
             cachedLogs: [],
             cachedRelatedLogs: [],
             historyVisibleCount: 10,
@@ -40,11 +39,6 @@
                             hasInitialData = true;
                             console.log('[Home] Initialized cachedTasks from initialData:', this.cachedTasks.length, 'items');
                         }
-                        if (initialData.notices && initialData.notices.length > 0 && this.cachedNotices.length === 0) {
-                            this.cachedNotices = initialData.notices;
-                            hasInitialData = true;
-                            console.log('[Home] Initialized cachedNotices from initialData:', this.cachedNotices.length, 'items');
-                        }
                         if (initialData.logs && initialData.logs.length > 0 && this.cachedLogs.length === 0) {
                             this.cachedLogs = initialData.logs;
                             this.cachedRelatedLogs = this.filterRelatedLogs(initialData.logs);
@@ -57,7 +51,6 @@
                             this.cachedRelatedLogs = this.filterRelatedLogs(this.cachedLogs);
                             this.historyVisibleCount = 10;
                             this.renderNextTasks(this.cachedTasks);
-                            this.renderNoticesForHome(this.cachedNotices);
                             this.renderRelatedHistoryForHome();
                             this.applyPanelHeights();
                             this.updateHeader();
@@ -77,9 +70,6 @@
                     const tasksQuery = {
                         where: { task_status_key: ['!=', 'DONE'] }
                     };
-                    const noticesQuery = {
-                        orderBy: { starts_at: 'desc' }
-                    };
                     const logsQuery = {
                         where: {
                             created_at: ['>', isoDate]
@@ -88,9 +78,8 @@
                         limit: 100
                     };
 
-                    const [tasksResult, noticesResult, logsResult] = await Promise.allSettled([
+                    const [tasksResult, logsResult] = await Promise.allSettled([
                         callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', tasksQuery, null, isRefresh),
-                        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.NOTICES, 'select', noticesQuery, null, isRefresh),
                         callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.LOGS, 'select', logsQuery, null, isRefresh)
                     ]);
 
@@ -102,19 +91,16 @@
 
                     // データ展開（失敗時はキャッシュを利用）
                     const tasks = asArray(tasksResult, this.cachedTasks);
-                    const notices = asArray(noticesResult, this.cachedNotices);
                     const logs = asArray(logsResult, this.cachedLogs);
 
                     // キャッシュ更新
                     this.cachedTasks = tasks;
-                    this.cachedNotices = notices;
                     this.cachedLogs = logs;
                     this.cachedRelatedLogs = this.filterRelatedLogs(logs);
                     this.historyVisibleCount = 10;
 
                     // 描画
                     this.renderNextTasks(tasks);
-                    this.renderNoticesForHome(notices);
                     this.renderRelatedHistoryForHome();
 
                     // 描画後にパネルの高さを調整
@@ -126,7 +112,6 @@
                     // キャッシュヒット時の再取得（バックグラウンド）
                     const hasCachedResult =
                         (tasksResult.status === 'fulfilled' && tasksResult.value?.isCached) ||
-                        (noticesResult.status === 'fulfilled' && noticesResult.value?.isCached) ||
                         (logsResult.status === 'fulfilled' && logsResult.value?.isCached);
 
                     if (!isRefresh && hasCachedResult) {
@@ -140,7 +125,6 @@
                     console.error('[Home] Error loading data:', error);
                     // エラー表示
                     this.showError('home-next-tasks', 'データの読み込みに失敗しました');
-                    this.showError('home-notices', 'データの読み込みに失敗しました');
                     this.showError('home-related-history', 'データの読み込みに失敗しました');
                 }
             },
@@ -156,10 +140,8 @@
                         <div class="row no-margin no-padding">
                             <h2 id="home-greeting" class="small bold"></h2>
                             <div class="max"></div>
-                            <div class="row no-margin no-padding tiny-space secondary-text" title="このページの最終更新">
-                                <i>update</i>
-                                <span id="home-last-updated" class="font-number"></span>
-                            </div>
+                            <span id="last-updated-home" class="small-text secondary-text"></span>
+                            ${window.refreshButtonHTML}
                         </div>
                         <div class="large-text">
                             <p id="home-event-countdown"></p>
@@ -183,23 +165,7 @@
                             </article>
                         </div>
 
-                        <!-- <div class="s12 m3 l3 small-margin">
-                           <article class="padding">
-                                <nav class="">
-                                        <h6 class="small bold">お知らせ</h6>
-                                    <div class="max"></div>
-                                        <button class="chip" onclick="App.utils.navigation.switchTab('notices')">
-                                            <i>chevron_right</i>
-                                            <span>一覧</span>
-                                        </button>
-                                </nav>
-                                    <span class="small-text secondary-text">現在掲示中のお知らせ</span>
-                                    <div id="home-notices" class="shimmer-loading scroll top-margin ">
-                                </div>
-                            </article>
-                        </div>
-
-                        <div class="s12 m3 l3 small-margin">
+                        <!-- <div class="s12 m6 l6 small-margin">
                            <article class="padding">
                                 <nav class="">
                                         <h6 class="small bold">更新履歴</h6>
@@ -218,15 +184,12 @@
 
             updateHeader: function () {
                 const greeting = this.getGreeting();
-                const formattedDate = formatDateTimeForDisplay(new Date(), 'yyyy年MM月dd日(E) HH:mm');
                 const daysUntilEvent = calculateDaysUntil(EVENT_CONFIG.FESTIVAL_DATE);
 
                 const greetingEl = document.getElementById('home-greeting');
-                const lastUpdatedEl = document.getElementById('home-last-updated');
                 const countdownEl = document.getElementById('home-event-countdown');
 
                 if (greetingEl) greetingEl.textContent = `${greeting}、${activeUser.display_name}さん｡`;
-                if (lastUpdatedEl) lastUpdatedEl.textContent = formattedDate;
                 if (countdownEl) countdownEl.textContent = `リアル会場0日目(準備日)まで、残り${daysUntilEvent}日です。`;
             },
 
@@ -242,7 +205,7 @@
             },
 
             // ---------------------------------------------------------
-            // 2. 次のタスク (Next Tasks)
+            // 次のタスク (Next Tasks)
             // ---------------------------------------------------------
 
 
@@ -446,66 +409,7 @@
             },
 
             // ---------------------------------------------------------
-            // 3. メンバーランキング (Member Ranking)
-            // ---------------------------------------------------------
-
-
-            renderNoticesForHome: function (notices) {
-                const container = document.getElementById('home-notices');
-                if (!container) return;
-                container.classList.remove('shimmer-loading');
-
-                const activeNotices = this.filterActiveNotices(notices).slice(0, 5);
-                const members = App.state.data.members || [];
-                const memberMap = new Map(members.map(m => [m.id, m]));
-
-                if (activeNotices.length === 0) {
-                    container.innerHTML = '<div class="padding center-align secondary-text">掲示中のお知らせはありません</div>';
-                    return;
-                }
-
-                const html = activeNotices.map((notice) => {
-                    const member = memberMap.get(notice.created_by);
-                    const author = member ? (member.display_name || member.name) : '不明';
-                    const icon = member && member.profile_photo_url
-                        ? `<i class="small circle"><img src="${escapeHtml(member.profile_photo_url)}" class="responsive"></i>`
-                        : '<i class="small">account_circle</i>';
-                    const body = this.toPlainText(notice.body || '');
-                    const clipped = body.length > 90 ? body.slice(0, 90) + '...' : body;
-                    const category = notice.category ? escapeHtml(notice.category) : '未分類';
-                    const noticeId = String(notice.id || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-
-                    return `
-                        <li class="small-margin" style="cursor: pointer;" onclick="App.pages.notices.openFromHome('${noticeId}')">
-                            <article class="border small-round padding">
-                                <div class="row tiny-space middle-align">
-                                    <span class="chip small border">${category}</span>
-                                    <div class="max"></div>
-                                    <span class="row tiny-space middle-align small-text secondary-text">${icon}${escapeHtml(author)}</span>
-                                </div>
-                                <h6 class="small bold top-margin">${escapeHtml(notice.title || '')}</h6>
-                                <p class="small-text secondary-text no-margin">${escapeHtml(clipped)}</p>
-                            </article>
-                        </li>
-                    `;
-                }).join('');
-
-                container.innerHTML = `<ul class="no-margin no-padding">${html}</ul>`;
-            },
-
-            filterActiveNotices: function (notices) {
-                const now = Date.now();
-                return (notices || []).filter((notice) => {
-                    if (!notice || !notice.starts_at || !notice.ends_at) return false;
-                    const startsAt = new Date(notice.starts_at).getTime();
-                    const endsAt = new Date(notice.ends_at).getTime();
-                    if (!Number.isFinite(startsAt) || !Number.isFinite(endsAt)) return false;
-                    return startsAt <= now && now < endsAt;
-                });
-            },
-
-            // ---------------------------------------------------------
-            // 4. 更新履歴 (Related History)
+            // 更新履歴 (Related History)
             // ---------------------------------------------------------
 
             filterRelatedLogs: function (logs) {
@@ -647,7 +551,7 @@
             },
 
             applyPanelHeights: function () {
-                const panelIds = ['home-next-tasks', 'home-notices', 'home-related-history'];
+                const panelIds = ['home-next-tasks', 'home-related-history'];
                 try {
                     const main = document.querySelector('main');
                     if (!main) return;

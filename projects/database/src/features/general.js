@@ -11,7 +11,7 @@ function getMemberByEmail(email) {
         }
         let result = handleDatabaseProcess(null, TABLE_NAMES.MEMBERS, 'select', {
             where: { email: ["=", email] }
-        }, null, false);
+        }, null, true);
         const members = result?.data || result || [];
         return members[0];
     } catch (error) {

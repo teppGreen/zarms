@@ -46,12 +46,6 @@
                     <span>新しいコメント</span>
                 </a>
             </li>
-            <li style="display: none;">
-                <a onclick="App.modals.newNotice.open()">
-                    <i>campaign</i>
-                    <span>新しいお知らせ</span>
-                </a>
-            </li>
         </menu>
     </button>
 
@@ -75,7 +69,7 @@
             <span id="comments-badge" class="badge" style="display: none;">0</span>
         </button>
 
-        <button class="l circle transparent" title="リンク">
+        <button class="l circle transparent" title="リンク" onclick="App.utils.header.refreshApps()">
             <i>apps</i>
             <menu id="apps-menu" class="left no-padding medium-width">
                 <div id="apps-grid">
@@ -87,7 +81,7 @@
         <button class="circle transparent" title="ヘルプ">
             <i>help</i>
             <menu id="help-menu" class="left no-wrap">
-                <li style="display: none;"><a onclick="App.utils.header.shortcuts.open()">ショートカット</a></li>
+                <li><a onclick="App.utils.header.shortcuts.open()">ショートカット</a></li>
                 <li><a id="help-link" href="" target="_blank">ヘルプ</a></li>
                 <li><a id="terms-link" href="" target="_blank">利用規約</a></li>
                 <li><a id="privacy-link" href="" target="_blank">プライバシーポリシー</a></li>
@@ -113,8 +107,8 @@
             <i>close</i>
         </button>
     </nav>
-    <article class="border small-round no-elevate scroll">
-        <div id="shortcuts-help-list" class="padding">
+    <article class="no-elevate scroll">
+        <div id="shortcuts-help-list">
             <div class="row tiny-space center-align secondary-text">
                 <progress class="circle indeterminate small"></progress>
                 <span>読み込み中...</span>
@@ -125,21 +119,17 @@
 
 <!-- システムアップデート通知モーダル -->
 <dialog id="modal-system-update" class="modal max large-padding">
-    <div class="large-margin large-padding center-align">
+    <div class="large-width center large-padding center-align middle">
         <h5 class="bold">ZARMSがアップデートされました</h5>
         <p>新しいバージョンを使うために、ページを更新してください。</p>
-        <div class="grid large-margin">
-            <div class="s6">
-                <button class="primary-container extra responsive" data-ui="#modal-system-update">
-                    <span class="secondary-text">あとで</span>
-                </button>
-            </div>
-            <div class="s6">
-                <button class="primary extra responsive" onclick="App.utils.header.systemUpdates.reloadPage(this)">
-                    <i>refresh</i>
-                    <span>今すぐ更新する</span>
-                </button>
-            </div>
+        <div class="large-margin">
+            <button class="primary responsive extra" onclick="App.utils.header.systemUpdates.reloadPage(this)">
+                <i>refresh</i>
+                <span>今すぐ更新する</span>
+            </button>
+            <button class="transparent responsive extra" onclick="appUi('modal-system-update', false)">
+                <span class="secondary-text">あとで</span>
+            </button>
         </div>
     </div>
 </dialog>

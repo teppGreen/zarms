@@ -24,17 +24,17 @@ npm run update:ui-deps -- --beercss=<version> --material-dynamic-colors=<version
 
 3. 変更ファイルを確認する。
    - `projects/frontend/src/css.html`
-   - `projects/frontend/src/pages/members-script.html`
+   - `projects/frontend/src/pages/catalog-script.html`
 4. 参照資料の整合を確認する。
    - `docs/beercss-tabulator-reference.md`
    - `docs/references/beercss-llms.md`
-5. 必要に応じて手動検証を実施する（membersタブ表示、ソート、フィルタ、行クリック）。
+5. 必要に応じて手動検証を実施する（catalogタブ表示、ソート、フィルタ、行クリック）。
 
 ## チェックポイント
 
 1. 置換対象が見つからないエラーが出ていないか。
 2. `beercss@x.y.z` / `material-dynamic-colors@x.y.z` / `tabulator-tables@x.y.z` が意図した値になっているか。
-3. members iframe 内 Tabulator が正常描画されるか。
+3. catalog iframe 内 Tabulator が正常描画されるか。
 4. 更新内容が `docs/docs-skills-boundary.md` の役割分担に沿っているか。
 
 ## 補足

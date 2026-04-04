@@ -1,0 +1,1630 @@
+<script>
+    (function () {
+        let _isLoading = false;
+        let _currentTab = 'member';
+        let _resizeHandlerBound = false;
+        let _tabNavigationBound = false;
+        const _memberTabNames = ['member', 'directory', 'skills', 'plans'];
+        const _tableParamToTab = {
+            members: 'member',
+            directories: 'directory',
+            skills: 'skills',
+            plans: 'plans'
+        };
+        const _tabToTableParam = {
+            member: 'members',
+            directory: 'directories',
+            skills: 'skills',
+            plans: 'plans'
+        };
+        const _tableData = {
+            member: [],
+            directory: [],
+            skills: [],
+            plans: []
+        };
+        const _sortState = {
+            member: [{ col: 'display_name', dir: 'asc' }],
+            directory: [{ col: 'name', dir: 'asc' }],
+            skills: [{ col: 'title', dir: 'asc' }],
+            plans: [{ col: 'plan_number', dir: 'asc' }]
+        };
+        const _defaultFilters = {
+            member: {
+                display_name: '',
+                name: '',
+                name_yomi: '',
+                display_name_yomi: '',
+                email: '',
+                phone_number: '',
+                birthday: '',
+                title: '',
+                system_role_key: '',
+                slack_profile_url: '',
+                remark: '',
+                directories: '',
+                status: ''
+            },
+            directory: {
+                name: '',
+                type: '',
+                parent: '',
+                status: '',
+                parentMode: '',
+                memberCountMin: '',
+                memberCountMax: ''
+            },
+            skills: {
+                title: '',
+                type: '',
+                description: '',
+                memberCountMin: '',
+                memberCountMax: ''
+            },
+            plans: {
+                planNumber: '',
+                name: '',
+                status: '',
+                type: '',
+                memberCountMin: '',
+                memberCountMax: ''
+            }
+        };
+        const _filters = {
+            member: Object.assign({}, _defaultFilters.member),
+            directory: Object.assign({}, _defaultFilters.directory),
+            skills: Object.assign({}, _defaultFilters.skills),
+            plans: Object.assign({}, _defaultFilters.plans)
+        };
+        const _headerFilters = {
+            member: [],
+            directory: [],
+            skills: [],
+            plans: []
+        };
+        const _quickSearch = {
+            member: '',
+            directory: '',
+            skills: '',
+            plans: ''
+        };
+        let _toolbarBound = false;
+        const _containers = {
+            member: 'members-table-container',
+            directory: 'directories-table-container',
+            skills: 'skills-table-container',
+            plans: 'plans-table-container'
+        };
+        const _loadingIds = {
+            member: 'members-table-loading',
+            directory: 'directories-table-loading',
+            skills: 'skills-table-loading',
+            plans: 'plans-table-loading'
+        };
+        const _frameIds = {
+            member: 'members-table-frame',
+            directory: 'directories-table-frame',
+            skills: 'skills-table-frame',
+            plans: 'plans-table-frame'
+        };
+        const _frameState = {
+            member: { ready: false, token: '', pendingPayload: null, detailMap: {} },
+            directory: { ready: false, token: '', pendingPayload: null, detailMap: {} },
+            skills: { ready: false, token: '', pendingPayload: null, detailMap: {} },
+            plans: { ready: false, token: '', pendingPayload: null, detailMap: {} }
+        };
+        const _tabulator = App.utils && App.utils.tabulator ? App.utils.tabulator : null;
+        const _frameMessageType = _tabulator ? _tabulator.createMessageTypes('members-tabulator') : {
+            ready: 'members-tabulator-ready',
+            rowClick: 'members-tabulator-row-click',
+            openExternal: 'members-tabulator-open-external',
+            sortChange: 'members-tabulator-sort-change',
+            filterChange: 'members-tabulator-filter-change',
+            error: 'members-tabulator-error',
+            render: 'members-tabulator-render',
+            resize: 'members-tabulator-resize',
+            downloadCsv: 'members-tabulator-download-csv',
+            downloadCsvResult: 'members-tabulator-download-csv-result'
+        };
+        const _filterFieldConfig = {
+            member: [
+                { key: 'display_name', label: '表示名', type: 'text' },
+                { key: 'name', label: '氏名', type: 'text' },
+                { key: 'name_yomi', label: '氏名ヨミ', type: 'text' },
+                { key: 'display_name_yomi', label: '表示名ヨミ', type: 'text' },
+                { key: 'email', label: 'メールアドレス', type: 'text' },
+                { key: 'phone_number', label: '電話番号', type: 'text' },
+                { key: 'birthday', label: '生年月日', type: 'text' },
+                { key: 'title', label: '筆頭役職', type: 'text' },
+                { key: 'system_role_key', label: 'システム権限', type: 'text' },
+                { key: 'slack_profile_url', label: 'Slack メンバーID', type: 'text' },
+                { key: 'remark', label: '備考', type: 'text' },
+                { key: 'directories', label: '所属組織', type: 'text' },
+                { key: 'status', label: 'ステータス', type: 'select', options: [{ value: '', label: 'すべて' }, { value: '在籍', label: '在籍' }, { value: '退籍', label: '退籍' }] }
+            ],
+            directory: [
+                { key: 'name', label: '組織名', type: 'text' },
+                { key: 'type', label: '種別', type: 'selectDynamicDirectoryTypes' },
+                { key: 'parent', label: '親組織', type: 'text' },
+                { key: 'status', label: 'ステータス', type: 'select', options: [{ value: '', label: 'すべて' }, { value: '有効', label: '有効' }, { value: '無効', label: '無効' }] },
+                { key: 'memberCountMin', label: '所属者数（最小）', type: 'number' },
+                { key: 'memberCountMax', label: '所属者数（最大）', type: 'number' }
+            ],
+            skills: [
+                { key: 'title', label: 'タイトル', type: 'text' },
+                { key: 'type', label: '種別', type: 'text' },
+                { key: 'description', label: '説明', type: 'text' },
+                { key: 'memberCountMin', label: '保有者数（最小）', type: 'number' },
+                { key: 'memberCountMax', label: '保有者数（最大）', type: 'number' }
+            ],
+            plans: [
+                { key: 'planNumber', label: '企画番号', type: 'text' },
+                { key: 'name', label: '企画名', type: 'text' },
+                { key: 'status', label: '状態', type: 'text' },
+                { key: 'type', label: '種別', type: 'text' },
+                { key: 'memberCountMin', label: '関係者数（最小）', type: 'number' },
+                { key: 'memberCountMax', label: '関係者数（最大）', type: 'number' }
+            ]
+        };
+        const _tableConfig = {
+            member: {
+                emptyText: '人物が見つかりません。条件を見直すか、絞り込みを解除してください',
+                columns: [
+                    { key: 'display_name', label: '表示名', formatterKey: 'memberNameLink'},
+                    { key: 'name', label: '氏名'},
+                    { key: 'name_yomi', label: '氏名ヨミ'},
+                    { key: 'display_name_yomi', label: '表示名ヨミ',},
+                    { key: 'email', label: 'メールアドレス'},
+                    { key: 'phone_number', label: '電話番号', visible: false},
+                    { key: 'birthday', label: '生年月日', visible: false},
+                    { key: 'title', label: '筆頭役職'},
+                    { key: 'system_role_key', label: 'システム権限', headerFilter: 'listDynamicMemberRoles'},
+                    { key: '_slackProfileTail', label: 'Slack'},
+                    { key: 'remark', label: '備考', wrap: true},
+                    { key: '_directoriesText', label: '所属組織', wrap: true},
+                    { key: '_statusText', label: 'ステータス', align: 'center', headerFilter: 'listMemberStatus'}
+                ]
+            },
+            directory: {
+                emptyText: '組織が見つかりません。条件を見直すか、絞り込みを解除してください',
+                columns: [
+                    { key: 'name', label: '組織名', responsive: 0 },
+                    { key: '_typeText', label: '種別', headerFilter: 'listDirectoryTypes'},
+                    { key: '_parentName', label: '親組織'},
+                    { key: '_memberCount', label: '所属者数', type: 'number', align: 'right'},
+                    { key: '_statusText', label: 'ステータス', align: 'center', headerFilter: 'listDirectoryStatus'}
+                ]
+            },
+            skills: {
+                emptyText: '技能が見つかりません。条件を見直すか、絞り込みを解除してください',
+                columns: [
+                    { key: 'title', label: 'タイトル'},
+                    { key: 'skill_type_key', label: '種別', headerFilter: 'listDynamicSkillTypes'},
+                    { key: 'description', label: '説明', wrap: true},
+                    { key: '_memberCount', label: '保有者数', type: 'number', align: 'right'}
+                ]
+            },
+            plans: {
+                emptyText: '企画が見つかりません。条件を見直すか、絞り込みを解除してください',
+                columns: [
+                    { key: 'plan_number', label: '企画番号'},
+                    { key: 'name', label: '企画名'},
+                    { key: '_statusText', label: '状態', headerFilter: 'listPlanStatus'},
+                    { key: '_typeText', label: '種別', headerFilter: 'listDynamicPlanTypes'},
+                    { key: '_memberCount', label: '関係者数', type: 'number', align: 'right'},
+                    { key: '_updatedAtText', label: '更新日時'}
+                ]
+            }
+        };
+        const _internalFrameKeys = {
+            __row_key: true,
+            __detail_id: true,
+            _children: true
+        };
+        const _forcedVisibleKeys = ['created_by', 'created_at', 'updated_by', 'updated_at'];
+        const _columnLabelOverrides = {
+            created_by: '作成者ID',
+            created_at: '作成日時',
+            updated_by: '更新者ID',
+            updated_at: '更新日時',
+            _createdByName: '作成者',
+            _updatedByName: '更新者',
+            _createdAtText: '作成日時(表示)',
+            _updatedAtText: '更新日時(表示)'
+        };
+
+        App.pages.catalog = {
+            _buildFrameDetailMap: function (rows) {
+                const map = {};
+                const walk = function (items) {
+                    (items || []).forEach(function (item) {
+                        if (!item || typeof item !== 'object') return;
+                        const rowKey = item.__row_key ? String(item.__row_key) : '';
+                        const detailId = item.__detail_id ? String(item.__detail_id) : '';
+                        if (rowKey) {
+                            map[rowKey] = detailId;
+                        }
+                        if (Array.isArray(item._children) && item._children.length) {
+                            walk(item._children);
+                        }
+                    });
+                };
+                walk(rows || []);
+                return map;
+            },
+
+            _resolveRowDetailId: function (tabName, row) {
+                if (!row || typeof row !== 'object') return '';
+                if (tabName === 'member') return String(row.id || row.member_id || '');
+                if (tabName === 'directory') return String(row.id || row.directory_id || '');
+                if (tabName === 'skills') return String(row.id || row.skill_id || '');
+                if (tabName === 'plans') return String(row.id || row.plan_id || '');
+                return String(row.id || '');
+            },
+
+            _buildFrameRows: function (tabName, rows) {
+                let seq = 0;
+                const build = function (row) {
+                    seq += 1;
+                    const hydratedRow = App.pages.catalog._attachAuditHelpers(row);
+                    const detailId = App.pages.catalog._resolveRowDetailId(tabName, row);
+                    const next = Object.assign({}, hydratedRow, {
+                        __detail_id: detailId,
+                        __row_key: detailId ? (tabName + ':' + detailId) : (tabName + ':row:' + String(seq))
+                    });
+                    if (Array.isArray(row && row._children)) {
+                        next._children = row._children.map(build);
+                    }
+                    return next;
+                };
+                return (rows || []).map(build);
+            },
+
+            _attachAuditHelpers: function (row) {
+                if (!row || typeof row !== 'object') return {};
+                const createdBy = row.created_by;
+                const updatedBy = row.updated_by;
+                return Object.assign({}, row, {
+                    _createdByName: this._resolveMemberDisplayName(createdBy),
+                    _updatedByName: this._resolveMemberDisplayName(updatedBy),
+                    _createdAtText: this._formatDateTime(row.created_at),
+                    _updatedAtText: this._formatDateTime(row.updated_at)
+                });
+            },
+
+            _resolveMemberDisplayName: function (memberId) {
+                if (memberId === null || memberId === undefined || memberId === '') return '';
+                const target = String(memberId);
+                const members = (App.state && App.state.data && Array.isArray(App.state.data.members)) ? App.state.data.members : [];
+                const matched = members.find(function (member) {
+                    return String(member && (member.id || member.member_id || '')) === target;
+                });
+                if (!matched) return target;
+                return String(matched.display_name || matched.name || matched.id || target);
+            },
+
+            _composeTabColumns: function (tabName, priorityColumns, frameRows) {
+                const preferred = Array.isArray(priorityColumns) ? priorityColumns.slice() : [];
+                const discoveredKeys = this._collectRowKeysRecursive(frameRows);
+                _forcedVisibleKeys.forEach(function (key) {
+                    discoveredKeys.add(key);
+                });
+                const preferredMap = {};
+                preferred.forEach(function (column) {
+                    const key = column && (column.key || column.field);
+                    if (!key) return;
+                    preferredMap[key] = true;
+                });
+                discoveredKeys.forEach(function (key) {
+                    if (preferredMap[key]) return;
+                    preferred.push({
+                        key: key,
+                        label: App.pages.catalog._buildColumnLabel(key)
+                    });
+                });
+                return preferred;
+            },
+
+            _collectRowKeysRecursive: function (rows) {
+                const keys = new Set();
+                const walk = function (items) {
+                    (items || []).forEach(function (item) {
+                        if (!item || typeof item !== 'object') return;
+                        Object.keys(item).forEach(function (key) {
+                            if (_internalFrameKeys[key]) return;
+                            keys.add(key);
+                        });
+                        if (Array.isArray(item._children) && item._children.length) {
+                            walk(item._children);
+                        }
+                    });
+                };
+                walk(rows || []);
+                return keys;
+            },
+
+            _buildColumnLabel: function (key) {
+                if (_columnLabelOverrides[key]) return _columnLabelOverrides[key];
+                const normalized = String(key || '').trim().replace(/^_+/, '');
+                if (!normalized) return '';
+                return normalized.split('_').filter(Boolean).map(function (token) {
+                    if (token.length <= 3) return token.toUpperCase();
+                    return token.charAt(0).toUpperCase() + token.slice(1);
+                }).join(' ');
+            },
+
+            _buildHeaderFiltersFromLegacy: function (tabName) {
+                const source = _filters[tabName] || {};
+                const mapping = this._getLegacyHeaderFilterMapping(tabName);
+                const entries = [];
+                Object.keys(mapping).forEach(function (legacyKey) {
+                    const value = source[legacyKey];
+                    if (value === '' || value === null || value === undefined) return;
+                    entries.push({ field: mapping[legacyKey], value: String(value) });
+                });
+                return entries;
+            },
+
+            _syncLegacyFiltersFromHeader: function (tabName, headerFilters) {
+                const mapping = this._getLegacyHeaderFilterMapping(tabName);
+                const reverse = {};
+                Object.keys(mapping).forEach(function (legacyKey) {
+                    reverse[mapping[legacyKey]] = legacyKey;
+                });
+
+                const nextFilters = Object.assign({}, _filters[tabName] || {}, _defaultFilters[tabName] || {});
+                Object.keys(reverse).forEach(function (field) {
+                    const legacyKey = reverse[field];
+                    if (legacyKey in nextFilters) {
+                        nextFilters[legacyKey] = '';
+                    }
+                });
+
+                (headerFilters || []).forEach(function (filter) {
+                    const legacyKey = reverse[filter.field];
+                    if (!legacyKey || !(legacyKey in nextFilters)) return;
+                    nextFilters[legacyKey] = String(filter.value || '');
+                });
+
+                _filters[tabName] = nextFilters;
+                this._updateFilterBadge();
+                this._updateSummary();
+            },
+
+            _getLegacyHeaderFilterMapping: function (tabName) {
+                if (tabName === 'member') {
+                    return {
+                        display_name: 'display_name',
+                        name: 'name',
+                        name_yomi: 'name_yomi',
+                        display_name_yomi: 'display_name_yomi',
+                        email: 'email',
+                        phone_number: 'phone_number',
+                        birthday: 'birthday',
+                        title: 'title',
+                        system_role_key: 'system_role_key',
+                        slack_profile_url: '_slackProfileTail',
+                        remark: 'remark',
+                        directories: '_directoriesText',
+                        status: '_statusText'
+                    };
+                }
+                if (tabName === 'directory') {
+                    return {
+                        name: 'name',
+                        type: '_typeText',
+                        parent: '_parentName',
+                        status: '_statusText',
+                        memberCountMin: '_memberCount',
+                        memberCountMax: '_memberCount'
+                    };
+                }
+                if (tabName === 'skills') {
+                    return {
+                        title: 'title',
+                        type: 'skill_type_key',
+                        description: 'description'
+                    };
+                }
+                return {
+                    planNumber: 'plan_number',
+                    name: 'name',
+                    status: '_statusText',
+                    type: '_typeText'
+                };
+            },
+
+            _buildListFilterValues: function (filterKey, tabName, rows) {
+                const sourceRows = Array.isArray(rows) ? rows : [];
+                const uniqueByField = function (field) {
+                    const values = sourceRows.map(function (row) {
+                        return row && row[field] !== undefined && row[field] !== null ? String(row[field]).trim() : '';
+                    }).filter(function (value) {
+                        return value !== '';
+                    });
+                    return Array.from(new Set(values)).sort(function (a, b) {
+                        return a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
+                    });
+                };
+
+                if (filterKey === 'listMemberStatus') return ['在籍', '退籍'];
+                if (filterKey === 'listDirectoryStatus') return ['有効', '無効'];
+                if (filterKey === 'listPlanStatus') {
+                    return Object.keys((KEY_LABELS && KEY_LABELS.PLAN_STATUS) ? KEY_LABELS.PLAN_STATUS : {}).map(function (statusKey) {
+                        return KEY_LABELS.PLAN_STATUS[statusKey];
+                    }).filter(function (value) {
+                        return value && String(value).trim() !== '';
+                    });
+                }
+                if (filterKey === 'listDirectoryTypes') {
+                    return Object.keys((KEY_LABELS && KEY_LABELS.DIRECTORY_TYPE) ? KEY_LABELS.DIRECTORY_TYPE : {}).map(function (typeKey) {
+                        return KEY_LABELS.DIRECTORY_TYPE[typeKey];
+                    }).filter(function (value) {
+                        return value && String(value).trim() !== '';
+                    });
+                }
+                if (filterKey === 'listDynamicMemberRoles') return uniqueByField('system_role_key');
+                if (filterKey === 'listDynamicSkillTypes') return uniqueByField('skill_type_key');
+                if (filterKey === 'listDynamicPlanTypes') return uniqueByField('_typeText');
+                return [];
+            },
+
+            _resolveHeaderFilterDefinition: function (column, tabName, rows) {
+                if (column.headerFilter === false) {
+                    return { type: false, values: [] };
+                }
+                if (column.headerFilter && String(column.headerFilter).indexOf('list') === 0) {
+                    return {
+                        type: 'list',
+                        values: this._buildListFilterValues(column.headerFilter, tabName, rows)
+                    };
+                }
+                if (column.headerFilter === 'number' || column.type === 'number') {
+                    return { type: 'number', values: [] };
+                }
+                return { type: 'input', values: [] };
+            },
+
+            _getTabulatorColumns: function (columns, tabName, rows) {
+                const openColumn = {
+                    title: '',
+                    field: '__open_action',
+                    minWidth: 74,
+                    responsive: 0,
+                    headerSort: false,
+                    headerFilter: false,
+                    headerFilterType: false,
+                    headerFilterValues: [],
+                    hozAlign: 'center',
+                    formatterKey: 'openAction',
+                    variableHeight: false,
+                    cssClass: 'members-tabulator-cell-nowrap',
+                    sorter: 'string'
+                };
+
+                return [openColumn].concat(columns).map(function (column) {
+                    const filterDefinition = App.pages.catalog._resolveHeaderFilterDefinition(column, tabName, rows);
+                    const colDef = {
+                        title: column.label || column.title || '',
+                        field: column.key || column.field,
+                        headerSort: column.headerSort !== undefined ? column.headerSort : (column.sortable !== false),
+                        headerFilterType: filterDefinition.type,
+                        headerFilterValues: filterDefinition.values,
+                        hozAlign: column.hozAlign || column.align || 'left',
+                        formatterKey: column.formatterKey || ((column.key || column.field) === '_statusText' ? 'status' : 'text'),
+                        variableHeight: column.wrap === true,
+                        cssClass: column.cssClass || (column.wrap ? 'members-tabulator-cell-wrap' : 'members-tabulator-cell-nowrap'),
+                        sorter: column.type === 'number' ? 'number' : 'string'
+                    };
+                    
+                    // 列の表示/非表示（カラム定義で明示的に指定された場合）
+                    if (column.visible !== undefined) {
+                        colDef.visible = column.visible;
+                        colDef._definedVisible = column.visible;
+                    }
+                    
+                    // レスポンシブ優先度（現在は使用していないが、将来の拡張用に保持）
+                    if (column.responsive !== undefined) {
+                        colDef.responsive = column.responsive;
+                    }
+                    
+                    return colDef;
+                });
+            },
+
+            _initializeToolbar: function () {
+                if (_toolbarBound) return;
+                _toolbarBound = true;
+                this._syncToolbarUi(_currentTab);
+            },
+
+            _syncToolbarUi: function (tabName) {
+                const normalizedTab = this._normalizeTabName(tabName);
+                const quickSearchInput = document.getElementById('catalog-quick-search-input');
+                if (quickSearchInput) {
+                    quickSearchInput.value = _quickSearch[normalizedTab] || '';
+                }
+
+                const sortSelect = document.getElementById('catalog-sort-select');
+                if (sortSelect) {
+                    const presets = this._buildSortPresets(normalizedTab);
+                    sortSelect.innerHTML = presets.map(function (preset) {
+                        return '<option value="' + App.pages.catalog._escapeAttr(preset.value) + '">' + App.pages.catalog._escapeHtml(preset.label) + '</option>';
+                    }).join('');
+                    const primary = (_sortState[normalizedTab] || [])[0];
+                    const currentValue = primary ? (primary.col + ':' + primary.dir) : '';
+                    if (currentValue && presets.some(function (preset) { return preset.value === currentValue; })) {
+                        sortSelect.value = currentValue;
+                    } else if (presets.length) {
+                        sortSelect.value = presets[0].value;
+                    }
+                }
+
+                this._updateQuickFilterChips();
+            },
+
+            _buildSortPresets: function (tabName) {
+                const targetTab = this._normalizeTabName(tabName);
+                const columns = ((_tableConfig[targetTab] && _tableConfig[targetTab].columns) || []).filter(function (column) {
+                    return column && column.sortable !== false;
+                });
+                return columns.map(function (column) {
+                    const key = column.key || column.field;
+                    const label = column.label || column.title || key;
+                    return [
+                        { value: key + ':asc', col: key, dir: 'asc', label: label + '（昇順）' },
+                        { value: key + ':desc', col: key, dir: 'desc', label: label + '（降順）' }
+                    ];
+                }).reduce(function (acc, pair) {
+                    return acc.concat(pair);
+                }, []);
+            },
+
+            _updateQuickFilterChips: function () {
+                const chips = document.getElementById('catalog-quick-filter-chips');
+                if (!chips) return;
+                const parts = [];
+                const searchValue = _quickSearch[_currentTab] || '';
+                if (searchValue) {
+                    parts.push('<span class="chip small border">検索: ' + this._escapeHtml(searchValue) + '</span>');
+                }
+                const primary = (_sortState[_currentTab] || [])[0];
+                if (primary && primary.col) {
+                    const columns = (_tableConfig[_currentTab] && _tableConfig[_currentTab].columns) || [];
+                    const column = columns.find(function (item) { return item.key === primary.col; });
+                    const label = column ? (column.label || column.title || primary.col) : primary.col;
+                    const dirLabel = primary.dir === 'desc' ? '降順' : '昇順';
+                    parts.push('<span class="chip small border">並び: ' + this._escapeHtml(label) + ' / ' + dirLabel + '</span>');
+                }
+                chips.innerHTML = parts.join('');
+            },
+
+            _ensureTabNavigation: function () {
+                if (_tabNavigationBound) return;
+                const tabNav = document.getElementById('catalog-table-nav');
+                if (!tabNav) return;
+                _tabNavigationBound = true;
+                tabNav.addEventListener('click', function (event) {
+                    const tabButton = event.target.closest('[data-catalog-table]');
+                    if (!tabButton || !tabNav.contains(tabButton)) {
+                        return;
+                    }
+                    const nextTab = tabButton.getAttribute('data-catalog-table');
+                    if (!nextTab) {
+                        return;
+                    }
+                    App.pages.catalog.switchTab(nextTab);
+                });
+            },
+
+            _setActiveTabUi: function (activeTab) {
+                _memberTabNames.forEach(function (tabName) {
+                    const tableParam = _tabToTableParam[tabName] || 'members';
+                    const button = document.querySelector('#catalog-table-nav [data-catalog-table="' + tableParam + '"]');
+                    if (button) {
+                        button.classList.toggle('active', tabName === activeTab);
+                    }
+
+                    const panel = document.getElementById('catalog-subtab-' + tableParam);
+                    if (panel) {
+                        panel.classList.toggle('active', tabName === activeTab);
+                        panel.style.display = tabName === activeTab ? '' : 'none';
+                    }
+                });
+            },
+
+            _normalizeTabName: function (tabName) {
+                const key = String(tabName || '').trim();
+                if (!key) return 'member';
+                if (_memberTabNames.indexOf(key) !== -1) return key;
+                if (Object.prototype.hasOwnProperty.call(_tableParamToTab, key)) {
+                    return _tableParamToTab[key];
+                }
+                return 'member';
+            },
+
+            _syncTableParam: function (tabName, replaceHistory) {
+                if (!App.utils || !App.utils.url || !App.utils.url.getParams || !App.utils.url.updateParams) {
+                    return;
+                }
+                const params = App.utils.url.getParams();
+                params.tab = 'catalog';
+                params.table = _tabToTableParam[tabName] || 'members';
+                App.utils.url.updateParams(params, replaceHistory === true);
+            },
+
+            _applyTableParamFromUrl: function () {
+                if (!App.utils || !App.utils.url || !App.utils.url.getParams) {
+                    return;
+                }
+                const params = App.utils.url.getParams();
+                if (!params || !params.table) {
+                    return;
+                }
+                const requestedTab = this._normalizeTabName(params.table);
+                if (_memberTabNames.indexOf(requestedTab) === -1) {
+                    return;
+                }
+                if (_currentTab !== requestedTab) {
+                    _currentTab = requestedTab;
+                    this._setActiveTabUi(_currentTab);
+                }
+            },
+
+            sortTable: function (tabName, colKey) {
+                const config = _tableConfig[tabName];
+                if (!config) return;
+
+                const column = config.columns.find(function (item) { return item.key === colKey; });
+                if (!column || column.sortable === false) return;
+
+                const current = _sortState[tabName] || [];
+                const primary = current[0];
+                if (primary && primary.col === colKey) {
+                    primary.dir = primary.dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    _sortState[tabName] = [{ col: colKey, dir: 'asc' }].concat(current.filter(function (item) {
+                        return item.col !== colKey;
+                    }));
+                }
+
+                this._renderTable(tabName);
+            },
+
+            resetFilters: function (tabName) {
+                _filters[tabName] = Object.assign({}, _defaultFilters[tabName]);
+                _headerFilters[tabName] = this._buildHeaderFiltersFromLegacy(tabName);
+                this._renderTable(tabName);
+                this._updateFilterBadge();
+                this._syncToolbarUi(tabName);
+                this._updateSummary();
+            },
+
+            resetColumnVisibility: function (tabName) {
+                const targetTab = this._normalizeTabName(tabName);
+                const storageKey = 'zarms.catalog.hiddenColumns.' + targetTab;
+                try {
+                    window.localStorage.removeItem(storageKey);
+                } catch (err) {
+                    console.warn('[Members] 列表示設定のリセットに失敗:', err);
+                }
+                this._renderTable(targetTab);
+                this._updateSummary();
+                showSnackbar(this._getTabLabel(targetTab) + 'の列表示をリセットしました', 'success');
+            },
+
+            setFilters: function (tabName, nextFilters) {
+                _filters[tabName] = Object.assign({}, _filters[tabName], nextFilters);
+                _headerFilters[tabName] = this._buildHeaderFiltersFromLegacy(tabName);
+                this._renderTable(tabName);
+                this._updateFilterBadge();
+                this._updateSummary();
+            },
+
+            getFilterFields: function (tabName) {
+                if (tabName === 'directory') {
+                    const values = Object.entries((KEY_LABELS && KEY_LABELS.DIRECTORY_TYPE) ? KEY_LABELS.DIRECTORY_TYPE : {}).map(function (entry) {
+                        return { value: entry[1], label: entry[1] };
+                    });
+                    return _filterFieldConfig.directory.map(function (field) {
+                        if (field.type === 'selectDynamicDirectoryTypes') {
+                            return {
+                                key: field.key,
+                                label: field.label,
+                                type: 'select',
+                                options: [{ value: '', label: 'すべて' }].concat(values)
+                            };
+                        }
+                        return field;
+                    });
+                }
+                return _filterFieldConfig[tabName] || [];
+            },
+
+            getCurrentTab: function () {
+                return _currentTab;
+            },
+
+            applyCurrentLayoutHeight: function () {
+                this._applyTableHeight(_currentTab);
+            },
+
+            getCurrentFilters: function () {
+                return Object.assign({}, _filters[_currentTab]);
+            },
+
+            getCurrentTabLabel: function () {
+                return this._getTabLabel(_currentTab);
+            },
+
+            init: function () {
+                this._ensureTabNavigation();
+                this._initializeToolbar();
+                this._ensureResizeHandler();
+                this._applyTableParamFromUrl();
+                this._setActiveTabUi(_currentTab);
+                this._syncToolbarUi(_currentTab);
+            },
+
+            loadData: async function (isRefresh) {
+                const forceRefresh = isRefresh === true;
+                this._ensureTabNavigation();
+                this._initializeToolbar();
+                this._ensureResizeHandler();
+                this._applyTableParamFromUrl();
+
+                const activeTab = this._normalizeTabName(_currentTab);
+                _isLoading = true;
+                this._showLoading(true, activeTab);
+                this._syncToolbarUi(activeTab);
+
+                const readRows = function (result, fallback) {
+                    if (result && Array.isArray(result.data)) return result.data;
+                    if (result && Array.isArray(result.results)) return result.results;
+                    if (Array.isArray(result)) return result;
+                    return Array.isArray(fallback) ? fallback : [];
+                };
+
+                try {
+                    const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, [
+                        { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: forceRefresh },
+                        { key: 'directories', tableName: TABLE_NAMES.DIRECTORIES, operation: 'select', dataObject: {}, forceRefresh: forceRefresh },
+                        { key: 'directoryAssignments', tableName: TABLE_NAMES.DIRECTORY_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: forceRefresh },
+                        { key: 'skills', tableName: TABLE_NAMES.SKILLS, operation: 'select', dataObject: {}, forceRefresh: forceRefresh },
+                        { key: 'skillAssignments', tableName: TABLE_NAMES.SKILL_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: forceRefresh },
+                        { key: 'plans', tableName: TABLE_NAMES.PLANS, operation: 'select', dataObject: {}, forceRefresh: forceRefresh },
+                        { key: 'planAssignments', tableName: TABLE_NAMES.PLAN_ASSIGNMENTS, operation: 'select', dataObject: {}, forceRefresh: forceRefresh }
+                    ]);
+                    const results = batchResult?.results || {};
+
+                    App.state.data.members = readRows(results.members, App.state.data.members);
+                    App.state.data.directories = readRows(results.directories, App.state.data.directories);
+                    App.state.data.directoryAssignments = readRows(results.directoryAssignments, App.state.data.directoryAssignments);
+                    App.state.data.skills = readRows(results.skills, App.state.data.skills);
+                    App.state.data.skillAssignments = readRows(results.skillAssignments, App.state.data.skillAssignments);
+                    App.state.data.plans = readRows(results.plans, App.state.data.plans);
+                    App.state.data.planAssignments = readRows(results.planAssignments, App.state.data.planAssignments);
+
+                    _tableData.member = this._buildMemberRows(App.state.data.members || [], App.state.data.directories || [], App.state.data.directoryAssignments || []);
+                    _tableData.directory = this._buildDirectoryRows(App.state.data.directories || [], App.state.data.directoryAssignments || []);
+                    _tableData.skills = this._buildSkillRows(App.state.data.skills || [], App.state.data.skillAssignments || []);
+                    _tableData.plans = this._buildPlanRows(App.state.data.plans || [], App.state.data.planAssignments || [], App.state.data.members || []);
+
+                    this._syncToolbarUi(activeTab);
+                    this._renderTable(activeTab);
+                    requestAnimationFrame(function () {
+                        App.pages.catalog._applyTableHeight(activeTab);
+                    });
+                } catch (error) {
+                    console.error('[Members] データ読み込みエラー:', error);
+                    showSnackbar('データを読み込めませんでした。再読み込みしてください', 'error');
+                } finally {
+                    _isLoading = false;
+                    this._showLoading(false, activeTab);
+                    this._renderTable(activeTab);
+                    this._updateFilterBadge();
+                    this._updateSummary();
+                    this._updateQuickFilterChips();
+                }
+            },
+
+            switchTab: function (tabName, options) {
+                const normalizedTab = this._normalizeTabName(tabName);
+                const nextOptions = options || {};
+                _currentTab = normalizedTab;
+                this._ensureTabNavigation();
+                this._initializeToolbar();
+                this._setActiveTabUi(normalizedTab);
+                this._syncToolbarUi(normalizedTab);
+
+                if (nextOptions.syncUrl !== false) {
+                    this._syncTableParam(normalizedTab, nextOptions.replaceHistory === true);
+                }
+
+                this._showLoading(_isLoading, normalizedTab);
+                if (!_isLoading) {
+                    this._renderTable(normalizedTab);
+                    requestAnimationFrame(function () {
+                        App.pages.catalog._applyTableHeight(normalizedTab);
+                    });
+                }
+
+                this._updateFilterBadge();
+                this._updateSummary();
+                this._updateQuickFilterChips();
+            },
+
+            setQuickSearch: function (value) {
+                const tabName = this._normalizeTabName(_currentTab);
+                _quickSearch[tabName] = String(value || '');
+                this._syncToolbarUi(tabName);
+                this._renderTable(tabName);
+                this._updateSummary();
+                this._applyTableHeight(tabName);
+            },
+
+            setSortPreset: function (presetValue) {
+                const tabName = this._normalizeTabName(_currentTab);
+                const value = String(presetValue || '').trim();
+                if (!value) {
+                    return;
+                }
+
+                const parts = value.split(':');
+                const colKey = parts[0] || '';
+                const dir = parts[1] === 'desc' ? 'desc' : 'asc';
+                if (!colKey) return;
+
+                const current = _sortState[tabName] || [];
+                const filtered = current.filter(function (item) {
+                    return item.col !== colKey;
+                });
+                _sortState[tabName] = [{ col: colKey, dir: dir }].concat(filtered);
+                this._syncToolbarUi(tabName);
+                this._renderTable(tabName);
+                this._updateSummary();
+                this._applyTableHeight(tabName);
+            },
+
+            toggleSortDirection: function () {
+                const tabName = this._normalizeTabName(_currentTab);
+                const current = _sortState[tabName] || [];
+                if (!current.length) {
+                    const presets = this._buildSortPresets(tabName);
+                    if (presets.length) {
+                        this.setSortPreset(presets[0].value);
+                    }
+                    return;
+                }
+
+                current[0].dir = current[0].dir === 'asc' ? 'desc' : 'asc';
+                this._syncToolbarUi(tabName);
+                this._renderTable(tabName);
+                this._updateSummary();
+                this._applyTableHeight(tabName);
+            },
+
+            downloadCsvForCurrentTab: function () {
+                const tabName = _currentTab;
+                const frame = document.getElementById(_frameIds[tabName]);
+                const state = _frameState[tabName];
+                if (!frame || !state || !state.ready || !frame.contentWindow) {
+                    showSnackbar('一覧の描画完了後にCSV出力してください', 'warning');
+                    return;
+                }
+                this._postFrameMessage(tabName, _frameMessageType.downloadCsv, {
+                    fileName: this._buildCsvFileName(tabName)
+                });
+            },
+
+            _getTabLabel: function (tabName) {
+                if (tabName === 'member') return '人物';
+                if (tabName === 'directory') return '組織';
+                if (tabName === 'skills') return '技能';
+                if (tabName === 'plans') return '企画';
+                return '人物';
+            },
+
+            _showLoading: function (show, tab) {
+                var memberLoading = document.getElementById(_loadingIds.member);
+                var dirLoading = document.getElementById(_loadingIds.directory);
+                var skillLoading = document.getElementById(_loadingIds.skills);
+                var plansLoading = document.getElementById(_loadingIds.plans);
+                var memberContainer = document.getElementById(_containers.member);
+                var dirContainer = document.getElementById(_containers.directory);
+                var skillContainer = document.getElementById(_containers.skills);
+                var plansContainer = document.getElementById(_containers.plans);
+                if (tab === 'member') {
+                    if (memberLoading) memberLoading.style.display = show ? '' : 'none';
+                    if (memberContainer) memberContainer.style.display = show ? 'none' : '';
+                } else if (tab === 'directory') {
+                    if (dirLoading) dirLoading.style.display = show ? '' : 'none';
+                    if (dirContainer) dirContainer.style.display = show ? 'none' : '';
+                } else if (tab === 'skills') {
+                    if (skillLoading) skillLoading.style.display = show ? '' : 'none';
+                    if (skillContainer) skillContainer.style.display = show ? 'none' : '';
+                } else {
+                    if (plansLoading) plansLoading.style.display = show ? '' : 'none';
+                    if (plansContainer) plansContainer.style.display = show ? 'none' : '';
+                }
+            },
+
+            _buildMemberRows: function (members, directories, assignments) {
+                return members.map(function (member) {
+                    const rowId = member ? (member.id || member.member_id || null) : null;
+                    const myAssignments = assignments.filter(function (assignment) {
+                        return String(assignment.member_id || '') === String(rowId || '') && assignment.is_active !== false;
+                    });
+                    const names = myAssignments.map(function (assignment) {
+                        const directory = directories.find(function (item) {
+                            const directoryId = item ? (item.id || item.directory_id || '') : '';
+                            return String(directoryId) === String(assignment.directory_id || '');
+                        });
+                        return directory ? directory.name : null;
+                    }).filter(Boolean);
+                    return Object.assign({}, member, {
+                        id: rowId,
+                        _slackProfileTail: App.pages.catalog._extractSlackProfileTail(member.slack_profile_url),
+                        _directoriesText: names.join(' / '),
+                        _statusText: member.is_active === false ? '退籍' : '在籍'
+                    });
+                });
+            },
+
+            _extractSlackProfileTail: function (value) {
+                if (!value) return '';
+                const trimmed = String(value).trim();
+                if (!trimmed) return '';
+                const normalized = trimmed.replace(/\/+$/, '');
+                const token = normalized.split(/[\/?#]/).filter(Boolean).pop() || '';
+                if (token.length <= 11) return token;
+                return token.slice(-11);
+            },
+
+            _buildDirectoryRows: function (directories, assignments) {
+                const typeMap = (KEY_LABELS && KEY_LABELS.DIRECTORY_TYPE) ? KEY_LABELS.DIRECTORY_TYPE : {};
+                const rowById = {};
+
+                directories.forEach(function (directory) {
+                    const rowId = directory ? (directory.id || directory.directory_id || null) : null;
+                    const parent = directories.find(function (item) {
+                        const itemId = item ? (item.id || item.directory_id || '') : '';
+                        return String(itemId) === String(directory.parent_directory_id || '');
+                    });
+                    const memberCount = assignments.filter(function (assignment) {
+                        return String(assignment.directory_id || '') === String(rowId || '') && assignment.is_active !== false;
+                    }).length;
+                    rowById[rowId] = Object.assign({}, directory, {
+                        id: rowId,
+                        _parentName: parent ? parent.name : '',
+                        _typeText: typeMap[directory.directory_type_key] || directory.directory_type_key || '',
+                        _memberCount: memberCount,
+                        _statusText: directory.is_active === false ? '無効' : '有効',
+                        _children: []
+                    });
+                });
+
+                const roots = [];
+                Object.keys(rowById).forEach(function (directoryId) {
+                    const row = rowById[directoryId];
+                    const parentId = row.parent_directory_id;
+                    if (!parentId || !rowById[parentId] || parentId === row.id) {
+                        roots.push(row);
+                        return;
+                    }
+                    rowById[parentId]._children.push(row);
+                });
+
+                return roots;
+            },
+
+            _buildSkillRows: function (skills, assignments) {
+                return skills.map(function (skill) {
+                    const count = assignments.filter(function (assignment) {
+                        return assignment.skill_id === skill.id;
+                    }).length;
+                    return Object.assign({}, skill, {
+                        _memberCount: count
+                    });
+                });
+            },
+
+            /* plans独立タブ化時はこの関数群を pages/plans へ移設する */
+            _buildPlanRows: function (plans, planAssignments, members) {
+                const memberMap = (members || []).reduce(function (acc, member) {
+                    acc[member.id] = member;
+                    return acc;
+                }, {});
+
+                return (plans || []).map(function (plan) {
+                    const activeAssignments = (planAssignments || []).filter(function (assignment) {
+                        return assignment.plan_id === plan.id && assignment.is_active !== false;
+                    });
+                    const memberNames = activeAssignments.map(function (assignment) {
+                        const member = memberMap[assignment.member_id];
+                        return member ? (member.display_name || member.name || '') : '';
+                    }).filter(Boolean);
+                    const status = plan.plan_status || '';
+                    const updatedAt = plan.updated_at || plan.created_at || '';
+
+                    return Object.assign({}, plan, {
+                        _statusText: KEY_LABELS.PLAN_STATUS[status] || status,
+                        _typeText: plan.plan_type || '',
+                        _memberCount: activeAssignments.length,
+                        _memberNamesText: memberNames.join(' / '),
+                        _updatedAtText: App.pages.catalog._formatDateTime(updatedAt)
+                    });
+                });
+            },
+
+            _renderAllTables: function () {
+                this._renderTable(_currentTab);
+            },
+
+            _renderTable: function (tabName) {
+                const container = document.getElementById(_containers[tabName]);
+                const config = _tableConfig[tabName];
+                if (!container || !config) return;
+
+                const rows = this._getVisibleRows(tabName);
+                const frame = this._ensureTabulatorFrame(tabName, container);
+                const payload = this._buildFramePayload(tabName, rows, config);
+
+                container.style.display = _isLoading ? 'none' : '';
+                this._applyTableHeight(tabName);
+
+                if (_frameState[tabName].ready && frame.contentWindow) {
+                    this._postFrameMessage(tabName, _frameMessageType.render, payload);
+                    return;
+                }
+
+                _frameState[tabName].pendingPayload = payload;
+            },
+
+            _ensureTabulatorFrame: function (tabName, container) {
+                const frameId = _frameIds[tabName];
+                const token = this._getFrameToken(tabName);
+                const srcdoc = _tabulator && _tabulator.buildFrameSrcdoc ? _tabulator.buildFrameSrcdoc({
+                    tabName: tabName,
+                    token: token,
+                    messageTypes: _frameMessageType,
+                    hostSource: 'members-host',
+                    rootId: 'members-tabulator-root',
+                    hiddenColumnsKey: 'zarms.catalog.hiddenColumns.' + tabName,
+                    tableCssUrl: 'https://unpkg.com/tabulator-tables@6.4.0/dist/css/tabulator.min.css',
+                    tableCssIntegrity: 'sha512-EJ6lxy7335ihpAJmiAeANxknYr5UhPDarr/7TWUAoTSZxK/j0UsdusF3uEYCe8nGwpOyHXnbuAiCanaOvyssgA==',
+                    tableJsUrl: 'https://unpkg.com/tabulator-tables@6.4.0/dist/js/tabulator.min.js',
+                    tableJsIntegrity: 'sha512-QEm/YyHse/1FVEczmITPosuIcPRjK1FmVsw7M5yoxogODzb3B/mao7WKabBLrM6jT8VCahLCsbsaGvtHkFmAQQ==',
+                    dataTreeElementColumn: 'name'
+                }) : '';
+                if (_tabulator && _tabulator.mountFrameToContainer) {
+                    return _tabulator.mountFrameToContainer({
+                        container: container,
+                        frameId: frameId,
+                        className: 'members-tabulator-frame',
+                        title: this._getTabLabel(tabName) + '一覧',
+                        sandbox: 'allow-scripts allow-popups allow-popups-to-escape-sandbox',
+                        loading: 'eager',
+                        referrerpolicy: 'no-referrer',
+                        srcdoc: srcdoc,
+                        width: '100%',
+                        border: '0',
+                        display: 'block',
+                        background: 'transparent'
+                    });
+                }
+
+                let frame = document.getElementById(frameId);
+                if (frame) return frame;
+                frame = document.createElement('iframe');
+                frame.id = frameId;
+                frame.className = 'members-tabulator-frame';
+                frame.setAttribute('title', this._getTabLabel(tabName) + '一覧');
+                frame.setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox');
+                frame.setAttribute('loading', 'eager');
+                frame.setAttribute('referrerpolicy', 'no-referrer');
+                frame.srcdoc = srcdoc;
+                frame.style.width = '100%';
+                frame.style.border = '0';
+                frame.style.display = 'block';
+                frame.style.background = 'transparent';
+                container.innerHTML = '';
+                container.appendChild(frame);
+                return frame;
+            },
+
+            _getFrameToken: function (tabName) {
+                if (_frameState[tabName].token) {
+                    return _frameState[tabName].token;
+                }
+
+                const token = _tabulator ? _tabulator.createFrameToken() : String(Date.now()) + String(Math.random()).slice(2);
+
+                _frameState[tabName].token = token;
+                return token;
+            },
+
+            _buildFramePayload: function (tabName, rows, config) {
+                const frameRows = this._buildFrameRows(tabName, rows);
+                const composedColumns = this._composeTabColumns(tabName, config.columns, frameRows);
+                _frameState[tabName].detailMap = this._buildFrameDetailMap(frameRows);
+                return {
+                    tabName: tabName,
+                    rows: frameRows,
+                    emptyText: config.emptyText,
+                    dataTree: tabName === 'directory',
+                    headerFilters: (_headerFilters[tabName] || []).slice(),
+                    columns: this._getTabulatorColumns(composedColumns, tabName, frameRows),
+                    sorters: (_sortState[tabName] || []).map(function (sorter) {
+                        return { column: sorter.col, dir: sorter.dir };
+                    })
+                };
+            },
+
+            _buildCsvFileName: function (tabName) {
+                const now = new Date();
+                const pad2 = function (value) { return String(value).padStart(2, '0'); };
+                const ymd = String(now.getFullYear()) + pad2(now.getMonth() + 1) + pad2(now.getDate());
+                const hm = pad2(now.getHours()) + pad2(now.getMinutes());
+                const tableParam = _tabToTableParam[tabName] || 'members';
+                return 'catalog-' + tableParam + '-' + ymd + '-' + hm + '.csv';
+            },
+
+            _postFrameMessage: function (tabName, type, payload) {
+                const frame = document.getElementById(_frameIds[tabName]);
+                const state = _frameState[tabName];
+                if (!frame || !frame.contentWindow || !state.token) return;
+
+                frame.contentWindow.postMessage({
+                    source: 'members-host',
+                    type: type,
+                    token: state.token,
+                    payload: payload || {}
+                }, '*');
+            },
+
+            _buildTableHtml: function (tabName, rows, config) {
+                const self = this;
+                const headerHtml = '<thead class="fixed"><tr>' + config.columns.map(function (column) {
+                    const icon = self._getSortIcon(tabName, column.key);
+                    const style = column.width ? ' style="width:' + column.width + ';"' : '';
+                    if (column.sortable === false) {
+                        return '<th' + style + '><div class="row tiny-space">' + self._escapeHtml(column.label) + '</div></th>';
+                    }
+                    return '<th' + style + ' class="members-sortable" onclick="App.pages.catalog.sortTable(\'' + tabName + '\', \'' + column.key + '\')"><div class="row tiny-space">' + self._escapeHtml(column.label) + '<i>' + icon + '</i></div></th>';
+                }).join('') + '</tr></thead>';
+
+                const bodyHtml = rows.length === 0
+                    ? '<tbody><tr><td colspan="' + config.columns.length + '" class="center-align secondary-text">' + this._escapeHtml(config.emptyText) + '</td></tr></tbody>'
+                    : '<tbody>' + rows.map(function (row) {
+                        return self._buildRowHtml(tabName, row, config.columns);
+                    }).join('') + '</tbody>';
+
+                return '<div class="scroll surface-container-low members-list-table-scroll">' +
+                    '<table class="border members-data-table">' + headerHtml + bodyHtml + '</table>' +
+                    '</div>';
+            },
+
+            _buildRowHtml: function (tabName, row, columns) {
+                const self = this;
+                return '<tr class="members-data-row" data-row-id="' + this._escapeAttr(row.id) + '">' + columns.map(function (column) {
+                    return self._buildCell(tabName, row, column);
+                }).join('') + '</tr>';
+            },
+
+            _buildCell: function (tabName, row, column) {
+                const displayHtml = this._getCellDisplayHtml(tabName, column, row);
+                const alignStyle = column.align ? 'text-align:' + column.align + ';' : '';
+                const className = column.wrap ? 'members-cell-wrap' : 'members-cell-nowrap';
+                return '<td style="' + alignStyle + '">' +
+                    '<div class="' + className + '">' + displayHtml + '</div>' +
+                    '</td>';
+            },
+
+            _getVisibleRows: function (tabName) {
+                const rows = (_tableData[tabName] || []).slice();
+                return this._applyQuickSearch(tabName, rows);
+            },
+
+            _applyQuickSearch: function (tabName, rows) {
+                const keyword = String(_quickSearch[tabName] || '').trim().toLowerCase();
+                if (!keyword) return rows;
+
+                const self = this;
+                const hasKeyword = function (row) {
+                    return self._collectRowSearchTargets(row).some(function (value) {
+                        return value.indexOf(keyword) !== -1;
+                    });
+                };
+
+                if (tabName === 'directory') {
+                    const filterTree = function (items) {
+                        return (items || []).reduce(function (acc, row) {
+                            if (!row || typeof row !== 'object') return acc;
+                            const next = Object.assign({}, row);
+                            const children = Array.isArray(row._children) ? row._children : [];
+                            const matchedChildren = filterTree(children);
+                            const selfMatched = hasKeyword(row);
+                            if (selfMatched || matchedChildren.length) {
+                                next._children = matchedChildren;
+                                acc.push(next);
+                            }
+                            return acc;
+                        }, []);
+                    };
+                    return filterTree(rows);
+                }
+
+                return rows.filter(function (row) {
+                    return hasKeyword(row);
+                });
+            },
+
+            _collectRowSearchTargets: function (row) {
+                if (!row || typeof row !== 'object') return [];
+                return Object.keys(row).reduce(function (acc, key) {
+                    if (_internalFrameKeys[key]) return acc;
+                    const value = row[key];
+                    if (value === null || value === undefined) return acc;
+                    if (typeof value === 'object') return acc;
+                    acc.push(String(value).toLowerCase());
+                    return acc;
+                }, []);
+            },
+
+            _applyFilters: function (tabName, rows) {
+                const filters = _filters[tabName] || {};
+                return rows.filter(function (row) {
+                    if (tabName === 'member') {
+                        return App.pages.catalog._matchText(row.display_name, filters.display_name) &&
+                            App.pages.catalog._matchText(row.name, filters.name) &&
+                            App.pages.catalog._matchText(row.name_yomi, filters.name_yomi) &&
+                            App.pages.catalog._matchText(row.display_name_yomi, filters.display_name_yomi) &&
+                            App.pages.catalog._matchText(row.email, filters.email) &&
+                            App.pages.catalog._matchText(row.phone_number, filters.phone_number) &&
+                            App.pages.catalog._matchText(row.birthday, filters.birthday) &&
+                            App.pages.catalog._matchText(row.title, filters.title) &&
+                            App.pages.catalog._matchText(row.system_role_key, filters.system_role_key) &&
+                            App.pages.catalog._matchText(row._slackProfileTail, filters.slack_profile_url) &&
+                            App.pages.catalog._matchText(row.remark, filters.remark) &&
+                            App.pages.catalog._matchText(row._directoriesText, filters.directories) &&
+                            App.pages.catalog._matchSelect(row._statusText, filters.status);
+                    }
+                    if (tabName === 'directory') {
+                        const parentMode = String(filters.parentMode || '');
+                        const hasParent = String(row._parentName || '').trim() !== '';
+                        const parentModeMatch = parentMode === 'roots'
+                            ? !hasParent
+                            : (parentMode === 'descendants' ? hasParent : true);
+                        return App.pages.catalog._matchText(row.name, filters.name) &&
+                            App.pages.catalog._matchSelect(row._typeText, filters.type) &&
+                            parentModeMatch &&
+                            App.pages.catalog._matchText(row._parentName, filters.parent) &&
+                            App.pages.catalog._matchSelect(row._statusText, filters.status) &&
+                            App.pages.catalog._matchMinMax(row._memberCount, filters.memberCountMin, filters.memberCountMax);
+                    }
+                    if (tabName === 'skills') {
+                        return App.pages.catalog._matchText(row.title, filters.title) &&
+                            App.pages.catalog._matchText(row.skill_type_key, filters.type) &&
+                            App.pages.catalog._matchText(row.description, filters.description) &&
+                            App.pages.catalog._matchMinMax(row._memberCount, filters.memberCountMin, filters.memberCountMax);
+                    }
+                    return App.pages.catalog._matchText(row.plan_number, filters.planNumber) &&
+                        App.pages.catalog._matchText(row.name, filters.name) &&
+                        App.pages.catalog._matchText(row._statusText, filters.status) &&
+                        App.pages.catalog._matchText(row._typeText, filters.type) &&
+                        App.pages.catalog._matchMinMax(row._memberCount, filters.memberCountMin, filters.memberCountMax);
+                });
+            },
+
+            _applySort: function (tabName, rows) {
+                const config = _tableConfig[tabName];
+                const criteria = _sortState[tabName] || [];
+                const nextRows = rows.slice();
+                nextRows.sort(function (left, right) {
+                    for (let i = 0; i < criteria.length; i += 1) {
+                        const criterion = criteria[i];
+                        const column = config.columns.find(function (item) { return item.key === criterion.col; });
+                        if (!column) continue;
+
+                        const a = App.pages.catalog._getSortableValue(left, column);
+                        const b = App.pages.catalog._getSortableValue(right, column);
+
+                        if (a === null && b === null) continue;
+                        if (a === null) return 1;
+                        if (b === null) return -1;
+
+                        let comparison = 0;
+                        if (column.type === 'number') {
+                            comparison = Number(a) - Number(b);
+                        } else {
+                            comparison = String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+                        }
+
+                        if (comparison !== 0) {
+                            return criterion.dir === 'desc' ? -comparison : comparison;
+                        }
+                    }
+                    return 0;
+                });
+                return nextRows;
+            },
+
+            _bindTableEvents: function (tabName, container) {
+                container.onclick = function (event) {
+                    const row = event.target.closest('tr[data-row-id]');
+                    if (!row) return;
+
+                    const rowId = row.dataset.rowId;
+                    if (!rowId) return;
+
+                    App.pages.catalog._openDetailModal(tabName, rowId);
+                };
+            },
+
+            _getCellDisplayHtml: function (tabName, column, row) {
+                const value = this._getCellCopyValue(tabName, column, row);
+                if (column.key === '_statusText') {
+                    const style = value === '在籍' || value === '有効'
+                        ? 'color: var(--primary); font-weight: 600;'
+                        : 'opacity: 0.55;';
+                    return '<span style="' + style + '">' + this._escapeHtml(value) + '</span>';
+                }
+                return this._escapeHtml(value);
+            },
+
+            _getCellCopyValue: function (tabName, column, row) {
+                if (!row || !column) return '';
+                const value = row[column.key];
+                if (value === null || value === undefined) return '';
+                return String(value);
+            },
+
+            _getSortableValue: function (row, column) {
+                const value = row[column.key];
+                if (value === null || value === undefined || value === '') return null;
+                return value;
+            },
+
+            _getSortIcon: function (tabName, colKey) {
+                const primary = (_sortState[tabName] || [])[0];
+                if (!primary || primary.col !== colKey) return '';
+                return primary.dir === 'asc' ? 'expand_less' : 'expand_more';
+            },
+
+            _matchText: function (value, filterValue) {
+                if (!filterValue) return true;
+                return String(value || '').toLowerCase().indexOf(String(filterValue).toLowerCase()) !== -1;
+            },
+
+            _matchSelect: function (value, filterValue) {
+                if (!filterValue) return true;
+                return String(value || '') === String(filterValue);
+            },
+
+            _matchMinMax: function (value, minValue, maxValue) {
+                const numericValue = Number(value || 0);
+                if (minValue !== '' && !Number.isNaN(Number(minValue)) && numericValue < Number(minValue)) return false;
+                if (maxValue !== '' && !Number.isNaN(Number(maxValue)) && numericValue > Number(maxValue)) return false;
+                return true;
+            },
+
+            _updateFilterBadge: function () {
+                const badge = document.getElementById('members-filter-count');
+                if (!badge) return;
+                const values = Object.values(_filters[_currentTab] || {}).filter(function (value) {
+                    return value !== '' && value !== null && value !== undefined;
+                });
+                badge.textContent = String(values.length);
+                badge.style.display = '';
+            },
+
+            _countRows: function (rows) {
+                if (!Array.isArray(rows)) return 0;
+                return rows.reduce(function (count, row) {
+                    if (!row || typeof row !== 'object') return count;
+                    const children = Array.isArray(row._children) ? row._children : [];
+                    return count + 1 + App.pages.catalog._countRows(children);
+                }, 0);
+            },
+
+            _flattenRows: function (rows) {
+                if (!Array.isArray(rows)) return [];
+                return rows.reduce(function (acc, row) {
+                    if (!row || typeof row !== 'object') return acc;
+                    acc.push(row);
+                    const children = Array.isArray(row._children) ? row._children : [];
+                    if (children.length) {
+                        acc = acc.concat(App.pages.catalog._flattenRows(children));
+                    }
+                    return acc;
+                }, []);
+            },
+
+            _updateSummary: function () {
+                const countElement = document.getElementById('members-summary-count');
+                if (countElement) {
+                    const rows = this._getVisibleRows(_currentTab);
+                    const count = this._countRows(rows);
+                    countElement.textContent = String(count);
+                }
+
+                const totalElement = document.getElementById('members-summary-total');
+                if (totalElement) {
+                    const totalRows = this._countRows(_tableData[_currentTab] || []);
+                    totalElement.textContent = '全 ' + String(totalRows) + ' 件';
+                }
+            },
+
+            _ensureResizeHandler: function () {
+                if (_resizeHandlerBound) return;
+                _resizeHandlerBound = true;
+                window.addEventListener('message', function (event) {
+                    App.pages.catalog._handleFrameMessage(event);
+                });
+                window.addEventListener('resize', function () {
+                    App.pages.catalog._applyTableHeight(_currentTab);
+                });
+            },
+
+            _handleFrameMessage: function (event) {
+                const data = event.data || {};
+                if (!data || data.source !== 'members-tabulator' || !data.tabName || !_frameState[data.tabName]) {
+                    return;
+                }
+
+                const frame = document.getElementById(_frameIds[data.tabName]);
+                if (!frame || event.source !== frame.contentWindow) {
+                    return;
+                }
+
+                if (data.token !== _frameState[data.tabName].token) {
+                    return;
+                }
+
+                if (data.type === _frameMessageType.ready) {
+                    _frameState[data.tabName].ready = true;
+                    this._applyTableHeight(data.tabName);
+                    if (_frameState[data.tabName].pendingPayload) {
+                        this._postFrameMessage(data.tabName, _frameMessageType.render, _frameState[data.tabName].pendingPayload);
+                        _frameState[data.tabName].pendingPayload = null;
+                    }
+                    return;
+                }
+
+                if (data.type === _frameMessageType.rowClick) {
+                    this._handleFrameRowClick(data.tabName, data.payload || {});
+                    return;
+                }
+
+                if (data.type === _frameMessageType.openExternal) {
+                    this._openExternalFromFrame(data.payload || {});
+                    return;
+                }
+
+                if (data.type === _frameMessageType.sortChange) {
+                    const sorters = (data.payload && data.payload.sorters) || [];
+                    _sortState[data.tabName] = sorters.map(function (sorter) {
+                        return { col: sorter.column, dir: sorter.dir === 'desc' ? 'desc' : 'asc' };
+                    });
+                    return;
+                }
+
+                if (data.type === _frameMessageType.filterChange) {
+                    const filters = (data.payload && data.payload.filters) || [];
+                    _headerFilters[data.tabName] = filters.map(function (filter) {
+                        return { field: String(filter.field || ''), value: String(filter.value || '') };
+                    }).filter(function (filter) {
+                        return filter.field && filter.value !== '';
+                    });
+                    this._syncLegacyFiltersFromHeader(data.tabName, _headerFilters[data.tabName]);
+                    return;
+                }
+
+                if (data.type === _frameMessageType.error) {
+                    console.error('[Members] Tabulator iframe error:', (data.payload && data.payload.message) || 'unknown error');
+                    showSnackbar('一覧を表示できませんでした。再読み込みしてください', 'error');
+                    return;
+                }
+
+                if (data.type === _frameMessageType.downloadCsvResult) {
+                    if (data.payload && data.payload.ok) {
+                        showSnackbar('CSV出力を開始しました', 'success');
+                        return;
+                    }
+                    showSnackbar((data.payload && data.payload.message) || 'CSV出力に失敗しました', 'error');
+                }
+            },
+
+            _handleFrameRowClick: function (tabName, payload) {
+                const rowKey = payload && payload.rowKey ? String(payload.rowKey) : '';
+                const rowId = rowKey && _frameState[tabName] && _frameState[tabName].detailMap
+                    ? String(_frameState[tabName].detailMap[rowKey] || '')
+                    : '';
+                if (!rowId) return;
+                this._openDetailModal(tabName, rowId);
+            },
+
+            _openDetailModal: function (tabName, rowId) {
+                if (tabName === 'member' && App.modals.memberDetail && App.modals.memberDetail.open) {
+                    App.modals.memberDetail.open(rowId);
+                    return;
+                }
+                if (tabName === 'directory' && App.modals.directoryDetail && App.modals.directoryDetail.open) {
+                    App.modals.directoryDetail.open(rowId);
+                    return;
+                }
+                if (tabName === 'plans' && App.modals.planDetail && App.modals.planDetail.open) {
+                    App.modals.planDetail.open(rowId);
+                    return;
+                }
+                if (App.modals.skillDetail && App.modals.skillDetail.open) {
+                    App.modals.skillDetail.open(rowId);
+                }
+            },
+
+            _openExternalFromFrame: function (payload) {
+                const rawUrl = payload && payload.url ? String(payload.url).trim() : '';
+                if (!rawUrl) return;
+                let parsed;
+                try {
+                    parsed = new URL(rawUrl);
+                } catch (err) {
+                    return;
+                }
+                if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+                    return;
+                }
+                window.open(parsed.toString(), '_blank', 'noopener,noreferrer');
+            },
+
+            _applyTableHeight: function (tabName) {
+                const container = document.getElementById(_containers[tabName]);
+                const frame = document.getElementById(_frameIds[tabName]);
+                if (!container || !frame) return;
+                try {
+                    const mainElement = document.querySelector('main');
+                    if (!mainElement) return;
+                    const windowHeight = window.innerHeight;
+                    const rect = container.getBoundingClientRect();
+                    if (rect.top <= 0) return;
+                    const mainStyle = window.getComputedStyle(mainElement);
+                    const marginBottom = parseFloat(mainStyle.marginBottom) || 0;
+                    const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
+                    const offsetBottom = marginBottom + paddingBottom + 32;
+                    const newHeight = windowHeight - rect.top - offsetBottom;
+                    if (newHeight > 0) {
+                        container.style.height = newHeight + 'px';
+                        container.style.minHeight = newHeight + 'px';
+                        frame.style.height = newHeight + 'px';
+                        this._postFrameMessage(tabName, _frameMessageType.resize, { height: newHeight });
+                    }
+                } catch (err) {
+                    console.error('[Members] テーブル高さの計算に失敗:', err);
+                }
+            },
+
+            _formatDateTime: function (value) {
+                if (!value) return '';
+                try {
+                    return formatDateTimeForDisplay(value, 'yyyy/MM/dd HH:mm');
+                } catch (e) {
+                    return String(value);
+                }
+            },
+
+            _escapeHtml: function (value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            },
+
+            _escapeAttr: function (value) {
+                return this._escapeHtml(value).replace(/`/g, '&#96;');
+            }
+        };
+    })();
+</script>

@@ -55,27 +55,20 @@
              * @param {boolean} forceRefresh - キャッシュを無視して強制再取得するか
              * @returns {Promise}
              */
-            loadData: async function (forceRefresh = false) {
-                if (this.isLoading && !forceRefresh) return;
+            loadData: async function () {
+                if (this.isLoading) return;
                 this.isLoading = true;
 
                 try {
-                    console.log('[Comments] Loading data... forceRefresh:', forceRefresh);
-                    const result = await callGAS('getCommentNavData', App.state.userId, forceRefresh);
+                    console.log('[Comments] Loading data...');
+                    const result = await callGAS('getCommentNavData', App.state.userId, true);
 
                     const comments = result?.comments || [];
                     this.cachedComments = comments;
                     this.isLoaded = true;
                     this.lastUpdatedAt = new Date();
 
-                    // 描画
                     this.render(comments);
-
-                    // キャッシュデータだった場合、バックグラウンドで最新データを取得して再描画
-                    if (!forceRefresh && result?.isCached === true) {
-                        console.log('[Comments] Cache detected. Fetching fresh data in background...');
-                        setTimeout(() => this.loadData(true), 100);
-                    }
                 } catch (error) {
                     console.error('[Comments] Error loading data:', error);
                     const container = document.getElementById('comments-hub-list');
@@ -162,7 +155,7 @@
                                 <div>
                                     <i class="circle extra">${avatarHtml}</i>
                                 </div>
-                                <div class="max">
+                                <div class="max tiny-line">
                                     <div class="row">
                                         <span class="bold small-text">${escapeHtml(comment.display_name)}</span>
                                         <span class="small-text secondary-text font-number">${updatedAt}</span>
@@ -173,7 +166,7 @@
                                         <span>${targetName}</span>
                                     </div>
                                     <div class="tiny-space"></div>
-                                    <div><span>${escapeHtml(commentContent)}</span></div>
+                                    <div><span class="small-text wrap">${escapeHtml(commentContent)}</span></div>
                                 </div>
                                 <div>
                                     <button class="transparent circle small no-margin"

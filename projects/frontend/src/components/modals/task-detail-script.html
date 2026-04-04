@@ -23,7 +23,6 @@
 
       applyAssigneeLabels: function () {
         const roleLabels = {
-          'task-detail-label-assignee-section': KEY_LABELS.ASIGNEE_TYPE.PROCESSED_BY,
           'task-detail-role-created-by': KEY_LABELS.ASIGNEE_TYPE.CREATED_BY,
           'task-detail-role-processed-by': KEY_LABELS.ASIGNEE_TYPE.PROCESSED_BY,
           'task-detail-role-reviewed-by': KEY_LABELS.ASIGNEE_TYPE.REVIEWED_BY,
@@ -517,7 +516,7 @@
         }
 
         // 削除処理開始を通知（成功トーストは callGAS の .then() 側で表示する）
-        showSnackbar('タスクを削除しています…', 'info');
+        showSnackbar('タスクを削除しています…', 'info', 'top', 0);
 
         // ── Optimistic UI Update: ローカルデータから削除 ──
         // 削除前の状態を保存（ロールバック用）
@@ -589,7 +588,7 @@
           })
           .catch(err => {
             console.error('Failed to delete task:', err);
-            showSnackbar('削除に失敗しました。元に戻しています...', 'error');
+            showSnackbar('タスクの削除に失敗しました', 'error');
 
             // ロールバック: グローバルデータに復元
             if (deletedTaskData && App.state.data.tasks && deletedGlobalIndex > -1) {
@@ -700,7 +699,7 @@
           App.utils.url.updateParams(newParams, false);
         }
 
-        showSnackbar('変更を保存しています...', 'info', 'top', 0);
+        showSnackbar('タスクの変更を保存しています...', 'info', 'top', 0);
 
         // ── Optimistic UI: callGAS前にローカルキャッシュを更新＆即座に描画 ──
         const newBoardId = currentItem.board_id;
@@ -788,7 +787,7 @@
           }
 
           console.log('[TaskDetail] Update successful');
-          showSnackbar('変更を保存しました', 'success');
+          showSnackbar('タスクの変更を保存しました', 'success');
 
           // もしこのタスクのモーダルが再度開かれていたら、内部状態を更新
           if (this.currentId === id) {
@@ -835,28 +834,11 @@
                 App.pages.boards.renderKanban('my-board');
               }
             }
-
-            // メンバーフィールドが更新された場合はバックグラウンドでDBから最新データを再取得（JOIN情報を同期）
-            const memberFieldsUpdated = ['processed_by', 'reviewed_by', 'received_by'].some(role => updates.hasOwnProperty(role));
-            if (memberFieldsUpdated && App.pages.boards.loadData) {
-              App.pages.boards.loadData(boardId, true).then(() => {
-                if (this.currentId === id) {
-                  const updatedTask = App.pages.boards.cachedBoardTasks[boardId]?.find(t => t.id === id);
-                  if (updatedTask) {
-                    this.currentItem = updatedTask;
-                    this.originalData = { ...updatedTask };
-                  }
-                }
-              });
-              if (App.pages.boards.currentBoardId === 'my-board') {
-                App.pages.boards.loadData('my-board', true);
-              }
-            }
           }
 
         } catch (error) {
           console.error('[TaskDetail] Update exception:', error);
-          showSnackbar('更新に失敗しました', 'error');
+          showSnackbar('タスクの更新に失敗しました', 'error');
           // Rollback
           Object.assign(currentItem, originalData);
           rollbackLocalData(TABLE_NAMES.TASKS, id, originalData);

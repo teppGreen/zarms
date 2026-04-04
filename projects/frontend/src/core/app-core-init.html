@@ -1,0 +1,744 @@
+<script>
+  // グローバル変数
+  // urlParams, EVENT_CONFIG, AUTH_CONFIG, EXTERNAL_URLS は既にregister.htmlで定義済みなので、再定義不要
+  const { TABLE_NAMES, KEY_LABELS, activeUser, initialData } = templateVariables;
+
+  // 本番環境（!isDevelopment）の場合、コンソール出力を抑制
+  if (!templateVariables.isDevelopment) {
+    const noop = () => { };
+    console.log = noop;
+    console.debug = noop;
+    console.info = noop;
+    console.warn = noop;
+    // console.error も抑制したい場合は、上記と同様に noop を代入してください
+  }
+
+  // App.state の初期化とデータ管理用関数の定義
+  (function () {
+    App.state = {
+      data: {
+        boards: [],
+        directories: [],
+        members: [],
+        plans: [],
+        tasks: [],
+        apps: [],
+        links: [],
+        systemUpdates: [],
+        directoryAssignments: [],
+        planAssignments: [],
+        skills: [],
+        skillAssignments: []
+      },
+
+      userId: null, // 現在のユーザーのID（uuid）
+      useApiMode: !!templateVariables.useApiMode,
+      userProperties: templateVariables.userProperties || {}, // ユーザープロパティ
+      previousTab: null,
+      isDevelopment: templateVariables.isDevelopment,
+
+      get: function (tableName) {
+        return this.data[tableName];
+      },
+
+      set: function (tableName, data) {
+        this.data[tableName] = data;
+      },
+
+      /**
+       * ユーザープロパティを保存します
+       * @param {string} key - プロパティキー
+       * @param {any} value - プロパティ値 (オブジェクトや配列の場合は自動的にJSON文字列化されます)
+       * @returns {Promise}
+       */
+      saveUserProperty: async function (key, value) {
+        let stringValue;
+        if (value === null || value === undefined) {
+          stringValue = '';
+        } else if (typeof value === 'object') {
+          stringValue = JSON.stringify(value);
+        } else {
+          stringValue = String(value);
+        }
+
+        // ローカル状態を更新
+        this.userProperties[key] = stringValue;
+
+        console.log(`[saveUserProperty] Key: ${key}, Value:`, value);
+        return await callGAS('saveUserProperty', key, stringValue);
+      },
+
+      /**
+       * ユーザープロパティを取得します
+       * @param {string} key - プロパティキー
+       * @param {any} defaultValue - 値がない場合のデフォルト値
+       * @returns {any} パースされた値、または元の値
+       */
+      getUserProperty: function (key, defaultValue = null) {
+        const value = this.userProperties[key];
+        if (value === undefined || value === null || value === '') return defaultValue;
+
+        // JSON形式（{ または [ で始まる）の場合はパースを試みる
+        if (typeof value === 'string' && (value.trim().startsWith('{') || value.trim().startsWith('['))) {
+          try {
+            return JSON.parse(value);
+          } catch (e) {
+            console.error(`[getUserProperty] Error parsing key "${key}":`, e);
+            return value;
+          }
+        }
+        return value;
+      }
+    };
+  })();
+
+
+  window.onload = initializeApp;
+
+  /**
+   * アプリケーションを初期化します
+   * ショートカット設定、履歴ハンドラー設定、データ読み込みを行います
+   * @returns {Promise<void>}
+   */
+  async function initializeApp() {
+    setupGlobalShortcuts();
+    setupBrowserHistoryHandlers();
+    setupModalCloseWarning();
+
+    // ユーザーIDを設定（templateVariablesから取得）
+    if (activeUser && activeUser.id) {
+      App.state.userId = activeUser.id;
+    }
+
+    // 必要最小限のデータを読み込み（バックグラウンド更新のPromiseを受け取る）
+    let needsBackgroundMasterDataRefresh = true;
+    const backgroundUpdatePromise = await loadInitialData();
+    App.utils.navigation.changeH1();
+
+    console.log('[initializeApp] URL params:', urlParams);
+
+    // 初期ローディングを削除
+    const initialLoading = document.getElementById('initial-loading');
+    if (initialLoading) {
+      initialLoading.style.display = 'none';
+    }
+
+    // URLパラメータに基づいて遷移判定
+    if (urlParams.tab === 'board' && urlParams.board_id) {
+      const targetBoardId = urlParams.board_id;
+      console.log('[initializeApp] Board requested:', targetBoardId);
+
+      // ボードの存在確認 (まずは現在のデータで確認)
+      let boards = [...(App.state.data.boards || []), { id: 'my-board', display_id: 'my-board', name: 'My Board' }];
+      let targetBoard = boards.find(b => b.id === targetBoardId || b.display_id === targetBoardId);
+
+      // キャッシュにない、かつバックグラウンド更新中の場合は待機
+      if (!targetBoard && backgroundUpdatePromise) {
+        console.log('[initializeApp] Board not found in cache. Waiting for background update...');
+        await backgroundUpdatePromise;
+        console.log('[initializeApp] Background update finished');
+
+        // 更新後のデータで再確認
+        boards = [...(App.state.data.boards || []), { id: 'my-board', display_id: 'my-board', name: 'My Board' }];
+        targetBoard = boards.find(b => b.id === targetBoardId || b.display_id === targetBoardId);
+      }
+
+      if (targetBoard) {
+        console.log('[initializeApp] Board found, switching:', targetBoard);
+        await App.utils.navigation.switchTab('board-' + targetBoard.id, true);
+      } else {
+        console.warn('[initializeApp] Board not found:', targetBoardId);
+        alert('ボードが見つかりませんでした\nID: ' + targetBoardId);
+        // ホーム画面にフォールバック（データはswitchTab内で読み込み）
+        await App.utils.navigation.switchTab('home', true);
+      }
+
+    } else if (urlParams.tab && urlParams.tab !== 'home') {
+      // その他のタブの場合
+      const requestedTab = urlParams.tab === 'members' ? 'catalog' : urlParams.tab;
+      await App.utils.navigation.switchTab(requestedTab, true);
+    } else {
+      // タブ指定がない、またはhomeの場合（データはswitchTab内で読み込み）
+      await App.utils.navigation.switchTab('home', true);
+    }
+
+    // モーダルパラメータがある場合は該当のモーダルを開く
+    if (urlParams.modal) {
+      // タスク詳細の場合は最新データを待機
+      if (urlParams.modal === 'task-detail' && backgroundUpdatePromise) {
+        console.log('[initializeApp] Waiting for background update before opening task modal...');
+        await backgroundUpdatePromise;
+      }
+      openModalFromParams(urlParams);
+    }
+
+    // タブごとの最終更新日時を初期化
+    App.state.tabLastUpdated = {};
+
+    // バックグラウンド更新が残っている場合は継続
+    if (needsBackgroundMasterDataRefresh) {
+      backgroundUpdatePromise;
+    }
+
+    // システムアップデートの自動更新を開始
+    if (App.utils.header.systemUpdates) {
+      App.utils.header.systemUpdates.startAutoRefresh();
+    }
+  }
+
+  /**
+   * URLパラメータからモーダルを開く
+   * @param {Object} params - URLパラメータ
+   */
+  function openModalFromParams(params) {
+    console.log('[openModalFromParams] Opening modal from params:', params);
+
+    const modalParam = String(params.modal || '').trim();
+    const normalizedModal = (function (value) {
+      const aliases = {
+        'task-detail': 'task-detail',
+        'member-detail': 'member-detail',
+        'modal-member-detail': 'member-detail',
+        'modal-detail-member': 'member-detail',
+        'directory-detail': 'directory-detail',
+        'modal-directory-detail': 'directory-detail',
+        'modal-detail-directory': 'directory-detail',
+        'skill-detail': 'skill-detail',
+        'modal-skill-detail': 'skill-detail',
+        'modal-detail-skill': 'skill-detail',
+        'plan-detail': 'plan-detail',
+        'modal-plan-detail': 'plan-detail',
+        'modal-detail-plan': 'plan-detail'
+      };
+      return aliases[value] || '';
+    })(modalParam);
+
+    // タスク詳細モーダル
+    if (normalizedModal === 'task-detail' && params.task_id) {
+      // マイボードの場合（board_id='my-board'）、またはボードIDが指定されていない場合は
+      // マイボードとして扱い、フィルタリングして表示
+      if (!params.board_id || params.board_id === 'my-board') {
+        if (App.utils.navigation && App.utils.navigation.navigateToMyBoardWithTaskName) {
+          App.utils.navigation.navigateToMyBoardWithTaskName(params.task_id);
+          return;
+        }
+      }
+
+      const currentBoardId = params.board_id || App.pages.boards?.currentBoardId;
+      if (!currentBoardId) {
+        // ボードIDが特定できない場合はそのままopen（エラー処理はopenに任せる）
+        App.modals.taskDetail.open(params.task_id, true);
+        return;
+      }
+
+      // 共通関数を使用してタスクを開く
+      if (App.utils.navigation && App.utils.navigation.tryOpenTask) {
+        // まずボードに遷移する (データロードはスキップし、tryOpenTaskに任せる)
+        if (App.utils.navigation.switchTab) {
+          (async () => {
+            await App.utils.navigation.switchTab(`board-${currentBoardId}`, false, false, true);
+            // 遷移後にタスクを開く
+            await App.utils.navigation.tryOpenTask(params.task_id, currentBoardId);
+          })();
+        } else {
+          App.utils.navigation.tryOpenTask(params.task_id, currentBoardId);
+        }
+      } else {
+        // 万が一関数がない場合はフォールバック
+        App.modals.taskDetail.open(params.task_id, true);
+      }
+      return;
+    }
+
+    // 人物詳細モーダル
+    if (normalizedModal === 'member-detail' && params.member_id) {
+      if (App.modals.memberDetail && typeof App.modals.memberDetail.open === 'function') {
+        App.modals.memberDetail.open(params.member_id, true);
+      }
+      return;
+    }
+
+    // 組織詳細モーダル
+    if (normalizedModal === 'directory-detail' && params.directory_id) {
+      if (App.modals.directoryDetail && typeof App.modals.directoryDetail.open === 'function') {
+        App.modals.directoryDetail.open(params.directory_id, true);
+      }
+      return;
+    }
+
+    // 技能詳細モーダル
+    if (normalizedModal === 'skill-detail' && params.skill_id) {
+      if (App.modals.skillDetail && typeof App.modals.skillDetail.open === 'function') {
+        App.modals.skillDetail.open(params.skill_id, true);
+      }
+      return;
+    }
+
+    // 企画詳細モーダル
+    if (normalizedModal === 'plan-detail' && params.plan_id) {
+      if (App.modals.planDetail && typeof App.modals.planDetail.open === 'function') {
+        App.modals.planDetail.open(params.plan_id, true);
+      }
+    }
+  }
+
+  /**
+   * ブラウザ履歴の戻る/進むボタンへの対応
+   */
+  function setupBrowserHistoryHandlers() {
+    const handleHistoryChange = async function (event) {
+      console.log('[history] Browser back/forward button pressed or history changed', event.state);
+
+      // event.stateがnullの場合は、URLから直接パラメータを取得（初回はキャッシュがあればそれを使用）
+      const params = event.state || App.utils.url.getParams() || {};
+
+      // 履歴変更があった場合はキャッシュを更新
+      if (App.utils.url.setParams) {
+        App.utils.url.setParams(params);
+      }
+
+      // タブを切り替え
+      if (params.tab) {
+        let tabId = 'home';
+        if (params.tab === 'board' && params.board_id) {
+          tabId = 'board-' + params.board_id;
+        } else if (params.tab !== 'board') {
+          tabId = params.tab === 'members' ? 'catalog' : params.tab;
+        }
+
+        if (App.utils.navigation && App.utils.navigation.switchTab) {
+          await App.utils.navigation.switchTab(tabId, true); // URL更新をスキップ
+        }
+      } else {
+        // パラメータがない場合はホームに戻る
+        if (App.utils.navigation && App.utils.navigation.switchTab) {
+          await App.utils.navigation.switchTab('home', true);
+        }
+      }
+
+      // モーダルの処理
+      // 既存のモーダルを閉じる（優先度順に、全て閉じる）
+      // URL状態と同期させるため、開いているモーダルがなくなるまで処理する
+      let safetyCounter = 0;
+      while (App.utils.ui.closeTopModal(true) && safetyCounter < 10) {
+        safetyCounter++;
+      }
+
+      // パラメータにモーダルが指定されている場合は開く
+      if (params.modal) {
+        openModalFromParams(params);
+      }
+    };
+
+    window.addEventListener('popstate', handleHistoryChange);
+
+    // google.script.history が利用可能な場合はリスナーを追加
+    if (typeof google !== 'undefined' && google.script && google.script.history) {
+      google.script.history.setChangeHandler(handleHistoryChange);
+    }
+  }
+
+  /**
+   * モーダルが開いている時にブラウザを閉じようとした際の警告を設定します
+   */
+  function setupModalCloseWarning() {
+    window.addEventListener('beforeunload', (e) => {
+      // モーダルが開いているかチェック
+      const hasOpenModal = isAnyModalOpen();
+
+      if (hasOpenModal) {
+        // ブラウザ標準の確認ダイアログを表示
+        e.preventDefault();
+        e.returnValue = ''; // Chrome では空文字列を設定する必要がある
+        return ''; // 一部のブラウザ用
+      }
+    });
+  }
+
+  /**
+   * 開いているモーダル要素を取得します（優先順位順にソート）
+   * @param {boolean} sorted - 優先順位でソートするか（デフォルト: false）
+   * @returns {Array<HTMLElement>} 開いているモーダル要素の配列
+   */
+  function getOpenModals(sorted = false) {
+    // 1. dialog要素で開いているものを取得
+    const dialogModals = Array.from(document.querySelectorAll('dialog[open], dialog.active')).filter(modal => {
+      return modal && modal.id && modal.id.startsWith('modal-');
+    });
+
+    // 2. classに'modal'が含まれ、activeまたはopenの要素を取得
+    const modalElements = Array.from(document.querySelectorAll('[class*="modal"]'));
+    const visibleModals = modalElements.filter(modal => {
+      if (!modal || !modal.id || !modal.id.startsWith('modal-')) {
+        return false;
+      }
+      const isActive = modal.classList.contains('active');
+      const hasOpenAttr = modal.hasAttribute('open') || modal.open === true;
+
+      return isActive || hasOpenAttr;
+    });
+
+    // 重複を除去してマージ
+    const allModals = [...new Set([...dialogModals, ...visibleModals])];
+
+    // ソートが必要な場合
+    if (sorted && allModals.length > 0) {
+      // 各要素にDOM内のインデックスを付与（後方ほど大きい値）
+      const allDialogs = Array.from(document.querySelectorAll('dialog'));
+      const domIndexMap = new Map();
+      allDialogs.forEach((el, i) => domIndexMap.set(el, i));
+
+      allModals.sort((a, b) => {
+        const getPriority = (id) => {
+          if (!id) return 0;
+          if (id.startsWith('modal-select-')) return 3;
+          if (id.startsWith('modal-new-')) return 2;
+          if (id.startsWith('modal-detail-')) return 1;
+          return 0;
+        };
+
+        const priorityA = getPriority(a.id);
+        const priorityB = getPriority(b.id);
+
+        // 優先度が異なる場合は優先度の高い順
+        if (priorityA !== priorityB) {
+          return priorityB - priorityA;
+        }
+
+        // 同一優先度の場合はDOM順の逆順（後方に配置されたものが上＝先に閉じるべき）
+        const indexA = domIndexMap.get(a) ?? 0;
+        const indexB = domIndexMap.get(b) ?? 0;
+        return indexB - indexA;
+      });
+    }
+
+    return allModals;
+  }
+
+  /**
+   * 何かしらのモーダルが開いているかチェックします
+   * @returns {boolean} モーダルが開いている場合true
+   */
+  function isAnyModalOpen() {
+    return getOpenModals().length > 0;
+  }
+
+  /**
+   * 初回ロード時に必要な最小限のデータを読み込みます。
+   * - navigation用マスタデータ（boards/apps/members）のみ取得
+   * - directories/plans/skills はタブ切り替え時に遅延ロード
+   * - tab-homeのデータはswitchTab経由の通常タブ読み込みで取得
+   * @returns {Promise<Promise|null>} バックグラウンド更新のPromise（なければnull）
+   */
+  async function loadInitialData() {
+    try {
+      // ── Step 1: サーバー埋め込みデータを即座に反映（GAS呼び出しなし）─────────────────────
+
+      let boards = [];
+      let members = [];
+
+      if (initialData) {
+        // ナビゲーション必須のマスタデータのみ反映
+        boards = initialData.boards || [];
+        members = initialData.members || [];
+        console.log('[loadInitialData] Server-embedded initialData');
+      }
+
+      // ── Step 2: App.stateにマスタデータを反映 ──────────────────────────────────────────
+      App.state.data.boards = boards;
+      App.state.data.members = members;
+
+      // ── Step 3: 即座にUIを描画（Render-First） ──────────────────────────────────────
+      App.utils.navigation.renderBoardsNavigation();
+      App.pages.boards.initialize();
+      App.pages.boards.initializeMyBoardFilters();
+
+      if (App.utils.header.comments) {
+        App.utils.header.comments.loadData().catch(e =>
+          console.warn('[Comments] Background initial load failed:', e)
+        );
+      }
+
+      if (App.utils.header.systemUpdates) {
+        App.utils.header.systemUpdates.loadData().catch(e =>
+          console.warn('[SystemUpdates] Background initial load failed:', e)
+        );
+      }
+
+      if (App.utils.header) {
+        App.utils.header.refreshApps().catch(e =>
+          console.warn('[Apps] Background initial load failed:', e)
+        );
+      }
+
+      // ── Step 4: バックグラウンドでboards/membersを最新化 ───────────────────────
+      const backgroundUpdatePromise = new Promise((resolve) => {
+        setTimeout(async (needsBackgroundMasterDataRefresh) => {
+          try {
+            const batchResult = await callGAS('handleBatchDatabaseProcess', App.state.userId, [
+              { key: 'boards', tableName: TABLE_NAMES.BOARDS, operation: 'select', dataObject: { orderBy: { name: 'asc' } }, forceRefresh: true },
+              { key: 'members', tableName: TABLE_NAMES.MEMBERS, operation: 'select', dataObject: {}, forceRefresh: true }
+            ]);
+            const r = batchResult?.results || {};
+
+            App.state.data.boards = r.boards?.data || r.boards || boards;
+            App.state.data.members = r.members?.data || r.members || members;
+            App.utils.navigation.renderBoardsNavigation();
+            App.pages.boards.initialize();
+            needsBackgroundMasterDataRefresh = false;
+            console.log('[loadInitialData] バックグラウンド更新完了');
+          } catch (error) {
+            console.error('[loadInitialData] バックグラウンド更新エラー:', error);
+          } finally {
+            resolve();
+          }
+        }, 100);
+      });
+
+      return backgroundUpdatePromise;
+
+    } catch (error) {
+      console.error('[loadInitialData] データ読み込みエラー:', error);
+      App.utils.error.handle(error);
+      return null;
+    }
+  }
+
+
+  /**
+   * 現在表示中のタブのデータを強制再取得して再描画します（手動更新ボタン用）
+   * @returns {Promise<void>}
+   */
+  async function refreshCurrentTab() {
+    console.log('[refreshCurrentTab] 手動更新開始');
+
+    // 現在表示中のタブを特定
+    const currentTab = document.querySelector('main > div[style*="display: block"]');
+    if (!currentTab) {
+      console.log('[refreshCurrentTab] アクティブなタブが見つかりません');
+      return;
+    }
+
+    const tabId = currentTab.id; // 例: 'tab-home', 'tab-catalog', 'tab-board'
+    console.log('[refreshCurrentTab] 現在のタブ:', tabId);
+
+    // 更新ボタンをローディング状態に
+    setRefreshButtonLoading(true);
+
+    try {
+      if (tabId === 'tab-board') {
+        // ボードページ: 表示中のボードのタスクのみを強制取得
+        const activeBoardDiv = document.querySelector('#tab-board > div[style*="display: block"]');
+        if (activeBoardDiv && activeBoardDiv.id) {
+          const boardId = activeBoardDiv.id.replace('tab-board-', '');
+          if (App.pages.boards && App.pages.boards.loadData) {
+            await App.pages.boards.loadData(boardId, true);
+          }
+          // 最終更新日時を更新
+          updateTabLastUpdated('board-' + boardId);
+        }
+      } else if (tabId === 'tab-catalog') {
+        if (App.pages.catalog && App.pages.catalog.loadData) {
+          await App.pages.catalog.loadData(true);
+        }
+        updateTabLastUpdated('catalog');
+      } else if (tabId === 'tab-boards') {
+        if (App.pages.boardsList && App.pages.boardsList.loadData) {
+          await App.pages.boardsList.loadData(true);
+        }
+        updateTabLastUpdated('boards');
+      } else if (tabId === 'tab-home') {
+        if (App.pages.home && App.pages.home.loadData) {
+          await App.pages.home.loadData(true);
+        }
+        updateTabLastUpdated('home');
+      } else if (tabId === 'tab-insights') {
+        if (App.pages.insights && App.pages.insights.loadData) {
+          await App.pages.insights.loadData(true);
+        }
+        updateTabLastUpdated('insights');
+      }
+
+      console.log('[refreshCurrentTab] 手動更新完了');
+    } catch (error) {
+      console.error('[refreshCurrentTab] 手動更新エラー:', error);
+    } finally {
+      // 更新ボタンをリセット
+      setRefreshButtonLoading(false);
+    }
+  }
+
+  /**
+   * 現在表示中のタブの更新ボタンアイコンをローディング／通常状態に切り替えます
+   * @param {boolean} isLoading
+   */
+  function setRefreshButtonLoading(isLoading) {
+    // 現在表示中のタブを特定してボタンを探す
+    const currentTab = document.querySelector('main > div[style*="display: block"]');
+    if (!currentTab) return;
+
+    // ボードタブの場合は内側の表示中ボードを対象に
+    let searchRoot = currentTab;
+    if (currentTab.id === 'tab-board') {
+      const activeBoard = currentTab.querySelector(':scope > div[style*="display: block"]');
+      if (activeBoard) searchRoot = activeBoard;
+    }
+
+    // 対象のrefreshボタンを探す
+    const btn = searchRoot.querySelector('button[onclick="refreshCurrentTab()"]');
+    if (!btn) return;
+
+    const iconEl = btn.querySelector('i > i');
+    if (!iconEl) return;
+
+    if (isLoading) {
+      iconEl.classList.add('fast-rotate');
+      btn.disabled = true;
+    } else {
+      iconEl.classList.remove('fast-rotate');
+      btn.disabled = false;
+    }
+  }
+
+  /**
+   * 指定タブの最終更新日時をApp.stateに保存し、UI表示を更新します
+   * @param {string} tabKey - タブキー（例: 'home', 'board-UUID'）
+   */
+  function updateTabLastUpdated(tabKey) {
+    if (!App.state.tabLastUpdated) App.state.tabLastUpdated = {};
+    const now = new Date();
+    App.state.tabLastUpdated[tabKey] = now;
+
+    // UI要素に反映
+    const el = document.getElementById('last-updated-' + tabKey);
+    if (el) {
+      const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      el.textContent = '最終更新: ' + timeStr;
+    }
+  }
+
+  // グローバルショートカットキーの設定
+  function setupGlobalShortcuts() {
+    if (!App.utils.shortcuts) App.utils.shortcuts = {};
+
+    App.utils.shortcuts.getDefinitions = function () {
+      return [
+        { keys: 'Alt + F', action: '検索欄にフォーカス' },
+        { keys: 'Alt + T', action: '新規タスクを開く' },
+        { keys: 'Alt + B', action: '新規ボードを作成' },
+        { keys: 'Alt + H', action: 'ショートカット一覧を開く' },
+        { keys: 'Alt + 1', action: 'ホームタブへ移動' },
+        { keys: 'Alt + 2', action: '一覧タブへ移動' },
+        { keys: 'Alt + 3', action: '予定タブへ移動' },
+        { keys: 'Alt + 4', action: '分析タブへ移動' },
+        { keys: 'Alt + 5', action: 'ボードタブへ移動' },
+        { keys: 'Alt + 6', action: 'タスクタブへ移動' },
+        { keys: 'Alt + R', action: '表示中データを再読込' },
+        { keys: 'Esc', action: 'モーダルを閉じる' }
+      ];
+    };
+
+    const isEditableTarget = function (target) {
+      if (!target || !(target instanceof HTMLElement)) return false;
+      if (target.isContentEditable) return true;
+      const tagName = (target.tagName || '').toLowerCase();
+      if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') return true;
+      return !!target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]');
+    };
+
+    const focusSearch = function () {
+      const searchInput = document.getElementById('search-input');
+      if (!searchInput) return;
+      searchInput.focus();
+      searchInput.select();
+    };
+
+    const openShortcutsHelp = function () {
+      if (App.utils.header && App.utils.header.shortcuts && App.utils.header.shortcuts.open) {
+        App.utils.header.shortcuts.open();
+        return;
+      }
+      const modal = document.getElementById('modal-shortcuts-help');
+      if (modal) appUi('modal-shortcuts-help', true);
+    };
+
+    document.addEventListener('keydown', (e) => {
+      if (!e || e.isComposing) return;
+
+      if (e.key === 'Escape') {
+        App.utils.ui.closeTopModal(false, 'escape');
+        return;
+      }
+
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+
+      if (e.code === 'KeyF') {
+        e.preventDefault();
+        focusSearch();
+        return;
+      }
+
+      if (e.code === 'KeyH') {
+        e.preventDefault();
+        openShortcutsHelp();
+        return;
+      }
+
+      if (isEditableTarget(e.target)) return;
+
+      if (e.code === 'KeyT' && App.modals.newTask && App.modals.newTask.open) {
+        e.preventDefault();
+        App.modals.newTask.open();
+        return;
+      }
+
+      if (e.code === 'KeyB' && App.pages.boards && App.pages.boards.createBoard) {
+        e.preventDefault();
+        App.pages.boards.createBoard();
+        return;
+      }
+
+      if (e.code === 'Digit2' && App.utils.navigation && App.utils.navigation.switchTab) {
+        e.preventDefault();
+        App.utils.navigation.switchTab('catalog');
+        return;
+      }
+
+      if (e.code === 'Digit1' && App.utils.navigation && App.utils.navigation.switchTab) {
+        e.preventDefault();
+        App.utils.navigation.switchTab('home');
+        return;
+      }
+
+      if (e.code === 'Digit5' && App.utils.navigation && App.utils.navigation.switchTab) {
+        e.preventDefault();
+        App.utils.navigation.switchTab('boards');
+        return;
+      }
+
+      if (e.code === 'Digit3' && App.utils.navigation && App.utils.navigation.switchTab) {
+        e.preventDefault();
+        App.utils.navigation.switchTab('calendar');
+        return;
+      }
+
+      if (e.code === 'Digit6' && App.utils.navigation && App.utils.navigation.switchTab) {
+        e.preventDefault();
+        App.utils.navigation.switchTab('board-my-board');
+        return;
+      }
+
+      if (e.code === 'Digit4' && App.utils.navigation && App.utils.navigation.switchTab) {
+        e.preventDefault();
+        App.utils.navigation.switchTab('insights');
+        return;
+      }
+
+      if (e.code === 'KeyR') {
+        e.preventDefault();
+        refreshCurrentTab();
+      }
+    });
+  }
+
+</script>

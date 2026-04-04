@@ -74,12 +74,12 @@ App.test.resumeAutoRefresh();
 - [ ] HTMLテンプレートで `//` のみ `\\/\\/` 化され、`/` 単体（特に `</dialog>` などの閉じタグ）が `\/` 化されていない
 
 ### tab-catalog周辺の重点確認
-- [ ] navigation-top に新規作成導線があり、tab-catalog 内に重複した追加ボタンが表示されない
-- [ ] 組織タブで不要なサマリ article が表示されない
-- [ ] 初期表示時に監査列を含む全列が表示される
 - [ ] 列の非表示・再表示が正しく動作する
 - [ ] 「列表示をリセット」で全列表示に戻る
 - [ ] 「CSV出力」で現在タブのCSVを取得できる
+- [ ] iframe `srcdoc` 生成後に `Unexpected token` / `Unexpected end of input` が発生しない
+- [ ] `components/utils/tabulator-foundation-script.html` の `buildFrameSrcdoc` で、文字列連結時に正規表現リテラルの `\` が不足していない（例: `^https?:\/\/` は生成後に必ず `\/\/` の形になる）
+- [ ] ヘッダメニュー生成式が `}).filter(...)` で閉じており、`})}. filter(...)` のような不正連結がない
 
 ### APIセキュリティ
 - [ ] HMAC署名エラー時に操作が拒否される
@@ -92,26 +92,11 @@ App.test.resumeAutoRefresh();
 - [ ] エラーメッセージが適切に表示される
 - [ ] スナックバーが正しく表示される
 
-### Home/Notices/Insights 追加機能の重点確認
-- [ ] homeで「お知らせ」「更新履歴」が表示され、旧ランキング表示が出ない
-- [ ] homeのお知らせクリックで notices タブへ遷移し、対象のお知らせ詳細モーダルが開く
-- [ ] notices詳細モーダルをEscで閉じた後、画面全体がクリック可能なまま維持される
-- [ ] navigation-top の新規作成メニューから「新しいお知らせ」モーダルを開ける
-- [ ] 新しいお知らせの作成時、タイトル/本文/掲示期間の必須チェックが動作する
-- [ ] noticesタブ再訪時、既存表示が一度消えずに背景更新される
-- [ ] noticesタブの資料リンクはcreated_by本人のみ編集/削除できる（他ユーザーはreadonly）
-- [ ] insightsタブで曜日別グラフが表示される（データなし時は空表示、失敗時はエラー表示）
-- [ ] 自動更新（またはAlt+R）で tab-home/tab-notices/tab-insights それぞれの loadData が再実行される
-
 ### タブ追加時の共通確認
 - [ ] 新規タブの主要描画領域に `data-tab-render-root` を付与している
 - [ ] `data-tab-render-root` または `hasRenderedContent()` により、タブ再訪時の白画面フリッカーが発生しない
 
-### ショートカット回帰確認
-- [ ] Alt+6 で notices タブへ遷移する
-- [ ] Alt+7 で insights タブへ遷移する
-
-### Detailモーダル統一（Phase 2+）
+### Detailモーダル統一
 - [ ] member/planのタブ切替が`data-ui`で動作し、`switchTab`依存がない
 - [ ] member detailの主ボタンが「変更なし=閉じる」「変更あり=変更を保存」に切り替わる
 - [ ] 保存中は主要操作（閉じる/破棄/保存）が無効化される
@@ -151,7 +136,6 @@ resetDatabaseDependencies();
 
 ### 1. 開発環境でのテスト
 - 本番環境に影響を与えないよう、必ず開発環境でテストを実行してください
-- スクリプトプロパティの `DEV_SPREADSHEET_ID` を使用して、開発用のスプレッドシートを指定してください
 
 ### 2. テストデータの管理
 - テスト用のデータは必ず `is_active = false` またはテスト用の識別子を付けてください
@@ -167,10 +151,6 @@ resetDatabaseDependencies();
 
 ## トラブルシューティング
 
-### App.testが利用できない
-- スクリプトプロパティの `MODE` が `development` に設定されているか確認してください
-- アプリケーションを再読み込みしてください
-
 ### テストデータが表示されない
 - `App.state.data` を確認してください
 - データがキャッシュされている可能性があるため、強制リフレッシュを試してください
@@ -184,27 +164,15 @@ resetDatabaseDependencies();
 - 閉じタグ（`</dialog>`, `</div>`, `</script>`）の `/` はエスケープしないでください
 - エスケープ対象は `//` のみで、単一 `/` は対象外です
 
-## 今後の拡張
-
-現在は手動テストのみですが、将来的には以下を検討します：
-- Google Apps Script用のユニットテストフレームワークの導入
-- clasp + Jest によるローカルテスト
-- E2Eテストの自動化
-- CI/CDパイプラインの構築
-
-## 自律サイクル実行
-
-Phase4-5の運用では、以下を1サイクルとして実行します。
-
-1. 影響範囲調査（サブエージェント）
-2. 小さな差分実装（最大3ファイル）
-3. エラー確認（Problems）
-4. devデプロイ
-5. 本ドキュメントとカバレッジシート更新
-
-関連資料:
-- docs/table-coverage-checklist.md
-- docs/autonomous-cycle-guide.md
+### iframe srcdoc の構文エラー
+- コンソールに `about:srcdoc` 起点の `Unexpected token` / `Unexpected end of input` が出ていないか確認してください
+- `components/utils/tabulator-foundation-script.html` の `buildFrameSrcdoc` 内で、以下の典型的な崩れを確認してください
+  - `:[;]` のような三項演算子の壊れ
+  - `})}. filter(...)` のような括弧の過不足
+  - 文字列内の関数閉じ忘れ（`}` / `)` / `;`）
+- 正規表現を文字列で埋め込む場合は、生成後の srcdoc で `^https?:\/\/` や `^\/+` のように意図した `\` が残っているか確認してください（`\` が欠けると `Unexpected end of input` の原因になります）
+- 変更後は `buildFrameSrcdoc` が返した文字列から `<script>...</script>` を取り出し、`new Function(...)` で構文チェックしてください（ブラウザ実行前に壊れを検知できます）
+- 変更後は catalog の全タブ（人物・組織・技能・企画）を順番に開いて、同一症状が再発しないことを確認してください
 
 ## 参考資料
 

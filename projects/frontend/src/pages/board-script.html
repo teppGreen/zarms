@@ -123,10 +123,12 @@
                 boards.forEach(board => {
                     let pageDiv = document.getElementById(`tab-board-${board.id}`);
                     const headerHtml = `
-                        <header class="small-margin no-padding">
+                    <header class="small-margin no-padding">
                             <nav id="board-tab-header-${board.id}" class="no-margin no-padding row">
                                 <h3 class="bold small">${escapeHtml(board.name)}</h3>
                                 <div class="max"></div>
+                                <span id="last-updated-board-${board.id}" class="small-text secondary-text"></span>
+                                ${window.refreshButtonHTML}
                                 <label class="switch icon board-view-toggle" id="view-toggle-${board.id}">
                                     <input type="checkbox" onchange="App.pages.boards.onViewToggleChange('${board.id}')">
                                     <span>
@@ -196,6 +198,8 @@
                     <nav id="board-tab-header-${boardId}" class="no-padding no-margin row">
                         <h3 class="bold small">マイボード</h3>
                         <div class="max"></div>
+                        <span id="last-updated-board-${boardId}" class="small-text secondary-text"></span>
+                        ${window.refreshButtonHTML}
                         <label class="switch icon board-view-toggle" id="view-toggle-${boardId}">
                             <input type="checkbox" onchange="App.pages.boards.onViewToggleChange('${boardId}')">
                             <span>
@@ -281,16 +285,10 @@
                         tasks = result?.data || result || [];
                     }
 
-                    // ボード固有のタスクキャッシュに保存
                     this.cachedBoardTasks[boardId] = tasks;
                     this.mergeTasksIntoGlobalCache(tasks);
-
-                    // 現在の表示モードで描画
-                    if (this.viewMode === 'list') {
-                        this.renderList(boardId, false);
-                    } else {
-                        this.renderKanban(boardId, false);
-                    }
+                    this.renderList(boardId, false);
+                    this.renderKanban(boardId, false);
 
                     // 読み込み完了としてマーク
                     if (this.loadingPromises[boardId]) {
@@ -1053,31 +1051,7 @@
                 }, `タスクステータスを更新`)
                     .then(result => {
                         if (!result || (Array.isArray(result) && result.length === 0)) {
-                            // ロールバック
-                            task.task_status_key = oldStatusKey;
-                            updateLocalData(TABLE_NAMES.TASKS, taskId, { task_status_key: oldStatusKey });
-
-                            // my-boardロールバック
-                            if (this.cachedBoardTasks['my-board']) {
-                                const myBoardTask = this.cachedBoardTasks['my-board'].find(t => t.id === taskId);
-                                if (myBoardTask) {
-                                    myBoardTask.task_status_key = oldStatusKey;
-                                }
-                            }
-
-                            // 再描画してロールバック
-                            this.renderKanban(boardId);
-                            if (this.currentBoardId === 'my-board' && boardId !== 'my-board') {
-                                this.renderKanban('my-board');
-                            }
-                            alert('ステータスの更新に失敗しました');
-                        } else {
-                            // バックグラウンドで最新データ同期（JOIN情報の更新など）
-                            this.loadData(boardId, true);
-                            // 同一ボードIDに対して二重にロードしないようにする
-                            if (this.currentBoardId === 'my-board' && boardId !== 'my-board') {
-                                this.loadData('my-board', true);
-                            }
+                            throw new Error('No data returned from update');
                         }
                     })
                     .catch(error => {
@@ -1093,17 +1067,15 @@
                             }
                         }
 
-                        // 再描画してロールバック
                         this.renderKanban(boardId);
+                        this.renderList(boardId);
                         if (this.currentBoardId === 'my-board' && boardId !== 'my-board') {
                             this.renderKanban('my-board');
+                            this.renderList('my-board');
                         }
                         App.utils.error.handle(error);
                     });
             },
-
-
-
 
             /**
              * 新しいボードを作成
@@ -1119,7 +1091,7 @@
                 }
 
                 try {
-                    showSnackbar('ボードを作成中です...');
+                    showSnackbar('ボードを作成中です...', 'info', 'top', 0);
 
                     const cleanItem = {
                         name: promptValue,
@@ -1149,6 +1121,8 @@
                     if (App.utils.navigation && App.utils.navigation.switchTab) {
                         await App.utils.navigation.switchTab(`board-${newBoard.id}`);
                     }
+
+                    showSnackbar('ボードを作成しました', 'success');
                 } catch (error) {
                     console.error('Failed to create board:', error);
                     App.utils.error.handle(error);

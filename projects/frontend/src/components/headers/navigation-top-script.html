@@ -43,7 +43,7 @@
                 },
 
                 close: function () {
-                    appUi('modal-shortcuts-help',false);
+                    appUi('modal-shortcuts-help', false);
                 },
 
                 render: function () {
@@ -60,8 +60,8 @@
                         const keyText = escapeHtml(item.keys || '');
                         const actionText = escapeHtml(item.action || '');
                         return '' +
-                            '<div class="row wrap tiny-space middle-align small-margin">' +
-                            '<span class="chip border small"><b>' + keyText + '</b></span>' +
+                            '<div class="row wrap tiny-space small-margin">' +
+                            '<span class="left-padding right-padding no-round border"><b>' + keyText + '</b></span>' +
                             '<span class="small-text">' + actionText + '</span>' +
                             '</div>';
                     }).join('');
@@ -82,7 +82,10 @@
                 const apps = App.state.data.apps || [];
 
                 if (apps.length === 0) {
-                    appsGrid.innerHTML = '<div class="padding center-align row tiny-space secondary-text"><i>info</i><span>リンクがありません</span></div>';
+                    // refreshApps()内でシマーまたはエラーが表示されるため、ここでは「リンクなし」のみを考慮
+                    if (!this.isAppsLoading) {
+                      appsGrid.innerHTML = '<div class="padding center-align row tiny-space secondary-text"><i>info</i><span>リンクがありません</span></div>';
+                    }
                     return;
                 }
 
@@ -112,6 +115,50 @@
                     });
                 });
             },
+
+            /**
+             * 最新のアプリリンク一覧を取得し、再描画します
+             * メニューを開いた際の onclick ハンドラとして使用されます
+             */
+            refreshApps: async function () {
+                const appsGrid = document.getElementById('apps-grid');
+                if (!appsGrid) return;
+
+                // 既に読み込み中なら何もしない
+                if (this.isAppsLoading) return;
+
+                // キャッシュがある場合はそのまま描画、ない場合はシマー
+                const apps = App.state.data.apps || [];
+                if (apps.length === 0) {
+                    appsGrid.innerHTML = `
+                        <div class="center padding center-align row small-space secondary-text">
+                            <progress class="circle indeterminate small"></progress>
+                            <span>リンクを読み込み中...</span>
+                        </div>
+                    `;
+                }
+
+                this.isAppsLoading = true;
+                try {
+                    console.log('[Apps] Fetching latest links...');
+                    const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.APPS, 'select', {}, null, true);
+                    const freshApps = result?.data || result || [];
+                    
+                    // 取得データが空なら「リンクなし」を表示
+                    App.state.data.apps = freshApps;
+                    this.renderApps();
+                } catch (error) {
+                    console.error('[Apps] Failed to refresh apps:', error);
+                    // エラー時、データが空ならエラーを表示
+                    if (App.state.data.apps.length === 0) {
+                        appsGrid.innerHTML = '<div class="padding center-align secondary-text error-text"><i>error</i><span>リンクの読み込みに失敗しました</span></div>';
+                    }
+                } finally {
+                    this.isAppsLoading = false;
+                }
+            },
+
+            isAppsLoading: false,
 
             /**
              * コメント既読状態を同期し、右上ボタンのバッジ表示を更新します
@@ -235,7 +282,7 @@
             showUpdateModal: function () {
                 const modal = document.getElementById('modal-system-update');
                 if (modal) {
-                    appUi('modal-system-update',true);
+                    appUi('modal-system-update', true);
                 }
             },
 
@@ -316,17 +363,23 @@
             },
 
             /**
-             * 1時間ごとの自動更新を開始
+             * 自動更新を開始
              */
             startAutoRefresh: function () {
                 if (this.autoRefreshInterval) {
                     clearInterval(this.autoRefreshInterval);
                 }
-                // 1時間 = 3600000ms
+                // 30分ごとにシステムアップデートとコメントを同時に再取得
                 this.autoRefreshInterval = setInterval(() => {
                     console.log('[SystemUpdates] Auto-refreshing...');
                     this.loadData();
-                }, 3600000);
+                    if (App.utils.header.comments && App.utils.header.comments.loadData) {
+                        console.log('[Comments] Auto-refreshing with system updates...');
+                        App.utils.header.comments.loadData(false).catch(e =>
+                            console.warn('[Comments] Auto-refresh failed:', e)
+                        );
+                    }
+                }, 1800000);
             },
 
             // ============================================
@@ -406,7 +459,7 @@
 
                 try {
                     // 全角数字を半角に変換してから数値チェック（共通ユーティリティを使用）
-                    const { normalizedValue, numericValue, isNumericInput } = App.utils.search.getNormalizedSearchInfo(searchValue);
+                    const { numericValue, isNumericInput } = App.utils.search.getNormalizedSearchInfo(searchValue);
 
                     const switchToMyBoardTab = async () => {
                         if (App.utils.navigation && App.utils.navigation.switchTab) {
@@ -415,7 +468,6 @@
                     };
 
                     if (isNumericInput) {
-                        // 数値入力の場合: display_id でタスクを特定する
                         let foundTask = null;
                         try {
                             const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'select', {
@@ -429,30 +481,43 @@
                             console.error('[Search] display_id 検索エラー:', e);
                         }
 
-                        // display_id 検索完了後にマイボードへ移動
-                        await switchToMyBoardTab();
-
+                        // モーダル描画で参照できるよう、my-boardキャッシュにタスク本体を先に反映
                         if (foundTask && App.pages.boards) {
-                            // 2. 特定したタスク名でマイボードフィルタを適用
-                            App.pages.boards.initializeMyBoardFilters(false);
-                            App.pages.boards.myBoardFilters.title = foundTask.name;
-                            App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
-
-                            // 3. 検索（データ再読み込み）
-                            await App.pages.boards.loadData('my-board', false);
-
-                            // 4. 特定したタスクの詳細画面を開く
-                            if (App.modals.taskDetail) {
-                                App.modals.taskDetail.open(foundTask.id);
-                                return;
+                            const myBoardTasks = Array.isArray(App.pages.boards.cachedBoardTasks['my-board'])
+                                ? App.pages.boards.cachedBoardTasks['my-board']
+                                : [];
+                            const existingIndex = myBoardTasks.findIndex(task => task.id === foundTask.id);
+                            if (existingIndex >= 0) {
+                                myBoardTasks[existingIndex] = foundTask;
+                            } else {
+                                myBoardTasks.unshift(foundTask);
                             }
-                        } else if (App.pages.boards) {
-                            // タスクが見つからなかった場合は数値をそのままタイトル検索にフォールバック
-                            App.pages.boards.initializeMyBoardFilters(false);
-                            App.pages.boards.myBoardFilters.title = searchValue;
-                            App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
-                            await App.pages.boards.loadData('my-board', false);
+                            App.pages.boards.cachedBoardTasks['my-board'] = myBoardTasks;
                         }
+
+                        await switchToMyBoardTab();
+                        
+                        // display_id ヒット時は即時に詳細モーダルを表示
+                        if (foundTask && App.modals.taskDetail) {    
+                            App.modals.taskDetail.open(foundTask.id);
+                        }
+
+                        // その後はバックグラウンドでタイトル検索を継続し、マイボードへ描画
+                        const titleQuery = foundTask ? foundTask.name : searchValue;
+                        if (App.pages.boards) {
+                            void (async () => {
+                                try {
+                                    App.pages.boards.initializeMyBoardFilters(false);
+                                    App.pages.boards.myBoardFilters.title = titleQuery;
+                                    App.pages.boards.myBoardFilters.titleMatchMode = 'contains';
+                                    await App.pages.boards.loadData('my-board', false);
+                                } catch (e) {
+                                    console.error('[Search] バックグラウンドタイトル検索エラー:', e);
+                                }
+                            })();
+                        }
+
+                        return;
                     } else {
                         // 通常の文字列検索
                         await switchToMyBoardTab();
