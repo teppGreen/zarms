@@ -1311,19 +1311,30 @@
                 if (!confirm(confirmMsg)) return;
 
                 try {
-                    showSnackbar(isArchiving ? 'ボードをアーカイブ中です...' : 'ボードのアーカイブを解除中です...', 'info');
+                    showSnackbar(isArchiving ? 'ボードをアーカイブしました' : 'ボードのアーカイブを解除しました', 'success');
                     const newStatus = !isArchiving;
                     const actionName = isArchiving ? 'ボードをアーカイブ' : 'ボードのアーカイブを解除';
+
+                    // Optimistic UI: すぐにUIを更新
+                    board.is_active = newStatus;
+                    this.initialize();
+                    if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+                        App.utils.navigation.renderBoardsNavigation();
+                    }
 
                     await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'update', {
                         where: { id: ["=", board.id] },
                         set: { is_active: newStatus }
                     }, actionName);
-
-                    refreshData();
                 } catch (e) {
                     console.error(e);
-                    alert('処理に失敗しました。時間をおいて再度お試しください。');
+                    showSnackbar(isArchiving ? 'ボードのアーカイブに失敗しました。時間をおいて再度お試しください。' : 'ボードのアーカイブ解除に失敗しました。時間をおいて再度お試しください。', 'error');
+                    // ロールバック
+                    board.is_active = !isArchiving;
+                    this.initialize();
+                    if (App.utils.navigation && App.utils.navigation.renderBoardsNavigation) {
+                        App.utils.navigation.renderBoardsNavigation();
+                    }
                 }
             },
 
