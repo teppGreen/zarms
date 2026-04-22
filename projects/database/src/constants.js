@@ -43,7 +43,7 @@ const TABLE_HEADERS = {
   COMMENTS: ['id', 'display_id', 'content', 'mentioned_to', 'related_table', 'related_id', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   DIRECTORIES: ['id', 'display_id', 'parent_directory_id', 'directory_type_key', 'name', 'description', 'achievements', 'scale', 'slack_channel_url', 'website_url', 'folder_url', 'document_url', 'logo_image_url', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   APPS: ['id', 'name', 'url', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
-  MEMBERS: ['id', 'email', 'slack_profile_url', 'name', 'display_name', 'title', 'description', 'website_url', 'profile_photo_file_url', 'profile_photo_url', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at', 'name_yomi', 'display_name_yomi', 'phone_number', 'birthday', 'system_role_key'],
+  MEMBERS: ['id', 'email', 'slack_profile_url', 'name', 'display_name', 'title', 'description', 'website_url', 'profile_photo_file_url', 'profile_photo_url', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at', 'name_yomi', 'display_name_yomi', 'phone_number', 'birthday', 'system_role_key', 'fri_planned_start_at', 'fri_planned_end_at', 'fri_actual_start_at', 'fri_actual_end_at', 'sat_planned_start_at', 'sat_planned_end_at', 'sat_actual_start_at', 'sat_actual_end_at', 'sun_planned_start_at', 'sun_planned_end_at', 'sun_actual_start_at', 'sun_actual_end_at', 'user_note', 'plan_id', 'attribute_type'],
   PLAN_ASSIGNMENTS: ['id', 'plan_id', 'member_id', 'role', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   DIRECTORY_ASSIGNMENTS: ['id', 'directory_id', 'member_id', 'role', 'is_active', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
   SKILLS: ['id', 'skill_type_key', 'title', 'user_note', 'remark', 'created_by', 'created_at', 'updated_by', 'updated_at'],
@@ -112,17 +112,3 @@ const TASK_BY_QUESTION_DEFAULT_VALUES = {
   remark: 'システムが自動作成',
   priority_key: 'MEDIUM',
 }
-
-// ============================================
-// API認証設定
-// ============================================
-
-/**
- * APIメッセージ認証に使用するHMAC秘密鍵とタイムスタンプ許容幅
- * ScriptPropertiesに 'DB_API_SECRET' を設定することで有効になる
- */
-const API_AUTH_CONFIG = {
-  SECRET_PROPERTY_KEY: 'DB_API_SECRET',
-  TIMESTAMP_TOLERANCE_MS: 5 * 60 * 1000, // ±5分
-  ALLOWED_OPERATIONS: ['select', 'insert', 'bulkinsert', 'update', 'remove'],
-};

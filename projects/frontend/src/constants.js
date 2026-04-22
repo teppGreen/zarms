@@ -141,6 +141,7 @@ const EXTERNAL_URLS = {
   GEMINI_GEMS_TASK_ADD: scriptProperties.getProperty('EXTERNAL_URLS.GEMINI_GEMS_TASK_ADD'),
   ZARMS_WEB: scriptProperties.getProperty('EXTERNAL_URLS.ZARMS_WEB'),
   MASCOT_MAIN_IMAGE: scriptProperties.getProperty('EXTERNAL_URLS.MASCOT_MAIN_IMAGE'),
+  MOBILE_APP: scriptProperties.getProperty('EXTERNAL_URLS.MOBILE_APP'),
 };
 
 /**
@@ -176,19 +177,4 @@ const UI_TEXT = {
   SUCCESS_SAVED: '保存しました',
   SUCCESS_DELETED: '削除しました',
   SUCCESS_CREATED: '作成しました'
-};
-
-// ============================================
-// Database API設定（APIモード用）
-// ============================================
-
-/**
- * unauthorizedユーザー向けDatabase API設定
- * ScriptPropertiesに以下を設定してください:
- *   DB_API_URL    - databaseプロジェクトのWebアプリURL
- *   DB_API_SECRET - HMAC署名用シークレット（databaseと同じ値）
- */
-const DB_API_CONFIG = {
-  URL: scriptProperties.getProperty('DB_API_URL'),
-  SECRET: scriptProperties.getProperty('DB_API_SECRET'),
 };

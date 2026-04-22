@@ -38,12 +38,10 @@ function doGet(e) {
  * 認証済みユーザーに対してアプリケーション画面を返します
  * @param {Object} activeUser - 現在のアクティブユーザー情報
  * @param {Object} urlParams - URLパラメータ
- * @param {boolean} isMobile - モバイル版かどうか
  * @returns {string} HTMLコンテンツ
  */
-function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false) {
-  const templatePath = isMobile ? 'mobile/index' : 'index';
-  const template = HtmlService.createTemplateFromFile(templatePath);
+function loadAppHtml(activeUser, urlParams) {
+  const template = HtmlService.createTemplateFromFile('index');
 
   // テンプレート変数の準備
   const templateVariables = {
@@ -51,13 +49,12 @@ function loadAppHtml(activeUser, urlParams, isMobile = false, useApiMode = false
     isDevelopment: isDevelopment(urlParams),
     TABLE_NAMES: TABLE_NAMES,
     KEY_LABELS: KEY_LABELS,
-    useApiMode: useApiMode,
+    EVENT_CONFIG: EVENT_CONFIG,
+    EXTERNAL_URLS: EXTERNAL_URLS,
     userProperties: PropertiesService.getUserProperties().getProperties()
   };
 
-  if (!isMobile) {
-    templateVariables.initialData = _prefetchMasterData(activeUser.id, useApiMode);
-  }
+  templateVariables.initialData = _prefetchMasterData(activeUser.id);
 
   template.templateVariables = templateVariables;
   return template.evaluate().getContent();
@@ -76,7 +73,6 @@ const USER_CACHE_TTL_SECONDS_DEFAULT = 21600;
  * register.htmlからの複数回のgoogle.script.run呼び出しを1回にまとめます。
  * @param {string} email - 現在のユーザーのメールアドレス
  * @param {Object} urlParams - URLパラメータ
- * @param {boolean} isMobile - モバイル版かどうか
  * @returns {Object} {
  *   status: 'ok' | 'unauthorized' | 'not_registered' | 'scope_required',
  *   activeUser: Object|null,     // 認証済みメンバー情報
@@ -88,7 +84,7 @@ const USER_CACHE_TTL_SECONDS_DEFAULT = 21600;
  *   requiresReAgreement: Object  // 再同意が必要な規約・ポリシー（terms, privacy）
  * }
  */
-function getInitialAppData(email, urlParams, isMobile = false) {
+function getInitialAppData(email, urlParams) {
   const authInfo = checkAppAuthorization();
   if (authInfo.status === 'REQUIRED') {
     return {
@@ -96,35 +92,23 @@ function getInitialAppData(email, urlParams, isMobile = false) {
       activeUser: null,
       appHtml: null,
       error: null,
-      authUrl: authInfo.url || null,
-      useApiMode: false
+      authUrl: authInfo.url || null
     };
   }
 
-  const cacheKey = _buildUserCacheKeyForInitialLoad(email, urlParams, isMobile);
+  const cacheKey = _buildUserCacheKeyForInitialLoad(email, urlParams);
   const cachedResult = _readUserCacheJson(cacheKey);
   if (cachedResult) {
     return cachedResult;
   }
 
-  let useApiMode = false;
   let activeUser = null;
 
   try {
-    // 1. まず通常モード（スプレッドシート直接アクセス）でメンバー取得を試みる
-    activeUser = getMemberByEmail(email, false);
-    useApiMode = false;
+    activeUser = getMemberByEmail(email);
   } catch (e) {
-    // 権限エラー（スプレッドシートにアクセスできない）等の場合、APIモードに切り替えて再試行
-    console.warn('Direct access failed (likely permission error), switching to API mode:', e.message);
-    try {
-      activeUser = getMemberByEmail(email, true);
-      useApiMode = true;
-    } catch (apiError) {
-      // APIモードでも失敗（ネットワークエラーやAPIの設定不備など）
-      console.error('API mode also failed:', apiError.message);
-      return { status: 'unauthorized', useApiMode: true, activeUser: null, appHtml: null, error: apiError.message };
-    }
+    console.error('[getInitialAppData] failed:', e.message);
+    return { status: 'unauthorized', activeUser: null, appHtml: null, error: e.message };
   }
 
   try {
@@ -137,7 +121,6 @@ function getInitialAppData(email, urlParams, isMobile = false) {
         appHtml: null,
         error: null,
         authUrl: null,
-        useApiMode: useApiMode,
         policyUpdateDates: policyUpdateDates
       };
       _writeUserCacheJson(cacheKey, result, USER_CACHE_TTL_SECONDS_DEFAULT);
@@ -158,7 +141,7 @@ function getInitialAppData(email, urlParams, isMobile = false) {
     const requiresReAgreement = _checkRequiresReAgreement(userAgreementData, policyUpdateDates);
 
     // 6. アプリのHTMLを生成
-    const appHtml = loadAppHtml(activeUser, urlParams, isMobile, useApiMode);
+    const appHtml = loadAppHtml(activeUser, urlParams);
 
     const result = {
       status: 'ok',
@@ -166,7 +149,6 @@ function getInitialAppData(email, urlParams, isMobile = false) {
       appHtml: appHtml,
       error: null,
       authUrl: null,
-      useApiMode: useApiMode,
       userAgreementData: userAgreementData,
       policyUpdateDates: policyUpdateDates,
       requiresReAgreement: requiresReAgreement
@@ -175,7 +157,7 @@ function getInitialAppData(email, urlParams, isMobile = false) {
     _writeUserCacheJson(cacheKey, result, USER_CACHE_TTL_SECONDS_DEFAULT);
     return result;
   } catch (e) {
-    return { status: 'unauthorized', useApiMode: useApiMode, activeUser: null, appHtml: null, error: e.message, authUrl: null };
+    return { status: 'unauthorized', activeUser: null, appHtml: null, error: e.message, authUrl: null };
   }
 }
 
@@ -225,7 +207,7 @@ function _checkRequiresReAgreement(userAgreementData, policyUpdateDates) {
  * @param {string} userId - ユーザーID
  * @returns {Object} { tasks, logs, boards, members, isCached }
  */
-function _prefetchMasterData(userId, useApiMode = false) {
+function _prefetchMasterData(userId) {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const isoDate = sevenDaysAgo.toISOString();
@@ -275,9 +257,7 @@ function _prefetchMasterData(userId, useApiMode = false) {
     }
   ];
 
-  const batchResult = useApiMode
-    ? handleBatchDatabaseProcessViaApi(queries)
-    : handleBatchDatabaseProcess(userId, queries);
+  const batchResult = handleBatchDatabaseProcess(userId, queries);
   const r = batchResult.results || {};
 
   return {
@@ -453,13 +433,12 @@ function checkAppAuthorization() {
   };
 }
 
-function _buildUserCacheKeyForInitialLoad(email, urlParams, isMobile) {
+function _buildUserCacheKeyForInitialLoad(email, urlParams) {
   const safeEmail = String(email || '').trim().toLowerCase() || 'anonymous';
-  const mode = isMobile ? 'mobile' : 'desktop';
   const env = isDevelopment(urlParams) ? 'dev' : 'prod';
   const policyDates = getPolicyUpdateDates();
   const policySignature = [policyDates.termsUpdatedAt || 'none', policyDates.privacyUpdatedAt || 'none'].join('|');
-  return [USER_CACHE_KEY_PREFIX_INITIAL_APP_DATA, safeEmail, mode, env, policySignature].join(':');
+  return [USER_CACHE_KEY_PREFIX_INITIAL_APP_DATA, safeEmail, env, policySignature].join(':');
 }
 
 function _readUserCacheJson(cacheKey) {
@@ -511,10 +490,8 @@ function _clearInitialLoadCacheForCurrentUser() {
     if (!email) return;
 
     const keys = [
-      _buildUserCacheKeyForInitialLoad(email, { use_prod_db: 'true' }, false),
-      _buildUserCacheKeyForInitialLoad(email, { use_prod_db: 'true' }, true),
-      _buildUserCacheKeyForInitialLoad(email, {}, false),
-      _buildUserCacheKeyForInitialLoad(email, {}, true)
+      _buildUserCacheKeyForInitialLoad(email, { use_prod_db: 'true' }),
+      _buildUserCacheKeyForInitialLoad(email, {})
     ];
     const cache = CacheService.getUserCache();
     keys.forEach(key => cache.remove(key));
