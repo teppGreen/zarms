@@ -18,18 +18,29 @@
             <div id="step-loading" class="page large-padding">
                 <h2 class="bold small bottom-margin">サインイン</h2>
                 <div class="top-padding bottom-padding">
-                    <p>展軸祭運営者向け業務システム「ZARMS」へようこそ！<br>
-                        大学のGoogle アカウントでサインインしてください。</p>
-                    <p class="s error-text">
-                        <i>info</i>
-                        <span>モバイル版では一部機能の利用が制限されます。通常はデスクトップ版（パソコンのブラウザからアクセス）をご利用ください。</span>
-                    </p>
+                    <p>展軸祭運営者向け業務システム「ZARMS」へようこそ！<br>大学のGoogle アカウントでサインインしてください。</p>
                 </div>
                 <nav class="top-margin">
                     <button disabled class="primary responsive extra">
                         <progress class="circle small indeterminate"></progress>
                         <span>サインイン中</span>
                     </button>
+                </nav>
+            </div>
+
+            <div id="step-mobile-redirect" class="page right large-padding">
+                <h2 class="bold small bottom-margin">モバイル版に移動します</h2>
+                <div class="top-padding bottom-padding">
+                    <div class="row tiny-space">
+                        <i class="extra">smartphone</i>
+                    </div>
+                    <p>ZARMSはデスクトップ版とモバイル版があり、それぞれ機能が異なります。このサインイン画面はデスクトップ版のものです。<br>スマートフォンなどからアクセスしている場合は、モバイル版をご利用ください。</p>
+                </div>
+                <nav class="right-align top-margin">
+                    <a id="mobile-app-open-link" class="button primary extra" target="_blank" rel="noopener noreferrer">
+                        <i>open_in_new</i>
+                        <span>モバイル版を開く</span>
+                    </a>
                 </nav>
             </div>
 
@@ -255,7 +266,6 @@
         const ERROR_HELPER_TEXT = `URLの形式が間違っています。`;
 
         let foundUser = null;
-        let useApiMode = false;
         let hasAgreed = false;
         let agreementNextAction = null;
         let userAgreementData = null;
@@ -278,6 +288,24 @@
 
         function setupListeners() {
             searchUserListeners();
+            mobileRedirectListeners();
+        }
+
+        function mobileRedirectListeners() {
+            const mobileAppOpenLink = document.getElementById('mobile-app-open-link');
+            if (!mobileAppOpenLink) {
+                return;
+            }
+
+            mobileAppOpenLink.addEventListener('click', function (e) {
+                e.preventDefault();
+                const targetUrl = this.href || buildMobileAppRedirectUrl();
+                if (!targetUrl) {
+                    showStep('step-system-error');
+                    return;
+                }
+                window.open(targetUrl, '_top');
+            });
         }
 
         function searchUserListeners() {
@@ -480,12 +508,59 @@
             }
         }
 
+        function buildMobileAppRedirectUrl() {
+            const mobileAppUrl = String((EXTERNAL_URLS && EXTERNAL_URLS.MOBILE_APP) || '').trim();
+            if (!mobileAppUrl) {
+                console.error('redirectToMobileApp: EXTERNAL_URLS.MOBILE_APP is empty');
+                return null;
+            }
+
+            try {
+                const target = new URL(mobileAppUrl);
+                const currentUrl = new URL(window.location.href);
+
+                currentUrl.searchParams.forEach(function (value, key) {
+                    target.searchParams.set(key, value);
+                });
+
+                return target.toString();
+            } catch (error) {
+                console.error('redirectToMobileApp failed:', error);
+                return null;
+            }
+        }
+
         /**
          * アクセス権限をチェックし、問題なければアプリケーションをロードします。
-         * デバイスタイプ（モバイル/デスクトップ）に応じて最適なHTMLを取得します。
+         * モバイル端末の場合は mobile-app へリダイレクトします。
          */
+        function redirectToMobileApp() {
+            const targetUrl = buildMobileAppRedirectUrl();
+            if (!targetUrl) {
+                showStep('step-system-error');
+                return;
+            }
+
+            const mobileAppOpenLink = document.getElementById('mobile-app-open-link');
+            if (mobileAppOpenLink) {
+                mobileAppOpenLink.href = targetUrl;
+            }
+
+            showStep('step-mobile-redirect');
+
+            const openedWindow = window.open(targetUrl, '_blank');
+            if (openedWindow && typeof openedWindow.focus === 'function') {
+                openedWindow.focus();
+            }
+        }
+
         function checkAccess() {
             const isMobile = isMobileDevice();
+            if (isMobile) {
+                redirectToMobileApp();
+                return;
+            }
+
             showStep('step-loading');
 
             google.script.run
@@ -501,8 +576,6 @@
                         showAgreementStep('scope');
                         return;
                     }
-
-                    useApiMode = !!result.useApiMode;
                     
                     if (result.status === 'not_registered') {
                         // ユーザー未登録時も、scriptPropertiesから方針更新日時を取得
@@ -548,9 +621,9 @@
                 })
                 .withFailureHandler(function (error) {
                     console.error('checkAccess failed:', error);
-                    showAccessErrorStep();
+                    showStep('step-system-error');
                 })
-                .getInitialAppData(activeUserEmail, urlParams, isMobile);
+                .getInitialAppData(activeUserEmail, urlParams);
         }
 
         function showStep(id) {
@@ -623,7 +696,7 @@
                     alert('エラーが発生しました: ' + error.message);
                     showInputStep();
                 })
-                .findUserBySlackUrl(slackProfileUrl, useApiMode);
+                .findUserBySlackUrl(slackProfileUrl);
         }
 
         function displayUserInfo(user) {
@@ -663,7 +736,7 @@
                     displayUserInfo(foundUser);
                     document.getElementById('confirm-nav').style.display = '';
                 })
-                .registerUserEmail(foundUser.id, useApiMode);
+                .registerUserEmail(foundUser.id);
         }
     </script>
 </body>
