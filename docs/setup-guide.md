@@ -77,6 +77,14 @@ op account list
 - **Item name**: `clasp-frontend-prod`
 - **Custom field**: `script-id` = `{GAS Frontend Prod Project ID}`
 
+#### Mobile App 開発環境用アイテム
+- **Item name**: `clasp-mobile-app-dev`
+- **Custom field**: `script-id` = `{GAS Mobile App Dev Project ID}`
+
+#### Mobile App 本番環境用アイテム
+- **Item name**: `clasp-mobile-app-prod`
+- **Custom field**: `script-id` = `{GAS Mobile App Prod Project ID}`
+
 ### 3-3. 1Password にアイテムを追加するコマンド例
 
 ```bash
@@ -107,6 +115,12 @@ op item get "clasp-database-dev" --vault "zarms" --fields label=script-id
 ```bash
 # Database 開発環境へのデプロイ
 npm run deploy:database:dev
+
+# Frontend 開発環境へのデプロイ
+npm run deploy:frontend:dev
+
+# Mobile App 開発環境へのデプロイ
+npm run deploy:mobile-app:dev
 
 # 期待される動作:
 # 1. generate-clasp-from-1password.js が 1Password から scriptId を取得
@@ -170,6 +184,15 @@ op item list --vault zarms
 
 1Password アイテムの `script-id` フィールドが空です。アイテムを編集して、正しい GAS Script ID を入力してください。
 
+### エラー: `Service Google Sheets API has not been enabled ...`
+
+`projects/database` ライブラリは書き込み処理で Google Sheets API（Advanced Service, v4）を利用します。
+呼び出し側の Web アプリ（frontend / mobile-app）で以下を確認してください。
+
+1. `appsscript.json` の `dependencies.enabledAdvancedServices` に `sheets:v4` が含まれている
+2. 必要な `oauthScopes`（`spreadsheets` など）が設定されている
+3. 修正後に `npm run deploy:frontend:dev` または `npm run deploy:mobile-app:dev` を実行して再デプロイしている
+
 ## よくある質問
 
 ### Q: ローカル開発時は毎回デプロイが必要ですか?
@@ -218,6 +241,7 @@ GitHub Actions などの CI/CD システムでは、1Password Service Account �
 ```bash
 rm projects/database/.clasp.json
 rm projects/frontend/.clasp.json
+rm projects/mobile-app/.clasp.json
 git add -A
 git commit -m "chore: remove static .clasp config files, use 1Password CLI instead"
 git push
@@ -245,4 +269,7 @@ npm run deploy:database:dev
 
 # フロントエンドのみデプロイ
 npm run deploy:frontend:dev
+
+# モバイル版のみデプロイ
+npm run deploy:mobile-app:dev
 ```

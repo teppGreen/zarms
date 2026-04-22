@@ -16,7 +16,7 @@ ZARMSで利用しているQuillエディタについて、表示崩れや読み�
 - `projects/frontend/src/components/modals/member-detail-script.html`
 - `projects/frontend/src/components/modals/plan-detail-script.html`
   - 上記3つは `App.utils.quill` を利用
-- `projects/frontend/src/mobile/quill_editor.html`
+- `projects/mobile-app/src/mobile/quill_editor.html`
   - モバイル向けに `new Quill(...)` を直接利用（共通化されていない）
 
 ### 2. 現在の入力導線
@@ -84,7 +84,7 @@ Quillのフォーマット解釈により、主に以下が生成対象になる
 - デスクトップ共通モジュール `App.utils.quill`
   - `clipboard.matchers` で色・フォント属性削除
   - `getContent` / `setContent` で色・フォント指定除去サニタイズを実施
-- モバイル `mobile/quill_editor.html`
+- モバイル `projects/mobile-app/src/mobile/quill_editor.html`
   - 同等の `clipboard.matchers` を適用
   - 保存時・初期表示時に色・フォント指定除去サニタイズを実施
 

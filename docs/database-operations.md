@@ -21,6 +21,8 @@
 
 このライブラリは、Google Visualization APIを使った高速な参照（SELECT）と、Google Sheets APIを使った書き込み（INSERT/UPDATE/DELETE）を組み合わせて実装されています。
 
+書き込み系処理は Sheets Advanced Service（v4）に依存するため、ライブラリ呼び出し側（frontend / mobile-app）の `appsscript.json` にも `dependencies.enabledAdvancedServices`（`sheets:v4`）が必要です。
+
 以下のパラメータが各関数で共通して使用されます。
 - `sheetName` (String): 操作対象のシート名（テーブル名に該当します）
 - `userId` (String): 操作を実行しているユーザーID（監査・ログ用途などで使用されます）

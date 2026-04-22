@@ -66,6 +66,18 @@ App.test.resumeAutoRefresh();
 - [ ] ボードの作成・更新・有効/無効切替が正しく動作する
 - [ ] 人物の表示・フィルタリングが正しく動作する
 
+### モバイル3タブ・出欠機能
+- [ ] 下部ナビゲーションの `タスク / 当日出欠 / マニュアル` タブが `data-ui` と `page` クラスで切り替わる
+- [ ] タスクタブ以外ではフィルタボタンと新規作成ボタンが非表示になる
+- [ ] frontendのregister画面でモバイル判定時に `EXTERNAL_URLS.MOBILE_APP` へリダイレクトされる
+- [ ] mobile-appで `Session.getActiveUser().getEmail()` が空の場合、アクセス拒否画面が表示される
+- [ ] 当日出欠の予定時刻は曜日ごとの期限日までは編集でき、期限日を過ぎると編集できない
+- [ ] 打刻ボタン押下で確認ダイアログ（活動を開始/終了しますか？）が表示される
+- [ ] ダイアログで `yes` を押した場合のみ位置情報取得に進む
+- [ ] 会場座標（35.64, 140.03）から半径200m以内でのみ打刻が成功する
+- [ ] 会場範囲外・位置情報拒否・位置情報取得失敗時はalert表示され、DB更新されない
+- [ ] 打刻の保存値が `HH:mm` 形式で記録される
+
 ### Members周辺の重点確認
 - [ ] 人物詳細で所属組織の追加・解除ができる
 - [ ] 組織詳細で所属人物の追加・解除ができる
@@ -81,10 +93,12 @@ App.test.resumeAutoRefresh();
 - [ ] `components/utils/tabulator-foundation-script.html` の `buildFrameSrcdoc` で、文字列連結時に正規表現リテラルの `\` が不足していない（例: `^https?:\/\/` は生成後に必ず `\/\/` の形になる）
 - [ ] ヘッダメニュー生成式が `}).filter(...)` で閉じており、`})}. filter(...)` のような不正連結がない
 
-### APIセキュリティ
-- [ ] HMAC署名エラー時に操作が拒否される
-- [ ] タイムスタンプ許容範囲外の操作が拒否される
-- [ ] 権限不足時にwrite操作が拒否される
+### データアクセスセキュリティ
+- [ ] ライブラリ経由で `permissions` テーブルの制御が維持されている
+- [ ] 権限不足時に write 操作が拒否される
+- [ ] frontend / mobile-app の `appsscript.json` で、ライブラリ呼び出しに必要な `oauthScopes` が設定されている
+- [ ] frontend / mobile-app の `appsscript.json` で、`dependencies.enabledAdvancedServices` に `Sheets (v4)` が設定されている
+- [ ] タスクの作成・更新で `Google Sheets API has not been enabled` エラーが再発しない
 
 ### UI/UX
 - [ ] モーダルが正しく開閉する
