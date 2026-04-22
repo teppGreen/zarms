@@ -12,6 +12,7 @@
  * 例:
  *   node scripts/cleanup-clasp.js database
  *   node scripts/cleanup-clasp.js frontend
+ *   node scripts/cleanup-clasp.js mobile-app
  */
 
 const fs = require('fs');

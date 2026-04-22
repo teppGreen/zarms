@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Phase4-5向けの最小自律サイクル補助スクリプト
-# 使い方: ./scripts/run-phase-cycle.sh frontend|database|all
+# 使い方: ./scripts/run-phase-cycle.sh frontend|mobile-app|database|all
 
 TARGET="${1:-frontend}"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,6 +13,9 @@ run_deploy() {
     frontend)
       npm run deploy:frontend:dev
       ;;
+    mobile-app)
+      npm run deploy:mobile-app:dev
+      ;;
     database)
       npm run deploy:database:dev
       ;;
@@ -20,7 +23,7 @@ run_deploy() {
       npm run deploy:all:dev
       ;;
     *)
-      echo "[ERROR] target must be frontend|database|all"
+      echo "[ERROR] target must be frontend|mobile-app|database|all"
       exit 1
       ;;
   esac

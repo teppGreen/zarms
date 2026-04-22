@@ -9,6 +9,7 @@
  * 例:
  *   node scripts/generate-clasp-from-1password.js database dev
  *   node scripts/generate-clasp-from-1password.js frontend prod
+ *   node scripts/generate-clasp-from-1password.js mobile-app dev
  */
 
 const fs = require('fs');
@@ -29,8 +30,8 @@ if (!['dev', 'prod'].includes(env)) {
   process.exit(1);
 }
 
-if (!['database', 'frontend'].includes(project)) {
-  console.error('❌ project は "database" または "frontend" である必要があります');
+if (!['database', 'frontend', 'mobile-app'].includes(project)) {
+  console.error('❌ project は "database"、"frontend"、または "mobile-app" である必要があります');
   process.exit(1);
 }
 
