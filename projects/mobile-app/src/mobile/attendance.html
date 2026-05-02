@@ -1,0 +1,735 @@
+<div id="tab-attendance" class="page">
+  <div class="center-align padding no-bottom-padding">
+    <h6 id="attendance-current-date" class="no-margin bold font-number"></h6>
+    <p>読み込みが落ち着くまで少しまってから操作してください。突貫工事で開発したため貧弱です。優しい気持ちで操作してほしいです。ごめんなさい。</p>
+  </div>
+  <article class="border small-round padding center-align no-elevate top-margin background">
+      <!-- <div class="medium-height medium-width">
+        <div class="shape sunny max rotate">
+          <img id="mascot-main-image" class="responsive">
+        </div>
+      </div> -->
+      <button id="tab-attendance-action-btn" class="extra responsive primary" onclick="App.pages.attendance.handlePunchAction()">
+        <i><progress class="circle white indeterminate small"></progress></i><span>読み込み中...</span>
+      </button>
+      <button id="tab-attendance-cancel-btn" class="responsive transparent error-text" onclick="App.pages.attendance.cancelPunch()" style="display: none;">
+        <span>取消</span>
+      </button>
+      <p id="tab-attendance-status-text" class="small-text secondary-text no-margin top-margin bottom-margin"></p>
+      <p id="tab-attendance-location-note" class="small-text secondary-text top-margin no-margin"></p>
+  </article>
+
+  <fieldset class="border top-margin">
+    <legend>
+      <label>
+        <input type="checkbox" id="attendance-fri-is-working">
+        <span>金曜稼働する</span>
+      </label>
+    </legend>
+    <div class="row middle-align tiny-space">
+      <i id="attendance-fri-status-icon" class="secondary-text">schedule</i>
+      <div class="field label border small max">
+        <input disabled type="time" id="attendance-fri-planned-start">
+        <label>稼働開始</label>
+      </div>
+      <i>arrow_forward</i>
+      <div class="field label border small max">
+        <input disabled type="time" id="attendance-fri-planned-end">
+        <label>稼働終了</label>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset class="border top-margin">
+    <legend>
+      <label>
+        <input type="checkbox" id="attendance-sat-is-working">
+        <span>土曜稼働する</span>
+      </label>
+    </legend>
+    <div class="row middle-align tiny-space">
+      <i id="attendance-sat-status-icon" class="secondary-text">schedule</i>
+      <div class="field label border small max">
+        <input disabled type="time" id="attendance-sat-planned-start">
+        <label>稼働開始</label>
+      </div>
+      <i>arrow_forward</i>
+      <div class="field label border small max">
+        <input disabled type="time" id="attendance-sat-planned-end">
+        <label>稼働終了</label>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset class="border top-margin bottom-margin">
+    <legend>
+      <label>
+        <input type="checkbox" id="attendance-sun-is-working">
+        <span>日曜稼働する</span>
+      </label>
+    </legend>
+    <div class="row middle-align tiny-space">
+      <i id="attendance-sun-status-icon" class="secondary-text">schedule</i>
+      <div class="field label border small max">
+        <input disabled type="time" id="attendance-sun-planned-start">
+        <label>稼働開始</label>
+      </div>
+      <i>arrow_forward</i>
+      <div class="field label border small max">
+        <input disabled type="time" id="attendance-sun-planned-end">
+        <label>稼働終了</label>
+      </div>
+    </div>
+  </fieldset>
+</div>
+
+
+
+<script>
+  (function () {
+    const DAY_CONFIGS = [
+      { key: 'fri', label: '金曜', offset: 0 },
+      { key: 'sat', label: '土曜', offset: 1 },
+      { key: 'sun', label: '日曜', offset: 2 }
+    ];
+
+    const FIELD_MAP = {
+      fri: {
+        isWorking: 'fri_is_working',
+        plannedStart: 'fri_planned_start_at',
+        plannedEnd: 'fri_planned_end_at',
+        actualStart: 'fri_actual_start_at',
+        actualEnd: 'fri_actual_end_at'
+      },
+      sat: {
+        isWorking: 'sat_is_working',
+        plannedStart: 'sat_planned_start_at',
+        plannedEnd: 'sat_planned_end_at',
+        actualStart: 'sat_actual_start_at',
+        actualEnd: 'sat_actual_end_at'
+      },
+      sun: {
+        isWorking: 'sun_is_working',
+        plannedStart: 'sun_planned_start_at',
+        plannedEnd: 'sun_planned_end_at',
+        actualStart: 'sun_actual_start_at',
+        actualEnd: 'sun_actual_end_at'
+      }
+    };
+
+    function changeMascotImage() {
+      const mascotImage = document.getElementById('mascot-main-image');
+      mascotImage.src = EXTERNAL_URLS.MASCOT_MAIN_IMAGE;
+    }
+
+    function getJstDateString(date) {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(date || new Date());
+
+      const result = { year: '0000', month: '00', day: '00' };
+      parts.forEach(function (part) {
+        if (part.type === 'year' || part.type === 'month' || part.type === 'day') {
+          result[part.type] = part.value;
+        }
+      });
+
+      return `${result.year}-${result.month}-${result.day}`;
+    }
+
+    function getJstTimeString(date) {
+      const parts = new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(date || new Date());
+
+      const result = { hour: '00', minute: '00' };
+      parts.forEach(function (part) {
+        if (part.type === 'hour' || part.type === 'minute') {
+          result[part.type] = part.value;
+        }
+      });
+
+      return `${result.hour}:${result.minute}`;
+    }
+
+    function addDays(baseDateString, offsetDays) {
+      const baseDate = new Date(`${baseDateString}T00:00:00+09:00`);
+      baseDate.setDate(baseDate.getDate() + offsetDays);
+      return getJstDateString(baseDate);
+    }
+
+    App.pages.attendance = {
+      currentMember: null,
+
+      getFestivalDates: function () {
+        const eventConfig = (App.constants && App.constants.eventConfig) || {};
+        const baseDate = eventConfig.FESTIVAL_DATE;
+        if (!baseDate) {
+          return null;
+        }
+
+        return {
+          fri: addDays(baseDate, 0),
+          sat: addDays(baseDate, 1),
+          sun: addDays(baseDate, 2)
+        };
+      },
+
+      getCurrentDayKey: function () {
+        const dates = this.getFestivalDates();
+        if (!dates) return null;
+
+        const today = getJstDateString(new Date());
+        if (today === dates.fri) return 'fri';
+        if (today === dates.sat) return 'sat';
+        if (today === dates.sun) return 'sun';
+        return null;
+      },
+
+      getMemberValue: function (fieldName) {
+        if (!this.currentMember) return '';
+        const value = this.currentMember[fieldName];
+        return value === null || value === undefined ? '' : String(value);
+      },
+
+      loadData: function (member, isCached = false) {
+        this.currentMember = member || null;
+        this.isUIdisabled = isCached;
+
+        if (!this.currentMember) {
+          const statusEl = document.getElementById('tab-attendance-status-text');
+          if (statusEl) {
+            statusEl.textContent = 'ユーザー情報が見つかりません';
+          }
+          return;
+        }
+
+        DAY_CONFIGS.forEach((day) => {
+          const fields = FIELD_MAP[day.key];
+          const isWorkingCheckbox = document.getElementById(`attendance-${day.key}-is-working`);
+          const plannedStartInput = document.getElementById(`attendance-${day.key}-planned-start`);
+          const plannedEndInput = document.getElementById(`attendance-${day.key}-planned-end`);
+
+          const isWorking = String(this.getMemberValue(fields.isWorking)).toLowerCase() === 'true';
+
+          if (isWorkingCheckbox) {
+            isWorkingCheckbox.checked = isWorking;
+            isWorkingCheckbox.disabled = this.isUIdisabled;
+
+            if (!isWorkingCheckbox.dataset.changeHandlerAttached) {
+              isWorkingCheckbox.addEventListener('change', () => {
+                App.pages.attendance.saveIsWorking(day.key);
+              });
+              isWorkingCheckbox.dataset.changeHandlerAttached = 'true';
+            }
+          }
+
+          const formatTime = (val) => {
+            if (!val) return '';
+            val = String(val);
+            if (/^\d{2}:\d{2}$/.test(val)) return val;
+            if (/^\d{2}:\d{2}:\d{2}/.test(val)) return val.substring(0, 5);
+            
+            // GAS から "Date(1899,11,30,16,10,0)" のような文字列が来る場合のパース
+            const dateMatch = val.match(/^Date\((\d+),(\d+),(\d+),(\d+),(\d+),(\d+)\)$/);
+            if (dateMatch) {
+              const h = String(dateMatch[4]).padStart(2, '0');
+              const m = String(dateMatch[5]).padStart(2, '0');
+              return `${h}:${m}`;
+            }
+
+            const d = new Date(val);
+            if (!isNaN(d.getTime())) return getJstTimeString(d);
+            return val;
+          };
+
+          const plannedStart = formatTime(this.getMemberValue(fields.plannedStart));
+          const plannedEnd = formatTime(this.getMemberValue(fields.plannedEnd));
+          const actualStart = formatTime(this.getMemberValue(fields.actualStart));
+          const actualEnd = formatTime(this.getMemberValue(fields.actualEnd));
+
+          const statusIcon = document.getElementById(`attendance-${day.key}-status-icon`);
+          if (statusIcon) {
+            if (actualStart && actualEnd) {
+              statusIcon.textContent = 'check_circle';
+              statusIcon.className = 'primary-text';
+              statusIcon.setAttribute('title', '稼働終了');
+            } else if (actualStart && !actualEnd) {
+              statusIcon.textContent = 'directions_run';
+              statusIcon.className = 'tertiary-text';
+              statusIcon.setAttribute('title', '稼働中');
+            } else {
+              statusIcon.textContent = 'schedule';
+              statusIcon.className = 'secondary-text';
+              statusIcon.setAttribute('title', '稼働前（予定）');
+            }
+          }
+
+          // 実績がある場合は input に実績値を表示して disabled に
+          if (actualStart) {
+            if (plannedStartInput) {
+              plannedStartInput.value = actualStart;
+              plannedStartInput.disabled = true;
+            }
+          } else {
+            if (plannedStartInput) {
+              plannedStartInput.value = plannedStart;
+            }
+          }
+
+          if (actualEnd) {
+            if (plannedEndInput) {
+              plannedEndInput.value = actualEnd;
+              plannedEndInput.disabled = true;
+            }
+          } else {
+            if (plannedEndInput) {
+              plannedEndInput.value = plannedEnd;
+            }
+          }
+
+          // blur イベントハンドラを登録（自動保存）
+          if (plannedStartInput && !plannedStartInput.dataset.blurHandlerAttached) {
+            plannedStartInput.addEventListener('blur', () => {
+              App.pages.attendance.savePlan(day.key, true); // isAutoSave = true
+            });
+            plannedStartInput.dataset.blurHandlerAttached = 'true';
+          }
+
+          if (plannedEndInput && !plannedEndInput.dataset.blurHandlerAttached) {
+            plannedEndInput.addEventListener('blur', () => {
+              App.pages.attendance.savePlan(day.key, true); // isAutoSave = true
+            });
+            plannedEndInput.dataset.blurHandlerAttached = 'true';
+          }
+        });
+
+        this.refreshUIState();
+
+        if (this.isUIdisabled) {
+          setTimeout(() => {
+            this.refreshData();
+          }, 100);
+        }
+      },
+
+      refreshData: async function () {
+        try {
+          const res = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {
+            where: { id: ['=', App.state.userId] }
+          }, null, true);
+          const member = res?.data ? res.data[0] : (res[0] || null);
+          if (member) {
+            App.state.data.currentMember = member;
+            this.loadData(member, false);
+          }
+        } catch(e) {
+          console.error('[MobileAttendance] Refresh failed:', e);
+          this.isUIdisabled = false;
+          this.refreshUIState();
+        }
+      },
+
+      refreshUIState: function () {
+        if (typeof formatDatetimeForDisplay === 'function') {
+          const el = document.getElementById('attendance-current-date');
+          if (el) el.textContent = formatDatetimeForDisplay(new Date(), 'yyyy/MM/dd(E)');
+        }
+
+        const dates = this.getFestivalDates();
+        const today = getJstDateString(new Date());
+        const statusEl = document.getElementById('tab-attendance-status-text');
+        const noteEl = document.getElementById('tab-attendance-location-note');
+        const actionBtn = document.getElementById('tab-attendance-action-btn');
+        const cancelBtn = document.getElementById('tab-attendance-cancel-btn');
+
+        const geofence = ((App.constants || {}).eventConfig || {}).ATTENDANCE_GEOFENCE || {};
+        if (noteEl) {
+          noteEl.textContent = `打刻は会場周辺 ${geofence.RADIUS_METERS || 200}m 以内でのみ有効です。`;
+        }
+
+        DAY_CONFIGS.forEach((day) => {
+          const fields = FIELD_MAP[day.key];
+          const deadline = dates ? dates[day.key] : null;
+          const isWorking = String(this.getMemberValue(fields.isWorking)).toLowerCase() === 'true';
+          const canEditStart = isWorking && !!deadline && today <= deadline && !this.getMemberValue(fields.actualStart) && !this.isUIdisabled;
+          const canEditEnd = isWorking && !!deadline && today <= deadline && !this.getMemberValue(fields.actualEnd) && !this.isUIdisabled;
+          const startInput = document.getElementById(`attendance-${day.key}-planned-start`);
+          const endInput = document.getElementById(`attendance-${day.key}-planned-end`);
+
+          if (startInput) startInput.disabled = !canEditStart;
+          if (endInput) endInput.disabled = !canEditEnd;
+        });
+
+        const currentDayKey = this.getCurrentDayKey();
+        if (!currentDayKey) {
+          if (statusEl) {
+            statusEl.textContent = '本日は打刻対象日ではありません';
+          }
+          if (actionBtn) {
+            actionBtn.disabled = true;
+            actionBtn.innerHTML = this.isUIdisabled ? '<i><progress class="circle indeterminate small"></progress></i><span>稼働開始</span>' : '<span>稼働開始</span>';
+          }
+          if (cancelBtn) {
+            cancelBtn.style.display = 'none';
+          }
+          return;
+        }
+
+        if (this.isUIdisabled && statusEl) {
+          statusEl.textContent = '最新のデータを取得しています...';
+        }
+
+        const currentFields = FIELD_MAP[currentDayKey];
+        const isWorkingToday = String(this.getMemberValue(currentFields.isWorking)).toLowerCase() === 'true';
+
+        if (!isWorkingToday) {
+          if (statusEl && !this.isUIdisabled) {
+            statusEl.textContent = '本日は稼働日ではありません（稼働する場合はチェックを入れてください）';
+          }
+          if (actionBtn) {
+            actionBtn.style.display = '';
+            actionBtn.disabled = true;
+            actionBtn.innerHTML = this.isUIdisabled ? '<i><progress class="circle white indeterminate small"></progress></i><span>稼働開始</span>' : '<span>稼働開始</span>';
+          }
+          if (cancelBtn) {
+            cancelBtn.style.display = 'none';
+          }
+          return;
+        }
+
+        const actualStart = this.getMemberValue(currentFields.actualStart);
+        const actualEnd = this.getMemberValue(currentFields.actualEnd);
+
+        if (!actualStart) {
+          if (statusEl && !this.isUIdisabled) {
+            statusEl.textContent = '未打刻です。活動を開始してください。';
+          }
+          if (actionBtn) {
+            actionBtn.style.display = '';
+            actionBtn.disabled = this.isUIdisabled || false;
+            actionBtn.innerHTML = this.isUIdisabled ? '<i><progress class="circle white indeterminate small"></progress></i><span>稼働開始</span>' : '<span>稼働開始</span>';
+          }
+          if (cancelBtn) {
+            cancelBtn.style.display = 'none';
+          }
+          return;
+        }
+
+        if (!actualEnd) {
+          if (statusEl && !this.isUIdisabled) {
+            statusEl.textContent = `稼働中です（開始: ${actualStart}）。活動終了時に打刻してください。`;
+          }
+          if (actionBtn) {
+            actionBtn.style.display = '';
+            actionBtn.disabled = this.isUIdisabled || false;
+            actionBtn.innerHTML = this.isUIdisabled ? '<i><progress class="circle indeterminate small"></progress></i><span>稼働終了</span>' : '<span>稼働終了</span>';
+          }
+          if (cancelBtn) {
+            cancelBtn.style.display = '';
+            cancelBtn.disabled = this.isUIdisabled || false;
+            cancelBtn.querySelector('span').textContent = '稼働開始を取消';
+          }
+          return;
+        }
+
+        if (statusEl && !this.isUIdisabled) {
+          statusEl.textContent = `本日の打刻は完了しています（${actualStart} → ${actualEnd}）。`;
+        }
+        if (actionBtn) {
+          actionBtn.style.display = 'none';
+          actionBtn.disabled = true;
+          actionBtn.innerHTML = this.isUIdisabled ? '<i><progress class="circle indeterminate small"></progress></i><span>稼働終了</span>' : '<span>稼働終了</span>';
+        }
+        if (cancelBtn) {
+           cancelBtn.style.display = '';
+           cancelBtn.disabled = this.isUIdisabled || false;
+           cancelBtn.querySelector('span').textContent = '稼働終了を取消';
+        }
+      },
+
+      savePlan: async function (dayKey, isAutoSave = false) {
+        if (!this.currentMember || !FIELD_MAP[dayKey]) {
+          if (!isAutoSave) {
+            alert('ユーザー情報が見つかりません');
+          }
+          return;
+        }
+
+        const fields = FIELD_MAP[dayKey];
+        const startInput = document.getElementById(`attendance-${dayKey}-planned-start`);
+        const endInput = document.getElementById(`attendance-${dayKey}-planned-end`);
+        if (!startInput || !endInput) {
+          if (!isAutoSave) {
+            alert('入力フォームが見つかりません');
+          }
+          return;
+        }
+
+        if (startInput.disabled && endInput.disabled) {
+          if (!isAutoSave) {
+            alert('この曜日の予定は編集できません');
+          }
+          return;
+        }
+
+        // 変更がなければスキップ（自動保存時）
+        if (isAutoSave) {
+          const currentStart = startInput.value || '';
+          const currentEnd = endInput.value || '';
+          const savedStart = this.getMemberValue(fields.plannedStart);
+          const savedEnd = this.getMemberValue(fields.plannedEnd);
+          
+          // 実績がある場合は自動保存をスキップ
+          const actualStart = this.getMemberValue(fields.actualStart);
+          const actualEnd = this.getMemberValue(fields.actualEnd);
+          if (actualStart || actualEnd) {
+            return;
+          }
+          
+          if (currentStart === savedStart && currentEnd === savedEnd) {
+            return; // 変更なし
+          }
+        }
+
+        const updates = {};
+        updates[fields.plannedStart] = startInput.value || '';
+        updates[fields.plannedEnd] = endInput.value || '';
+
+        try {
+          await callGAS(
+            'handleDatabaseProcess',
+            App.state.userId,
+            TABLE_NAMES.MEMBERS,
+            'update',
+            {
+              set: updates,
+              where: { id: ['=', this.currentMember.id] }
+            },
+            isAutoSave ? '' : `${dayKey}の稼働予定を更新しました`
+          );
+
+          Object.assign(this.currentMember, updates);
+          App.state.data.currentMember = this.currentMember;
+          if (!isAutoSave) {
+            showSnackbar('予定を保存しました');
+            this.refreshUIState();
+          }
+        } catch (error) {
+          console.error('[MobileAttendance] Failed to save plan:', error);
+          if (!isAutoSave) {
+            alert('予定の保存に失敗しました: ' + error.message);
+          }
+        }
+      },
+
+      saveIsWorking: async function (dayKey) {
+        if (!this.currentMember) return;
+        const checkbox = document.getElementById(`attendance-${dayKey}-is-working`);
+        if (!checkbox) return;
+        
+        const fields = FIELD_MAP[dayKey];
+        const originalStatus = this.currentMember[fields.isWorking];
+        
+        // Optimistic UI updates
+        this.currentMember[fields.isWorking] = checkbox.checked;
+        App.state.data.currentMember = this.currentMember;
+        this.refreshUIState();
+
+        const updates = {};
+        updates[fields.isWorking] = checkbox.checked;
+        
+        try {
+          await callGAS(
+            'handleDatabaseProcess',
+            App.state.userId,
+            TABLE_NAMES.MEMBERS,
+            'update',
+            {
+              set: updates,
+              where: { id: ['=', this.currentMember.id] }
+            },
+            ''
+          );
+        } catch (e) {
+          console.error('[MobileAttendance] Failed to save isWorking:', e);
+          alert('稼働有無の保存に失敗しました');
+          // Revert optimistic changes
+          this.currentMember[fields.isWorking] = originalStatus;
+          App.state.data.currentMember = this.currentMember;
+          checkbox.checked = String(originalStatus).toLowerCase() === 'true';
+          this.refreshUIState();
+        }
+      },
+
+      /**
+       * 打刻を取消
+       */
+      cancelPunch: async function () {
+        if (!this.currentMember) {
+          alert('ユーザー情報が見つかりません');
+          return;
+        }
+
+        const dayKey = this.getCurrentDayKey();
+        if (!dayKey) {
+          alert('本日は打刻対象日ではありません');
+          return;
+        }
+
+        const fields = FIELD_MAP[dayKey];
+        const actualStart = this.getMemberValue(fields.actualStart);
+        const actualEnd = this.getMemberValue(fields.actualEnd);
+
+        if (!actualStart) {
+          alert('取消対象の打刻がありません');
+          return;
+        }
+
+        let action;
+        let confirmMessage;
+
+        if (actualEnd) {
+          action = 'cancelEnd';
+          confirmMessage = '稼働終了の打刻を取消しますか？';
+        } else {
+          action = 'cancelStart';
+          confirmMessage = '稼働開始の打刻を取消しますか？';
+        }
+
+        if (!confirm(confirmMessage)) {
+          return;
+        }
+
+        try {
+          const result = await callGAS(
+            'punchAttendance',
+            App.state.userId,
+            null,
+            action
+          );
+
+          if (result && result.success) {
+            Object.assign(this.currentMember, result.updates);
+            App.state.data.currentMember = this.currentMember;
+            showSnackbar('打刻を取り消しました');
+            this.loadData(this.currentMember);
+          }
+        } catch (error) {
+          console.error('[MobileAttendance] Failed to cancel punch:', error);
+          alert('打刻の取消に失敗しました: ' + error.message);
+        }
+      },
+
+      getCurrentLocation: function () {
+        return new Promise((resolve, reject) => {
+          if (!navigator.geolocation) {
+            reject(new Error('このブラウザでは位置情報を取得できません'));
+            return;
+          }
+
+          navigator.geolocation.getCurrentPosition(
+            function (position) {
+              resolve({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy
+              });
+            },
+            function (error) {
+              if (error && error.code === error.PERMISSION_DENIED) {
+                reject(new Error('位置情報の利用が許可されていません'));
+                return;
+              }
+              if (error && error.code === error.TIMEOUT) {
+                reject(new Error('位置情報の取得がタイムアウトしました'));
+                return;
+              }
+              reject(new Error('位置情報を取得できませんでした'));
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 12000,
+              maximumAge: 0
+            }
+          );
+        });
+      },
+
+      handlePunchAction: async function () {
+        if (!this.currentMember) {
+          alert('ユーザー情報が見つかりません');
+          return;
+        }
+
+        const dayKey = this.getCurrentDayKey();
+        if (!dayKey) {
+          alert('本日は打刻対象日ではありません');
+          return;
+        }
+
+        const fields = FIELD_MAP[dayKey];
+        const isWorking = String(this.getMemberValue(fields.isWorking)).toLowerCase() === 'true';
+        if (!isWorking) {
+          alert('本日は稼働日ではありません');
+          return;
+        }
+
+        const actualStart = this.getMemberValue(fields.actualStart);
+        const actualEnd = this.getMemberValue(fields.actualEnd);
+
+        let action = null;
+        let confirmMessage = '';
+
+        if (!actualStart) {
+          action = 'start';
+          confirmMessage = '本日の稼働を開始しますか？';
+        } else if (!actualEnd) {
+          action = 'end';
+          confirmMessage = '本日の稼働を終了しますか？';
+        } else {
+          alert('本日の打刻は完了しています');
+          this.refreshUIState();
+          return;
+        }
+
+        if (!confirm(confirmMessage)) {
+          return;
+        }
+
+        let location;
+        try {
+          location = await this.getCurrentLocation();
+        } catch (error) {
+          alert(error.message);
+          return;
+        }
+
+        try {
+          const result = await callGAS(
+            'punchAttendance',
+            App.state.userId,
+            location,
+            action
+          );
+
+          if (result && result.success) {
+            Object.assign(this.currentMember, result.updates);
+            App.state.data.currentMember = this.currentMember;
+            showSnackbar(action === 'start' ? '稼働開始を記録しました' : '稼働終了を記録しました');
+            this.loadData(this.currentMember);
+          }
+        } catch (error) {
+          console.error('[MobileAttendance] Failed to punch:', error);
+          alert('打刻に失敗しました: ' + error.message);
+        }
+      }
+    };
+  })();
+</script>

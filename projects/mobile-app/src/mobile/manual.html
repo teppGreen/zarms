@@ -1,0 +1,53 @@
+<div id="tab-manual" class="page">
+  <iframe id="manual-iframe" src="https://docs.google.com/presentation/d/1kH0afej215gmhTZmg8vllkTw9UYmmlDKo3WfSSQB_Z4/preview" style="width: 100%; height: 100%; border: 0;"></iframe>
+</div>
+
+<script>
+  /**
+   * manual タブが表示されるときに iframe の高さを計算して設定
+   */
+  function adjustManualIframeHeight() {
+    const tabManual = document.getElementById('tab-manual');
+    const iframe = document.getElementById('manual-iframe');
+    
+    if (!tabManual || !iframe) return;
+    
+    // viewport 高さ
+    const windowHeight = window.innerHeight;
+    
+    // header の高さを取得
+    const header = document.querySelector('header.fixed');
+    const headerHeight = header ? header.offsetHeight : 0;
+    
+    // bottom navigation の高さを取得
+    const bottomNav = document.querySelector('nav.bottom.surface');
+    const bottomNavHeight = bottomNav ? bottomNav.offsetHeight : 0;
+    
+    // 計算上の利用可能高さ
+    const availableHeight = windowHeight - headerHeight - bottomNavHeight - 32;
+    
+    // iframe に高さを設定
+    iframe.style.height = availableHeight + 'px';
+  }
+
+  // tab-manual が表示されるときに高さを調整
+  const originalSwitchMobileTab = window.switchMobileTab;
+  window.switchMobileTab = function (tabKey) {
+    originalSwitchMobileTab(tabKey);
+    
+    if (tabKey === 'manual') {
+      // 次フレームで高さを計算（DOM 更新完了後）
+      setTimeout(adjustManualIframeHeight, 0);
+    }
+  };
+
+  // リサイズ時にも高さを調整
+  window.addEventListener('resize', function () {
+    if (App && App.state && App.state.mobileActiveTab === 'manual') {
+      adjustManualIframeHeight();
+    }
+  });
+
+  // 初期化完了後の自動調整
+  setTimeout(adjustManualIframeHeight, 500);
+</script>

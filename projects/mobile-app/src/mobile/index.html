@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.bubble.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+  <script>
+    window.App = {
+      pages: {},
+      overlays: {},
+      utils: {},
+      constants: {},
+      modals: {},
+      state: {
+        data: {}
+      }
+    };
+  </script>
+  <?!= include('css'); ?>
+</head>
+
+<body class="light" style="display: flex; justify-content: center;">
+  <?!= include('components/popups/error'); ?>
+  <script>
+    const templateVariables = <?!= JSON.stringify(templateVariables) ?>;
+  </script>
+  <?!= include('mobile/js') ?>
+
+  <div class="surface-container large-width">
+    <nav class="bottom surface">
+      <a nav-tab="attendance" onclick="switchMobileTab('attendance')">
+        <i>punch_clock</i>
+        <span>稼働管理</span>
+      </a>
+      <a nav-tab="tasks" onclick="switchMobileTab('tasks')" >
+        <i>assignment</i>
+        <span>タスク</span>
+      </a>
+      <a nav-tab="manual" onclick="switchMobileTab('manual')">
+        <i>menu_book</i>
+        <span>資料</span>
+      </a>
+      <a id="help-link" target="_blank" rel="noopener noreferrer">
+        <i>help</i>
+        <span>問合せ</span>
+      </a>
+    </nav>
+
+    <header class="fixed">
+      <div class="row no-space">
+        <i class="extra"><svg viewBox="0 0 1024 1024"><path d="M335.01,245.57c0-68.25,31.27-105.17,95.13-105.17h118.76c36.36,0,65.84,29.48,65.84,65.84v56.77c0,36.36-29.48,65.84-65.84,65.84h-85.42l-128.47-83.28Z"></path><circle cx="772.15" cy="715.46" r="137.49"></circle><path d="M641.67,845.93c-16.93-16.93-30.23-36.66-39.53-58.64-9.63-22.78-14.52-46.95-14.52-71.84s4.89-49.06,14.52-71.84c1.24-2.93,2.55-5.81,3.93-8.65-61.16-40.88-142.06-53.42-227.03-18.21l58.64-238.28-121.6-78.99-182.89,415.98s-36.54,70.96,39.01,86.65c60.98,12.66,376.18,51.13,495.51,65.49-9.27-6.38-17.98-13.6-26.04-21.67Z"></path></svg></i>
+        <h1 class="max font-title" style="font-size: 1.75rem;">ZARMS</h1>
+        <div class="max"></div>
+        <span id="header_display_name" class="bold"></span>
+      </div>
+    </header>
+
+    <footer class="fixed transparent right-align bottom-padding">
+      <div id="footer-tasks" style="display: none;">
+        <nav class="toolbar primary elevate">
+          <button class="circle transparent" id="mobile-filter-btn" onclick="App.modals.mobileFilter.open()">
+            <i>filter_list</i>
+          </button>
+          <button class="circle transparent" id="mobile-new-task-btn" onclick="App.modals.taskDetail.create()">
+            <i>add</i>
+          </button>  
+        </nav>
+      </div>
+    </footer>
+
+    <main class="small-padding surface-container">
+      <?!= include('mobile/board'); ?>
+      <?!= include('mobile/attendance'); ?>
+      <?!= include('mobile/manual'); ?>
+      <?!= include('mobile/task-detail'); ?>
+      <?!= include('mobile/quill_editor'); ?>
+      <?!= include('mobile/task-filter'); ?>
+    </main>
+
+    <div id="global-snackbar" class="snackbar top"></div>
+
+    <dialog id="modal-mobile-unauthorized" class="modal max">
+      <div class="surface padding">
+        <h2 class="bold small bottom-margin error-text">あなたが誰なのかわかりませんでした</h2>
+        <div class="top-padding bottom-padding">
+          <div class="row tiny-space">
+            <i class="extra error-text">error</i>
+          </div>
+          <p class="large-text error-text bold">あなたはZARMSの利用対象者ではありません</p>
+          <p>アクセスしたアカウントのメールアドレスが関係者名簿から検出されませんでした。<br>
+            実行委員会があなたを展軸祭運営関係者として把握していない可能性があります。<br>
+            間違いだと思われる場合は、<a id="unauthorized-help-link" target="_blank" class="help-site-link link">ヘルプサイト</a>の問い合わせ先までご連絡ください。
+          </p>
+        </div>
+      </div>
+    </dialog>
+  </div>
+  <script>
+    (function() {
+      const updateHelpLink = () => {
+        const el = document.getElementById('help-link');
+        el.href = "https://zen-student.slack.com/archives/C0AH0KRBFNF";
+      };
+
+      updateHelpLink();
+    })();
+  </script>
+</body>
+</html>

@@ -658,6 +658,20 @@ function update(userId, sheetName, query) {
             throw new Error('No records found matching the update criteria');
         }
 
+        // Members テーブルの attendance カラムをフロントからの直接操作から保護
+        if (sheetName === TABLE_NAMES.MEMBERS && query.set) {
+          const attendanceFields = [
+            'fri_actual_start_at', 'fri_actual_end_at',
+            'sat_actual_start_at', 'sat_actual_end_at',
+            'sun_actual_start_at', 'sun_actual_end_at'
+          ];
+          for (const field of attendanceFields) {
+            if (field in query.set && query._systemPass !== 'allow_punch') {
+               throw new Error(`${field} は直接更新できません。専用の打刻APIを使用してください。`);
+            }
+          }
+        }
+
         // 更新対象のレコードを特定し、書き込み用のデータを収集
         const results = [];
         const allData = Sheets.Spreadsheets.Values.get(SPREADSHEET_ID, sheetName);

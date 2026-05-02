@@ -442,6 +442,194 @@ function getMyBoardTasks(userId, filters, forceRefresh) {
     }
 }
 
+// ============================================
+// Mobile-specific Secure Tasks
+// 責任: モバイル専用のセキュアなタスク取得（userId由来条件を強制）
+// ============================================
+
+/**
+ * モバイル専用: ユーザー本人が関連するタスクのみを返す（サーバー側でuserId由来条件を強制）
+ * クライアント側からのmembers指定は無視し、userId をすべてのロール条件として自動設定
+ * 
+ * @param {string} userId - ユーザーID（Session.getActiveUser().getEmail()で取得済み）
+ * @param {Object} filters - フィルタ条件（boards, dateRanges, isOverdue, ballHolderOnly, titleのみ許可）
+ *   {
+ *     boards: string[],              // ボードIDの配列（空の場合は全ボード）
+ *     dateRanges: {                  // 日付範囲フィルタ
+ *       starts_at: { from: string|null, to: string|null },
+ *       ends_at:   { from: string|null, to: string|null }
+ *     },
+ *     isOverdue: boolean,            // 期限超過フィルタ
+ *     ballHolderOnly: boolean,       // ボール保持者のみ表示
+ *     title: string,                 // タイトル曖昧検索キーワード
+ *     titleMatchMode: string         // 'contains' | 'starts_with' | 'ends_with' | 'not_contains'
+ *   }
+ * @param {boolean} forceRefresh - キャッシュを無視して強制再取得するか
+ * @returns {Object} { data: Array, isCached: boolean }
+ */
+function getMobileUserTasks(userId, filters, forceRefresh) {
+    forceRefresh = forceRefresh || false;
+
+    // キャッシュキーを生成（安全なフィルタ要素のみで構成、membersフィルタは含めない）
+    const safeCacheFilters = {
+        boards: filters && filters.boards ? filters.boards : [],
+        dateRanges: filters && filters.dateRanges ? filters.dateRanges : {},
+        isOverdue: filters && filters.isOverdue ? true : false,
+        ballHolderOnly: filters && filters.ballHolderOnly ? true : false,
+        title: filters && filters.title ? filters.title : '',
+        titleMatchMode: filters && filters.titleMatchMode ? filters.titleMatchMode : 'contains'
+    };
+    const cacheKey = 'mobile_user_tasks_' + userId + '_' + _hashFilters(safeCacheFilters);
+    const cachePublicRange = 'script';
+
+    if (!forceRefresh) {
+        try {
+            const cached = CacheManager.get(cacheKey, cachePublicRange);
+            if (cached) {
+                return { data: cached, isCached: true };
+            }
+        } catch (e) {
+            console.warn('[getMobileUserTasks] Cache retrieval failed:', e);
+        }
+    }
+
+    try {
+        if (!userId) {
+            throw new ValidationError('userId is required', 'userId', userId);
+        }
+
+        const tasksHeadersMap = getHeadersMap(TABLE_NAMES.TASKS);
+
+        // ── Step 1: userId をすべてのロール条件として強制設定 ──────────────
+        // クライアント側のmembers指定は無視し、userId のみをサーバー側で設定
+        const roles = ['created_by', 'processed_by', 'reviewed_by', 'received_by'];
+        const memberOrParts = [];
+
+        for (const role of roles) {
+            const colId = tasksHeadersMap[role];
+            if (colId) {
+                memberOrParts.push(`${colId} = '${userId.replace(/'/g, "\\'")}'`);
+            }
+        }
+
+        // ── Step 2: tasks クエリの WHERE 句を組み立てる ──────────────────
+        // 各条件の部品（AND で結合する）
+        const andParts = [];
+
+        // ユーザーOR条件（必須）
+        if (memberOrParts.length > 0) {
+            andParts.push(`(${memberOrParts.join(' OR ')})`);
+        }
+
+        // ボードフィルタ（クライアント指定可、安全）
+        if (filters && filters.boards && filters.boards.length > 0) {
+            const boardColId = tasksHeadersMap['board_id'];
+            if (boardColId) {
+                const boardParts = filters.boards.map(id => `${boardColId} = '${id.replace(/'/g, "\\'")}'`);
+                andParts.push(`(${boardParts.join(' OR ')})`);
+            }
+        }
+
+        // 日付範囲フィルタ
+        if (filters && filters.dateRanges) {
+            const dr = filters.dateRanges;
+            const startsColId = tasksHeadersMap['starts_at'];
+            const endsColId = tasksHeadersMap['ends_at'];
+
+            if (startsColId && dr.starts_at && dr.starts_at.from) {
+                andParts.push(`${startsColId} >= '${dr.starts_at.from.replace(/'/g, "\\'")}'`);
+            }
+            if (startsColId && dr.starts_at && dr.starts_at.to) {
+                andParts.push(`${startsColId} <= '${dr.starts_at.to.replace(/'/g, "\\'")}'`);
+            }
+            if (endsColId && dr.ends_at && dr.ends_at.from) {
+                andParts.push(`${endsColId} >= '${dr.ends_at.from.replace(/'/g, "\\'")}'`);
+            }
+            if (endsColId && dr.ends_at && dr.ends_at.to) {
+                andParts.push(`${endsColId} <= '${dr.ends_at.to.replace(/'/g, "\\'")}'`);
+            }
+        }
+
+        // 期限超過フィルタ
+        if (filters && filters.isOverdue) {
+            const endsColId = tasksHeadersMap['ends_at'];
+            const statusColId = tasksHeadersMap['task_status_key'];
+            const nowIso = new Date().toISOString().replace(/'/g, '');
+            if (endsColId && statusColId) {
+                andParts.push(`${endsColId} IS NOT NULL`);
+                andParts.push(`${endsColId} < '${nowIso}'`);
+                andParts.push(`${statusColId} != 'DONE'`);
+            }
+        }
+
+        // ── Step 3: クエリを実行 ────────────────────────────────────────────
+        const tasksQuery = {};
+        if (andParts.length > 0) {
+            tasksQuery.rawWhere = andParts.join(' AND ');
+        }
+
+        const tasksResult = select(TABLE_NAMES.TASKS, tasksQuery);
+        let filteredTasks = tasksResult || [];
+
+        // ── Step 4: JS側での追加フィルタリング（ボール保持者、タイトル検索） ──
+        if (filters) {
+            // ボール保持者フィルタ
+            if (filters.ballHolderOnly) {
+                filteredTasks = filteredTasks.filter(function (task) {
+                    let ballRole;
+                    const status = task.task_status_key;
+                    if (status === 'TODO' || status === 'IN_PROGRESS') {
+                        ballRole = 'processed_by';
+                    } else if (status === 'IN_REVIEW') {
+                        ballRole = 'reviewed_by';
+                    } else if (status === 'DONE') {
+                        ballRole = 'received_by';
+                    }
+
+                    if (ballRole) {
+                        return task[ballRole] === userId;
+                    }
+                    return false;
+                });
+            }
+
+            // タイトル曖昧検索
+            if (filters.title) {
+                const normalizedKeyword = normalizeText(filters.title);
+                const mode = filters.titleMatchMode || 'contains';
+
+                filteredTasks = filteredTasks.filter(function (task) {
+                    const normalizedTitle = normalizeText(task.name);
+                    if (mode === 'starts_with') {
+                        return normalizedTitle.indexOf(normalizedKeyword) === 0;
+                    } else if (mode === 'ends_with') {
+                        return normalizedTitle.length >= normalizedKeyword.length &&
+                            normalizedTitle.lastIndexOf(normalizedKeyword) === (normalizedTitle.length - normalizedKeyword.length);
+                    } else if (mode === 'not_contains') {
+                        return normalizedTitle.indexOf(normalizedKeyword) === -1;
+                    } else {
+                        // contains (default)
+                        return normalizedTitle.indexOf(normalizedKeyword) !== -1;
+                    }
+                });
+            }
+        }
+
+        // キャッシュに保存
+        try {
+            CacheManager.put(cacheKey, filteredTasks, cachePublicRange);
+        } catch (e) {
+            console.warn('[getMobileUserTasks] Cache storage failed:', e);
+        }
+
+        return { data: filteredTasks, isCached: false };
+
+    } catch (error) {
+        console.error('[getMobileUserTasks] Error:', error);
+        throw error;
+    }
+}
+
 /**
  * フィルタオブジェクトを簡易ハッシュ化（キャッシュキー用）
  * @param {Object} filters
