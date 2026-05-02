@@ -1,7 +1,6 @@
 <div id="tab-attendance" class="page">
   <div class="center-align padding no-bottom-padding">
     <h6 id="attendance-current-date" class="no-margin bold font-number"></h6>
-    <p>読み込みが落ち着くまで少しまってから操作してください。突貫工事で開発したため貧弱です。優しい気持ちで操作してほしいです。ごめんなさい。</p>
   </div>
   <article class="border small-round padding center-align no-elevate top-margin background">
       <!-- <div class="medium-height medium-width">
@@ -15,8 +14,7 @@
       <button id="tab-attendance-cancel-btn" class="responsive transparent error-text" onclick="App.pages.attendance.cancelPunch()" style="display: none;">
         <span>取消</span>
       </button>
-      <p id="tab-attendance-status-text" class="small-text secondary-text no-margin top-margin bottom-margin"></p>
-      <p id="tab-attendance-location-note" class="small-text secondary-text top-margin no-margin"></p>
+      <p id="tab-attendance-status-text" class="small-text secondary-text top-margin"></p>
   </article>
 
   <fieldset class="border top-margin">
@@ -345,14 +343,9 @@
         const dates = this.getFestivalDates();
         const today = getJstDateString(new Date());
         const statusEl = document.getElementById('tab-attendance-status-text');
-        const noteEl = document.getElementById('tab-attendance-location-note');
         const actionBtn = document.getElementById('tab-attendance-action-btn');
         const cancelBtn = document.getElementById('tab-attendance-cancel-btn');
-
         const geofence = ((App.constants || {}).eventConfig || {}).ATTENDANCE_GEOFENCE || {};
-        if (noteEl) {
-          noteEl.textContent = `打刻は会場周辺 ${geofence.RADIUS_METERS || 200}m 以内でのみ有効です。`;
-        }
 
         DAY_CONFIGS.forEach((day) => {
           const fields = FIELD_MAP[day.key];
