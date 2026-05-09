@@ -78,16 +78,12 @@
       const [boardsRes, membersRes, currentMemberRes] = await Promise.all([
         callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.BOARDS, 'select', {}, null, false),
         callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {}, null, false),
-        callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {
-          where: { id: ['=', App.state.userId] }
-        }, null, false)
+        callGAS('getAuthenticatedMember', false)
       ]);
 
       App.state.data.boards = boardsRes?.data || boardsRes || [];
       App.state.data.members = membersRes?.data || membersRes || [];
-      const currentMemberRows = currentMemberRes?.data || currentMemberRes || [];
-      
-      const foundMember = currentMemberRows[0]
+      const foundMember = currentMemberRes
         || (App.state.data.members || []).find(function (member) { return member.id === App.state.userId; });
 
       if (!foundMember) {

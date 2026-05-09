@@ -309,10 +309,7 @@
 
       refreshData: async function () {
         try {
-          const res = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.MEMBERS, 'select', {
-            where: { id: ['=', App.state.userId] }
-          }, null, true);
-          const member = res?.data ? res.data[0] : (res[0] || null);
+          const member = await callGAS('getAuthenticatedMember', true);
           if (member) {
             App.state.data.currentMember = member;
             this.loadData(member, false);
