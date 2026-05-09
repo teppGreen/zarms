@@ -7,22 +7,13 @@ const scriptProperties = PropertiesService.getScriptProperties();
 const TABLE_NAMES = {
   LOGS: 'logs',
   BOARDS: 'boards',
-  NOTICES: 'notices',
   COMMENTS: 'comments',
-  DIRECTORIES: 'directories',
   APPS: 'apps',
-  LINKS: 'links',
   MEMBERS: 'members',
-  PLAN_ASSIGNMENTS: 'plan_assignments',
-  DIRECTORY_ASSIGNMENTS: 'directory_assignments',
-  SKILLS: 'skills',
-  SKILL_ASSIGNMENTS: 'skill_assignments',
   TASKS: 'tasks',
   LISTS: 'lists',
-  FILES: 'files',
   SYSTEM_UPDATES: 'system_updates',
-  QUESTIONS: 'questions',
-  PLANS: 'plans',
+  QUESTIONS: 'questions'
 };
 
 const KEY_LABELS = {
@@ -37,10 +28,6 @@ const KEY_LABELS = {
     PROCESSED_BY: '進行者',
     REVIEWED_BY: '確認者',
     RECEIVED_BY: '受領者'
-  },
-  // 後方互換のためのエイリアス（ASIGNEE_TYPE はタイポ）
-  get ASIGNEE_TYPE() {
-    return this.ASSIGNEE_TYPE;
   },
   PRIORITY: {
     LOW: '低',

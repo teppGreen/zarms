@@ -9,8 +9,8 @@
     "generate-clasp:prod": "node ../../scripts/generate-clasp-from-1password.js mobile-app prod",
     "cleanup-clasp": "node ../../scripts/cleanup-clasp.js mobile-app",
     "cleanup-lib-id": "node ../../scripts/cleanup-library-id.js mobile-app",
-    "deploy:dev": "npm run update-lib-id:dev && npm run generate-clasp:dev && clasp push --force && npm run cleanup-clasp && npm run cleanup-lib-id",
-    "deploy:prod": "npm run update-lib-id:prod && npm run generate-clasp:prod && clasp push --force && npm run cleanup-clasp && npm run cleanup-lib-id",
-    "watch:dev": "npm run update-lib-id:dev && npm run generate-clasp:dev && clasp push --watch"
+    "deploy:dev": "node ../../scripts/ensure-clasp-auth.js && npm run update-lib-id:dev && npm run generate-clasp:dev && npx @google/clasp push --force && npm run cleanup-clasp && npm run cleanup-lib-id",
+    "deploy:prod": "node ../../scripts/ensure-clasp-auth.js && npm run update-lib-id:prod && npm run generate-clasp:prod && npx @google/clasp push --force && npm run cleanup-clasp && npm run cleanup-lib-id",
+    "watch:dev": "node ../../scripts/ensure-clasp-auth.js && npm run update-lib-id:dev && npm run generate-clasp:dev && npx @google/clasp push --watch"
   }
 }

@@ -10,8 +10,7 @@
             // データのキャッシュ
             cachedTasks: [],
             cachedLogs: [],
-            cachedRelatedLogs: [],
-            historyVisibleCount: 10,
+            historyVisibleCount: 100,
             isLoadingMoreHistory: false,
 
             loadData: async function (isRefresh = false) {
@@ -41,39 +40,33 @@
                         }
                         if (initialData.logs && initialData.logs.length > 0 && this.cachedLogs.length === 0) {
                             this.cachedLogs = initialData.logs;
-                            this.cachedRelatedLogs = this.filterRelatedLogs(initialData.logs);
                             hasInitialData = true;
                             console.log('[Home] Initialized cachedLogs from initialData:', this.cachedLogs.length, 'items');
                         }
 
-                        // initialData があれば、即座にキャッシュから描画してから、バックグラウンドで最新データを取得
+                        // initialData があれば、即座にキャッシュから描画してから、必要な場合だけバックグラウンドで最新データを取得
                         if (hasInitialData) {
-                            this.cachedRelatedLogs = this.filterRelatedLogs(this.cachedLogs);
-                            this.historyVisibleCount = 10;
+                            this.historyVisibleCount = 100;
                             this.renderNextTasks(this.cachedTasks);
                             this.renderRelatedHistoryForHome();
                             this.applyPanelHeights();
                             this.updateHeader();
 
-                            // バックグラウンドで最新データを取得（100ms後）
-                            console.log('[Home] Initial data rendered. Fetching fresh data in background...');
-                            setTimeout(() => this.loadData(true), 100);
+                            const shouldRefreshFromServer = Boolean(initialData.hasAnyCachedData);
+                            if (shouldRefreshFromServer) {
+                                console.log('[Home] Initial data rendered from cache. Fetching fresh data in background...');
+                                setTimeout(() => this.loadData(true), 100);
+                            }
                             return;
                         }
                     }
-
-                    const sevenDaysAgo = new Date();
-                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-                    const isoDate = sevenDaysAgo.toISOString();
 
                     // クエリの準備
                     const tasksQuery = {
                         where: { task_status_key: ['!=', 'DONE'] }
                     };
                     const logsQuery = {
-                        where: {
-                            created_at: ['>', isoDate]
-                        },
+                        where: { created_by: ['=', App.state.userId] },
                         orderBy: { created_at: 'desc' },
                         limit: 100
                     };
@@ -96,8 +89,7 @@
                     // キャッシュ更新
                     this.cachedTasks = tasks;
                     this.cachedLogs = logs;
-                    this.cachedRelatedLogs = this.filterRelatedLogs(logs);
-                    this.historyVisibleCount = 10;
+                    this.historyVisibleCount = 100;
 
                     // 描画
                     this.renderNextTasks(tasks);
@@ -149,7 +141,7 @@
                     </header>
 
                     <div class="grid no-space">
-                        <div class="s12 m12 l12 small-margin">
+                        <div class="s12 m6 l6 small-margin">
                             <article class="padding">
                                 <nav class="">
                                     <h6 class="small bold">マイタスク</h6>
@@ -165,18 +157,18 @@
                             </article>
                         </div>
 
-                        <!-- <div class="s12 m6 l6 small-margin">
+                        <div class="s12 m6 l6 small-margin">
                            <article class="padding">
                                 <nav class="">
-                                        <h6 class="small bold">更新履歴</h6>
+                                        <h6 class="small bold">操作履歴</h6>
                                     <div class="max"></div>
-                                        <button class="chip" disabled>10件ずつ</button>
+                                        <button class="chip" disabled>直近100件</button>
                                 </nav>
-                                    <span class="small-text secondary-text">自分に関連する更新のみ表示</span>
+                                    <span class="small-text secondary-text">あなたがZARMS内で操作した履歴</span>
                                     <div id="home-related-history" class="shimmer-loading scroll top-margin ">
                                 </div>
                             </article>
-                        </div> -->
+                        </div>
                     </div>
                 `;
                 this.updateHeader();
@@ -190,7 +182,7 @@
                 const countdownEl = document.getElementById('home-event-countdown');
 
                 if (greetingEl) greetingEl.textContent = `${greeting}、${activeUser.display_name}さん｡`;
-                if (countdownEl) countdownEl.textContent = `リアル会場0日目(準備日)まで、残り${daysUntilEvent}日です。`;
+                if (countdownEl && daysUntilEvent > 0) countdownEl.textContent = `リアル会場0日目(準備日)まで、残り${daysUntilEvent}日です。`;
             },
 
             getGreeting: function () {
@@ -408,89 +400,45 @@
                 }
             },
 
-            // ---------------------------------------------------------
-            // 更新履歴 (Related History)
-            // ---------------------------------------------------------
-
-            filterRelatedLogs: function (logs) {
-                return (logs || []).filter((log) => this.isLogRelatedToCurrentUser(log));
-            },
-
-            isLogRelatedToCurrentUser: function (log) {
-                if (!log || !log.data) return false;
-
-                const userId = App.state.userId;
-                if (!userId) return false;
-
-                let parsed;
-                try {
-                    parsed = typeof log.data === 'string' ? JSON.parse(log.data) : log.data;
-                } catch (error) {
-                    return false;
-                }
-
-                const memberIds = new Set();
-                this.collectMemberIds(parsed, memberIds);
-                return memberIds.has(userId);
-            },
-
-            collectMemberIds: function (value, out) {
-                if (!value || !out) return;
-
-                if (Array.isArray(value)) {
-                    value.forEach((item) => this.collectMemberIds(item, out));
-                    return;
-                }
-
-                if (typeof value !== 'object') return;
-
-                Object.keys(value).forEach((key) => {
-                    const current = value[key];
-                    const lowerKey = String(key || '').toLowerCase();
-                    const isMemberKey =
-                        lowerKey === 'member_id' ||
-                        lowerKey.endsWith('_member_id') ||
-                        lowerKey.endsWith('_by') ||
-                        lowerKey === 'assign_to' ||
-                        lowerKey === 'mentioned_to' ||
-                        lowerKey === 'applied_by';
-
-                    if (isMemberKey && typeof current === 'string' && current) {
-                        out.add(current);
-                    }
-
-                    this.collectMemberIds(current, out);
-                });
-            },
-
             renderRelatedHistoryForHome: function () {
                 const container = document.getElementById('home-related-history');
                 if (!container) return;
                 container.classList.remove('shimmer-loading');
 
-                const logs = this.cachedRelatedLogs || [];
+                const logs = this.cachedLogs || [];
                 const visible = logs.slice(0, this.historyVisibleCount);
 
                 if (visible.length === 0) {
-                    container.innerHTML = '<div class="padding center-align secondary-text">関連する更新履歴はありません</div>';
+                    container.innerHTML = '<div class="padding center-align secondary-text">操作履歴はありません</div>';
                     return;
                 }
 
                 const listHtml = visible.map((log) => {
-                    const tableName = escapeHtml(log.table_name || 'unknown');
-                    const timestamp = log.created_at ? formatDateTimeForDisplay(new Date(log.created_at), 'MM/dd HH:mm') : '-';
-                    const summary = this.getLogSummary(log);
+                    const logId = this.getSafeDomId(log.id);
+                    const tableNameKey = this.normalizeLogTableName(log.table_name);
+                    const tableName = escapeHtml(this.getLogTableLabel(tableNameKey));
+                    const operationLabel = escapeHtml(this.getLogOperationLabel(log.operation_type_key));
+                    const timestamp = log.created_at ? formatDateTimeForDisplay(new Date(log.created_at), 'MM/dd(E) HH:mm') : '-';
+                    const remarkText = this.getLogRemarkText(log);
+                    const isTaskRow = this.isLogTaskRow(tableNameKey, log);
+                    const isBoardRow = this.isLogBoardRow(tableNameKey, log);
+                    const isClickable = isTaskRow || isBoardRow;
+                    const rowAttrs = isClickable
+                        ? `style="cursor: pointer;" onclick="App.pages.home.handleHistoryRowClick(event, this)"`
+                        : '';
+                    const tooltipHtml = this.renderLogDataTooltip(log);
+
                     return `
-                        <li class="small-margin">
-                            <article class="border small-round padding">
-                                <div class="row tiny-space middle-align">
-                                    <span class="chip small border">${tableName}</span>
-                                    <div class="max"></div>
-                                    <span class="small-text secondary-text">${timestamp}</span>
+                        <tr ${rowAttrs} data-table-name="${escapeHtmlAttribute(tableNameKey)}" data-record-id="${escapeHtmlAttribute(log.record_id || '')}">
+                            <td id="log-${logId}-operation" data-id="${escapeHtmlAttribute(log.id)}" style="width: 0; white-space: nowrap;"><span class="fill round left-padding right-padding">${operationLabel}</span></td>
+                            <td id="log-${logId}-table" data-id="${escapeHtmlAttribute(log.id)}" style="width: 0; white-space: nowrap;">${tableName}</td>
+                            <td id="log-${logId}-remark" data-id="${escapeHtmlAttribute(log.id)}">
+                                <div class="row tiny-space no-margin">
+                                    ${tooltipHtml}${remarkText}
                                 </div>
-                                <p class="small-text no-margin top-margin">${escapeHtml(summary)}</p>
-                            </article>
-                        </li>
+                            </td>
+                            <td id="log-${logId}-created-at" data-id="${escapeHtmlAttribute(log.id)}" class="right-align" style="width: 0; white-space: nowrap;">${escapeHtml(timestamp)}</td>
+                        </tr>
                     `;
                 }).join('');
 
@@ -499,15 +447,57 @@
                     ? `<div class="center-align top-margin"><button class="chip" ${this.isLoadingMoreHistory ? 'disabled' : ''} onclick="App.pages.home.loadMoreRelatedHistory()"><i>expand_more</i><span>もっと見る</span></button></div>`
                     : '';
 
-                container.innerHTML = `<ul class="no-margin no-padding">${listHtml}</ul>${moreButton}`;
+                container.innerHTML = `
+                    <table class="border small-text">
+                        <thead class="fixed surface-container-low">
+                            <tr>
+                                <th class="left-align">種別</th>
+                                <th class="left-align">場所</th>
+                                <th class="left-align">内容</th>
+                                <th class="right-align">日時</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${listHtml}
+                        </tbody>
+                    </table>
+                    ${moreButton}
+                `;
             },
 
             loadMoreRelatedHistory: function () {
                 if (this.isLoadingMoreHistory) return;
                 this.isLoadingMoreHistory = true;
-                this.historyVisibleCount += 10;
+                this.historyVisibleCount += 100;
                 this.renderRelatedHistoryForHome();
                 this.isLoadingMoreHistory = false;
+            },
+
+            handleHistoryRowClick: async function (event, rowEl) {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+
+                if (!rowEl) return;
+
+                const tableNameKey = this.normalizeLogTableName(rowEl.dataset.tableName || '');
+                const recordId = String(rowEl.dataset.recordId || '');
+
+                if (!recordId) return;
+
+                // table_name === 'tasks' かつ record_id があれば、record_id はタスクID
+                if (this.isLogTaskRow(tableNameKey, { record_id: recordId })) {
+                    await this.openTaskFromHome(recordId, 'my-board');
+                    return;
+                }
+
+                // table_name === 'boards' かつ record_id があれば、record_id はボードID
+                if (this.isLogBoardRow(tableNameKey, { record_id: recordId })) {
+                    if (App.utils.navigation && App.utils.navigation.switchTab) {
+                        await App.utils.navigation.switchTab(`board-${recordId}`);
+                    }
+                }
             },
 
             getLogSummary: function (log) {
@@ -530,6 +520,64 @@
                 }
 
                 return '更新されました';
+            },
+
+            getLogOperationLabel: function (operationTypeKey) {
+                const key = String(operationTypeKey || '').toUpperCase();
+                return LOG_OPERATION_LABELS[key] || key || '-';
+            },
+
+            getLogTableLabel: function (tableName) {
+                const key = this.normalizeLogTableName(tableName);
+                return TABLE_LABELS_JA[key] || tableName || '-';
+            },
+
+            normalizeLogTableName: function (tableName) {
+                return String(tableName || '').toLowerCase();
+            },
+
+            isLogTaskRow: function (tableNameKey, log) {
+                const key = this.normalizeLogTableName(tableNameKey);
+                return (key === TABLE_NAMES.TASKS || key === TABLE_NAMES.TASK) && !!String(log?.record_id || '');
+            },
+
+            isLogBoardRow: function (tableNameKey, log) {
+                const key = this.normalizeLogTableName(tableNameKey);
+                return (key === TABLE_NAMES.BOARDS || key === TABLE_NAMES.BOARD) && !!String(log?.record_id || '');
+            },
+
+            getLogRemarkText: function (log) {
+                const remark = log && log.remark !== undefined && log.remark !== null ? String(log.remark) : '';
+                return remark ? escapeHtml(remark) : '<span class="secondary-text">-</span>';
+            },
+
+            renderLogDataTooltip: function (log) {
+                const prettyJson = this.getPrettyLogData(log.data);
+                return `
+                    <div>
+                        <button class="transparent circle" type="button" aria-label="詳細" onclick="event.stopPropagation()">
+                            <i>tooltip</i>
+                        </button>
+                        <div class="tooltip right max">
+                            <code class="inverse-surface" style="word-break: break-word;">${escapeHtml(prettyJson)}</code>
+                        </div>
+                    </div>
+                `;
+            },
+
+            getSafeDomId: function (value) {
+                return String(value || '').replace(/[^A-Za-z0-9_-]/g, '_');
+            },
+
+            getPrettyLogData: function (data) {
+                if (data === null || data === undefined || data === '') return '-';
+
+                try {
+                    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+                    return JSON.stringify(parsed, null, 2);
+                } catch (error) {
+                    return typeof data === 'string' ? data : String(data);
+                }
             },
 
             toPlainText: function (html) {

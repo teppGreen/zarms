@@ -125,7 +125,7 @@
                     const headerHtml = `
                     <header class="small-margin no-padding">
                             <nav id="board-tab-header-${board.id}" class="no-margin no-padding row">
-                                <h3 class="bold small">${escapeHtml(board.name)}</h3>
+                                <h3 id="board-name-${board.id}" class="bold small">${escapeHtml(board.name)}</h3>
                                 <div class="max"></div>
                                 <span id="last-updated-board-${board.id}" class="small-text secondary-text"></span>
                                 ${window.refreshButtonHTML}
@@ -149,7 +149,7 @@
                                     <div class="tooltip bottom">スター</div>
                                 </button>
                                 <button class="circle transparent" id="btn-info-${board.id}">
-                                    <i>info</i>
+                                    <i>settings</i>
                                     <div class="tooltip bottom">ボード設定</div>
                                 </button>
                             </nav>
@@ -1180,6 +1180,13 @@
                 const btnInfo = document.getElementById(`btn-info-${board.id}`);
                 if (btnInfo) {
                     btnInfo.addEventListener('click', () => {
+                        this.openBoardSettingsModal(board.id);
+                    });
+                }
+
+                const boardName = document.getElementById(`board-name-${board.id}`);
+                if (boardName) {
+                    boardName.addEventListener('click', (e) => {
                         this.openBoardSettingsModal(board.id);
                     });
                 }

@@ -1,15 +1,65 @@
 <script>
   (function () {
-    // カレンダーURLを設定から取得
-    document.addEventListener('DOMContentLoaded', function () {
-      const iframe = document.getElementById('calendar-iframe');
-      if (iframe) {
-        iframe.src = EXTERNAL_URLS.CALENDAR;
-      }
+    App.pages.calendar = {
+      isResizeHandlerBound: false,
+      resizeRafId: null,
 
-      const link = document.getElementById('add-calendar');
-      if (link) {
-        link.href = EXTERNAL_URLS.ADD_CALENDAR;
+      init: function () {
+        const iframe = document.getElementById('calendar-iframe');
+        if (iframe) {
+          iframe.src = EXTERNAL_URLS.CALENDAR;
+        }
+
+        const link = document.getElementById('add-calendar');
+        if (link) {
+          link.href = EXTERNAL_URLS.ADD_CALENDAR;
+        }
+
+        this.setupResizeHandler();
+        requestAnimationFrame(() => this.applyLayoutHeight());
+      },
+
+      applyLayoutHeight: function () {
+        const iframe = document.getElementById('calendar-iframe');
+        if (!iframe) return;
+        try {
+          const mainElement = document.querySelector('main');
+          if (!mainElement) return;
+          const windowHeight = window.innerHeight;
+          const rect = iframe.getBoundingClientRect();
+          if (rect.top <= 0) return;
+          const mainStyle = window.getComputedStyle(mainElement);
+          const marginBottom = parseFloat(mainStyle.marginBottom) || 0;
+          const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
+          const offsetBottom = marginBottom + paddingBottom + 32;
+          const newHeight = windowHeight - rect.top - offsetBottom;
+          if (newHeight > 0) {
+            iframe.style.height = `${newHeight}px`;
+          }
+        } catch (error) {
+          console.error('[calendar] applyLayoutHeight failed:', error);
+        }
+      },
+
+      setupResizeHandler: function () {
+        if (this.isResizeHandlerBound) return;
+        this.isResizeHandlerBound = true;
+
+        window.addEventListener('resize', () => {
+          const tab = document.getElementById('tab-calendar');
+          if (tab && tab.style.display !== 'none') {
+            if (this.resizeRafId) cancelAnimationFrame(this.resizeRafId);
+            this.resizeRafId = requestAnimationFrame(() => {
+              this.applyLayoutHeight();
+            });
+          }
+        });
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+      if (App.pages.calendar && typeof App.pages.calendar.init === 'function') {
+        App.pages.calendar.init();
       }
     });
   })();

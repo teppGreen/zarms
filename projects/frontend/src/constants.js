@@ -25,6 +25,35 @@ const TABLE_NAMES = {
   PLANS: 'plans',
 };
 
+const TABLE_LABELS_JA = {
+  [TABLE_NAMES.LOGS]: 'ログ',
+  [TABLE_NAMES.BOARDS]: 'ボード',
+  [TABLE_NAMES.NOTICES]: 'お知らせ',
+  [TABLE_NAMES.COMMENTS]: 'コメント',
+  [TABLE_NAMES.DIRECTORIES]: '組織',
+  [TABLE_NAMES.APPS]: 'アプリ',
+  [TABLE_NAMES.LINKS]: 'リンク',
+  [TABLE_NAMES.MEMBERS]: '人物',
+  [TABLE_NAMES.PLAN_ASSIGNMENTS]: '担当企画',
+  [TABLE_NAMES.DIRECTORY_ASSIGNMENTS]: '所属組織',
+  [TABLE_NAMES.SKILLS]: '技能',
+  [TABLE_NAMES.SKILL_ASSIGNMENTS]: '保有技能',
+  [TABLE_NAMES.TASKS]: 'タスク',
+  [TABLE_NAMES.LISTS]: 'リスト',
+  [TABLE_NAMES.FILES]: 'ファイル',
+  [TABLE_NAMES.SYSTEM_UPDATES]: 'システムアップデート',
+  [TABLE_NAMES.QUESTIONS]: '問い合わせ',
+  [TABLE_NAMES.PLANS]: '企画'
+};
+
+const LOG_OPERATION_LABELS = {
+  INSERT: '作成',
+  BULKINSERT: '一括作成',
+  BULK_INSERT: '一括作成',
+  UPDATE: '更新',
+  REMOVE: '削除'
+};
+
 const KEY_LABELS = {
   TASK_STATUS: {
     TODO: '未着手',

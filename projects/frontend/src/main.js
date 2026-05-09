@@ -48,6 +48,8 @@ function loadAppHtml(activeUser, urlParams) {
     activeUser: activeUser,
     isDevelopment: isDevelopment(urlParams),
     TABLE_NAMES: TABLE_NAMES,
+    TABLE_LABELS_JA: TABLE_LABELS_JA,
+    LOG_OPERATION_LABELS: LOG_OPERATION_LABELS,
     KEY_LABELS: KEY_LABELS,
     EVENT_CONFIG: EVENT_CONFIG,
     EXTERNAL_URLS: EXTERNAL_URLS,
@@ -208,10 +210,6 @@ function _checkRequiresReAgreement(userAgreementData, policyUpdateDates) {
  * @returns {Object} { tasks, logs, boards, members, isCached }
  */
 function _prefetchMasterData(userId) {
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const isoDate = sevenDaysAgo.toISOString();
-  
   const queries = [
     {
       key: 'tasks',
@@ -228,7 +226,7 @@ function _prefetchMasterData(userId) {
       tableName: TABLE_NAMES.LOGS,
       operation: 'select',
       dataObject: {
-        where: { created_at: ['>', isoDate] },
+        where: { created_by: ['=', userId] },
         orderBy: { created_at: 'desc' },
         limit: 100
       },
@@ -259,6 +257,13 @@ function _prefetchMasterData(userId) {
 
   const batchResult = handleBatchDatabaseProcess(userId, queries);
   const r = batchResult.results || {};
+  const hasAnyCachedData = Boolean(
+    r.tasks?.isCached ||
+    r.logs?.isCached ||
+    r.boards?.isCached ||
+    r.members?.isCached ||
+    r.systemUpdates?.isCached
+  );
 
   return {
     tasks: (r.tasks?.data || r.tasks || []),
@@ -266,6 +271,7 @@ function _prefetchMasterData(userId) {
     boards: (r.boards?.data || r.boards || []),
     members: (r.members?.data || r.members || []),
     systemUpdates: (r.systemUpdates?.data || r.systemUpdates || []),
+    hasAnyCachedData: hasAnyCachedData,
     isCached: !batchResult.hasAnyUncached
   };
 }
