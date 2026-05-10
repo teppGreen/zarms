@@ -19,17 +19,20 @@ function loadAuthFile() {
   const raw = fs.readFileSync(authPath, 'utf8');
   const parsed = JSON.parse(raw);
 
-  if (parsed && typeof parsed.token === 'object' && parsed.token) {
-    return { parsed, token: parsed.token, migrated: false };
-  }
-
+  // tokens.default を最優先（最新のトークン）
   if (parsed && parsed.tokens && typeof parsed.tokens === 'object') {
     const candidate = parsed.tokens.default || Object.values(parsed.tokens).find((value) => value && typeof value === 'object');
-    if (candidate) {
+    if (candidate && candidate.access_token) {
       return { parsed, token: candidate, migrated: true };
     }
   }
 
+  // 次に token （旧形式）を試す
+  if (parsed && typeof parsed.token === 'object' && parsed.token && parsed.token.access_token) {
+    return { parsed, token: parsed.token, migrated: false };
+  }
+
+  // 最後に top-level の access_token
   if (parsed && typeof parsed.access_token === 'string') {
     return { parsed, token: parsed, migrated: true };
   }
