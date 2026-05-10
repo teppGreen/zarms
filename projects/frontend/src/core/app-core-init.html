@@ -243,11 +243,15 @@
         if (App.utils.navigation.switchTab) {
           (async () => {
             await App.utils.navigation.switchTab(`board-${currentBoardId}`, false, false, true);
-            // 遷移後にタスクを開く
-            await App.utils.navigation.tryOpenTask(params.task_id, currentBoardId);
+            // 遷移後にタスクを開く（ボード内にタスクが見つからない場合はフォールバック）
+            await App.utils.navigation.tryOpenTask(params.task_id, currentBoardId, {
+              fallbackToMyBoard: true
+            });
           })();
         } else {
-          App.utils.navigation.tryOpenTask(params.task_id, currentBoardId);
+          App.utils.navigation.tryOpenTask(params.task_id, currentBoardId, {
+            fallbackToMyBoard: true
+          });
         }
       } else {
         // 万が一関数がない場合はフォールバック
