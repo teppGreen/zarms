@@ -1315,11 +1315,29 @@
         App.modals.selectMembers.open({
           multiSelect: false,
           preSelected: currentMemberId ? [currentMemberId] : [],
+          showApplyAll: true,
           callback: (selectedIds) => {
             if (selectedIds && selectedIds.length > 0) {
               this.updateMemberField(role, selectedIds[0]);
             }
+          },
+          applyAllCallback: (selectedIds) => {
+            if (selectedIds && selectedIds.length > 0) {
+              this.applyMemberToAllRoles(selectedIds[0]);
+            }
           }
+        });
+      },
+
+      /**
+       * 選択したメンバーをタスクの担当者全体に反映する
+       * @param {string} memberId - メンバーID
+       */
+      applyMemberToAllRoles: function (memberId) {
+        const roles = ['created_by', 'processed_by', 'reviewed_by', 'received_by'];
+
+        roles.forEach((role) => {
+          this.updateMemberField(role, memberId);
         });
       },
 
