@@ -35,6 +35,18 @@
             },
 
             /**
+             * 右隣のカラムIDを取得する
+             */
+            getNextStatusId: function (statusId) {
+                const statusOrder = ['todo', 'in-progress', 'in-review', 'done'];
+                const currentIndex = statusOrder.indexOf(statusId);
+                if (currentIndex < 0 || currentIndex >= statusOrder.length - 1) {
+                    return null;
+                }
+                return statusOrder[currentIndex + 1];
+            },
+
+            /**
              * マイボードフィルタを初期化（初回のみ）
              */
             initializeMyBoardFilters: function (filterByActiveUser = true) {
@@ -462,8 +474,14 @@
                                     <div class="row tiny-space s12 no-round left-margin right-margin">
                                         <i class="tiny circle ${column.color}"></i>
                                         <span class="bold">${column.title}</span>
-                                        <div class="max"></div>
                                         <span class="font-number">${countText}</span>
+                                        <div class="max"></div>
+                                        ${(!isLoading && column.id !== 'done') ? `
+                                        <button class="small circle transparent" ${countText === 0 ? 'disabled' : ''} onclick="App.pages.boards.moveColumnTasksRight('${boardId}', '${column.id}')">
+                                            <i>Arrow_Forward</i>
+                                            <div class="tooltip left">ステータスを一括移動</div>
+                                        </button>
+                                        ` : ''}
                                     </div>
                                     <div class="s12 scroll no-padding kanban-column-items" data-status-id="${column.id}" data-board-id="${boardId}" id="kanban-${boardId}-${column.id}-list">
                                         ${itemsHtml}
@@ -716,8 +734,8 @@
                                                 <span>複製する</span>
                                             </li>
                                             <li class="row no-margin" data-action="delete">
-                                                <i>delete</i>
-                                                <span>削除する</span>
+                                                <i class="error-text">delete</i>
+                                                <span class="error-text">削除する</span>
                                             </li>
                                         </menu>
                                     </div>
@@ -869,6 +887,109 @@
                 this.handleTaskDrop(taskId, targetStatusId, boardId, () => {
                     this.renderKanban(boardId);
                 });
+            },
+
+            /**
+             * 指定列のタスクを右隣のステータスへ一括移動する
+             */
+            moveColumnTasksRight: async function (boardId, sourceStatusId) {
+                if (!boardId || !sourceStatusId) {
+                    return;
+                }
+
+                const targetStatusId = this.getNextStatusId(sourceStatusId);
+                if (!targetStatusId) {
+                    return;
+                }
+
+                const sourceStatusKey = this.statusMapping[sourceStatusId];
+                const targetStatusKey = this.statusMapping[targetStatusId];
+                if (!sourceStatusKey || !targetStatusKey) {
+                    return;
+                }
+
+                // 進行中の再読込を止めて、更新競合を避ける
+                if (typeof refreshDataAbortController !== 'undefined' && refreshDataAbortController) {
+                    console.log('[moveColumnTasksRight] refreshDataを中止します');
+                    refreshDataAbortController.aborted = true;
+                    refreshDataAbortController = null;
+                }
+
+                const boardTasks = this.cachedBoardTasks[boardId] || [];
+                const visibleTasks = (boardId === 'my-board' && this.myBoardFilters)
+                    ? this.filterMyBoardTasks(boardTasks)
+                    : boardTasks;
+                const targetTasks = visibleTasks.filter(task => task.task_status_key === sourceStatusKey);
+
+                if (targetTasks.length === 0) {
+                    return;
+                }
+
+                const taskIds = targetTasks.map(task => task.id);
+                const oldStatusMap = new Map(targetTasks.map(task => [task.id, task.task_status_key]));
+
+                const applyStatusToCache = (tasks) => {
+                    if (!Array.isArray(tasks)) {
+                        return;
+                    }
+                    tasks.forEach(task => {
+                        if (task && oldStatusMap.has(task.id)) {
+                            task.task_status_key = targetStatusKey;
+                        }
+                    });
+                };
+
+                // Optimistic UI: ローカルキャッシュを先に更新
+                applyStatusToCache(boardTasks);
+                if (boardId !== 'my-board') {
+                    applyStatusToCache(this.cachedBoardTasks['my-board']);
+                }
+                taskIds.forEach(taskId => {
+                    updateLocalData(TABLE_NAMES.TASKS, taskId, { task_status_key: targetStatusKey });
+                });
+
+                this.renderKanban(boardId);
+                if (this.currentBoardId === 'my-board' && boardId !== 'my-board') {
+                    this.renderKanban('my-board');
+                }
+
+                try {
+                    const result = await callGAS('handleDatabaseProcess', App.state.userId, TABLE_NAMES.TASKS, 'update', {
+                        where: { id: ['in', taskIds] },
+                        set: { task_status_key: targetStatusKey }
+                    }, 'タスクを一括移動');
+
+                    if (!result || (Array.isArray(result) && result.length === 0)) {
+                        throw new Error('No data returned from bulk update');
+                    }
+                } catch (error) {
+                    // ロールバック: 変更前のステータスに戻す
+                    const restoreStatusToCache = (tasks) => {
+                        if (!Array.isArray(tasks)) {
+                            return;
+                        }
+                        tasks.forEach(task => {
+                            if (task && oldStatusMap.has(task.id)) {
+                                task.task_status_key = oldStatusMap.get(task.id);
+                            }
+                        });
+                    };
+
+                    restoreStatusToCache(boardTasks);
+                    if (boardId !== 'my-board') {
+                        restoreStatusToCache(this.cachedBoardTasks['my-board']);
+                    }
+                    taskIds.forEach(taskId => {
+                        updateLocalData(TABLE_NAMES.TASKS, taskId, { task_status_key: oldStatusMap.get(taskId) });
+                    });
+
+                    this.renderKanban(boardId);
+                    if (this.currentBoardId === 'my-board' && boardId !== 'my-board') {
+                        this.renderKanban('my-board');
+                    }
+
+                    App.utils.error.handle(error);
+                }
             },
 
             /**
@@ -1533,8 +1654,8 @@
                             <span>複製する</span>
                         </li>
                         <li class="row no-margin" data-action="delete">
-                            <i>delete</i>
-                            <span>削除する</span>
+                            <i class="error-text">delete</i>
+                            <span class="error-text">削除する</span>
                         </li>
                     </menu>
                 </article>
