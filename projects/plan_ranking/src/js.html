@@ -1,0 +1,176 @@
+<script>
+    const templateVariablesElement = document.getElementById('template-variables');
+    const templateVariables = templateVariablesElement ? JSON.parse(templateVariablesElement.textContent || '{}') : {};
+    const PAGE_IDS = ['state-loading', 'state-error', 'state-result'];
+    const APP_TITLE = String(templateVariables.APP_TITLE || '');
+    const PUBLIC_SHEET_URL = String(templateVariables.PUBLIC_SHEET_URL || '');
+    const FALLBACK_ERROR_MESSAGE = '集計結果を取得できませんでした。再読み込みしてください。';
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initializePage();
+        loadRankingData();
+    });
+
+    function initializePage() {
+        const title = document.getElementById('page-title');
+        if (title) {
+            title.textContent = APP_TITLE;
+        }
+
+        const retryButton = document.getElementById('retry-button');
+        if (retryButton) {
+            retryButton.addEventListener('click', function () {
+                showLoadingState();
+                loadRankingData();
+            });
+        }
+
+        const publicSheetLink = document.getElementById('public-sheet-link');
+        if (publicSheetLink) {
+            if (PUBLIC_SHEET_URL) {
+                publicSheetLink.href = PUBLIC_SHEET_URL;
+                publicSheetLink.hidden = false;
+            } else {
+                publicSheetLink.hidden = true;
+            }
+        }
+    }
+
+    function loadRankingData() {
+        showLoadingState();
+
+        google.script.run
+            .withSuccessHandler(function (result) {
+                if (!result || result.status !== 'ok') {
+                    renderError(result && result.error ? result.error : 'データを取得できませんでした。');
+                    return;
+                }
+
+                renderResult(result);
+            })
+            .withFailureHandler(function (error) {
+                renderError(error && error.message ? error.message : FALLBACK_ERROR_MESSAGE);
+            })
+            .getInitialPlanRankingData();
+    }
+
+    function showLoadingState() {
+        setVisibleState('state-loading');
+    }
+
+    function renderError(message) {
+        const errorMessage = document.getElementById('error-message');
+        if (errorMessage) {
+            errorMessage.textContent = message || FALLBACK_ERROR_MESSAGE;
+        }
+
+        setVisibleState('state-error');
+    }
+
+    function renderResult(result) {
+        const member = result.member || {};
+        const plan = result.plan || {};
+
+        setText('plan-num', plan.plan_num);
+        setText('plan-name', plan.plan_name);
+        setText('type-ranking-label', `${plan.plan_type}企画内ランク`);
+        setText('member-display-name', member.display_name);
+        setText('member-role', member.role);
+        setText('directory-name', plan.directory_name);
+        setText('count-num', formatInteger(plan.count_num));
+        setText('count-ratio', formatPercent(plan.count_ratio));
+        setText('general-ranking', formatRank(plan.ranking_general_num));
+        setText('type-ranking', formatRank(plan.ranking_type_num));
+
+        setVisibleState('state-result');
+    }
+
+    function setVisibleState(stateId) {
+        PAGE_IDS.forEach(function (id) {
+            const page = document.getElementById(id);
+            if (page) {
+                page.classList.remove('active');
+            }
+        });
+
+        const activePage = document.getElementById(stateId);
+        if (!activePage) {
+            return;
+        }
+
+        if (typeof ui === 'function') {
+            ui(`#${stateId}`);
+        } else {
+            activePage.classList.add('active');
+        }
+    }
+
+    function setText(id, value) {
+        const element = document.getElementById(id);
+        if (!element) {
+            return;
+        }
+
+        element.textContent = String(value == null ? '' : value);
+    }
+
+    function formatInteger(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) {
+            return '0';
+        }
+
+        return new Intl.NumberFormat('ja-JP').format(number);
+    }
+
+    function formatPercent(value) {
+        const ratio = normalizeRatio(value);
+        if (ratio === null) {
+            return '0.00%';
+        }
+
+        return new Intl.NumberFormat('ja-JP', {
+            style: 'percent',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(ratio);
+    }
+
+    function normalizeRatio(value) {
+        if (value === null || value === undefined || value === '') {
+            return null;
+        }
+
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            if (value > 1) {
+                return value / 100;
+            }
+            return value;
+        }
+
+        const text = String(value).trim().replace(/%$/, '');
+        if (!text) {
+            return null;
+        }
+
+        const parsed = Number(text);
+        if (!Number.isFinite(parsed)) {
+            return null;
+        }
+
+        if (parsed > 1) {
+            return parsed / 100;
+        }
+
+        return parsed;
+    }
+
+    function formatRank(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) {
+            return '未集計';
+        }
+
+        return `No.${number}`;
+    }
+</script>
